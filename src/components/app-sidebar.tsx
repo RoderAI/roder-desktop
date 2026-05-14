@@ -1,4 +1,4 @@
-import { Archive, Boxes, ChevronLeft, ChevronRight, Folder, GitBranch, Pin, Search, Send, SidebarIcon } from "lucide-react";
+import { Archive, Boxes, ChevronLeft, ChevronRight, Folder, GitBranch, PanelLeftClose, Pin, Search, Send } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import type { GodeThread } from "@/types/gode";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ type AppSidebarProps = {
   onNewThread: () => void;
   onBack: () => void;
   onForward: () => void;
+  onClose: () => void;
   canGoBack: boolean;
   canGoForward: boolean;
 };
@@ -38,6 +39,7 @@ export function AppSidebar({
   onNewThread,
   onBack,
   onForward,
+  onClose,
   canGoBack,
   canGoForward,
 }: AppSidebarProps): React.JSX.Element {
@@ -76,7 +78,9 @@ export function AppSidebar({
       style={{ width }}
     >
       <div className="flex h-[64px] items-center gap-4 px-5 pl-[104px]">
-        <SidebarIcon className="size-4 opacity-70" />
+        <button className="no-drag rounded-md p-1 opacity-70 hover:bg-sidebar-accent hover:opacity-100" aria-label="Hide sidebar" onClick={onClose}>
+          <PanelLeftClose className="size-4" />
+        </button>
         <Search className="size-5 opacity-70" />
         <div className="ml-auto flex items-center gap-3 opacity-60">
           <button className="rounded-md p-1 disabled:opacity-30" disabled={!canGoBack} onClick={onBack}>

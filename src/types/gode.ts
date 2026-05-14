@@ -168,6 +168,7 @@ declare global {
       browserToggleAnnotation: () => Promise<BrowserSnapshot>;
       browserSetBounds: (bounds: BrowserBounds) => Promise<BrowserSnapshot>;
       browserSnapshot: () => Promise<BrowserSnapshot>;
+      canvasSavePng: (dataUrl: string) => Promise<ResolvedDesktopFile>;
       codexAccount: () => Promise<CodexAccountSnapshot>;
       codexLogin: () => Promise<CodexAccountSnapshot>;
       codexLogout: () => Promise<CodexAccountSnapshot>;
