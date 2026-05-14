@@ -67,7 +67,7 @@ export function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className="no-drag size-8 shrink-0 rounded-md text-muted-foreground active:scale-95"
+            className="no-drag size-8 shrink-0 translate-y-[4px] rounded-md text-muted-foreground active:scale-95"
             aria-label="Show sidebar"
             title="Show sidebar"
             onClick={onToggleSidebar}
