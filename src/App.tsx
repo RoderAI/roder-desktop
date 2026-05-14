@@ -152,6 +152,7 @@ export function App(): React.JSX.Element {
               onScrollToBottom={followBottom}
               onAttachmentsChange={setComposerAttachments}
               onSend={sendPrompt}
+              onStop={agent.stopTurn}
             />
             <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-border px-8 text-xs text-muted-foreground">
               <Laptop className="size-4" />

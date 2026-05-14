@@ -39,6 +39,13 @@ export const godeIpc = {
     }
     return window.godeDesktop.request("turn/start", { threadId, prompt });
   },
+  steerTurn: (threadId: string, expectedTurnId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
+    const input = turnInput(prompt, attachments);
+    const params = input.length > 0 ? { threadId, expectedTurnId, input } : { threadId, expectedTurnId, prompt };
+    return window.godeDesktop.request("turn/steer", params);
+  },
+  interruptTurn: (threadId: string, turnId?: string) =>
+    window.godeDesktop.request("turn/interrupt", { threadId, turnId: turnId || undefined }),
   listModels: () => window.godeDesktop.request("model/list", {}) as Promise<ModelListResult>,
   onStatus: (callback: (status: GodeStatus) => void) => window.godeDesktop.onStatus(callback),
   onNotification: window.godeDesktop.onNotification,
