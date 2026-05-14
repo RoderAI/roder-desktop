@@ -95,7 +95,9 @@ export function App(): React.JSX.Element {
           thread={activeThread}
           status={agent.status}
           activeTool={activeTool}
+          sidebarOpen={sidebarOpen}
           onRestart={() => void agent.restart()}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
           onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
           onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
