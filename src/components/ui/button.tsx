@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Button as BaseButton } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -28,15 +28,29 @@ const buttonVariants = cva(
   },
 );
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
+export type ButtonProps = React.ComponentPropsWithoutRef<typeof BaseButton> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   };
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
+export const Button = React.forwardRef<React.ElementRef<typeof BaseButton>, ButtonProps>(
+  ({ asChild = false, children, className, variant, size, ...props }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+      return (
+        <BaseButton
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          render={children}
+          {...props}
+        />
+      );
+    }
+
+    return (
+      <BaseButton className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
+        {children}
+      </BaseButton>
+    );
   },
 );
 
