@@ -43,6 +43,7 @@ type GodeStore = {
   workspaceRecents: WorkspaceFolder[];
   appearance: SystemAppearance;
   busy: boolean;
+  activeTurnId: string;
   hydrated: boolean;
   error: string | null;
   bootstrap: () => Promise<void>;
@@ -52,6 +53,7 @@ type GodeStore = {
   goForward: () => Promise<void>;
   newThread: () => Promise<void>;
   sendPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
+  stopTurn: () => Promise<void>;
   restart: () => Promise<void>;
   setSelectedModel: (model: string) => void;
   setModelVisibility: (modelId: string, visible: boolean) => void;
@@ -129,6 +131,7 @@ export const useGodeStore = create<GodeStore>()(
       workspaceRecents: [],
       appearance: "light",
       busy: false,
+      activeTurnId: "",
       hydrated: false,
       error: null,
 
@@ -288,6 +291,7 @@ export const useGodeStore = create<GodeStore>()(
         }
 
         let threadId = get().activeThreadId;
+        const steering = get().busy && threadId !== "" && get().activeTurnId !== "";
         set({ busy: true, error: null });
 
         try {
@@ -320,9 +324,26 @@ export const useGodeStore = create<GodeStore>()(
             },
           }));
 
+          if (steering) {
+            await godeIpc.steerTurn(threadId, get().activeTurnId, text, attachments);
+            return;
+          }
+
           await godeIpc.startTurn(threadId, text, attachments);
         } catch (error) {
-          set({ busy: false, error: (error as Error).message });
+          set({ busy: steering ? get().busy : false, error: (error as Error).message });
+        }
+      },
+
+      stopTurn: async () => {
+        const state = get();
+        if (!state.activeThreadId || !state.activeTurnId) {
+          return;
+        }
+        try {
+          await godeIpc.interruptTurn(state.activeThreadId, state.activeTurnId);
+        } catch (error) {
+          set({ error: (error as Error).message });
         }
       },
 
@@ -430,6 +451,17 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
     };
   }
 
+  if (notification.method === "turn/started") {
+    const threadId = String(params.threadId ?? state.activeThreadId);
+    const turn = isRecord(params.turn) ? params.turn : {};
+    const turnId = String(turn.id ?? "");
+    return {
+      activeThreadId: threadId || state.activeThreadId,
+      activeTurnId: turnId || state.activeTurnId,
+      busy: true,
+    };
+  }
+
   if (notification.method === "item/agentMessage/delta") {
     const threadId = String(params.threadId ?? state.activeThreadId);
     const itemId = String(params.itemId ?? "");
@@ -479,7 +511,12 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
   }
 
   if (notification.method === "turn/completed") {
-    return { busy: false };
+    const turn = isRecord(params.turn) ? params.turn : {};
+    const turnId = String(turn.id ?? "");
+    return {
+      busy: false,
+      activeTurnId: turnId === state.activeTurnId || !turnId ? "" : state.activeTurnId,
+    };
   }
 
   if (notification.method === "thread/status/changed") {

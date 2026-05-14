@@ -1,4 +1,4 @@
-import { ArrowDown, Check, ChevronDown, FileText, ImageIcon, Plus, Search, X } from "lucide-react";
+import { ArrowDown, Check, ChevronDown, FileText, ImageIcon, Plus, Search, Square, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { DesktopAttachment, GodeModel, GodeThread, ReasoningEffort, WorkspaceFolder } from "@/types/gode";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -30,6 +30,7 @@ type ComposerProps = {
   onScrollToBottom: () => void;
   onAttachmentsChange: (attachments: DesktopAttachment[]) => void;
   onSend: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
+  onStop: () => Promise<void>;
 };
 
 export function Composer({
@@ -49,6 +50,7 @@ export function Composer({
   onScrollToBottom,
   onAttachmentsChange,
   onSend,
+  onStop,
 }: ComposerProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [dragActive, setDragActive] = useState(false);
@@ -70,7 +72,7 @@ export function Composer({
 
   async function submit(): Promise<void> {
     const value = prompt.trim();
-    if ((!value && attachments.length === 0) || busy) {
+    if (!value && attachments.length === 0) {
       return;
     }
     const submittedAttachments = attachments;
@@ -188,8 +190,7 @@ export function Composer({
           <Textarea
             ref={textareaRef}
             value={prompt}
-            placeholder="Send follow-up"
-            disabled={busy}
+            placeholder={busy ? "Queue a follow-up or steer the current run" : "Send follow-up"}
             className="min-h-[64px] overflow-hidden border-0 bg-transparent px-1 py-2 text-[16px] shadow-none ring-0 focus-visible:ring-0"
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
@@ -209,13 +210,26 @@ export function Composer({
             >
               <Plus className="size-5" />
             </Button>
-            <ModelPicker
-              models={models}
-              selectedModel={selectedModel}
-              selectedReasoning={selectedReasoning}
-              onChange={onSelectedModelChange}
-              onCycleReasoning={onCycleReasoning}
-            />
+            <div className="flex items-center gap-2">
+              {busy && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  aria-label="Stop inference"
+                  onClick={() => void onStop()}
+                >
+                  <Square className="size-4 fill-current" />
+                </Button>
+              )}
+              <ModelPicker
+                models={models}
+                selectedModel={selectedModel}
+                selectedReasoning={selectedReasoning}
+                onChange={onSelectedModelChange}
+                onCycleReasoning={onCycleReasoning}
+              />
+            </div>
           </div>
         </div>
       </div>
