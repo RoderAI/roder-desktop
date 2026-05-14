@@ -1,5 +1,5 @@
 import { ArrowDown, Check, ChevronDown, FileText, ImageIcon, Plus, Search, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { DesktopAttachment, GodeModel, GodeThread, ReasoningEffort, WorkspaceFolder } from "@/types/gode";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { WorkspacePicker } from "@/components/workspace-picker";
@@ -53,6 +53,20 @@ export function Composer({
   const [prompt, setPrompt] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  function resizeTextarea(): void {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [prompt]);
 
   async function submit(): Promise<void> {
     const value = prompt.trim();
@@ -158,7 +172,7 @@ export function Composer({
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2 px-3 py-2">
+        <div className="px-3 py-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -171,20 +185,12 @@ export function Composer({
               event.currentTarget.value = "";
             }}
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9 shrink-0 rounded-full text-muted-foreground"
-            aria-label="Attach files"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Plus className="size-5" />
-          </Button>
           <Textarea
+            ref={textareaRef}
             value={prompt}
             placeholder="Send follow-up"
             disabled={busy}
-            className="max-h-36 min-h-[44px] border-0 bg-transparent px-1 py-2 text-[16px] shadow-none ring-0 focus-visible:ring-0"
+            className="min-h-[64px] overflow-hidden border-0 bg-transparent px-1 py-2 text-[16px] shadow-none ring-0 focus-visible:ring-0"
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -193,13 +199,24 @@ export function Composer({
               }
             }}
           />
-          <ModelPicker
-            models={models}
-            selectedModel={selectedModel}
-            selectedReasoning={selectedReasoning}
-            onChange={onSelectedModelChange}
-            onCycleReasoning={onCycleReasoning}
-          />
+          <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 shrink-0 rounded-full text-muted-foreground"
+              aria-label="Attach files"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus className="size-5" />
+            </Button>
+            <ModelPicker
+              models={models}
+              selectedModel={selectedModel}
+              selectedReasoning={selectedReasoning}
+              onChange={onSelectedModelChange}
+              onCycleReasoning={onCycleReasoning}
+            />
+          </div>
         </div>
       </div>
     </div>
