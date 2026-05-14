@@ -44,6 +44,7 @@ export type GodeItem = {
   type: "userMessage" | "agentMessage" | "toolMessage" | "toolCall" | "reasoning" | "compaction" | "error" | string;
   text?: string;
   status?: string;
+  phase?: string;
   payload?: unknown;
   raw?: unknown;
   toolName?: string;
@@ -70,6 +71,7 @@ export type ConversationMessage = {
   role: "user" | "assistant" | "system" | "tool";
   text: string;
   status?: "streaming" | "complete" | "failed";
+  phase?: string;
   toolName?: string;
   toolCallId?: string;
   toolStatus?: "running" | "complete" | "failed";
