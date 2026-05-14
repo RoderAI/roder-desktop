@@ -77,8 +77,13 @@ export function AppSidebar({
       className="drag-region relative z-20 flex h-screen shrink-0 flex-col overflow-visible border-r border-border bg-sidebar text-sidebar-foreground"
       style={{ width }}
     >
-      <div className="flex h-[64px] items-center gap-4 px-5 pl-[104px]">
-        <button className="no-drag rounded-md p-1 opacity-70 hover:bg-sidebar-accent hover:opacity-100" aria-label="Hide sidebar" onClick={onClose}>
+      <div className="flex h-[64px] items-center gap-3 px-5 pl-[104px]">
+        <button
+          className="no-drag flex size-8 items-center justify-center rounded-md opacity-70 transition-colors hover:bg-sidebar-accent hover:opacity-100 active:scale-95"
+          aria-label="Hide sidebar"
+          title="Hide sidebar"
+          onClick={onClose}
+        >
           <PanelLeftClose className="size-4" />
         </button>
         <Search className="size-5 opacity-70" />

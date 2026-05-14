@@ -1,10 +1,11 @@
-import { Camera, Eraser, MousePointer2, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Camera, Circle, Eraser, Minus, MousePointer2, Pencil, RotateCcw, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopAttachment } from "@/types/gode";
-import { Button } from "@/components/ui/button";
+import { CanvasToolbarButton as ToolbarButton } from "@/components/canvas-toolbar-button";
 import {
   canvasBackground,
   drawImageSelection,
+  drawShape,
   drawStroke,
   hitResizeHandle,
   imageAtPoint,
@@ -14,6 +15,8 @@ import {
   resizeImage,
   strokeNearPoint,
   type CanvasImage,
+  type CanvasShape,
+  type CanvasShapeKind,
   type CanvasTool,
   type ImageInteraction,
   type Point,
@@ -32,11 +35,15 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imagesRef = useRef<CanvasImage[]>([]);
+  const shapesRef = useRef<CanvasShape[]>([]);
   const strokesRef = useRef<Stroke[]>([]);
   const activeStrokeRef = useRef<Stroke | null>(null);
+  const activeShapeRef = useRef<CanvasShape | null>(null);
   const imageInteractionRef = useRef<ImageInteraction | null>(null);
   const selectedImageIdRef = useRef<string | null>(null);
+  const orderRef = useRef(0);
   const [images, setImages] = useState<CanvasImage[]>([]);
+  const [shapes, setShapes] = useState<CanvasShape[]>([]);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [color, setColor] = useState(defaultPencilColor);
@@ -75,8 +82,12 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     for (const image of imagesRef.current) {
       context.drawImage(image.image, image.x, image.y, image.width, image.height);
     }
-    for (const stroke of strokesRef.current) {
-      drawStroke(context, stroke);
+    for (const mark of orderedMarks(shapesRef.current, strokesRef.current)) {
+      if (mark.type === "shape") {
+        drawShape(context, mark.value);
+      } else {
+        drawStroke(context, mark.value);
+      }
     }
     if (options.includeSelection !== false) {
       const selected = imagesRef.current.find((image) => image.id === selectedImageIdRef.current);
@@ -87,9 +98,10 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
   }, []);
 
   useEffect(() => {
+    shapesRef.current = shapes;
     strokesRef.current = strokes;
     redraw();
-  }, [redraw, strokes, images, selectedImageId]);
+  }, [redraw, shapes, strokes, images, selectedImageId]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -161,9 +173,27 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
         id: "eraser",
         color: "transparent",
         width: width * 3,
+        order: nextOrder(),
         points: [point],
       };
       eraseAt(point);
+      return;
+    }
+
+    if (isShapeTool(mode)) {
+      const shape: CanvasShape = {
+        id: crypto.randomUUID(),
+        kind: mode,
+        color,
+        width,
+        order: nextOrder(),
+        start: point,
+        end: point,
+      };
+      activeShapeRef.current = shape;
+      const next = [...shapesRef.current, shape];
+      shapesRef.current = next;
+      setShapes(next);
       return;
     }
 
@@ -171,6 +201,7 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
       id: crypto.randomUUID(),
       color,
       width,
+      order: nextOrder(),
       points: [point],
     };
     activeStrokeRef.current = stroke;
@@ -184,6 +215,13 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     if (imageInteraction) {
       event.preventDefault();
       updateImageInteraction(imageInteraction, pointFromEvent(event));
+      return;
+    }
+    const shape = activeShapeRef.current;
+    if (shape) {
+      event.preventDefault();
+      shape.end = pointFromEvent(event);
+      redraw();
       return;
     }
     const stroke = activeStrokeRef.current;
@@ -201,6 +239,7 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
 
   function endStroke(event: React.PointerEvent<HTMLCanvasElement>): void {
     activeStrokeRef.current = null;
+    activeShapeRef.current = null;
     imageInteractionRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -208,6 +247,17 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
   }
 
   function undo(): void {
+    const lastShape = shapesRef.current.at(-1);
+    const lastStroke = strokesRef.current.at(-1);
+    if (!lastShape && !lastStroke) {
+      return;
+    }
+    if ((lastShape?.order ?? -1) > (lastStroke?.order ?? -1)) {
+      const next = shapesRef.current.slice(0, -1);
+      shapesRef.current = next;
+      setShapes(next);
+      return;
+    }
     const next = strokesRef.current.slice(0, -1);
     strokesRef.current = next;
     setStrokes(next);
@@ -229,9 +279,11 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
       URL.revokeObjectURL(image.objectUrl);
     }
     imagesRef.current = [];
+    shapesRef.current = [];
     strokesRef.current = [];
     selectedImageIdRef.current = null;
     setImages([]);
+    setShapes([]);
     setStrokes([]);
     setSelectedImageId(null);
   }
@@ -277,6 +329,11 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     setSelectedImageId(selectedImageIdRef.current);
   }
 
+  function nextOrder(): number {
+    orderRef.current += 1;
+    return orderRef.current;
+  }
+
   async function attachCanvas(): Promise<void> {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -304,6 +361,15 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
         </ToolbarButton>
         <ToolbarButton label="Erase" active={mode === "erase"} onClick={() => setMode("erase")}>
           <Eraser className="size-4" />
+        </ToolbarButton>
+        <ToolbarButton label="Rectangle" active={mode === "rectangle"} onClick={() => setMode("rectangle")}>
+          <Square className="size-4" />
+        </ToolbarButton>
+        <ToolbarButton label="Ellipse" active={mode === "ellipse"} onClick={() => setMode("ellipse")}>
+          <Circle className="size-4" />
+        </ToolbarButton>
+        <ToolbarButton label="Line" active={mode === "line"} onClick={() => setMode("line")}>
+          <Minus className="size-4" />
         </ToolbarButton>
         <div className="mx-1 h-5 w-px bg-border" />
         <div className="flex items-center gap-1">
@@ -345,10 +411,10 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
           />
         </label>
         <div className="ml-auto flex items-center gap-1">
-          <ToolbarButton label="Undo stroke" disabled={strokes.length === 0} onClick={undo}>
+          <ToolbarButton label="Undo mark" disabled={strokes.length === 0 && shapes.length === 0} onClick={undo}>
             <RotateCcw className="size-4" />
           </ToolbarButton>
-          <ToolbarButton label="Clear canvas" disabled={strokes.length === 0 && images.length === 0} onClick={clear}>
+          <ToolbarButton label="Clear canvas" disabled={strokes.length === 0 && shapes.length === 0 && images.length === 0} onClick={clear}>
             <Trash2 className="size-4" />
           </ToolbarButton>
           <ToolbarButton label="Attach canvas screenshot" disabled={capturing} onClick={attachCanvas}>
@@ -406,42 +472,26 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
       </div>
       <div className="flex h-7 shrink-0 items-center gap-2 border-t border-border px-3 text-[11px] text-muted-foreground">
         <span>Canvas</span>
-        <span className="truncate">Drop images, resize them, annotate ideas, then attach the PNG to the prompt.</span>
+        <span className="truncate">Drop images, resize them, add shapes or pencil notes, then attach the PNG to the prompt.</span>
       </div>
     </div>
   );
 }
 
-function ToolbarButton({
-  active,
-  children,
-  className,
-  disabled,
-  label,
-  onClick,
-}: {
-  active?: boolean;
-  children: React.ReactNode;
-  className?: string;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void | Promise<void>;
-}): React.JSX.Element {
-  return (
-    <Button
-      variant={active ? "secondary" : "ghost"}
-      size="icon"
-      className={cn("size-8 shrink-0 rounded-md text-muted-foreground", active && "text-foreground", className)}
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={() => void onClick()}
-    >
-      {children}
-    </Button>
-  );
-}
-
 function pointFromEvent(event: React.PointerEvent<HTMLCanvasElement>): Point {
   return pointFromClient(event.clientX, event.clientY, event.currentTarget);
+}
+
+function isShapeTool(tool: CanvasTool): tool is CanvasShapeKind {
+  return tool === "rectangle" || tool === "ellipse" || tool === "line";
+}
+
+function orderedMarks(
+  shapes: CanvasShape[],
+  strokes: Stroke[],
+): Array<{ type: "shape"; value: CanvasShape; order: number } | { type: "stroke"; value: Stroke; order: number }> {
+  return [
+    ...shapes.map((shape) => ({ type: "shape" as const, value: shape, order: shape.order })),
+    ...strokes.map((stroke) => ({ type: "stroke" as const, value: stroke, order: stroke.order })),
+  ].sort((left, right) => left.order - right.order);
 }

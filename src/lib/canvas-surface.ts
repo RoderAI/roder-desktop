@@ -7,10 +7,23 @@ export type Stroke = {
   id: string;
   color: string;
   width: number;
+  order: number;
   points: Point[];
 };
 
-export type CanvasTool = "draw" | "erase" | "select";
+export type CanvasShapeKind = "rectangle" | "ellipse" | "line";
+
+export type CanvasShape = {
+  id: string;
+  kind: CanvasShapeKind;
+  color: string;
+  width: number;
+  order: number;
+  start: Point;
+  end: Point;
+};
+
+export type CanvasTool = "draw" | "erase" | "select" | CanvasShapeKind;
 
 export type CanvasImage = {
   id: string;
@@ -59,6 +72,31 @@ export function drawStroke(context: CanvasRenderingContext2D, stroke: Stroke): v
   if (stroke.points.length === 1) {
     context.lineTo(stroke.points[0].x + 0.1, stroke.points[0].y + 0.1);
   }
+  context.stroke();
+  context.restore();
+}
+
+export function drawShape(context: CanvasRenderingContext2D, shape: CanvasShape): void {
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  context.strokeStyle = shape.color;
+  context.lineWidth = shape.width;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.beginPath();
+
+  if (shape.kind === "line") {
+    context.moveTo(shape.start.x, shape.start.y);
+    context.lineTo(shape.end.x, shape.end.y);
+  } else {
+    const rect = normalizedShapeRect(shape);
+    if (shape.kind === "rectangle") {
+      context.rect(rect.x, rect.y, rect.width, rect.height);
+    } else {
+      context.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width / 2, rect.height / 2, 0, 0, Math.PI * 2);
+    }
+  }
+
   context.stroke();
   context.restore();
 }
@@ -180,4 +218,15 @@ function resizeWidthFromDrag(interaction: ImageInteraction, dx: number, dy: numb
       ? (interaction.original.height - dy) * aspect
       : (interaction.original.height + dy) * aspect;
   return Math.abs(fromX - interaction.original.width) >= Math.abs(fromY - interaction.original.width) ? fromX : fromY;
+}
+
+function normalizedShapeRect(shape: CanvasShape): { x: number; y: number; width: number; height: number } {
+  const x = Math.min(shape.start.x, shape.end.x);
+  const y = Math.min(shape.start.y, shape.end.y);
+  return {
+    x,
+    y,
+    width: Math.abs(shape.end.x - shape.start.x),
+    height: Math.abs(shape.end.y - shape.start.y),
+  };
 }
