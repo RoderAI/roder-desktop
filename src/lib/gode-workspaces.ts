@@ -1,0 +1,43 @@
+import type { GodeThread, WorkspaceFolder } from "@/types/gode";
+
+export function normalizeThreadCwd(thread: GodeThread, baseCwd?: string): GodeThread {
+  const cwd = normalizeCwd(thread.cwd, baseCwd);
+  return cwd === thread.cwd ? thread : { ...thread, cwd };
+}
+
+export function normalizeThreadsCwd(threads: GodeThread[], baseCwd?: string): GodeThread[] {
+  return threads.map((thread) => normalizeThreadCwd(thread, baseCwd));
+}
+
+export function normalizeCwd(cwd: string, baseCwd?: string): string {
+  if (!cwd || cwd === ".") {
+    return baseCwd || cwd || "workspace";
+  }
+  if (cwd.startsWith("/") || !baseCwd) {
+    return cwd;
+  }
+  return `${baseCwd.replace(/\/+$/, "")}/${cwd.replace(/^\/+/, "")}`;
+}
+
+export function upsertWorkspaceRecent(recents: WorkspaceFolder[], path: string): WorkspaceFolder[] {
+  if (!path) {
+    return recents;
+  }
+  const normalized = path.replace(/\/+$/, "") || path;
+  const next: WorkspaceFolder = {
+    path: normalized,
+    name: workspaceName(normalized),
+    lastUsedAt: Date.now(),
+  };
+  return [next, ...recents.filter((recent) => recent.path !== normalized)]
+    .sort((left, right) => right.lastUsedAt - left.lastUsedAt)
+    .slice(0, 10);
+}
+
+function workspaceName(path: string): string {
+  if (!path || path === ".") {
+    return "workspace";
+  }
+  const trimmed = path.replace(/\/+$/, "");
+  return trimmed.split("/").filter(Boolean).pop() || "Home";
+}

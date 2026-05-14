@@ -15,15 +15,32 @@
   "build": {
     "appId": "sc.gode.desktop",
     "productName": "Gode",
+    "icon": "resources/icon.png",
+    "mac": {
+      "icon": "resources/icon.icns"
+    },
     "files": [
       "out/**",
-      "package.json"
+      "package.json",
+      "node_modules/node-pty/**"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**"
     ],
     "extraResources": [
       {
         "from": "resources/bin",
         "to": "bin"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
       }
+    ]
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-pty"
     ]
   },
   "devDependencies": {
@@ -31,6 +48,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "npm-run-all": "^4.1.5",
     "typescript": "~6.0.2",
@@ -45,11 +63,13 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.3.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron": "^42.0.1",
     "electron-vite": "^5.0.0",
     "lucide-react": "^1.14.0",
+    "node-pty": "^1.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "tailwind-merge": "^3.6.0",
