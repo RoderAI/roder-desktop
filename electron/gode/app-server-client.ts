@@ -206,21 +206,13 @@ export class GodeAppServerClient extends EventEmitter {
   }
 
   #resolveSpawnTarget(): SpawnTarget {
-    const explicit = process.env.GODE_DESKTOP_GODE_BIN;
-    if (explicit && existsSync(explicit)) {
-      return {
-        command: explicit,
-        args: ["app-server", "--listen", "stdio://"],
-        label: explicit,
-      };
-    }
-
     const binaryName = process.platform === "win32" ? "gode.exe" : "gode";
     const packaged = join(process.resourcesPath, "bin", binaryName);
     if (app.isPackaged && existsSync(packaged)) {
       return {
         command: packaged,
         args: ["app-server", "--listen", "stdio://"],
+        cwd: process.cwd(),
         label: packaged,
       };
     }
@@ -230,21 +222,12 @@ export class GodeAppServerClient extends EventEmitter {
       return {
         command: bundled,
         args: ["app-server", "--listen", "stdio://"],
+        cwd: process.cwd(),
         label: bundled,
       };
     }
 
-    const source = resolve(thisDir, "..", "..", "..", "gode");
-    if (existsSync(join(source, "go.mod"))) {
-      return {
-        command: "go",
-        args: ["run", "./cmd/gode", "app-server", "--listen", "stdio://"],
-        cwd: source,
-        label: `go run ./cmd/gode (${source})`,
-      };
-    }
-
-    throw new Error("Could not find bundled gode binary or ../gode source checkout");
+    throw new Error(`Could not find embedded gode binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:gode before launching the desktop app.`);
   }
 
   #setStatus(status: GodeStatus): void {

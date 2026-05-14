@@ -42,7 +42,7 @@ function InlineCode({ text }: { text: string }): React.JSX.Element {
     <>
       {parts.map((part, index) =>
         part.startsWith("`") && part.endsWith("`") ? (
-          <code key={`${part}-${index}`} className="rounded-md bg-[#e8e8e8] px-1.5 py-0.5 text-[0.94em] text-[#2b2b2b]">
+          <code key={`${part}-${index}`} className="rounded-md bg-muted px-1.5 py-0.5 text-[0.94em] text-foreground">
             {part.slice(1, -1)}
           </code>
         ) : (
