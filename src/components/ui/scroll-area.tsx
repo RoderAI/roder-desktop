@@ -1,49 +1,45 @@
 import * as React from "react";
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from "@/lib/utils";
 
-type ScrollAreaProps = React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
+type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement> & {
   viewportClassName?: string;
-  viewportRef?: React.Ref<React.ElementRef<typeof ScrollAreaPrimitive.Viewport>>;
-  onViewportScroll?: React.UIEventHandler<React.ElementRef<typeof ScrollAreaPrimitive.Viewport>>;
+  viewportRef?: React.Ref<HTMLDivElement>;
+  onViewportScroll?: React.UIEventHandler<HTMLDivElement>;
 };
 
 export const ScrollArea = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
+  HTMLDivElement,
   ScrollAreaProps
 >(({ className, children, viewportClassName, viewportRef, onViewportScroll, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
-    <ScrollAreaPrimitive.Viewport
+  <div ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
+    <div
       ref={viewportRef}
-      className={cn("size-full rounded-[inherit]", viewportClassName)}
+      className={cn("size-full overflow-auto rounded-[inherit]", viewportClassName)}
       onScroll={onViewportScroll}
     >
       {children}
-    </ScrollAreaPrimitive.Viewport>
-    <ScrollBar />
-    <ScrollAreaPrimitive.Corner />
-  </ScrollAreaPrimitive.Root>
+    </div>
+  </div>
 ));
 
-ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
+ScrollArea.displayName = "ScrollArea";
 
 export const ScrollBar = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
->(({ className, orientation = "vertical", ...props }, ref) => (
-  <ScrollAreaPrimitive.ScrollAreaScrollbar
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { orientation?: "vertical" | "horizontal" }
+>(({ className, orientation = "vertical", children, ...props }, ref) => (
+  <div
     ref={ref}
-    orientation={orientation}
     className={cn(
-      "flex touch-none select-none transition-colors",
+      "pointer-events-none absolute flex touch-none select-none transition-colors",
       orientation === "vertical" && "h-full w-2.5 border-l border-l-transparent p-px",
       orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent p-px",
       className,
     )}
     {...props}
   >
-    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
-  </ScrollAreaPrimitive.ScrollAreaScrollbar>
+    {children}
+  </div>
 ));
 
-ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
+ScrollBar.displayName = "ScrollBar";

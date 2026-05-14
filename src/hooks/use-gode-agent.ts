@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { godeIpc } from "@/lib/gode-ipc";
 import { visibleModelsFor } from "@/lib/gode-models";
@@ -7,9 +7,15 @@ import type { ConversationMessage } from "@/types/gode";
 
 const emptyMessages: ConversationMessage[] = [];
 
-export function useGodeAgent(): ReturnType<typeof selectAgentState> {
+export function useGodeAgent() {
   useGodeStoreBootstrap();
-  return useGodeStore(useShallow(selectAgentState));
+  const state = useGodeStore(useShallow(selectAgentState));
+  const models = useMemo(() => visibleModelsFor(state.allModels, state.visibleModelIds), [state.allModels, state.visibleModelIds]);
+
+  return {
+    ...state,
+    models,
+  };
 }
 
 function useGodeStoreBootstrap(): void {
@@ -45,7 +51,8 @@ function selectAgentState(state: ReturnType<typeof useGodeStore.getState>) {
     threads: state.threads,
     activeThreadId: state.activeThreadId,
     messages,
-    models: visibleModelsFor(state.models, state.visibleModelIds),
+    allModels: state.models,
+    visibleModelIds: state.visibleModelIds,
     selectedModel: state.selectedModel,
     selectedReasoning: state.selectedReasoning,
     selectedWorkspaceCwd: state.selectedWorkspaceCwd,

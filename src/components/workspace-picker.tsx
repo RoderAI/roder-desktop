@@ -1,7 +1,7 @@
 import { Check, ChevronDown, Folder, FolderOpen, Home, Laptop, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { GodeThread, WorkspaceFolder } from "@/types/gode";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,18 +46,14 @@ export function WorkspacePicker({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="compact"
-          className="h-8 rounded-full px-2.5 text-[15px] text-muted-foreground"
-          aria-label={`Choose workspace folder: ${selectedLabel}`}
-        >
-          <span className="max-w-[180px] truncate text-foreground">{selectedLabel}</span>
-          <ChevronDown className="size-4" />
-          <Laptop className="ml-1 size-4" />
-          <span>Local</span>
-        </Button>
+      <DropdownMenuTrigger
+        className={cn(buttonVariants({ variant: "ghost", size: "compact" }), "h-8 rounded-full px-2.5 text-[15px] text-muted-foreground")}
+        aria-label={`Choose workspace folder: ${selectedLabel}`}
+      >
+        <span className="max-w-[180px] truncate text-foreground">{selectedLabel}</span>
+        <ChevronDown className="size-4" />
+        <Laptop className="ml-1 size-4" />
+        <span>Local</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" side="top" sideOffset={8} className="w-[368px] rounded-xl p-0">
         <div className="flex h-11 items-center gap-2.5 border-b border-border px-3.5">
