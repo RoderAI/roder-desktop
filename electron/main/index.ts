@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, type Rectangle } from "electron";
-import { join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
 import { GodeAppServerClient } from "../gode/app-server-client";
@@ -111,6 +113,7 @@ ipcMain.handle("browser:captureScreenshot", () => browser.captureScreenshot());
 ipcMain.handle("browser:toggleAnnotation", () => browser.toggleAnnotation());
 ipcMain.handle("browser:setBounds", (_event, bounds: Rectangle) => browser.setBounds(scaleRendererBounds(bounds)));
 ipcMain.handle("browser:snapshot", () => browser.snapshot());
+ipcMain.handle("canvas:savePng", (_event, dataUrl: string) => saveCanvasPng(dataUrl));
 ipcMain.handle("codex:account", () => getCodexAccountSnapshot());
 ipcMain.handle("codex:login", () => startCodexLogin());
 ipcMain.handle("codex:logout", () => logoutCodex());
@@ -159,5 +162,24 @@ function scaleRendererBounds(bounds?: Rectangle): Rectangle {
     y: Math.round(source.y * rendererZoomFactor),
     width: Math.max(100, Math.round(source.width * rendererZoomFactor)),
     height: Math.max(100, Math.round(source.height * rendererZoomFactor)),
+  };
+}
+
+async function saveCanvasPng(dataUrl: string): Promise<{ name: string; path: string; type: string; size: number }> {
+  const prefix = "data:image/png;base64,";
+  if (!dataUrl.startsWith(prefix)) {
+    throw new Error("Canvas capture must be a PNG data URL");
+  }
+  const data = Buffer.from(dataUrl.slice(prefix.length), "base64");
+  const dir = join(tmpdir(), "gode-desktop-canvas");
+  await mkdir(dir, { recursive: true });
+  const name = `canvas-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+  const path = join(dir, name);
+  await writeFile(path, data);
+  return {
+    name: basename(path),
+    path,
+    type: "image/png",
+    size: data.byteLength,
   };
 }

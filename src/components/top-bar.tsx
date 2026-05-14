@@ -1,9 +1,9 @@
-import { Ellipsis, Globe2, PanelRight, Share, SquareTerminal, TerminalSquare } from "lucide-react";
+import { Globe2, Paintbrush, SquareTerminal, TerminalSquare } from "lucide-react";
 import type { GodeStatus, GodeThread } from "@/types/gode";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export type ToolPanel = "terminal" | "browser" | null;
+export type ToolPanel = "terminal" | "browser" | "canvas" | null;
 
 type TopBarProps = {
   thread?: GodeThread;
@@ -12,6 +12,7 @@ type TopBarProps = {
   onRestart: () => void;
   onToggleTerminal: () => void;
   onToggleBrowser: () => void;
+  onToggleCanvas: () => void;
 };
 
 export function TopBar({
@@ -21,6 +22,7 @@ export function TopBar({
   onRestart,
   onToggleTerminal,
   onToggleBrowser,
+  onToggleCanvas,
 }: TopBarProps): React.JSX.Element {
   const connected = status.state === "ready";
   return (
@@ -38,12 +40,6 @@ export function TopBar({
             Restart
           </Button>
         )}
-        <Button variant="ghost" size="icon" aria-label="More actions" title="More actions">
-          <Ellipsis className="size-5" />
-        </Button>
-        <Button variant="ghost" size="icon" aria-label="Share thread" title="Share thread">
-          <Share className="size-5" />
-        </Button>
         <Button
           variant={activeTool === "terminal" ? "secondary" : "ghost"}
           size="icon"
@@ -62,8 +58,14 @@ export function TopBar({
         >
           <Globe2 className="size-5" />
         </Button>
-        <Button variant="ghost" size="icon" aria-label="Toggle side panel" title="Toggle side panel">
-          <PanelRight className="size-5" />
+        <Button
+          variant={activeTool === "canvas" ? "secondary" : "ghost"}
+          size="icon"
+          aria-label="Toggle canvas"
+          title="Toggle canvas"
+          onClick={onToggleCanvas}
+        >
+          <Paintbrush className="size-5" />
         </Button>
       </div>
     </header>

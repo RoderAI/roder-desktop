@@ -2,6 +2,7 @@ import { Laptop, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
+import { CanvasPanel } from "@/components/canvas-panel";
 import { Composer } from "@/components/composer";
 import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
@@ -20,6 +21,7 @@ export function App(): React.JSX.Element {
   const [followSignal, setFollowSignal] = useState(0);
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
@@ -36,6 +38,15 @@ export function App(): React.JSX.Element {
     followBottom();
     void agent.newThread();
   }, [agent, followBottom]);
+  const attachToComposer = useCallback(
+    (attachment: DesktopAttachment) => {
+      setComposerAttachments((attachments) =>
+        attachments.some((existing) => existing.path === attachment.path) ? attachments : [...attachments, attachment],
+      );
+      followBottom();
+    },
+    [followBottom],
+  );
   const sendPrompt = useCallback(
     async (prompt: string, attachments: DesktopAttachment[]) => {
       followBottom();
@@ -56,92 +67,90 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
-        {settingsOpen && <SettingsView />}
-        <AppSidebar
-          threads={agent.threads}
-          activeThreadId={agent.activeThreadId}
-          width={leftSidebarWidth}
-          onSelectThread={selectThread}
-          onNewThread={newThread}
-          onBack={() => void agent.goBack()}
-          onForward={() => void agent.goForward()}
-          canGoBack={agent.canGoBack}
-          canGoForward={agent.canGoForward}
-        />
-        <div
-          className="no-drag relative z-30 h-screen w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
-          aria-label="Resize thread sidebar"
-          role="separator"
-          onPointerDown={beginSidebarResize}
-        />
-        <section className="flex min-w-0 flex-1 flex-col">
-          <TopBar
-            thread={activeThread}
-            status={agent.status}
-            activeTool={activeTool}
-            onRestart={() => void agent.restart()}
-            onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
-            onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
+      {settingsOpen && <SettingsView />}
+      {sidebarOpen && (
+        <>
+          <AppSidebar
+            threads={agent.threads}
+            activeThreadId={agent.activeThreadId}
+            width={leftSidebarWidth}
+            onSelectThread={selectThread}
+            onNewThread={newThread}
+            onBack={() => void agent.goBack()}
+            onForward={() => void agent.goForward()}
+            canGoBack={agent.canGoBack}
+            canGoForward={agent.canGoForward}
+            onClose={() => setSidebarOpen(false)}
           />
-          <div className="flex min-h-0 flex-1">
-            <div className="flex min-w-0 flex-1 flex-col">
-              <Transcript messages={agent.messages} followSignal={followSignal} />
-              {agent.error && (
-                <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-sm text-destructive">{agent.error}</div>
-              )}
-              <Composer
-                busy={agent.busy}
-                models={agent.models}
-                selectedModel={agent.selectedModel}
-                selectedReasoning={agent.selectedReasoning}
-                selectedWorkspaceCwd={agent.selectedWorkspaceCwd}
-                statusCwd={agent.status.cwd}
-                workspaceRecents={agent.workspaceRecents}
-                threads={agent.threads}
-                attachments={composerAttachments}
-                onSelectedModelChange={agent.setSelectedModel}
-                onCycleReasoning={agent.cycleSelectedReasoning}
-                onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
-                onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
-                onScrollToBottom={followBottom}
-                onAttachmentsChange={setComposerAttachments}
-                onSend={sendPrompt}
-              />
-              <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-border px-8 text-xs text-muted-foreground">
-                <Laptop className="size-4" />
-                <span>Local</span>
-                <span>{projectName}</span>
-                <span className="ml-auto flex items-center gap-2">
-                  {agent.busy && <Loader2 className="size-3 animate-spin" />}
-                  <Badge variant="muted" className="text-[11px]">
-                    {agent.status.state === "ready" ? "gode app-server" : agent.status.state}
-                  </Badge>
-                </span>
-              </footer>
-            </div>
-            {activeTool && (
-              <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
-                <div
-                  className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
-                  aria-label="Resize tool panel"
-                  role="separator"
-                  onPointerDown={beginToolPanelResize}
-                />
-                {activeTool === "terminal" && <TerminalPanel />}
-                {activeTool === "browser" && (
-                  <BrowserPanel
-                    onAttach={(attachment) => {
-                      setComposerAttachments((attachments) =>
-                        attachments.some((existing) => existing.path === attachment.path) ? attachments : [...attachments, attachment],
-                      );
-                      followBottom();
-                    }}
-                  />
-                )}
-              </div>
+          <div
+            className="no-drag relative z-30 h-screen w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+            aria-label="Resize thread sidebar"
+            role="separator"
+            onPointerDown={beginSidebarResize}
+          />
+        </>
+      )}
+      <section className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          thread={activeThread}
+          status={agent.status}
+          activeTool={activeTool}
+          onRestart={() => void agent.restart()}
+          onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
+          onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
+          onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
+        />
+        <div className="flex min-h-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Transcript messages={agent.messages} followSignal={followSignal} />
+            {agent.error && (
+              <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-sm text-destructive">{agent.error}</div>
             )}
+            <Composer
+              busy={agent.busy}
+              models={agent.models}
+              selectedModel={agent.selectedModel}
+              selectedReasoning={agent.selectedReasoning}
+              selectedWorkspaceCwd={agent.selectedWorkspaceCwd}
+              statusCwd={agent.status.cwd}
+              workspaceRecents={agent.workspaceRecents}
+              threads={agent.threads}
+              attachments={composerAttachments}
+              onSelectedModelChange={agent.setSelectedModel}
+              onCycleReasoning={agent.cycleSelectedReasoning}
+              onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
+              onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
+              onScrollToBottom={followBottom}
+              onAttachmentsChange={setComposerAttachments}
+              onSend={sendPrompt}
+            />
+            <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-border px-8 text-xs text-muted-foreground">
+              <Laptop className="size-4" />
+              <span>Local</span>
+              <span>{projectName}</span>
+              <span className="ml-auto flex items-center gap-2">
+                {agent.busy && <Loader2 className="size-3 animate-spin" />}
+                <Badge variant="muted" className="text-[11px]">
+                  {agent.status.state === "ready" ? "gode app-server" : agent.status.state}
+                </Badge>
+              </span>
+            </footer>
           </div>
-        </section>
+          {activeTool && (
+            <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
+              <div
+                className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
+                aria-label="Resize tool panel"
+                role="separator"
+                onPointerDown={beginToolPanelResize}
+              />
+              {activeTool === "terminal" && <TerminalPanel />}
+              {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
+              {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
