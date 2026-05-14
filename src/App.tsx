@@ -1,5 +1,5 @@
 import { Laptop, Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useGodeAgent } from "@/hooks/use-gode-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
-import type { DesktopAttachment } from "@/types/gode";
+import type { DesktopAttachment, GodeThread } from "@/types/gode";
 
 export function App(): React.JSX.Element {
   const agent = useGodeAgent();
@@ -25,6 +25,14 @@ export function App(): React.JSX.Element {
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
+  const activeWorkspaceCwd = activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.status.cwd ?? "";
+  const folderOptions = useMemo(() => buildFolderOptions(agent.threads, activeWorkspaceCwd), [activeWorkspaceCwd, agent.threads]);
+  const threadOptions = useMemo(() => {
+    const selectedFolder = normalizePath(activeWorkspaceCwd);
+    return agent.threads
+      .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === selectedFolder)
+      .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
+  }, [activeWorkspaceCwd, agent.threads]);
   const projectName = basename(activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.threads.find((thread) => thread.cwd)?.cwd) ?? "workspace";
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
@@ -93,11 +101,16 @@ export function App(): React.JSX.Element {
       <section className="flex min-w-0 flex-1 flex-col">
         <TopBar
           thread={activeThread}
+          threads={threadOptions}
+          folders={folderOptions}
+          activeFolderPath={activeWorkspaceCwd}
           status={agent.status}
           activeTool={activeTool}
           sidebarOpen={sidebarOpen}
           onRestart={() => void agent.restart()}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          onSelectFolder={agent.setSelectedWorkspaceCwd}
+          onSelectThread={selectThread}
           onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
           onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
           onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
@@ -159,6 +172,66 @@ export function App(): React.JSX.Element {
 
 function basename(path: string | undefined): string | undefined {
   return path?.split("/").filter(Boolean).pop();
+}
+
+type FolderOption = {
+  path: string;
+  name: string;
+  updatedAt: number;
+  threadCount: number;
+};
+
+function buildFolderOptions(threads: GodeThread[], activePath: string): FolderOption[] {
+  const folders = new Map<string, FolderOption>();
+  const activeFolderPath = normalizePath(activePath);
+
+  if (activeFolderPath) {
+    folders.set(activeFolderPath, {
+      path: activeFolderPath,
+      name: workspaceName(activeFolderPath),
+      updatedAt: Date.now(),
+      threadCount: 0,
+    });
+  }
+
+  for (const thread of threads) {
+    if (thread.id.startsWith("demo-")) {
+      continue;
+    }
+    const path = normalizePath(thread.cwd);
+    const existing = folders.get(path);
+    folders.set(path, {
+      path,
+      name: existing?.name ?? workspaceName(path),
+      updatedAt: Math.max(existing?.updatedAt ?? 0, normalizedTimestamp(thread.updatedAt)),
+      threadCount: (existing?.threadCount ?? 0) + 1,
+    });
+  }
+
+  return [...folders.values()].sort((left, right) => {
+    if (left.path === activeFolderPath) {
+      return -1;
+    }
+    if (right.path === activeFolderPath) {
+      return 1;
+    }
+    return right.updatedAt - left.updatedAt || left.name.localeCompare(right.name);
+  });
+}
+
+function normalizePath(path: string | undefined): string {
+  return (path || "").replace(/\/+$/, "") || path || "";
+}
+
+function workspaceName(path: string): string {
+  return basename(path) ?? "workspace";
+}
+
+function normalizedTimestamp(timestamp: number): number {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return 0;
+  }
+  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
 }
 
 function beginHorizontalResize(
