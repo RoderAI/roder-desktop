@@ -43,9 +43,12 @@ export type GodeItem = {
   id: string;
   type: "userMessage" | "agentMessage" | "toolMessage" | "toolCall" | "reasoning" | "compaction" | "error" | string;
   text?: string;
+  status?: string;
   payload?: unknown;
+  raw?: unknown;
   toolName?: string;
   toolCallId?: string;
+  sourceKind?: string;
 };
 
 export type GodeModel = {
@@ -64,9 +67,13 @@ export type ConversationMessage = {
   id: string;
   threadId?: string;
   turnId?: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   text: string;
   status?: "streaming" | "complete" | "failed";
+  toolName?: string;
+  toolCallId?: string;
+  toolStatus?: "running" | "complete" | "failed";
+  toolSummary?: string;
 };
 
 export type NavigationEntry = {

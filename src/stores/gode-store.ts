@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { godeIpc } from "@/lib/gode-ipc";
-import { messagesFromThread, sortThreadsByUpdatedAt, upsertThread } from "@/lib/gode-thread";
+import { messagesFromGodeItem, messagesFromThread, sortThreadsByUpdatedAt, upsertConversationMessage, upsertThread } from "@/lib/gode-thread";
 import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/gode-models";
 import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceRecent } from "@/lib/gode-workspaces";
 import type {
@@ -9,6 +9,7 @@ import type {
   DesktopAttachment,
   GodeModel,
   GodeNotification,
+  GodeItem,
   GodeStatus,
   GodeThread,
   NavigationEntry,
@@ -403,22 +404,20 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
 
   if (notification.method === "item/started") {
     const item = isRecord(params.item) ? params.item : {};
-    if (item.type !== "agentMessage") {
+    if (item.type !== "agentMessage" && !String(item.type ?? "").startsWith("tool.")) {
       return {};
     }
     const threadId = String(params.threadId ?? state.activeThreadId);
-    const message: ConversationMessage = {
-      id: String(item.id),
-      threadId,
-      turnId: String(params.turnId ?? ""),
-      role: "assistant",
-      text: String(item.text ?? ""),
-      status: "streaming",
-    };
+    const [message] = messagesFromGodeItem(threadId, String(params.turnId ?? ""), item as GodeItem, "inProgress");
+    if (!message) {
+      return {};
+    }
+    const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
+    upsertConversationMessage(nextMessages, message);
     return {
       messagesByThread: {
         ...state.messagesByThread,
-        [threadId]: [...activeMessages(state.messagesByThread, threadId), message],
+        [threadId]: nextMessages,
       },
     };
   }
@@ -439,18 +438,19 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
 
   if (notification.method === "item/completed") {
     const item = isRecord(params.item) ? params.item : {};
-    if (item.type !== "agentMessage") {
+    const threadId = String(params.threadId ?? state.activeThreadId);
+    const messages = messagesFromGodeItem(threadId, String(params.turnId ?? ""), item as GodeItem, "completed");
+    if (messages.length === 0) {
       return {};
     }
-    const threadId = String(params.threadId ?? state.activeThreadId);
-    const itemId = String(item.id);
-    const text = String(item.text ?? "");
+    const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
+    for (const message of messages) {
+      upsertConversationMessage(nextMessages, message);
+    }
     return {
       messagesByThread: {
         ...state.messagesByThread,
-        [threadId]: activeMessages(state.messagesByThread, threadId).map((message) =>
-          message.id === itemId ? { ...message, text: text || message.text, status: "complete" } : message,
-        ),
+        [threadId]: nextMessages,
       },
     };
   }
