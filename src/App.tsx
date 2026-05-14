@@ -42,6 +42,20 @@ export function App(): React.JSX.Element {
     },
     [agent, followBottom],
   );
+  const selectFolder = useCallback(
+    (path: string) => {
+      const normalizedPath = normalizePath(path);
+      const latestThread = agent.threads
+        .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === normalizedPath)
+        .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt))[0];
+
+      agent.setSelectedWorkspaceCwd(path);
+      if (latestThread) {
+        selectThread(latestThread.id);
+      }
+    },
+    [agent, selectThread],
+  );
   const newThread = useCallback(() => {
     followBottom();
     void agent.newThread();
@@ -109,7 +123,7 @@ export function App(): React.JSX.Element {
           sidebarOpen={sidebarOpen}
           onRestart={() => void agent.restart()}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onSelectFolder={agent.setSelectedWorkspaceCwd}
+          onSelectFolder={selectFolder}
           onSelectThread={selectThread}
           onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
           onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
