@@ -1,5 +1,5 @@
 import * as React from "react";
-import * as SelectPrimitive from "@radix-ui/react-select";
+import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,25 +26,33 @@ export const SelectTrigger = React.forwardRef<
   </SelectPrimitive.Trigger>
 ));
 
-SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
+SelectTrigger.displayName = "SelectTrigger";
+
+type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Popup> & {
+  align?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>["align"];
+  position?: "popper" | "item-aligned";
+  side?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>["side"];
+  sideOffset?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>["sideOffset"];
+};
 
 export const SelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+  React.ElementRef<typeof SelectPrimitive.Popup>,
+  SelectContentProps
+>(({ align = "start", className, children, position: _position, side, sideOffset = 6, ...props }, ref) => (
   <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      ref={ref}
-      className={cn("z-50 min-w-48 overflow-hidden rounded-md border border-border bg-popover shadow-md", className)}
-      position={position}
-      {...props}
-    >
-      <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
-    </SelectPrimitive.Content>
+    <SelectPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-50">
+      <SelectPrimitive.Popup
+        ref={ref}
+        className={cn("min-w-48 overflow-hidden rounded-md border border-border bg-popover shadow-md outline-none", className)}
+        {...props}
+      >
+        <SelectPrimitive.List className="p-1">{children}</SelectPrimitive.List>
+      </SelectPrimitive.Popup>
+    </SelectPrimitive.Positioner>
   </SelectPrimitive.Portal>
 ));
 
-SelectContent.displayName = SelectPrimitive.Content.displayName;
+SelectContent.displayName = "SelectContent";
 
 export const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
@@ -57,11 +65,11 @@ export const SelectItem = React.forwardRef<
   >
     <span className="absolute left-2 flex size-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check />
+        <Check className="size-3.5" />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ));
 
-SelectItem.displayName = SelectPrimitive.Item.displayName;
+SelectItem.displayName = "SelectItem";
