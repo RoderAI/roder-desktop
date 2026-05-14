@@ -8,7 +8,6 @@ import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
 import { Transcript } from "@/components/transcript";
 import { Badge } from "@/components/ui/badge";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGodeAgent } from "@/hooks/use-gode-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
@@ -56,8 +55,7 @@ export function App(): React.JSX.Element {
   }, [toolPanelWidth]);
 
   return (
-    <TooltipProvider delayDuration={250}>
-      <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
         {settingsOpen && <SettingsView />}
         <AppSidebar
           threads={agent.threads}
@@ -144,8 +142,7 @@ export function App(): React.JSX.Element {
             )}
           </div>
         </section>
-      </div>
-    </TooltipProvider>
+    </div>
   );
 }
 

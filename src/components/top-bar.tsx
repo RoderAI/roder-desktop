@@ -2,7 +2,6 @@ import { Ellipsis, Globe2, PanelRight, Share, SquareTerminal, TerminalSquare } f
 import type { GodeStatus, GodeThread } from "@/types/gode";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export type ToolPanel = "terminal" | "browser" | null;
 
@@ -39,56 +38,33 @@ export function TopBar({
             Restart
           </Button>
         )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="More actions">
-              <Ellipsis className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>More actions</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Share thread">
-              <Share className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Share thread</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={activeTool === "terminal" ? "secondary" : "ghost"}
-              size="icon"
-              aria-label="Toggle terminal"
-              onClick={onToggleTerminal}
-            >
-              <TerminalSquare className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Toggle terminal</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={activeTool === "browser" ? "secondary" : "ghost"}
-              size="icon"
-              aria-label="Toggle browser"
-              onClick={onToggleBrowser}
-            >
-              <Globe2 className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Toggle browser</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Toggle side panel">
-              <PanelRight className="size-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Toggle side panel</TooltipContent>
-        </Tooltip>
+        <Button variant="ghost" size="icon" aria-label="More actions" title="More actions">
+          <Ellipsis className="size-5" />
+        </Button>
+        <Button variant="ghost" size="icon" aria-label="Share thread" title="Share thread">
+          <Share className="size-5" />
+        </Button>
+        <Button
+          variant={activeTool === "terminal" ? "secondary" : "ghost"}
+          size="icon"
+          aria-label="Toggle terminal"
+          title="Toggle terminal"
+          onClick={onToggleTerminal}
+        >
+          <TerminalSquare className="size-5" />
+        </Button>
+        <Button
+          variant={activeTool === "browser" ? "secondary" : "ghost"}
+          size="icon"
+          aria-label="Toggle browser"
+          title="Toggle browser"
+          onClick={onToggleBrowser}
+        >
+          <Globe2 className="size-5" />
+        </Button>
+        <Button variant="ghost" size="icon" aria-label="Toggle side panel" title="Toggle side panel">
+          <PanelRight className="size-5" />
+        </Button>
       </div>
     </header>
   );

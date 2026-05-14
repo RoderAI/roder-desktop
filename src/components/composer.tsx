@@ -1,7 +1,7 @@
 import { ArrowDown, Check, ChevronDown, FileText, ImageIcon, Plus, Search, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { DesktopAttachment, GodeModel, GodeThread, ReasoningEffort, WorkspaceFolder } from "@/types/gode";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { WorkspacePicker } from "@/components/workspace-picker";
 import {
   DropdownMenu,
@@ -118,11 +118,9 @@ export function Composer({
       <div className="mb-3 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex items-center gap-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="subtle" size="compact" className="rounded-full px-3 text-muted-foreground">
-                Commit
-                <ChevronDown className="size-4" />
-              </Button>
+            <DropdownMenuTrigger className={cn(buttonVariants({ variant: "subtle", size: "compact" }), "rounded-full px-3 text-muted-foreground")}>
+              Commit
+              <ChevronDown className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuGroup>
@@ -258,16 +256,14 @@ function ModelPicker({
   return (
     <div className="flex h-10 shrink-0 items-center overflow-hidden rounded-xl bg-muted/65 text-foreground">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            className="group flex h-full min-w-[138px] items-center px-4 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Choose model"
-          >
-            <span className="relative max-w-[112px] truncate text-[15px] font-medium leading-none">
-              {modelName(selected)}
-              <span className="absolute -bottom-1.5 left-0 h-0.5 w-full rounded-full bg-fuchsia-400" />
-            </span>
-          </button>
+        <DropdownMenuTrigger
+          className="group flex h-full min-w-[138px] items-center px-4 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Choose model"
+        >
+          <span className="relative max-w-[112px] truncate text-[15px] font-medium leading-none">
+            {modelName(selected)}
+            <span className="absolute -bottom-1.5 left-0 h-0.5 w-full rounded-full bg-fuchsia-400" />
+          </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-[320px] rounded-xl p-0">
           <div className="flex h-11 items-center gap-2.5 border-b border-border px-3.5">

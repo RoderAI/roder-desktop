@@ -20,7 +20,7 @@ export const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <SelectPrimitive.Icon asChild>
+    <SelectPrimitive.Icon>
       <ChevronDown data-icon="inline-end" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>

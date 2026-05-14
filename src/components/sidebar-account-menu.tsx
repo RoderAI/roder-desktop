@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { CodexAccountSnapshot, CodexRateWindow } from "@/types/gode";
 import { useThemeStore } from "@/stores/theme-store";
@@ -61,21 +61,21 @@ export function SidebarAccountMenu(): React.JSX.Element {
   return (
     <div className="no-drag shrink-0 border-t border-border/70 p-3">
       <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="h-12 w-full justify-start gap-3 rounded-lg px-2.5 text-[15px] text-sidebar-foreground hover:bg-sidebar-accent"
-            onClick={() => void refresh()}
-          >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-[13px] text-sidebar-active-foreground">
-              {account?.displayName ? initials(account.displayName) : "G"}
-            </div>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate text-sidebar-active-foreground">{label}</span>
-              <span className="block truncate text-[12px] text-sidebar-muted">{secondary}</span>
-            </span>
-            <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted" />
-          </Button>
+        <DropdownMenuTrigger
+          className={cn(
+            buttonVariants({ variant: "ghost" }),
+            "h-12 w-full justify-start gap-3 rounded-lg px-2.5 text-[15px] text-sidebar-foreground hover:bg-sidebar-accent",
+          )}
+          onClick={() => void refresh()}
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-[13px] text-sidebar-active-foreground">
+            {account?.displayName ? initials(account.displayName) : "G"}
+          </div>
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-sidebar-active-foreground">{label}</span>
+            <span className="block truncate text-[12px] text-sidebar-muted">{secondary}</span>
+          </span>
+          <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           side="top"
