@@ -1,7 +1,15 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { godeIpc } from "@/lib/gode-ipc";
-import { messagesFromGodeItem, messagesFromThread, sortThreadsByUpdatedAt, upsertConversationMessage, upsertThread } from "@/lib/gode-thread";
+import {
+  assistantMessageId,
+  messagesFromGodeItem,
+  messagesFromThread,
+  normalizeAssistantPhase,
+  sortThreadsByUpdatedAt,
+  upsertConversationMessage,
+  upsertThread,
+} from "@/lib/gode-thread";
 import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/gode-models";
 import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceRecent } from "@/lib/gode-workspaces";
 import type {
@@ -409,7 +417,7 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
     }
     const threadId = String(params.threadId ?? state.activeThreadId);
     const [message] = messagesFromGodeItem(threadId, String(params.turnId ?? ""), item as GodeItem, "inProgress");
-    if (!message) {
+    if (!message || (message.role === "assistant" && !message.text)) {
       return {};
     }
     const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
@@ -426,12 +434,27 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
     const threadId = String(params.threadId ?? state.activeThreadId);
     const itemId = String(params.itemId ?? "");
     const delta = String(params.delta ?? "");
+    const phase = normalizeAssistantPhase(typeof params.phase === "string" ? params.phase : undefined);
+    const messageId = assistantMessageId(itemId, phase);
+    const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
+    const index = nextMessages.findIndex((message) => message.id === messageId);
+    if (index === -1) {
+      nextMessages.push({
+        id: messageId,
+        threadId,
+        turnId: String(params.turnId ?? ""),
+        role: "assistant",
+        text: delta,
+        phase,
+        status: "streaming",
+      });
+    } else {
+      nextMessages[index] = { ...nextMessages[index], text: nextMessages[index].text + delta, status: "streaming", phase };
+    }
     return {
       messagesByThread: {
         ...state.messagesByThread,
-        [threadId]: activeMessages(state.messagesByThread, threadId).map((message) =>
-          message.id === itemId ? { ...message, text: message.text + delta, status: "streaming" } : message,
-        ),
+        [threadId]: nextMessages,
       },
     };
   }

@@ -43,7 +43,16 @@ export function messagesFromGodeItem(threadId: string, turnId: string, item: God
     return [{ id: item.id, threadId, turnId, role: "user", text, status: "complete" }];
   }
   if (item.type === "agentMessage") {
-    return [{ id: item.id, threadId, turnId, role: "assistant", text, status: turnStatus === "inProgress" ? "streaming" : "complete" }];
+    const phase = normalizeAssistantPhase(item.phase);
+    return [{
+      id: assistantMessageId(item.id, phase),
+      threadId,
+      turnId,
+      role: "assistant",
+      text,
+      phase,
+      status: turnStatus === "inProgress" ? "streaming" : "complete",
+    }];
   }
   if (item.type === "error") {
     return [{ id: item.id, threadId, turnId, role: "system", text, status: "failed" }];
@@ -61,6 +70,19 @@ export function upsertConversationMessage(messages: ConversationMessage[], incom
 
   messages[index] = mergeMessage(messages[index], incoming);
   return messages;
+}
+
+export function assistantMessageId(itemId: string, phase?: string): string {
+  const normalized = normalizeAssistantPhase(phase);
+  if (!normalized || normalized === "final_answer") {
+    return itemId;
+  }
+  return `${itemId}:${normalized}`;
+}
+
+export function normalizeAssistantPhase(phase?: string): string | undefined {
+  const normalized = phase?.trim();
+  return normalized || undefined;
 }
 
 function extractItemText(item: GodeItem): string {
@@ -173,7 +195,7 @@ function summarizeTool(
 
 function mergeMessage(existing: ConversationMessage, incoming: ConversationMessage): ConversationMessage {
   if (existing.role !== "tool" || incoming.role !== "tool") {
-    return { ...existing, ...incoming, text: incoming.text || existing.text };
+    return { ...existing, ...incoming, text: incoming.text || existing.text, phase: incoming.phase || existing.phase };
   }
 
   return {

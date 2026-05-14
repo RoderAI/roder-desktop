@@ -3,6 +3,7 @@ import type { ConversationMessage } from "@/types/gode";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { MessageContent } from "./message-content";
+import { PhaseMessage } from "./phase-message";
 import { ToolTimelineItem } from "./tool-timeline-item";
 
 type TranscriptProps = {
@@ -65,6 +66,7 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
           {messages.map((message, index) => {
             const previousIsTool = messages[index - 1]?.role === "tool";
             const nextIsTool = messages[index + 1]?.role === "tool";
+            const isPhaseMessage = message.role === "assistant" && Boolean(message.phase && message.phase !== "final_answer");
 
             return (
               <article
@@ -72,6 +74,7 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
                 className={cn(
                   "text-foreground",
                   message.role !== "tool" && "my-3",
+                  isPhaseMessage && "my-4",
                   message.role === "tool" && "my-0",
                   message.role === "tool" && !previousIsTool && "mt-2",
                   message.role === "tool" && !nextIsTool && "mb-2",
@@ -80,6 +83,8 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
               >
                 {message.role === "tool" ? (
                   <ToolTimelineItem message={message} />
+                ) : isPhaseMessage ? (
+                  <PhaseMessage text={message.text || (message.status === "streaming" ? " " : "")} />
                 ) : message.role === "assistant" ? (
                   <MessageContent text={message.text || (message.status === "streaming" ? " " : "")} />
                 ) : (
