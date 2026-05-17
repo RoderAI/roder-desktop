@@ -1,252 +1,238 @@
-import { Laptop, Loader2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AlertCircle, ArrowLeft, ArrowRight, Clock3, HelpCircle, Loader2, PanelLeft, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
-import { Composer } from "@/components/composer";
 import { SettingsView } from "@/components/settings-view";
+import { TeamShell } from "@/components/team-shell";
 import { TerminalPanel } from "@/components/terminal-panel";
-import { TopBar, type ToolPanel } from "@/components/top-bar";
-import { Transcript } from "@/components/transcript";
 import { Badge } from "@/components/ui/badge";
-import { useGodeAgent } from "@/hooks/use-gode-agent";
+import { godeIpc } from "@/lib/gode-ipc";
+import {
+  toTeamShellMembers,
+  toTeamShellMessages,
+  toTeamShellTeam,
+  type TeamAppId,
+} from "@/lib/team-view-model";
+import { useRoderTeam } from "@/hooks/use-roder-team";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
-import type { DesktopAttachment, GodeThread } from "@/types/gode";
+import type { TeamDrawer } from "@/components/team-shell";
+import type { DesktopAttachment, SystemAppearance } from "@/types/gode";
+
+type ToolPanel = "terminal" | "browser" | "canvas" | null;
 
 export function App(): React.JSX.Element {
-  const agent = useGodeAgent();
+  const teamState = useRoderTeam();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
-  useThemeApplication(agent.appearance);
-  const [followSignal, setFollowSignal] = useState(0);
+  const openSettings = useThemeStore((state) => state.openSettings);
+  const [appearance, setAppearance] = useState<SystemAppearance>("light");
+  const [activeDrawer, setActiveDrawer] = useState<TeamDrawer>({ type: "details" });
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
-  const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
-  const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
-  const activeWorkspaceCwd = activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.status.cwd ?? "";
-  const folderOptions = useMemo(() => buildFolderOptions(agent.threads, activeWorkspaceCwd), [activeWorkspaceCwd, agent.threads]);
-  const threadOptions = useMemo(() => {
-    const selectedFolder = normalizePath(activeWorkspaceCwd);
-    return agent.threads
-      .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === selectedFolder)
-      .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
-  }, [activeWorkspaceCwd, agent.threads]);
-  const projectName = basename(activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.threads.find((thread) => thread.cwd)?.cwd) ?? "workspace";
-  const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
-  const selectThread = useCallback(
-    (threadId: string) => {
-      followBottom();
-      void agent.selectThread(threadId);
-    },
-    [agent, followBottom],
-  );
-  const selectFolder = useCallback(
-    (path: string) => {
-      const normalizedPath = normalizePath(path);
-      const latestThread = agent.threads
-        .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === normalizedPath)
-        .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt))[0];
+  const [serverError, setServerError] = useState<string | null>(null);
+  useThemeApplication(appearance);
 
-      agent.setSelectedWorkspaceCwd(path);
-      if (latestThread) {
-        selectThread(latestThread.id);
+  useEffect(() => {
+    const offAppearance = godeIpc.onAppearance(setAppearance);
+    void godeIpc.appearance().then(setAppearance);
+    void godeIpc.start().catch((error: Error) => setServerError(error.message));
+    return () => {
+      offAppearance();
+    };
+  }, []);
+
+  const shellTeam = useMemo(() => toTeamShellTeam(teamState.activeTeam), [teamState.activeTeam]);
+  const members = useMemo(() => toTeamShellMembers(teamState.activeTeam), [teamState.activeTeam]);
+  const messages = useMemo(() => toTeamShellMessages(teamState.activeMessages), [teamState.activeMessages]);
+  const activeChannelId = teamState.activeChannelId ?? shellTeam.channels?.[0]?.id ?? "general";
+
+  const sendChannelMessage = useCallback(
+    async (channelId: string, body: string) => {
+      const teamId = teamState.activeTeamId;
+      if (!teamId) {
+        return;
       }
+      await teamState.sendChannelMessage({
+        teamId,
+        channelId,
+        text: body,
+      });
     },
-    [agent, selectThread],
+    [teamState],
   );
-  const newThread = useCallback(() => {
-    followBottom();
-    void agent.newThread();
-  }, [agent, followBottom]);
-  const attachToComposer = useCallback(
-    (attachment: DesktopAttachment) => {
-      setComposerAttachments((attachments) =>
-        attachments.some((existing) => existing.path === attachment.path) ? attachments : [...attachments, attachment],
-      );
-      followBottom();
+
+  const sendMemberDM = useCallback(
+    async (memberId: string, body: string) => {
+      const teamId = teamState.activeTeamId;
+      if (!teamId || memberId === "system") {
+        return;
+      }
+      await teamState.sendMemberMessage({
+        teamId,
+        memberId,
+        channelId: null,
+        text: body,
+      });
     },
-    [followBottom],
+    [teamState],
   );
-  const sendPrompt = useCallback(
-    async (prompt: string, attachments: DesktopAttachment[]) => {
-      followBottom();
-      await agent.sendPrompt(prompt, attachments);
+
+  const toggleScheduler = useCallback(() => {
+    void teamState.setSchedulerRunning(!teamState.schedulerRunning);
+  }, [teamState]);
+
+  const openAppDrawer = useCallback(
+    (appId?: TeamAppId) => {
+      if (!appId) {
+        setActiveDrawer({ type: "apps" });
+        return;
+      }
+      setActiveDrawer({ type: "apps", appId });
+      if (appId === "settings") {
+        openSettings("appearance");
+        return;
+      }
+      setActiveTool((current) => (current === appId ? null : appId));
     },
-    [agent, followBottom],
+    [openSettings],
   );
-  const beginSidebarResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    beginHorizontalResize(event, leftSidebarWidth, (startWidth, deltaX) => {
-      setLeftSidebarWidth(clamp(startWidth + deltaX, 220, 420));
-    });
-  }, [leftSidebarWidth]);
-  const beginToolPanelResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    beginHorizontalResize(event, toolPanelWidth, (startWidth, deltaX) => {
-      setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
-    });
-  }, [toolPanelWidth]);
+
+  const stopMember = useCallback(
+    (memberId: string) => {
+      void teamState.interruptMember(memberId);
+    },
+    [teamState],
+  );
+
+  const attachToContext = useCallback((_attachment: DesktopAttachment) => {
+    setActiveDrawer({ type: "details" });
+  }, []);
+
+  const beginToolPanelResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      beginHorizontalResize(event, toolPanelWidth, (startWidth, deltaX) => {
+        setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
+      });
+    },
+    [toolPanelWidth],
+  );
+
+  const statusError = teamState.error ?? serverError;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
+      <TitleCommandBar onOpenSettings={() => openSettings("appearance")} />
       {settingsOpen && <SettingsView />}
-      {sidebarOpen && (
-        <>
-          <AppSidebar
-            threads={agent.threads}
-            activeThreadId={agent.activeThreadId}
-            width={leftSidebarWidth}
-            onSelectThread={selectThread}
-            onNewThread={newThread}
-            onBack={() => void agent.goBack()}
-            onForward={() => void agent.goForward()}
-            canGoBack={agent.canGoBack}
-            canGoForward={agent.canGoForward}
-            onClose={() => setSidebarOpen(false)}
+      <div className="relative flex h-full w-full pt-11">
+        <section className="h-full min-w-0 flex-1">
+          <TeamShell
+            team={shellTeam}
+            activeChannelId={activeChannelId}
+            messages={messages}
+            members={members}
+            activeDrawer={activeDrawer}
+            schedulerRunning={teamState.schedulerRunning}
+            onSelectChannel={teamState.selectChannel}
+            onSendChannelMessage={sendChannelMessage}
+            onSendMemberDM={sendMemberDM}
+            onToggleScheduler={toggleScheduler}
+            onOpenAppDrawer={openAppDrawer}
+            onOpenDrawer={setActiveDrawer}
+            onStopMember={stopMember}
           />
-          <div
-            className="no-drag relative z-30 h-screen w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
-            aria-label="Resize thread sidebar"
-            role="separator"
-            onPointerDown={beginSidebarResize}
-          />
-        </>
-      )}
-      <section className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          thread={activeThread}
-          threads={threadOptions}
-          folders={folderOptions}
-          activeFolderPath={activeWorkspaceCwd}
-          status={agent.status}
-          activeTool={activeTool}
-          sidebarOpen={sidebarOpen}
-          onRestart={() => void agent.restart()}
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onSelectFolder={selectFolder}
-          onSelectThread={selectThread}
-          onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
-          onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
-          onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
-        />
-        <div className="flex min-h-0 flex-1">
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Transcript messages={agent.messages} followSignal={followSignal} />
-            {agent.error && (
-              <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-sm text-destructive">{agent.error}</div>
-            )}
-            <Composer
-              busy={agent.busy}
-              models={agent.models}
-              selectedModel={agent.selectedModel}
-              selectedReasoning={agent.selectedReasoning}
-              selectedWorkspaceCwd={agent.selectedWorkspaceCwd}
-              statusCwd={agent.status.cwd}
-              workspaceRecents={agent.workspaceRecents}
-              threads={agent.threads}
-              attachments={composerAttachments}
-              onSelectedModelChange={agent.setSelectedModel}
-              onCycleReasoning={agent.cycleSelectedReasoning}
-              onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
-              onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
-              onScrollToBottom={followBottom}
-              onAttachmentsChange={setComposerAttachments}
-              onSend={sendPrompt}
-              onStop={agent.stopTurn}
+        </section>
+        {activeTool && (
+          <div className="relative h-full min-w-0 shrink-0 border-l border-border bg-background" style={{ width: toolPanelWidth }}>
+            <div
+              className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
+              aria-label="Resize app panel"
+              role="separator"
+              onPointerDown={beginToolPanelResize}
             />
-            <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-border px-8 text-xs text-muted-foreground">
-              <Laptop className="size-4" />
-              <span>Local</span>
-              <span>{projectName}</span>
-              <span className="ml-auto flex items-center gap-2">
-                {agent.busy && <Loader2 className="size-3 animate-spin" />}
-                <Badge variant="muted" className="text-[11px]">
-                  {agent.status.state === "ready" ? "roder app-server" : agent.status.state}
-                </Badge>
-              </span>
-            </footer>
+            {activeTool === "terminal" && <TerminalPanel />}
+            {activeTool === "browser" && <BrowserPanel onAttach={attachToContext} />}
+            {activeTool === "canvas" && <CanvasPanel onAttach={attachToContext} />}
           </div>
-          {activeTool && (
-            <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
-              <div
-                className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
-                aria-label="Resize tool panel"
-                role="separator"
-                onPointerDown={beginToolPanelResize}
-              />
-              {activeTool === "terminal" && <TerminalPanel />}
-              {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
-              {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
-            </div>
+        )}
+      </div>
+      {(!teamState.hydrated || teamState.busy || statusError) && (
+        <div className="pointer-events-none fixed bottom-4 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm shadow-lg">
+          {!statusError && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+          {statusError && <AlertCircle className="size-4 text-destructive" />}
+          <span className="max-w-[560px] truncate">
+            {statusError ?? (teamState.hydrated ? "Syncing team state" : "Starting Roder team")}
+          </span>
+          {teamState.activeTeam && (
+            <Badge variant="muted" className="text-[11px]">
+              {teamState.activeTeam.provider}/{teamState.activeTeam.model}
+            </Badge>
           )}
         </div>
-      </section>
+      )}
     </div>
   );
 }
 
-function basename(path: string | undefined): string | undefined {
-  return path?.split("/").filter(Boolean).pop();
-}
-
-type FolderOption = {
-  path: string;
-  name: string;
-  updatedAt: number;
-  threadCount: number;
-};
-
-function buildFolderOptions(threads: GodeThread[], activePath: string): FolderOption[] {
-  const folders = new Map<string, FolderOption>();
-  const activeFolderPath = normalizePath(activePath);
-
-  if (activeFolderPath) {
-    folders.set(activeFolderPath, {
-      path: activeFolderPath,
-      name: workspaceName(activeFolderPath),
-      updatedAt: Date.now(),
-      threadCount: 0,
-    });
-  }
-
-  for (const thread of threads) {
-    if (thread.id.startsWith("demo-")) {
-      continue;
-    }
-    const path = normalizePath(thread.cwd);
-    const existing = folders.get(path);
-    folders.set(path, {
-      path,
-      name: existing?.name ?? workspaceName(path),
-      updatedAt: Math.max(existing?.updatedAt ?? 0, normalizedTimestamp(thread.updatedAt)),
-      threadCount: (existing?.threadCount ?? 0) + 1,
-    });
-  }
-
-  return [...folders.values()].sort((left, right) => {
-    if (left.path === activeFolderPath) {
-      return -1;
-    }
-    if (right.path === activeFolderPath) {
-      return 1;
-    }
-    return right.updatedAt - left.updatedAt || left.name.localeCompare(right.name);
-  });
-}
-
-function normalizePath(path: string | undefined): string {
-  return (path || "").replace(/\/+$/, "") || path || "";
-}
-
-function workspaceName(path: string): string {
-  return basename(path) ?? "workspace";
-}
-
-function normalizedTimestamp(timestamp: number): number {
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return 0;
-  }
-  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
+function TitleCommandBar({ onOpenSettings }: { onOpenSettings: () => void }): React.JSX.Element {
+  return (
+    <header className="drag-region absolute inset-x-0 top-0 z-[60] flex h-11 items-center border-b border-white/10 bg-[linear-gradient(90deg,#064563_0%,#17385a_42%,#1c0b34_100%)] pl-[112px] pr-3 text-white shadow-sm">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+        <button
+          type="button"
+          aria-label="Back"
+          className="no-drag flex size-8 items-center justify-center rounded-md text-white/58 hover:bg-white/10 hover:text-white"
+        >
+          <ArrowLeft className="size-5" />
+        </button>
+        <button
+          type="button"
+          aria-label="Forward"
+          className="no-drag flex size-8 items-center justify-center rounded-md text-white/58 hover:bg-white/10 hover:text-white"
+        >
+          <ArrowRight className="size-5" />
+        </button>
+        <button
+          type="button"
+          aria-label="History"
+          className="no-drag flex size-8 items-center justify-center rounded-md text-white/85 hover:bg-white/10"
+        >
+          <Clock3 className="size-5" />
+        </button>
+        <label className="no-drag flex h-8 min-w-[280px] max-w-[720px] flex-1 items-center gap-2 rounded-md border border-white/10 bg-white/26 px-3 text-sm text-white shadow-inner">
+          <Search className="size-4 shrink-0 text-white/86" />
+          <input
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-white/78"
+            placeholder="Describe what you are looking for"
+            aria-label="Search Roder"
+          />
+        </label>
+        <button
+          type="button"
+          aria-label="Profile"
+          className="no-drag ml-1 flex size-8 items-center justify-center rounded-lg border border-white/16 bg-white/18 text-[15px] shadow-sm hover:bg-white/24"
+        >
+          R
+        </button>
+      </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2 pl-4">
+        <button
+          type="button"
+          aria-label="Toggle sidebar"
+          className="no-drag flex h-8 items-center gap-1 rounded-lg border border-white/18 bg-white/8 px-2 text-white/80 hover:bg-white/14 hover:text-white"
+        >
+          <PanelLeft className="size-4" />
+        </button>
+        <button
+          type="button"
+          aria-label="Help"
+          className="no-drag flex size-8 items-center justify-center rounded-md text-white/82 hover:bg-white/10 hover:text-white"
+          onClick={onOpenSettings}
+        >
+          <HelpCircle className="size-5" />
+        </button>
+      </div>
+    </header>
+  );
 }
 
 function beginHorizontalResize(

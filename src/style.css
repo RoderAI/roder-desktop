@@ -190,3 +190,22 @@ code {
 .transcript-fade {
   background: linear-gradient(to top, var(--color-background) 20%, var(--transcript-fade-clear));
 }
+
+.team-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sidebar-dot) transparent;
+}
+
+.team-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.team-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.team-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--color-sidebar-dot);
+}

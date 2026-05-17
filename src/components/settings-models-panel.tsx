@@ -1,35 +1,27 @@
 import { Check, RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { visibleModelIdsFor } from "@/lib/gode-models";
-import { useGodeStore } from "@/stores/gode-store";
+import { useTeamStore } from "@/stores/team-store";
 import type { GodeModel } from "@/types/gode";
 import { cn } from "@/lib/utils";
 
 export function ModelsSettingsPanel(): React.JSX.Element {
-  const models = useGodeStore((state) => state.models);
-  const selectedModel = useGodeStore((state) => state.selectedModel);
-  const visibleModelIds = useGodeStore((state) => state.visibleModelIds);
-  const setModelVisibility = useGodeStore((state) => state.setModelVisibility);
-  const resetVisibleModels = useGodeStore((state) => state.resetVisibleModels);
+  const models = useTeamStore((state) => state.models);
+  const activeTeam = useTeamStore((state) => state.activeTeamId ? state.teamById[state.activeTeamId] : null);
   const [query, setQuery] = useState("");
 
-  const visibleIds = useMemo(() => visibleModelIdsFor(models, visibleModelIds), [models, visibleModelIds]);
-  const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const filteredModels = useMemo(() => filterModels(models, query), [models, query]);
   const grouped = useMemo(() => groupByProvider(filteredModels), [filteredModels]);
-  const customised = visibleModelIds.length > 0;
+  const selectedModel = activeTeam?.model ?? "gpt-5.5";
 
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
         <div>
           <h1 className="text-[16px] font-medium">Models</h1>
-          <p className="mt-1 text-[14px] text-muted-foreground">
-            {visibleIds.length} of {models.length} shown in the composer
-          </p>
+          <p className="mt-1 text-[14px] text-muted-foreground">{models.length} available to the team scheduler</p>
         </div>
-        <Button variant="ghost" size="sm" disabled={!customised} onClick={resetVisibleModels}>
+        <Button variant="ghost" size="sm" disabled>
           <RotateCcw className="size-3.5" />
           Show all
         </Button>
@@ -56,15 +48,14 @@ export function ModelsSettingsPanel(): React.JSX.Element {
               <h2 className="mb-2 text-[13px] font-medium text-muted-foreground">{providerName(group.provider)}</h2>
               <div className="space-y-1">
                 {group.models.map((model) => {
-                  const visible = visibleSet.has(model.id);
                   return (
                     <ModelVisibilityRow
                       key={model.id}
                       model={model}
                       selected={model.id === selectedModel}
-                      visible={visible}
-                      disabled={visible && visibleIds.length <= 1}
-                      onToggle={() => setModelVisibility(model.id, !visible)}
+                      visible
+                      disabled
+                      onToggle={() => undefined}
                     />
                   );
                 })}
