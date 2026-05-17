@@ -32,7 +32,7 @@ export class TerminalManager extends EventEmitter {
       cwd: options.cwd || process.cwd(),
       env: {
         ...process.env,
-        TERM_PROGRAM: "gode-desktop",
+        TERM_PROGRAM: "roder-desktop",
       },
     });
     const id = "primary";

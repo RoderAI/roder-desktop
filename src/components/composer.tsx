@@ -385,7 +385,7 @@ function modelName(model: GodeModel | undefined): string {
 
 function providerName(provider: string): string {
   if (!provider) {
-    return "Gode";
+    return "Roder";
   }
   if (provider.toLowerCase() === "openai") {
     return "OpenAI";

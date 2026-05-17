@@ -23,7 +23,7 @@ export class BrowserManager {
   #window: BrowserWindow | null = null;
   #view: WebContentsView | null = null;
   #visible = false;
-  #url = "https://www.google.com/search?q=gode";
+  #url = "https://www.google.com/search?q=roder";
   #annotating = false;
 
   constructor(private readonly cdpPort: string) {}

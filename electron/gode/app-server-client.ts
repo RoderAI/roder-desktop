@@ -77,7 +77,7 @@ export class GodeAppServerClient extends EventEmitter {
       cwd: target.cwd,
       env: {
         ...process.env,
-        GODE_DESKTOP: "1",
+        RODER_DESKTOP: "1",
       },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -95,7 +95,7 @@ export class GodeAppServerClient extends EventEmitter {
       }
     });
     this.#child.once("exit", (code, signal) => {
-      const message = signal ? `gode exited with signal ${signal}` : `gode exited with code ${code ?? 0}`;
+      const message = signal ? `roder exited with signal ${signal}` : `roder exited with code ${code ?? 0}`;
       this.#rejectAll(new Error(message));
       this.#child = null;
       this.#setStatus({ state: "stopped", binary: target.label, cwd: target.cwd, message });
@@ -108,8 +108,8 @@ export class GodeAppServerClient extends EventEmitter {
 
     await this.request("initialize", {
       clientInfo: {
-        name: "gode-desktop",
-        title: "Gode Desktop",
+        name: "roder-desktop",
+        title: "Roder Desktop",
         version: app.getVersion(),
       },
       capabilities: {
@@ -128,7 +128,7 @@ export class GodeAppServerClient extends EventEmitter {
     const child = this.#child;
     this.#child = null;
     child.kill();
-    this.#rejectAll(new Error("gode app-server stopped"));
+    this.#rejectAll(new Error("roder app-server stopped"));
     this.#setStatus({ state: "stopped", binary: this.#status.binary, cwd: this.#status.cwd });
   }
 
@@ -142,7 +142,7 @@ export class GodeAppServerClient extends EventEmitter {
       await this.start();
     }
     if (!this.#child) {
-      throw new Error("gode app-server is not running");
+      throw new Error("roder app-server is not running");
     }
 
     const id = this.#nextId++;
@@ -179,7 +179,7 @@ export class GodeAppServerClient extends EventEmitter {
     try {
       message = JSON.parse(line) as JsonRpcMessage;
     } catch (error) {
-      this.emit("stderr", `Invalid gode app-server JSON: ${(error as Error).message}`);
+      this.emit("stderr", `Invalid roder app-server JSON: ${(error as Error).message}`);
       return;
     }
 
@@ -206,7 +206,7 @@ export class GodeAppServerClient extends EventEmitter {
   }
 
   #resolveSpawnTarget(): SpawnTarget {
-    const binaryName = process.platform === "win32" ? "gode.exe" : "gode";
+    const binaryName = process.platform === "win32" ? "roder.exe" : "roder";
     const packaged = join(process.resourcesPath, "bin", binaryName);
     if (app.isPackaged && existsSync(packaged)) {
       return {
@@ -227,7 +227,7 @@ export class GodeAppServerClient extends EventEmitter {
       };
     }
 
-    throw new Error(`Could not find embedded gode binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:gode before launching the desktop app.`);
+    throw new Error(`Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`);
   }
 
   #setStatus(status: GodeStatus): void {

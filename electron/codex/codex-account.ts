@@ -118,12 +118,12 @@ export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {
 export async function startCodexLogin(): Promise<CodexAccountSnapshot> {
   if (!loginPending) {
     loginPending = true;
-    const target = resolveGodeBinary();
+    const target = resolveRoderBinary();
     const child = spawn(target.command, [...target.args, "auth", "login", "codex"], {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        GODE_DESKTOP: "1",
+        RODER_DESKTOP: "1",
       },
       detached: true,
       stdio: "ignore",
@@ -141,7 +141,7 @@ export async function startCodexLogin(): Promise<CodexAccountSnapshot> {
 
 export async function logoutCodex(): Promise<CodexAccountSnapshot> {
   loginPending = false;
-  await rm(godeAuthPath(), { force: true });
+  await rm(roderAuthPath(), { force: true });
   return getCodexAccountSnapshot();
 }
 
@@ -170,7 +170,7 @@ async function readCodexAuth(): Promise<{
 }
 
 async function readGodeAuth(): Promise<{ signedIn: boolean; accountId: string | null }> {
-  const auth = await readJson<GodeAuthJson>(godeAuthPath());
+  const auth = await readJson<GodeAuthJson>(roderAuthPath());
   return {
     signedIn: Boolean(auth?.refresh),
     accountId: firstText(auth?.account_id),
@@ -292,8 +292,8 @@ function parseIdToken(idToken: string | undefined): CodexIdTokenPayload | null {
   }
 }
 
-function resolveGodeBinary(): { command: string; args: string[] } {
-  const binaryName = process.platform === "win32" ? "gode.exe" : "gode";
+function resolveRoderBinary(): { command: string; args: string[] } {
+  const binaryName = process.platform === "win32" ? "roder.exe" : "roder";
   const packaged = join(process.resourcesPath, "bin", binaryName);
   if (app.isPackaged && existsSync(packaged)) {
     return { command: packaged, args: [] };
@@ -302,11 +302,11 @@ function resolveGodeBinary(): { command: string; args: string[] } {
   if (existsSync(bundled)) {
     return { command: bundled, args: [] };
   }
-  throw new Error(`Could not find embedded gode binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:gode before launching the desktop app.`);
+  throw new Error(`Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`);
 }
 
-function godeAuthPath(): string {
-  return join(process.env.GODE_DATA_DIR || join(homedir(), ".gode"), "auth", "codex.json");
+function roderAuthPath(): string {
+  return join(process.env.RODER_DATA_DIR || join(homedir(), ".roder"), "auth", "codex.json");
 }
 
 function firstText(...values: Array<string | null | undefined>): string | null {

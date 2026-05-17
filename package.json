@@ -1,20 +1,20 @@
 {
-  "name": "gode-desktop",
+  "name": "roder-desktop",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "bundle:gode": "node scripts/bundle-gode.mjs",
-    "dev": "pnpm bundle:gode && electron-vite dev",
-    "build": "pnpm bundle:gode && tsc --noEmit && electron-vite build",
+    "bundle:roder": "node scripts/bundle-roder.mjs",
+    "dev": "pnpm bundle:roder && electron-vite dev",
+    "build": "pnpm bundle:roder && tsc --noEmit && electron-vite build",
     "preview": "electron-vite preview",
     "dist": "pnpm build && electron-builder",
     "typecheck": "tsc --noEmit"
   },
   "build": {
-    "appId": "sc.gode.desktop",
-    "productName": "Gode",
+    "appId": "sc.roder.desktop",
+    "productName": "Roder",
     "icon": "resources/icon.png",
     "mac": {
       "icon": "resources/icon.icns"
@@ -35,6 +35,10 @@
       {
         "from": "resources/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "resources/wordmark.png",
+        "to": "wordmark.png"
       }
     ]
   },
