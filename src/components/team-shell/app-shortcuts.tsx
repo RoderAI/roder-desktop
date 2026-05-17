@@ -1,4 +1,4 @@
-import { MonitorCog, PanelsTopLeft, Settings, SquareTerminal } from "lucide-react";
+import { Activity, MonitorCog, PanelsTopLeft, Settings, SquareTerminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TeamAppId, TeamAppShortcut } from "@/lib/team-view-model";
 
@@ -11,12 +11,13 @@ const icons: Record<TeamAppId, React.ReactNode> = {
   terminal: <SquareTerminal className="size-4" />,
   browser: <PanelsTopLeft className="size-4" />,
   canvas: <MonitorCog className="size-4" />,
+  events: <Activity className="size-4" />,
   settings: <Settings className="size-4" />,
 };
 
 export function AppShortcuts({ shortcuts, onOpenAppDrawer }: AppShortcutsProps): React.JSX.Element {
   return (
-    <div className="team-scrollbar border-t border-border bg-card/50 px-4 py-2">
+    <div className="no-drag team-scrollbar border-t border-border bg-card/50 px-4 py-2">
       <div className="mx-auto flex max-w-[1040px] flex-wrap items-center gap-2">
         <span className="mr-1 text-xs font-medium text-muted-foreground">Apps</span>
         {shortcuts.map((shortcut) => (

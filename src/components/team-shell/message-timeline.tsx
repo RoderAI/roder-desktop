@@ -1,7 +1,7 @@
 import { FileText, MessageSquare, MoreHorizontal, SmilePlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatTeamDay, formatTeamTime } from "@/lib/team-view-model";
+import { formatTeamDay, formatTeamTime, LOCAL_MEMBER_ID, SYSTEM_MEMBER_ID } from "@/lib/team-view-model";
 import type { TeamMember, TeamMessage } from "./types";
 import { MemberAvatar } from "./member-avatar";
 
@@ -118,7 +118,7 @@ function MessageRow({
 }
 
 function renderMessageBody(body: string, membersById: Map<string, TeamMember>): React.ReactNode {
-  const members = [...membersById.values()].filter((member) => member.id !== "system");
+  const members = [...membersById.values()].filter((member) => member.id !== SYSTEM_MEMBER_ID && member.id !== LOCAL_MEMBER_ID);
   if (members.length === 0 || !body.includes("@")) {
     return body;
   }

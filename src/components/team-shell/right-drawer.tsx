@@ -1,7 +1,8 @@
-import { Circle, Hash, MessageSquare, Send, Square, X } from "lucide-react";
+import { Activity, Circle, Hash, MessageSquare, Send, Square, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { DebugEvent } from "@/lib/debug-events";
 import { DEFAULT_TEAM_APP_SHORTCUTS } from "@/lib/team-view-model";
 import type { TeamAppId, TeamChannel } from "@/lib/team-view-model";
 import type { TeamDrawer, TeamMember } from "./types";
@@ -12,9 +13,11 @@ type RightDrawerProps = {
   channel: TeamChannel;
   members: TeamMember[];
   schedulerRunning: boolean;
+  debugEvents: DebugEvent[];
   onOpenAppDrawer: (appId?: TeamAppId) => void;
   onOpenDrawer?: (drawer: TeamDrawer) => void;
   onSendMemberDM: (memberId: string, body: string) => void | Promise<void>;
+  onClearDebugEvents: () => void;
   onStopMember: (memberId: string) => void;
 };
 
@@ -23,9 +26,11 @@ export function RightDrawer({
   channel,
   members,
   schedulerRunning,
+  debugEvents,
   onOpenAppDrawer,
   onOpenDrawer,
   onSendMemberDM,
+  onClearDebugEvents,
   onStopMember,
 }: RightDrawerProps): React.JSX.Element | null {
   if (!drawer) {
@@ -43,6 +48,7 @@ export function RightDrawer({
       {drawer.type === "details" && <ChannelDetails channel={channel} members={members} schedulerRunning={schedulerRunning} />}
       {drawer.type === "members" && <MemberList members={members} onSendMemberDM={onSendMemberDM} onStopMember={onStopMember} />}
       {drawer.type === "apps" && <AppsPanel activeAppId={drawer.appId} onOpenAppDrawer={onOpenAppDrawer} />}
+      {drawer.type === "events" && <EventsPanel events={debugEvents} onClear={onClearDebugEvents} />}
     </aside>
   );
 }
@@ -176,6 +182,50 @@ function AppsPanel({
   );
 }
 
+function EventsPanel({ events, onClear }: { events: DebugEvent[]; onClear: () => void }): React.JSX.Element {
+  return (
+    <div className="team-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Activity className="size-4 text-muted-foreground" />
+        <div className="text-sm font-semibold">Raw events</div>
+        <Badge variant="muted" className="ml-auto text-[11px]">
+          {events.length}
+        </Badge>
+      </div>
+      <Button variant="subtle" size="compact" className="mb-3 h-8 w-full" onClick={onClear}>
+        Clear events
+      </Button>
+      {events.length === 0 ? (
+        <div className="rounded-md border border-border bg-background p-3 text-sm leading-5 text-muted-foreground">
+          Type in the composer or send a message to see UI, IPC, and notification events here.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {events.map((event) => (
+            <article key={event.id} className="rounded-md border border-border bg-background p-3">
+              <div className="flex items-start gap-2">
+                <span className={eventLevelClass(event.level)}>{event.level}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-semibold">
+                    {event.source}/{event.event}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">{formatDebugTime(event.createdAt)}</div>
+                </div>
+              </div>
+              {event.summary && <div className="mt-2 text-xs text-muted-foreground">{event.summary}</div>}
+              {event.payload !== undefined && (
+                <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/60 p-2 font-mono text-[11px] leading-4 text-muted-foreground">
+                  {formatPayload(event.payload)}
+                </pre>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }): React.JSX.Element {
   return (
     <div className="rounded-md border border-border bg-background p-3">
@@ -195,5 +245,34 @@ function drawerTitle(drawer: Exclude<TeamDrawer, null>): string {
   if (drawer.type === "members") {
     return "Members";
   }
+  if (drawer.type === "events") {
+    return "Raw events";
+  }
   return "Apps";
+}
+
+function eventLevelClass(level: DebugEvent["level"]): string {
+  const base = "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase";
+  if (level === "error") {
+    return `${base} bg-destructive/10 text-destructive`;
+  }
+  if (level === "warn") {
+    return `${base} bg-amber-500/12 text-amber-700`;
+  }
+  return `${base} bg-emerald-500/10 text-emerald-700`;
+}
+
+function formatDebugTime(value: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatPayload(payload: unknown): string {
+  if (typeof payload === "string") {
+    return payload;
+  }
+  return JSON.stringify(payload, null, 2);
 }

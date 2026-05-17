@@ -15,7 +15,10 @@ export function memberIdFromDmChannelId(channelId: string | null | undefined): s
 }
 
 export function conversationIdForMessage(
-  message: Pick<RoderTeamMessage, "channel_id" | "author_member_id">,
+  message: Pick<RoderTeamMessage, "channel_id" | "author_member_id" | "target_member_id">,
 ): string {
-  return message.channel_id ?? (message.author_member_id ? dmChannelId(message.author_member_id) : "direct");
+  return message.channel_id ??
+    (message.target_member_id ? dmChannelId(message.target_member_id)
+    : message.author_member_id ? dmChannelId(message.author_member_id)
+    : "direct");
 }

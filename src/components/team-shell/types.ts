@@ -1,3 +1,4 @@
+import type { DebugEvent } from "@/lib/debug-events";
 import type { TeamAppId, TeamAppShortcut, TeamChannel } from "@/lib/team-view-model";
 
 export type TeamMemberPresence = "active" | "away" | "busy" | "offline";
@@ -45,6 +46,7 @@ export type TeamDrawer =
   | { type: "details" }
   | { type: "apps"; appId?: TeamAppId }
   | { type: "members" }
+  | { type: "events" }
   | null;
 
 export type TeamShellTeam = {
@@ -60,6 +62,7 @@ export type TeamShellProps = {
   activeChannelId: string;
   messages: TeamMessage[];
   members: TeamMember[];
+  debugEvents: DebugEvent[];
   activeDrawer: TeamDrawer;
   schedulerRunning: boolean;
   onSelectChannel: (channelId: string) => void;
@@ -68,5 +71,6 @@ export type TeamShellProps = {
   onToggleScheduler: () => void;
   onOpenAppDrawer: (appId?: TeamAppId) => void;
   onOpenDrawer?: (drawer: TeamDrawer) => void;
+  onClearDebugEvents: () => void;
   onStopMember: (memberId: string) => void;
 };

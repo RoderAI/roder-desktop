@@ -2,7 +2,7 @@ import { ChevronDown, Circle, Hash, Headphones, MoreHorizontal, Plus } from "luc
 import { Button } from "@/components/ui/button";
 import { dmChannelId } from "@/lib/team-conversations";
 import { cn } from "@/lib/utils";
-import type { TeamChannel } from "@/lib/team-view-model";
+import { LOCAL_MEMBER_ID, SYSTEM_MEMBER_ID, type TeamChannel } from "@/lib/team-view-model";
 import type { TeamMember, TeamShellTeam } from "./types";
 import { MemberAvatar } from "./member-avatar";
 
@@ -23,7 +23,7 @@ export function ChannelSidebar({
   onSelectChannel,
   onSelectMemberDm,
 }: ChannelSidebarProps): React.JSX.Element {
-  const visibleMembers = members.filter((member) => member.id !== "system").slice(0, 7);
+  const visibleMembers = members.filter((member) => member.id !== SYSTEM_MEMBER_ID && member.id !== LOCAL_MEMBER_ID).slice(0, 7);
 
   return (
     <aside className="team-scrollbar flex h-screen w-[270px] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar text-sidebar-foreground">

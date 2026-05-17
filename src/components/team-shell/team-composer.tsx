@@ -1,6 +1,7 @@
 import { AtSign, Plus, Send, Smile, Zap } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { recordDebugEvent } from "@/stores/debug-event-store";
 import { MemberAvatar } from "./member-avatar";
 import type { TeamMember } from "./types";
 
@@ -41,11 +42,19 @@ export function TeamComposer({
   async function submit(): Promise<void> {
     const value = body.trim();
     if (!value) {
+      recordComposerEvent("submit:empty", { channelId });
       return;
     }
+    recordComposerEvent("submit:start", { channelId, text: value });
     setBody("");
     setMention(null);
-    await onSendChannelMessage(channelId, value);
+    try {
+      await onSendChannelMessage(channelId, value);
+      recordComposerEvent("submit:ok", { channelId, text: value });
+    } catch (error) {
+      recordComposerEvent("submit:error", { channelId, error: (error as Error).message, text: value }, "error");
+      throw error;
+    }
   }
 
   function updateMentionState(value: string, cursor: number): void {
@@ -65,6 +74,7 @@ export function TeamComposer({
 
     setBody(nextBody);
     setMention(null);
+    recordComposerEvent("mention:insert", { channelId, memberId: member.id, memberName: member.name, value: nextBody });
     requestAnimationFrame(() => {
       textarea?.focus();
       textarea?.setSelectionRange(nextCursor, nextCursor);
@@ -83,6 +93,7 @@ export function TeamComposer({
     setBody(nextBody);
     setMention({ start: atIndex, end: atIndex + 1, query: "" });
     setActiveMentionIndex(0);
+    recordComposerEvent("mention:open", { channelId, value: nextBody });
     requestAnimationFrame(() => {
       textarea?.focus();
       textarea?.setSelectionRange(atIndex + 1, atIndex + 1);
@@ -90,7 +101,7 @@ export function TeamComposer({
   }
 
   return (
-    <div className="relative shrink-0 bg-background px-5 pb-4">
+    <div className="no-drag relative shrink-0 bg-background px-5 pb-4">
       {mention && mentionMatches.length > 0 && (
         <div className="absolute bottom-[142px] left-5 z-30 w-[320px] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-lg">
           <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">Mention teammate</div>
@@ -121,14 +132,24 @@ export function TeamComposer({
           value={body}
           placeholder={placeholder ?? `Message #${channelName}`}
           className="min-h-[74px] w-full resize-none bg-transparent px-4 py-3 text-[14px] leading-5 outline-none placeholder:text-muted-foreground"
+          onFocus={() => recordComposerEvent("focus", { channelId, placeholder: placeholder ?? `Message #${channelName}` })}
           onChange={(event) => {
             const value = event.target.value;
             setBody(value);
+            recordComposerEvent("input", { channelId, value, length: value.length });
             updateMentionState(value, event.target.selectionStart);
           }}
           onClick={(event) => updateMentionState(body, event.currentTarget.selectionStart)}
           onKeyUp={(event) => updateMentionState(body, event.currentTarget.selectionStart)}
           onKeyDown={(event) => {
+            recordComposerEvent("key", {
+              channelId,
+              key: event.key,
+              shiftKey: event.shiftKey,
+              metaKey: event.metaKey,
+              ctrlKey: event.ctrlKey,
+              bodyLength: body.length,
+            });
             if (mention && mentionMatches.length > 0) {
               if (event.key === "ArrowDown") {
                 event.preventDefault();
@@ -178,6 +199,15 @@ export function TeamComposer({
       </div>
     </div>
   );
+}
+
+function recordComposerEvent(event: string, payload: unknown, level: "info" | "warn" | "error" = "info"): void {
+  recordDebugEvent({
+    source: "composer",
+    event,
+    level,
+    payload,
+  });
 }
 
 function mentionAtCursor(value: string, cursor: number): MentionState | null {

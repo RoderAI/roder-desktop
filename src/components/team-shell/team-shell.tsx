@@ -15,6 +15,7 @@ export function TeamShell({
   activeChannelId,
   messages,
   members,
+  debugEvents,
   activeDrawer,
   schedulerRunning,
   onSelectChannel,
@@ -23,6 +24,7 @@ export function TeamShell({
   onToggleScheduler,
   onOpenAppDrawer,
   onOpenDrawer,
+  onClearDebugEvents,
   onStopMember,
 }: TeamShellProps): React.JSX.Element {
   const channels = team.channels?.length ? team.channels : DEFAULT_TEAM_CHANNELS;
@@ -75,9 +77,11 @@ export function TeamShell({
             channel={activeChannel}
             members={members}
             schedulerRunning={schedulerRunning}
+            debugEvents={debugEvents}
             onOpenAppDrawer={onOpenAppDrawer}
             onOpenDrawer={onOpenDrawer}
             onSendMemberDM={onSendMemberDM}
+            onClearDebugEvents={onClearDebugEvents}
             onStopMember={onStopMember}
           />
         </div>

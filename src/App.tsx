@@ -14,6 +14,7 @@ import {
   type TeamAppId,
 } from "@/lib/team-view-model";
 import { useRoderTeam } from "@/hooks/use-roder-team";
+import { recordDebugEvent, useDebugEventStore } from "@/stores/debug-event-store";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
 import type { TeamDrawer } from "@/components/team-shell";
@@ -23,6 +24,8 @@ type ToolPanel = "terminal" | "browser" | "canvas" | null;
 
 export function App(): React.JSX.Element {
   const teamState = useRoderTeam();
+  const debugEvents = useDebugEventStore((state) => state.events);
+  const clearDebugEvents = useDebugEventStore((state) => state.clear);
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
   const openSettings = useThemeStore((state) => state.openSettings);
   const [appearance, setAppearance] = useState<SystemAppearance>("light");
@@ -50,8 +53,10 @@ export function App(): React.JSX.Element {
     async (channelId: string, body: string) => {
       const teamId = teamState.activeTeamId;
       if (!teamId) {
+        recordDebugEvent({ source: "shell", event: "send-channel:no-team", level: "warn", payload: { channelId, text: body } });
         return;
       }
+      recordDebugEvent({ source: "shell", event: "send-channel", payload: { teamId, channelId, text: body } });
       await teamState.sendChannelMessage({
         teamId,
         channelId,
@@ -65,8 +70,10 @@ export function App(): React.JSX.Element {
     async (memberId: string, body: string) => {
       const teamId = teamState.activeTeamId;
       if (!teamId || memberId === "system") {
+        recordDebugEvent({ source: "shell", event: "send-dm:skipped", level: "warn", payload: { teamId, memberId, text: body } });
         return;
       }
+      recordDebugEvent({ source: "shell", event: "send-dm", payload: { teamId, memberId, text: body } });
       await teamState.sendMemberMessage({
         teamId,
         memberId,
@@ -85,6 +92,10 @@ export function App(): React.JSX.Element {
     (appId?: TeamAppId) => {
       if (!appId) {
         setActiveDrawer({ type: "apps" });
+        return;
+      }
+      if (appId === "events") {
+        setActiveDrawer({ type: "events" });
         return;
       }
       setActiveDrawer({ type: "apps", appId });
@@ -130,6 +141,7 @@ export function App(): React.JSX.Element {
             activeChannelId={activeChannelId}
             messages={messages}
             members={members}
+            debugEvents={debugEvents}
             activeDrawer={activeDrawer}
             schedulerRunning={teamState.schedulerRunning}
             onSelectChannel={teamState.selectChannel}
@@ -138,6 +150,7 @@ export function App(): React.JSX.Element {
             onToggleScheduler={toggleScheduler}
             onOpenAppDrawer={openAppDrawer}
             onOpenDrawer={setActiveDrawer}
+            onClearDebugEvents={clearDebugEvents}
             onStopMember={stopMember}
           />
         </section>

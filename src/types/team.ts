@@ -35,6 +35,7 @@ export type RoderTeamMessage = {
   channel_id?: RoderTeamChannelId | null;
   author_kind: RoderTeamMessageAuthorKind;
   author_member_id?: RoderTeamMemberId | null;
+  target_member_id?: RoderTeamMemberId | null;
   text: string;
   thread_ts?: string | null;
   turn_id?: string | null;

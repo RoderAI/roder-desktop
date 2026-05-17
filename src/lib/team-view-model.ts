@@ -12,7 +12,7 @@ export type TeamChannel = {
   topic?: string;
 };
 
-export type TeamAppId = "terminal" | "browser" | "canvas" | "settings";
+export type TeamAppId = "terminal" | "browser" | "canvas" | "events" | "settings";
 
 export type TeamAppShortcut = {
   id: TeamAppId;
@@ -37,10 +37,12 @@ export const DEFAULT_TEAM_APP_SHORTCUTS: TeamAppShortcut[] = [
   { id: "terminal", label: "Terminal", description: "Run local commands", hotkey: "⌘`" },
   { id: "browser", label: "Browser", description: "Inspect web surfaces", hotkey: "⌘B" },
   { id: "canvas", label: "Canvas", description: "Open visual artifacts", hotkey: "⌘K" },
+  { id: "events", label: "Events", description: "Inspect raw UI and Roder events", hotkey: "⌘E" },
   { id: "settings", label: "Settings", description: "Models and preferences", hotkey: "⌘," },
 ];
 
-const SYSTEM_MEMBER_ID = "system";
+export const LOCAL_MEMBER_ID = "self";
+export const SYSTEM_MEMBER_ID = "system";
 
 export function channelTitle(channelId: string, channels: TeamChannel[] = DEFAULT_TEAM_CHANNELS): string {
   return channels.find((channel) => channel.id === channelId)?.name ?? channelId;
@@ -70,6 +72,15 @@ export function toTeamShellMembers(team: RoderTeam | null | undefined): TeamMemb
   const members = team?.members ?? [];
   return [
     {
+      id: LOCAL_MEMBER_ID,
+      name: "You",
+      title: "Local teammate",
+      presence: "active",
+      status: "here",
+      initials: "YZ",
+      color: "#1264a3",
+    },
+    {
       id: SYSTEM_MEMBER_ID,
       name: "Roder",
       title: "Workspace",
@@ -86,7 +97,7 @@ export function toTeamShellMessages(messages: RoderTeamMessage[]): TeamMessage[]
   return messages.map((message) => ({
     id: message.id,
     channelId: conversationIdForMessage(message),
-    authorId: message.author_member_id ?? SYSTEM_MEMBER_ID,
+    authorId: authorIdForMessage(message),
     body: message.text,
     createdAt: message.created_at,
     threadCount: message.thread_ts ? 1 : undefined,
@@ -102,6 +113,16 @@ export function toTeamShellMessages(messages: RoderTeamMessage[]): TeamMessage[]
         ]
       : undefined,
   }));
+}
+
+function authorIdForMessage(message: RoderTeamMessage): string {
+  if (message.author_kind === "user") {
+    return LOCAL_MEMBER_ID;
+  }
+  if (message.author_kind === "system") {
+    return SYSTEM_MEMBER_ID;
+  }
+  return message.author_member_id ?? SYSTEM_MEMBER_ID;
 }
 
 export function memberInitials(name: string): string {
