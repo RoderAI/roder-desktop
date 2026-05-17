@@ -61,7 +61,7 @@ export function WorkspacePicker({
           <input
             value={query}
             className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
-            placeholder="Run Gode anywhere..."
+            placeholder="Run Roder anywhere..."
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => event.stopPropagation()}
           />

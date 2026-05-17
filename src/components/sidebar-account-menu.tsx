@@ -56,7 +56,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
 
   const signedIn = account?.signedIn ?? false;
   const label = account?.displayName ?? (signedIn ? "Codex account" : "Sign in to Codex");
-  const secondary = account?.godeSignedIn ? "Gode connected" : account?.codexSignedIn ? "Codex detected" : "Connect provider";
+  const secondary = account?.godeSignedIn ? "Roder connected" : account?.codexSignedIn ? "Codex detected" : "Connect provider";
 
   return (
     <div className="no-drag shrink-0 border-t border-border/70 p-3">

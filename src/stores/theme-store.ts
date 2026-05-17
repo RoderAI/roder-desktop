@@ -56,7 +56,7 @@ const defaultCodeFont = `"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono
 export const themePresets: ThemePreset[] = [
   {
     id: "gode-light",
-    name: "Gode Light",
+    name: "Roder Light",
     scheme: "light",
     palette: {
       presetId: "gode-light",
@@ -104,7 +104,7 @@ export const themePresets: ThemePreset[] = [
   },
   {
     id: "gode-dark",
-    name: "Gode Dark",
+    name: "Roder Dark",
     scheme: "dark",
     palette: {
       presetId: "gode-dark",

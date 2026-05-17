@@ -12,7 +12,7 @@ const terminal = new TerminalManager();
 const cdpPort = process.env.GODE_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort);
 let mainWindow: BrowserWindow | null = null;
-const appName = "Gode";
+const appName = "Roder";
 const rendererZoomFactor = 0.84;
 
 app.setName(appName);

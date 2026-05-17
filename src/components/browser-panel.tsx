@@ -10,7 +10,7 @@ type BrowserPanelProps = {
 
 export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const [location, setLocation] = useState("https://www.google.com/search?q=gode");
+  const [location, setLocation] = useState("https://www.google.com/search?q=roder");
   const [snapshot, setSnapshot] = useState<BrowserSnapshot | null>(null);
   const [capturing, setCapturing] = useState(false);
 

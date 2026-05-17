@@ -216,7 +216,7 @@ export const useGodeStore = create<GodeStore>()(
         try {
           const result = await godeIpc.readThread(threadId);
           if (!result.thread) {
-            throw new Error("gode app-server did not return a thread");
+            throw new Error("roder app-server did not return a thread");
           }
           const thread = normalizeThreadCwd(result.thread, get().status.cwd);
           set((state) => ({
@@ -266,7 +266,7 @@ export const useGodeStore = create<GodeStore>()(
           const selectedModel = model?.id ?? state.selectedModel;
           const result = await godeIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
           if (!result.thread) {
-            throw new Error("gode app-server did not return a thread");
+            throw new Error("roder app-server did not return a thread");
           }
           const thread = normalizeThreadCwd(result.thread, get().status.cwd);
           set((state) => ({
@@ -302,7 +302,7 @@ export const useGodeStore = create<GodeStore>()(
             const selectedModel = model?.id ?? state.selectedModel;
             const result = await godeIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
             if (!result.thread) {
-              throw new Error("gode app-server did not return a thread");
+              throw new Error("roder app-server did not return a thread");
             }
             const thread = normalizeThreadCwd(result.thread, get().status.cwd);
             threadId = thread.id;

@@ -161,7 +161,7 @@ export function App(): React.JSX.Element {
               <span className="ml-auto flex items-center gap-2">
                 {agent.busy && <Loader2 className="size-3 animate-spin" />}
                 <Badge variant="muted" className="text-[11px]">
-                  {agent.status.state === "ready" ? "gode app-server" : agent.status.state}
+                  {agent.status.state === "ready" ? "roder app-server" : agent.status.state}
                 </Badge>
               </span>
             </footer>

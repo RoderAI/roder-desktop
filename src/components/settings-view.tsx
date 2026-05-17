@@ -168,7 +168,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         <SettingsRow label="Use pointer cursors" description="Change the cursor when hovering over interactive elements">
           <Switch checked={settings.pointerCursors} onChange={setPointerCursors} />
         </SettingsRow>
-        <SettingsRow label="UI font size" description="Adjust the base size used for the Gode UI">
+        <SettingsRow label="UI font size" description="Adjust the base size used for the Roder UI">
           <NumberStepper value={settings.uiFontSize} min={11} max={18} suffix="px" onChange={setUiFontSize} />
         </SettingsRow>
         <SettingsRow label="Code font size" description="Adjust inline code and transcript code text">
