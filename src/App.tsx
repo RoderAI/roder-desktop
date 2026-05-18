@@ -20,6 +20,7 @@ import type { DesktopAttachment, RoderThread } from "@/types/roder";
 export function App(): React.JSX.Element {
   const agent = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
+  const openSettings = useThemeStore((state) => state.openSettings);
   useExtensionThemes();
   useThemeApplication(agent.appearance);
   const [followSignal, setFollowSignal] = useState(0);
@@ -131,6 +132,7 @@ export function App(): React.JSX.Element {
           width={leftSidebarWidth}
           onSelectThread={selectThread}
           onNewThread={newThread}
+          onOpenPlugins={() => openSettings("plugins")}
         />
       </div>
       {sidebarOpen && (

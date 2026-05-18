@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceParent = dirname(root);
-const siblingSource = resolve(workspaceParent, basename(workspaceParent));
+const sourceDirectoryName = basename(root).endsWith("-desktop")
+  ? basename(root).slice(0, -"desktop".length).replace(/-$/, "")
+  : "gode";
+const siblingSource = resolve(workspaceParent, sourceDirectoryName);
 const roderSource = resolve(process.env.RODER_SOURCE_DIR ?? siblingSource);
 const output = resolve(root, "resources", "bin", process.platform === "win32" ? "roder.exe" : "roder");
 

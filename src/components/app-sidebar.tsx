@@ -12,6 +12,7 @@ type AppSidebarProps = {
   width: number;
   onSelectThread: (threadId: string) => void;
   onNewThread: () => void;
+  onOpenPlugins: () => void;
 };
 
 type ThreadGroup = {
@@ -28,6 +29,7 @@ export function AppSidebar({
   width,
   onSelectThread,
   onNewThread,
+  onOpenPlugins,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
   const threadGroups = useMemo(() => groupThreadsByFolder(threads, activeThreadId), [activeThreadId, threads]);
@@ -61,9 +63,9 @@ export function AppSidebar({
           <span className="min-w-0 flex-1 truncate">New Agent</span>
           <Kbd className="ml-auto">⌘+N</Kbd>
         </SidebarRowButton>
-        <SidebarRowButton>
+        <SidebarRowButton onClick={onOpenPlugins}>
           <Store className="size-4.5" />
-          <span className="min-w-0 flex-1 truncate">Marketplace</span>
+          <span className="min-w-0 flex-1 truncate">Plugins</span>
         </SidebarRowButton>
       </div>
 
