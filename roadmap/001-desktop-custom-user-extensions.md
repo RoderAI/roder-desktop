@@ -1,7 +1,7 @@
 # Desktop Custom User Extensions PRD
 
-**Status:** Ready
-**Current Stage:** 1 - Extension Contract And Package Format
+**Status:** In progress
+**Current Stage:** 2 - Desktop Extension Catalog And Settings UI
 **Owner:** Codex
 **Created:** 2026-05-18
 **Updated:** 2026-05-18
@@ -94,7 +94,7 @@ The sibling Roder backend already has a hardened native Rust extension model for
 - `P1`: Support dev-mode extension folders with hot reload and clear error overlays/logs.
 - `P1`: Support extension webview panels with strict CSP, no Node integration, resource URI rewriting, and message passing.
 - `P1`: Support packaged `.rdx` archives with deterministic manifest, lockfile, checksums, README, icon, `dist`, and assets.
-- `P1`: Support a CLI developer package such as `@roder/extension-api` and `@roder/create-extension`.
+- `P1`: Support CLI developer packages such as `@roderai/extension-api` and `@roderai/create-extension`.
 - `P1`: Support extension update checks from trusted local paths or signed release URLs.
 - `P2`: Support importing or converting selected VSIX/Raycast-style packages where APIs overlap.
 - `P2`: Support a curated registry or marketplace after local install security and review semantics are proven.
@@ -214,14 +214,14 @@ Acceptance:
 
 ### Stage 1: Extension Contract And Package Format
 
-**Status:** Ready
+**Status:** Complete
 **Owned Paths:** `electron/extensions/manifest.ts`, `packages/extension-api/**`, `examples/extensions/hello-roder/**`, `package.json`, `pnpm-lock.yaml`, `tsconfig.json`
 
-- [ ] Define `RoderExtensionManifest` TypeScript types and runtime validation for `package.json` plus `roder` fields.
-- [ ] Define stable ids for commands, tools, views, configuration keys, activation events, and capabilities.
-- [ ] Create `@roder/extension-api` types for `activate(context)`, commands, tools, storage, secrets, environment, workspace, thread, notifications, and subscriptions.
-- [ ] Create a minimal example extension with one command, one no-view command, one tool, one preference, and one workspace storage call.
-- [ ] Add manifest validation tests with accepted and rejected fixtures.
+- [x] Define `RoderExtensionManifest` TypeScript types and runtime validation for `package.json` plus `roder` fields.
+- [x] Define stable ids for commands, tools, views, configuration keys, activation events, and capabilities.
+- [x] Create `@roderai/extension-api` types for `activate(context)`, commands, tools, storage, secrets, environment, workspace, thread, notifications, and subscriptions.
+- [x] Create a minimal example extension with one command, one no-view command, one tool, one preference, and one workspace storage call.
+- [x] Add manifest validation tests with accepted and rejected fixtures.
 
 Run:
 
@@ -428,6 +428,13 @@ Acceptance:
 - Commands: `python3 "${CODEX_HOME:-$HOME/.codex}/skills/roadmap-prd-verifier/scripts/validate_roadmap.py" roadmap/001-desktop-custom-user-extensions.md` crashed before checking files because the validator placeholder-scan regex is malformed; reran the same script through a one-process regex shim without editing the installed skill.
 - Result: shimmed validator reported `roadmap validation passed`.
 - Gaps: stock validator script should be fixed separately; roadmap artifact itself passed structural validation.
+
+### 2026-05-18 - Stage 1 Contract Slice
+
+- Evidence: added the publishable workspace package `@roderai/extension-api`, runtime manifest validation in `electron/extensions/manifest.ts`, the `examples/extensions/hello-roder` extension, and manifest validation tests for accepted and rejected manifests.
+- Commands: `pnpm test`; `pnpm typecheck`; `pnpm build`.
+- Result: all three commands passed. `pnpm build` completed Electron/Vite output; `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w` before continuing, so no backend binary was rebuilt in this environment.
+- Gaps: extension install/catalog, runtime activation, settings UI, and backend tool bridge remain for later stages.
 
 ## Open Questions
 
