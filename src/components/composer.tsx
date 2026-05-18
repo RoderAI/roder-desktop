@@ -1,6 +1,6 @@
 import { ArrowDown, Check, ChevronDown, FileText, ImageIcon, Plus, Search, Square, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import type { DesktopAttachment, GodeModel, GodeThread, ReasoningEffort, WorkspaceFolder } from "@/types/gode";
+import type { DesktopAttachment, RoderModel, RoderThread, ReasoningEffort, WorkspaceFolder } from "@/types/roder";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { WorkspacePicker } from "@/components/workspace-picker";
 import {
@@ -15,13 +15,13 @@ import { cn } from "@/lib/utils";
 
 type ComposerProps = {
   busy: boolean;
-  models: GodeModel[];
+  models: RoderModel[];
   selectedModel: string;
   selectedReasoning: ReasoningEffort;
   selectedWorkspaceCwd: string;
   statusCwd?: string;
   workspaceRecents: WorkspaceFolder[];
-  threads: GodeThread[];
+  threads: RoderThread[];
   attachments: DesktopAttachment[];
   onSelectedModelChange: (model: string) => void;
   onCycleReasoning: () => void;
@@ -96,7 +96,7 @@ export function Composer({
   }
 
   function attachFiles(files: FileList | File[]): void {
-    const resolved = window.godeDesktop
+    const resolved = window.roderDesktop
       .resolveDroppedFiles(Array.from(files))
       .map((file) => ({ ...file, id: crypto.randomUUID() }));
     addAttachments(resolved);
@@ -268,7 +268,7 @@ function ModelPicker({
   onChange,
   onCycleReasoning,
 }: {
-  models: GodeModel[];
+  models: RoderModel[];
   selectedModel: string;
   selectedReasoning: ReasoningEffort;
   onChange: (model: string) => void;
@@ -379,7 +379,7 @@ function ProviderMark({ provider }: { provider: string }): React.JSX.Element {
   );
 }
 
-function modelName(model: GodeModel | undefined): string {
+function modelName(model: RoderModel | undefined): string {
   return model?.name || model?.id || "Model";
 }
 

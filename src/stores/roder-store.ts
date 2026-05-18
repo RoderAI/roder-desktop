@@ -1,41 +1,41 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { godeIpc } from "@/lib/gode-ipc";
+import { roderIpc } from "@/lib/roder-ipc";
 import {
   assistantMessageId,
-  messagesFromGodeItem,
+  messagesFromRoderItem,
   messagesFromThread,
   normalizeAssistantPhase,
   sortThreadsByUpdatedAt,
   upsertConversationMessage,
   upsertThread,
-} from "@/lib/gode-thread";
-import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/gode-models";
-import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceRecent } from "@/lib/gode-workspaces";
+} from "@/lib/roder-thread";
+import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/roder-models";
+import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceRecent } from "@/lib/roder-workspaces";
 import type {
   ConversationMessage,
   DesktopAttachment,
-  GodeModel,
-  GodeNotification,
-  GodeItem,
-  GodeStatus,
-  GodeThread,
+  RoderModel,
+  RoderNotification,
+  RoderItem,
+  RoderStatus,
+  RoderThread,
   NavigationEntry,
   ReasoningEffort,
   SystemAppearance,
   WorkspaceFolder,
-} from "@/types/gode";
+} from "@/types/roder";
 
-type GodeStore = {
-  status: GodeStatus;
+type RoderStore = {
+  status: RoderStatus;
   stderr: string[];
-  threads: GodeThread[];
-  threadDetails: Record<string, GodeThread>;
+  threads: RoderThread[];
+  threadDetails: Record<string, RoderThread>;
   messagesByThread: Record<string, ConversationMessage[]>;
   activeThreadId: string;
   backStack: NavigationEntry[];
   forwardStack: NavigationEntry[];
-  models: GodeModel[];
+  models: RoderModel[];
   visibleModelIds: string[];
   selectedModel: string;
   selectedReasoning: ReasoningEffort;
@@ -62,12 +62,12 @@ type GodeStore = {
   setSelectedWorkspaceCwd: (cwd: string) => void;
   openWorkspaceFolder: () => Promise<void>;
   applyAppearance: (appearance: SystemAppearance) => void;
-  applyStatus: (status: GodeStatus) => void;
+  applyStatus: (status: RoderStatus) => void;
   applyStderr: (message: string) => void;
-  applyNotification: (notification: GodeNotification) => void;
+  applyNotification: (notification: RoderNotification) => void;
 };
 
-const initialStatus: GodeStatus = {
+const initialStatus: RoderStatus = {
   state: "starting",
   binary: "unresolved",
 };
@@ -92,11 +92,11 @@ function nextReasoningEffort(value: ReasoningEffort): ReasoningEffort {
   return reasoningCycle[(index + 1) % reasoningCycle.length] ?? "low";
 }
 
-function realThreads(threads: GodeThread[]): GodeThread[] {
+function realThreads(threads: RoderThread[]): RoderThread[] {
   return sortThreadsByUpdatedAt(threads.filter((thread) => !thread.id.startsWith("demo-")));
 }
 
-function firstThreadId(threads: GodeThread[], fallback: string): string {
+function firstThreadId(threads: RoderThread[], fallback: string): string {
   return threads[0]?.id ?? fallback;
 }
 
@@ -108,11 +108,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function notificationParams(notification: GodeNotification): Record<string, unknown> {
+function notificationParams(notification: RoderNotification): Record<string, unknown> {
   return isRecord(notification.params) ? notification.params : {};
 }
 
-export const useGodeStore = create<GodeStore>()(
+export const useRoderStore = create<RoderStore>()(
   persist(
     (set, get) => ({
       status: initialStatus,
@@ -138,11 +138,11 @@ export const useGodeStore = create<GodeStore>()(
       bootstrap: async () => {
         set({ busy: true, error: null });
         try {
-          const readyStatus = await godeIpc.start();
+          const readyStatus = await roderIpc.start();
           const [status, threadResult, modelResult] = await Promise.all([
-            godeIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
-            godeIpc.listThreads(100),
-            godeIpc.listModels(),
+            roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
+            roderIpc.listThreads(100),
+            roderIpc.listModels(),
           ]);
 
           const threads = realThreads(normalizeThreadsCwd(threadResult.data ?? [], status.cwd));
@@ -190,7 +190,7 @@ export const useGodeStore = create<GodeStore>()(
       },
 
       refreshThreads: async () => {
-        const result = await godeIpc.listThreads(100);
+        const result = await roderIpc.listThreads(100);
         set({ threads: realThreads(normalizeThreadsCwd(result.data ?? [], get().status.cwd)) });
       },
 
@@ -214,7 +214,7 @@ export const useGodeStore = create<GodeStore>()(
         }
 
         try {
-          const result = await godeIpc.readThread(threadId);
+          const result = await roderIpc.readThread(threadId);
           if (!result.thread) {
             throw new Error("roder app-server did not return a thread");
           }
@@ -264,7 +264,7 @@ export const useGodeStore = create<GodeStore>()(
           const state = get();
           const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
           const selectedModel = model?.id ?? state.selectedModel;
-          const result = await godeIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
+          const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
           if (!result.thread) {
             throw new Error("roder app-server did not return a thread");
           }
@@ -300,7 +300,7 @@ export const useGodeStore = create<GodeStore>()(
             const state = get();
             const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
             const selectedModel = model?.id ?? state.selectedModel;
-            const result = await godeIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
+            const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
             if (!result.thread) {
               throw new Error("roder app-server did not return a thread");
             }
@@ -325,11 +325,11 @@ export const useGodeStore = create<GodeStore>()(
           }));
 
           if (steering) {
-            await godeIpc.steerTurn(threadId, get().activeTurnId, text, attachments);
+            await roderIpc.steerTurn(threadId, get().activeTurnId, text, attachments);
             return;
           }
 
-          await godeIpc.startTurn(threadId, text, attachments);
+          await roderIpc.startTurn(threadId, text, attachments);
         } catch (error) {
           set({ busy: steering ? get().busy : false, error: (error as Error).message });
         }
@@ -341,7 +341,7 @@ export const useGodeStore = create<GodeStore>()(
           return;
         }
         try {
-          await godeIpc.interruptTurn(state.activeThreadId, state.activeTurnId);
+          await roderIpc.interruptTurn(state.activeThreadId, state.activeTurnId);
         } catch (error) {
           set({ error: (error as Error).message });
         }
@@ -350,7 +350,7 @@ export const useGodeStore = create<GodeStore>()(
       restart: async () => {
         set({ busy: true, error: null });
         try {
-          const status = await godeIpc.restart();
+          const status = await roderIpc.restart();
           set({ status, busy: false });
           await get().bootstrap();
         } catch (error) {
@@ -388,7 +388,7 @@ export const useGodeStore = create<GodeStore>()(
       }),
       openWorkspaceFolder: async () => {
         const state = get();
-        const folder = await godeIpc.openWorkspaceFolder(state.selectedWorkspaceCwd || state.status.cwd);
+        const folder = await roderIpc.openWorkspaceFolder(state.selectedWorkspaceCwd || state.status.cwd);
         if (folder) {
           get().setSelectedWorkspaceCwd(folder);
         }
@@ -402,7 +402,7 @@ export const useGodeStore = create<GodeStore>()(
       applyNotification: (notification) => set((state) => reduceNotification(state, notification)),
     }),
     {
-      name: "gode-desktop-navigation",
+      name: "roder-desktop-navigation",
       partialize: (state) => ({
         activeThreadId: state.activeThreadId,
         backStack: state.backStack,
@@ -417,11 +417,11 @@ export const useGodeStore = create<GodeStore>()(
   ),
 );
 
-function reduceNotification(state: GodeStore, notification: GodeNotification): Partial<GodeStore> {
+function reduceNotification(state: RoderStore, notification: RoderNotification): Partial<RoderStore> {
   const params = notificationParams(notification);
 
   if (notification.method === "thread/started" && isRecord(params.thread)) {
-    const thread = normalizeThreadCwd(params.thread as GodeThread, state.status.cwd);
+    const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
     return {
       threads: upsertThread(state.threads, thread),
       activeThreadId: thread.id,
@@ -437,7 +437,7 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
       return {};
     }
     const threadId = String(params.threadId ?? state.activeThreadId);
-    const [message] = messagesFromGodeItem(threadId, String(params.turnId ?? ""), item as GodeItem, "inProgress");
+    const [message] = messagesFromRoderItem(threadId, String(params.turnId ?? ""), item as RoderItem, "inProgress");
     if (!message || (message.role === "assistant" && !message.text)) {
       return {};
     }
@@ -494,7 +494,7 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
   if (notification.method === "item/completed") {
     const item = isRecord(params.item) ? params.item : {};
     const threadId = String(params.threadId ?? state.activeThreadId);
-    const messages = messagesFromGodeItem(threadId, String(params.turnId ?? ""), item as GodeItem, "completed");
+    const messages = messagesFromRoderItem(threadId, String(params.turnId ?? ""), item as RoderItem, "completed");
     if (messages.length === 0) {
       return {};
     }
@@ -512,8 +512,16 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
 
   if (notification.method === "turn/completed") {
     const turn = isRecord(params.turn) ? params.turn : {};
+    const threadId = String(params.threadId ?? state.activeThreadId);
     const turnId = String(turn.id ?? "");
+    const nextMessages = activeMessages(state.messagesByThread, threadId).map((message) =>
+      message.status === "streaming" ? { ...message, status: "complete" as const } : message,
+    );
     return {
+      messagesByThread: {
+        ...state.messagesByThread,
+        [threadId]: nextMessages,
+      },
       busy: false,
       activeTurnId: turnId === state.activeTurnId || !turnId ? "" : state.activeTurnId,
     };
@@ -521,7 +529,7 @@ function reduceNotification(state: GodeStore, notification: GodeNotification): P
 
   if (notification.method === "thread/status/changed") {
     const threadId = String(params.threadId ?? "");
-    const status = isRecord(params.status) ? (params.status as GodeThread["status"]) : { type: "idle" };
+    const status = isRecord(params.status) ? (params.status as RoderThread["status"]) : { type: "idle" };
     return {
       threads: state.threads.map((thread) => (thread.id === threadId ? { ...thread, status } : thread)),
     };

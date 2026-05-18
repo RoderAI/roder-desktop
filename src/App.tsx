@@ -9,13 +9,13 @@ import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
 import { Transcript } from "@/components/transcript";
 import { Badge } from "@/components/ui/badge";
-import { useGodeAgent } from "@/hooks/use-gode-agent";
+import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
-import type { DesktopAttachment, GodeThread } from "@/types/gode";
+import type { DesktopAttachment, RoderThread } from "@/types/roder";
 
 export function App(): React.JSX.Element {
-  const agent = useGodeAgent();
+  const agent = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
   useThemeApplication(agent.appearance);
   const [followSignal, setFollowSignal] = useState(0);
@@ -196,7 +196,7 @@ type FolderOption = {
   threadCount: number;
 };
 
-function buildFolderOptions(threads: GodeThread[], activePath: string): FolderOption[] {
+function buildFolderOptions(threads: RoderThread[], activePath: string): FolderOption[] {
   const folders = new Map<string, FolderOption>();
   const activeFolderPath = normalizePath(activePath);
 

@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 
-export type GodeNotification = {
+export type RoderNotification = {
   method: string;
   params: unknown;
 };
 
-export type GodeStatus = {
+export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
   cwd?: string;
@@ -46,7 +46,7 @@ export type CodexRateWindow = {
 
 export type CodexAccountSnapshot = {
   signedIn: boolean;
-  godeSignedIn: boolean;
+  roderSignedIn: boolean;
   codexSignedIn: boolean;
   displayName: string | null;
   accountId: string | null;
@@ -68,11 +68,11 @@ export type DroppedFile = {
 };
 
 const api = {
-  request: (method: string, params?: unknown) => ipcRenderer.invoke("gode:request", method, params ?? {}),
-  start: () => ipcRenderer.invoke("gode:start") as Promise<GodeStatus>,
-  restart: () => ipcRenderer.invoke("gode:restart") as Promise<GodeStatus>,
-  status: () => ipcRenderer.invoke("gode:status") as Promise<GodeStatus>,
-  appearance: () => ipcRenderer.invoke("gode:appearance") as Promise<SystemAppearance>,
+  request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
+  start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
+  restart: () => ipcRenderer.invoke("roder:restart") as Promise<RoderStatus>,
+  status: () => ipcRenderer.invoke("roder:status") as Promise<RoderStatus>,
+  appearance: () => ipcRenderer.invoke("roder:appearance") as Promise<SystemAppearance>,
   openWorkspaceFolder: (defaultPath?: string) => ipcRenderer.invoke("workspace:openFolder", defaultPath) as Promise<string | null>,
   terminalStart: (options?: { cols?: number; rows?: number }) => ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
   terminalWrite: (data: string) => ipcRenderer.invoke("terminal:write", data) as Promise<void>,
@@ -103,25 +103,25 @@ const api = {
         size: file.size,
       }))
       .filter((file) => file.path) as DroppedFile[],
-  onNotification: (callback: (notification: GodeNotification) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, notification: GodeNotification) => callback(notification);
-    ipcRenderer.on("gode:notification", listener);
-    return () => ipcRenderer.removeListener("gode:notification", listener);
+  onNotification: (callback: (notification: RoderNotification) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, notification: RoderNotification) => callback(notification);
+    ipcRenderer.on("roder:notification", listener);
+    return () => ipcRenderer.removeListener("roder:notification", listener);
   },
-  onStatus: (callback: (status: GodeStatus) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, status: GodeStatus) => callback(status);
-    ipcRenderer.on("gode:status", listener);
-    return () => ipcRenderer.removeListener("gode:status", listener);
+  onStatus: (callback: (status: RoderStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: RoderStatus) => callback(status);
+    ipcRenderer.on("roder:status", listener);
+    return () => ipcRenderer.removeListener("roder:status", listener);
   },
   onStderr: (callback: (message: string) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, message: string) => callback(message);
-    ipcRenderer.on("gode:stderr", listener);
-    return () => ipcRenderer.removeListener("gode:stderr", listener);
+    ipcRenderer.on("roder:stderr", listener);
+    return () => ipcRenderer.removeListener("roder:stderr", listener);
   },
   onAppearance: (callback: (appearance: SystemAppearance) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, appearance: SystemAppearance) => callback(appearance);
-    ipcRenderer.on("gode:appearance", listener);
-    return () => ipcRenderer.removeListener("gode:appearance", listener);
+    ipcRenderer.on("roder:appearance", listener);
+    return () => ipcRenderer.removeListener("roder:appearance", listener);
   },
   onTerminalData: (callback: (payload: { id: string; data: string }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; data: string }) => callback(payload);
@@ -135,4 +135,4 @@ const api = {
   },
 };
 
-contextBridge.exposeInMainWorld("godeDesktop", api);
+contextBridge.exposeInMainWorld("roderDesktop", api);

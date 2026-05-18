@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const roderSource = resolve(process.env.RODER_SOURCE_DIR ?? process.env.GODE_SOURCE_DIR ?? resolve(root, "..", "gode"));
+const workspaceParent = dirname(root);
+const siblingSource = resolve(workspaceParent, basename(workspaceParent));
+const roderSource = resolve(process.env.RODER_SOURCE_DIR ?? siblingSource);
 const output = resolve(root, "resources", "bin", process.platform === "win32" ? "roder.exe" : "roder");
 
 if (!existsSync(resolve(roderSource, "Cargo.toml"))) {
