@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { Composer } from "@/components/composer";
+import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
 import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
 import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
@@ -11,6 +12,7 @@ import { Transcript } from "@/components/transcript";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
+import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
 
@@ -21,10 +23,13 @@ export function App(): React.JSX.Element {
   useThemeApplication(agent.appearance);
   const [followSignal, setFollowSignal] = useState(0);
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
+  const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
+  const extensions = useExtensionsStore((state) => state.extensions);
+  const selectedExtension = extensions.find((extension) => extension.id === selectedExtensionId) ?? extensions[0];
   const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
   const activeWorkspaceCwd = activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.status.cwd ?? "";
   const folderOptions = useMemo(() => buildFolderOptions(agent.threads, activeWorkspaceCwd), [activeWorkspaceCwd, agent.threads]);
@@ -76,6 +81,27 @@ export function App(): React.JSX.Element {
     },
     [agent, followBottom],
   );
+  useEffect(() => {
+    if (extensions.length === 0) {
+      setSelectedExtensionId(null);
+      return;
+    }
+    if (!selectedExtensionId || !extensions.some((extension) => extension.id === selectedExtensionId)) {
+      setSelectedExtensionId(extensions[0].id);
+    }
+  }, [extensions, selectedExtensionId]);
+  const toggleExtensionsPanel = useCallback(() => {
+    if (activeTool === "extensions") {
+      setActiveTool(null);
+      return;
+    }
+    setSelectedExtensionId((extensionId) => extensionId ?? selectedExtension?.id ?? null);
+    setActiveTool("extensions");
+  }, [activeTool, selectedExtension]);
+  const selectExtensionFromRail = useCallback((extensionId: string) => {
+    setSelectedExtensionId(extensionId);
+    setActiveTool("extensions");
+  }, []);
   const beginSidebarResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     beginHorizontalResize(event, leftSidebarWidth, (startWidth, deltaX) => {
       setLeftSidebarWidth(clamp(startWidth + deltaX, 220, 420));
@@ -131,7 +157,7 @@ export function App(): React.JSX.Element {
           onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
           onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
           onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
-          onToggleExtensions={() => setActiveTool((tool) => (tool === "extensions" ? null : "extensions"))}
+          onToggleExtensions={toggleExtensionsPanel}
         />
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
@@ -170,9 +196,10 @@ export function App(): React.JSX.Element {
               {activeTool === "terminal" && <TerminalPanel />}
               {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
               {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
-              {activeTool === "extensions" && <ExtensionsPanel />}
+              {activeTool === "extensions" && <ExtensionsPanel selectedExtensionId={selectedExtensionId} onSelectedExtensionChange={setSelectedExtensionId} />}
             </div>
           )}
+          <ExtensionActivityRail active={activeTool === "extensions"} activeExtensionId={selectedExtensionId} onSelectExtension={selectExtensionFromRail} />
         </div>
       </section>
     </div>
