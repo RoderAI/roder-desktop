@@ -494,6 +494,13 @@ Acceptance:
 - Result: theme validation tests passed; `Aurora Dark` and `Aurora Light` were read from an installed `.rdx`; `pnpm test`, `pnpm typecheck`, and `pnpm build` passed.
 - Gaps: theme marketplace docs, preview thumbnails, and granular CSS token coverage remain pending.
 
+### 2026-05-18 - Compact Extensions Sidebar And Composer Theming
+
+- Evidence: replaced the right-side Extensions sidebar's settings-card layout with compact VS Code-style search/actions, collapsible Contributed Panels and Installed groups, extension identity initials, status dots, selected panel identity, and secondary management controls; updated textarea/composer styling to use app theme colors and font-size variables.
+- Commands: `pnpm typecheck`; `pnpm test`; `pnpm build`.
+- Result: all commands passed. `pnpm build` completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`.
+- Gaps: no screenshot-based desktop visual smoke was captured in this pass.
+
 ## Open Questions
 
 - [ ] Stage 3 owner: confirm whether Electron `utilityProcess` is the right host primitive for extension execution in Electron 42, or whether a forked Node child process is more reliable for this app.

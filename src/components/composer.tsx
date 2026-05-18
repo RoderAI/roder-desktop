@@ -193,8 +193,8 @@ export function Composer({
       </div>
       <div
         className={cn(
-          "rounded-3xl bg-white/85 shadow-[0_10px_28px_hsl(0_0%_0%/0.08)] ring-[5px] ring-black/5 mt-3 backdrop-blur-md transition-colors",
-          dragActive && "ring-ring/75",
+          "mt-3 rounded-3xl border border-border bg-card/95 shadow-sm backdrop-blur-md transition-[background-color,border-color,box-shadow]",
+          dragActive && "border-ring bg-card shadow-md ring-2 ring-ring/25",
         )}
       >
         {attachments.length > 0 && (
@@ -229,7 +229,7 @@ export function Composer({
                 ? "Queue a follow-up or steer the current run"
                 : "Send follow-up"
             }
-            className="min-h-[64px] overflow-hidden border-0 bg-transparent px-1 py-2 text-[17px] shadow-none ring-0 focus-visible:ring-0"
+            className="min-h-16 overflow-hidden border-0 bg-transparent px-1 py-2 text-[var(--font-size-composer)] leading-6 shadow-none focus-visible:border-transparent focus-visible:ring-0"
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
