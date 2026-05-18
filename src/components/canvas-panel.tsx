@@ -1,6 +1,6 @@
 import { Camera, Circle, Eraser, Minus, MousePointer2, Pencil, RotateCcw, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DesktopAttachment } from "@/types/gode";
+import type { DesktopAttachment } from "@/types/roder";
 import { CanvasToolbarButton as ToolbarButton } from "@/components/canvas-toolbar-button";
 import {
   canvasBackground,
@@ -342,7 +342,7 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     setCapturing(true);
     try {
       redraw({ includeSelection: false });
-      const file = await window.godeDesktop.canvasSavePng(canvas.toDataURL("image/png"));
+      const file = await window.roderDesktop.canvasSavePng(canvas.toDataURL("image/png"));
       onAttach({ ...file, id: crypto.randomUUID() });
     } finally {
       redraw();

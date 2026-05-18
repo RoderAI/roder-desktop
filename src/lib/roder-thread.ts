@@ -1,14 +1,14 @@
-import type { ConversationMessage, GodeItem, GodeThread, GodeTurn } from "@/types/gode";
+import type { ConversationMessage, RoderItem, RoderThread, RoderTurn } from "@/types/roder";
 
-export function sortThreadsByUpdatedAt(threads: GodeThread[]): GodeThread[] {
+export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
   return [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
-export function upsertThread(threads: GodeThread[], incoming: GodeThread): GodeThread[] {
+export function upsertThread(threads: RoderThread[], incoming: RoderThread): RoderThread[] {
   return sortThreadsByUpdatedAt([incoming, ...threads.filter((thread) => thread.id !== incoming.id && !thread.id.startsWith("demo-"))]);
 }
 
-export function messagesFromThread(thread: GodeThread | undefined): ConversationMessage[] {
+export function messagesFromThread(thread: RoderThread | undefined): ConversationMessage[] {
   if (!thread?.turns) {
     return [];
   }
@@ -16,16 +16,16 @@ export function messagesFromThread(thread: GodeThread | undefined): Conversation
   return thread.turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
 }
 
-export function messagesFromTurn(threadId: string, turn: GodeTurn): ConversationMessage[] {
+export function messagesFromTurn(threadId: string, turn: RoderTurn): ConversationMessage[] {
   return turn.items.reduce<ConversationMessage[]>((messages, item) => {
-    for (const message of messagesFromGodeItem(threadId, turn.id, item, turn.status)) {
+    for (const message of messagesFromRoderItem(threadId, turn.id, item, turn.status)) {
       upsertConversationMessage(messages, message);
     }
     return messages;
   }, []);
 }
 
-export function messagesFromGodeItem(threadId: string, turnId: string, item: GodeItem, turnStatus: string): ConversationMessage[] {
+export function messagesFromRoderItem(threadId: string, turnId: string, item: RoderItem, turnStatus: string): ConversationMessage[] {
   const toolMessage = toolMessageFromItem(threadId, turnId, item);
   if (toolMessage) {
     return [toolMessage];
@@ -85,7 +85,7 @@ export function normalizeAssistantPhase(phase?: string): string | undefined {
   return normalized || undefined;
 }
 
-function extractItemText(item: GodeItem): string {
+function extractItemText(item: RoderItem): string {
   if (typeof item.text === "string") {
     return item.text;
   }
@@ -100,7 +100,7 @@ function isLegacyToolLabel(text: string): boolean {
   return /^Tool\s+\S+\s+(result|failed):\s*$/i.test(text.trim());
 }
 
-function toolMessageFromItem(threadId: string, turnId: string, item: GodeItem): ConversationMessage | null {
+function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem): ConversationMessage | null {
   if (!isToolItem(item)) {
     return null;
   }
@@ -129,11 +129,11 @@ function toolMessageFromItem(threadId: string, turnId: string, item: GodeItem): 
   };
 }
 
-function isToolItem(item: GodeItem): boolean {
+function isToolItem(item: RoderItem): boolean {
   return item.type === "toolCall" || item.type === "toolMessage" || item.type.startsWith("tool.");
 }
 
-function toolStatusFromItem(item: GodeItem): "running" | "complete" | "failed" {
+function toolStatusFromItem(item: RoderItem): "running" | "complete" | "failed" {
   const sourceKind = item.sourceKind ?? "";
   if (item.type === "tool.failed" || sourceKind === "tool.failed") {
     return "failed";
@@ -147,7 +147,7 @@ function toolStatusFromItem(item: GodeItem): "running" | "complete" | "failed" {
   return "running";
 }
 
-function toolOutputText(item: GodeItem, payload: Record<string, unknown>): string {
+function toolOutputText(item: RoderItem, payload: Record<string, unknown>): string {
   if (item.type === "toolCall" || item.type === "tool.requested" || item.type === "tool.started") {
     return firstString(payload.text, payload.output, payload.error) ?? "";
   }
@@ -312,7 +312,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function threadTitle(thread: GodeThread | undefined): string {
+export function threadTitle(thread: RoderThread | undefined): string {
   if (!thread) {
     return "New Agent";
   }

@@ -1,17 +1,17 @@
 import { Check, RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { visibleModelIdsFor } from "@/lib/gode-models";
-import { useGodeStore } from "@/stores/gode-store";
-import type { GodeModel } from "@/types/gode";
+import { visibleModelIdsFor } from "@/lib/roder-models";
+import { useRoderStore } from "@/stores/roder-store";
+import type { RoderModel } from "@/types/roder";
 import { cn } from "@/lib/utils";
 
 export function ModelsSettingsPanel(): React.JSX.Element {
-  const models = useGodeStore((state) => state.models);
-  const selectedModel = useGodeStore((state) => state.selectedModel);
-  const visibleModelIds = useGodeStore((state) => state.visibleModelIds);
-  const setModelVisibility = useGodeStore((state) => state.setModelVisibility);
-  const resetVisibleModels = useGodeStore((state) => state.resetVisibleModels);
+  const models = useRoderStore((state) => state.models);
+  const selectedModel = useRoderStore((state) => state.selectedModel);
+  const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
+  const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
+  const resetVisibleModels = useRoderStore((state) => state.resetVisibleModels);
   const [query, setQuery] = useState("");
 
   const visibleIds = useMemo(() => visibleModelIdsFor(models, visibleModelIds), [models, visibleModelIds]);
@@ -84,7 +84,7 @@ function ModelVisibilityRow({
   disabled,
   onToggle,
 }: {
-  model: GodeModel;
+  model: RoderModel;
   selected: boolean;
   visible: boolean;
   disabled: boolean;
@@ -129,7 +129,7 @@ function VisibilitySwitch({ checked, disabled }: { checked: boolean; disabled: b
   );
 }
 
-function filterModels(models: GodeModel[], query: string): GodeModel[] {
+function filterModels(models: RoderModel[], query: string): RoderModel[] {
   const needle = query.trim().toLowerCase();
   if (!needle) {
     return models;
@@ -137,10 +137,10 @@ function filterModels(models: GodeModel[], query: string): GodeModel[] {
   return models.filter((model) => `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase().includes(needle));
 }
 
-function groupByProvider(models: GodeModel[]): Array<{ provider: string; models: GodeModel[] }> {
-  const groups = new Map<string, GodeModel[]>();
+function groupByProvider(models: RoderModel[]): Array<{ provider: string; models: RoderModel[] }> {
+  const groups = new Map<string, RoderModel[]>();
   for (const model of models) {
-    const provider = model.modelProvider || "gode";
+    const provider = model.modelProvider || "roder";
     groups.set(provider, [...(groups.get(provider) ?? []), model]);
   }
   return [...groups.entries()].map(([provider, groupModels]) => ({ provider, models: groupModels }));

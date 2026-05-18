@@ -1,4 +1,4 @@
-import type { ConversationMessage } from "@/types/gode";
+import type { ConversationMessage } from "@/types/roder";
 import { cn } from "@/lib/utils";
 
 type ToolTimelineItemProps = {

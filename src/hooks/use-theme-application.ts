@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useThemeStore, type ThemePalette, type ThemeScheme } from "@/stores/theme-store";
-import type { SystemAppearance } from "@/types/gode";
+import type { SystemAppearance } from "@/types/roder";
 
 export function useThemeApplication(systemAppearance: SystemAppearance): void {
   const settings = useThemeStore((state) => state.settings);

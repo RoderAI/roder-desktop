@@ -1,11 +1,11 @@
-import type { GodeThread, WorkspaceFolder } from "@/types/gode";
+import type { RoderThread, WorkspaceFolder } from "@/types/roder";
 
-export function normalizeThreadCwd(thread: GodeThread, baseCwd?: string): GodeThread {
+export function normalizeThreadCwd(thread: RoderThread, baseCwd?: string): RoderThread {
   const cwd = normalizeCwd(thread.cwd, baseCwd);
   return cwd === thread.cwd ? thread : { ...thread, cwd };
 }
 
-export function normalizeThreadsCwd(threads: GodeThread[], baseCwd?: string): GodeThread[] {
+export function normalizeThreadsCwd(threads: RoderThread[], baseCwd?: string): RoderThread[] {
   return threads.map((thread) => normalizeThreadCwd(thread, baseCwd));
 }
 
