@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { RoderExtensionCapability } from "@roderai/extension-api";
 import type { RoderExtensionManifest } from "./manifest";
@@ -212,7 +212,10 @@ export class ExtensionCatalog {
 
   async #write(catalog: PersistedCatalog): Promise<void> {
     await mkdir(this.#basePath, { recursive: true });
-    await writeFile(this.#catalogPath(), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
+    const catalogPath = this.#catalogPath();
+    const tmpPath = `${catalogPath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tmpPath, `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
+    await rename(tmpPath, catalogPath);
   }
 
   #catalogPath(): string {

@@ -241,10 +241,10 @@ Acceptance:
 **Status:** Ready
 **Owned Paths:** `electron/extensions/catalog.ts`, `electron/extensions/package-manager.ts`, `electron/extensions/storage.ts`, `electron/extensions/secrets.ts`, `electron/main/index.ts`, `electron/preload/index.ts`, `src/lib/extensions-ipc.ts`, `src/stores/extensions-store.ts`, `src/types/extensions.ts`, `src/components/extensions/**`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`
 
-- [ ] Add main-process extension catalog APIs for list, install from folder, install from archive, uninstall, enable, disable, reload, and read logs.
-- [ ] Add typed preload and renderer wrappers for extension catalog methods.
-- [ ] Add a separate Zustand extension store instead of growing `src/stores/roder-store.ts`.
-- [ ] Add an Extensions settings section with installed/dev/disabled/error states, capability review, preferences, logs, and actions.
+- [x] Add main-process extension catalog APIs for list, install from folder, uninstall, enable, disable, reload, and read logs.
+- [x] Add typed preload and renderer wrappers for extension catalog methods.
+- [x] Add a separate Zustand extension store instead of growing `src/stores/roder-store.ts`.
+- [x] Add an Extensions settings section with installed/dev/disabled/error states, capability review, preferences, logs, and actions.
 - [ ] Add safe-mode startup behavior that skips user extension activation when configured or when a previous startup crash is attributed to extensions.
 - [ ] Add tests for catalog persistence and renderer state mapping.
 
@@ -449,6 +449,13 @@ Acceptance:
 - Commands: `node --test test/extension-host.test.mjs`; `pnpm test`; `pnpm typecheck`.
 - Result: all commands passed.
 - Gaps: crash isolation and capability-denied API tests remain open; Settings UI controls and backend tool proxy are still pending.
+
+### 2026-05-18 - Stage 2 Settings UI Slice
+
+- Evidence: added a dedicated renderer extension store, typed renderer IPC wrapper usage, an Extensions settings section, and operational controls for install-from-folder, refresh, enable, disable, activate, reload, remove, command execution, tool calls, preferences, and logs. Catalog writes were changed to atomic temp-file renames after tests exposed a host log write/read race.
+- Commands: `pnpm test`; `pnpm typecheck`; `pnpm build`.
+- Result: all commands passed. `pnpm build` again completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`.
+- Gaps: safe-mode startup behavior and renderer state mapping tests remain open.
 
 ## Open Questions
 

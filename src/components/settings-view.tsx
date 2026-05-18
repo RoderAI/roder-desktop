@@ -9,6 +9,7 @@ import {
   Laptop,
   Moon,
   Paintbrush,
+  Puzzle,
   RotateCcw,
   Server,
   Sun,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import {
@@ -50,6 +52,7 @@ export function SettingsView(): React.JSX.Element {
           <SettingsNavItem id="appearance" active={settingsSection === "appearance"} icon={<Paintbrush className="size-4" />} label="Appearance" onClick={setSettingsSection} />
           <SettingsNavItem id="components" active={settingsSection === "components"} icon={<Component className="size-4" />} label="Components" onClick={setSettingsSection} />
           <SettingsNavItem id="models" active={settingsSection === "models"} icon={<Bot className="size-4" />} label="Models" onClick={setSettingsSection} />
+          <SettingsNavItem id="extensions" active={settingsSection === "extensions"} icon={<Puzzle className="size-4" />} label="Extensions" onClick={setSettingsSection} />
           <SettingsNavItem id="configuration" active={settingsSection === "configuration"} icon={<Braces className="size-4" />} label="Configuration" onClick={setSettingsSection} />
           <SettingsNavItem id="personalization" active={settingsSection === "personalization"} icon={<UserRound className="size-4" />} label="Personalization" onClick={setSettingsSection} />
           <SettingsNavItem id="mcp" active={settingsSection === "mcp"} icon={<Server className="size-4" />} label="MCP servers" onClick={setSettingsSection} />
@@ -65,6 +68,8 @@ export function SettingsView(): React.JSX.Element {
             <ComponentsSettingsPanel />
           ) : settingsSection === "models" ? (
             <ModelsSettingsPanel />
+          ) : settingsSection === "extensions" ? (
+            <ExtensionsSettingsPanel />
           ) : (
             <SettingsPlaceholder section={settingsSection} />
           )}
