@@ -6,7 +6,7 @@ import { test } from "node:test";
 import ts from "typescript";
 
 async function loadExtensionModules() {
-  const directory = mkdtempSync(join(tmpdir(), "roder-extension-host-"));
+  const directory = testModuleTemp("roder-extension-host-");
   writeTranspiledModule("../electron/extensions/manifest.ts", join(directory, "manifest.mjs"));
   writeTranspiledModule("../electron/extensions/package-manager.ts", join(directory, "package-manager.mjs"), {
     "./manifest": "./manifest.mjs",
@@ -26,6 +26,12 @@ async function loadExtensionModules() {
     ExtensionCatalog: catalogModule.ExtensionCatalog,
     ExtensionHost: hostModule.ExtensionHost,
   };
+}
+
+function testModuleTemp(prefix) {
+  const directory = join(process.cwd(), "node_modules", ".cache");
+  mkdirSync(directory, { recursive: true });
+  return mkdtempSync(join(directory, prefix));
 }
 
 function writeTranspiledModule(sourcePath, outputPath, replacements = {}) {

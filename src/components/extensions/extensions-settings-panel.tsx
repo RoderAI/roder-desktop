@@ -12,6 +12,7 @@ export function ExtensionsSettingsPanel(): React.JSX.Element {
   const error = useExtensionsStore((state) => state.error);
   const lastResult = useExtensionsStore((state) => state.lastResult);
   const load = useExtensionsStore((state) => state.load);
+  const selectAndInstallArchive = useExtensionsStore((state) => state.selectAndInstallArchive);
   const selectAndInstallFolder = useExtensionsStore((state) => state.selectAndInstallFolder);
 
   useEffect(() => {
@@ -35,6 +36,9 @@ export function ExtensionsSettingsPanel(): React.JSX.Element {
           <Button variant="secondary" size="sm" disabled={loading} onClick={() => void selectAndInstallFolder()}>
             Install from folder
           </Button>
+          <Button variant="secondary" size="sm" disabled={loading} onClick={() => void selectAndInstallArchive()}>
+            Install .rdx
+          </Button>
         </div>
       </header>
 
@@ -45,7 +49,7 @@ export function ExtensionsSettingsPanel(): React.JSX.Element {
 
       {extensions.length === 0 ? (
         <div className="px-5 py-8 text-[14px] text-muted-foreground">
-          Build an extension, then install its folder here. Local folders stay linked so reloads pick up rebuilt files.
+          Build an extension, then install its folder or packaged .rdx archive here. Local folders stay linked; archives are copied into app storage.
         </div>
       ) : (
         <div className="divide-y divide-border">
@@ -92,7 +96,9 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
             <Badge variant={extension.activationState === "failed" ? "outline" : "muted"}>{extension.activationState}</Badge>
           </div>
           <p className="mt-1 max-w-[620px] text-[13px] text-muted-foreground">{extension.manifest.description}</p>
-          <p className="mt-2 truncate text-[12px] text-muted-foreground">{extension.source.path}</p>
+          <p className="mt-2 truncate text-[12px] text-muted-foreground">
+            {extension.source.type === "archive" ? `Packaged archive: ${extension.source.archivePath ?? extension.source.path}` : extension.source.path}
+          </p>
           <p className="mt-1 text-[12px] text-muted-foreground">{capabilitySummary}</p>
           {extension.lastError && <p className="mt-2 text-[13px] text-destructive">{extension.lastError}</p>}
         </div>

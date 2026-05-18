@@ -18,7 +18,7 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 
 | ID | PRD | Status | Current Stage | Updated | Verification | Next Action |
 | --- | --- | --- | --- | --- | --- | --- |
-| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 4 - Backend Tool Proxy Integration | 2026-05-18 | Example extension smoke passed; desktop `tools/list`/`tools/call` proxy tests, `pnpm test`, `pnpm typecheck`, and `pnpm build` passed | Implement Rust app-server reverse-RPC bridge, safe mode, and packaging |
+| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 6 - Developer Tooling, Packaging, And Documentation | 2026-05-18 | `.rdx` package/install smoke passed; `pnpm test` and `pnpm build` passed | Implement Rust app-server reverse-RPC bridge, safe mode, package checksums/signatures, and docs |
 
 ## Completed PRDs
 

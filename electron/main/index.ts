@@ -129,6 +129,10 @@ ipcMain.handle("extensions:installFromFolder", async (_event, folderPath: string
   await getExtensionCatalog().installFromFolder(folderPath);
   return getExtensionCatalog().list();
 });
+ipcMain.handle("extensions:installFromArchive", async (_event, archivePath: string) => {
+  await getExtensionCatalog().installFromArchive(archivePath);
+  return getExtensionCatalog().list();
+});
 ipcMain.handle("extensions:selectAndInstallFolder", async () => {
   const options: Electron.OpenDialogOptions = {
     title: "Install Extension From Folder",
@@ -139,6 +143,19 @@ ipcMain.handle("extensions:selectAndInstallFolder", async () => {
     return getExtensionCatalog().list();
   }
   await getExtensionCatalog().installFromFolder(result.filePaths[0]);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:selectAndInstallArchive", async () => {
+  const options: Electron.OpenDialogOptions = {
+    title: "Install Extension Package",
+    filters: [{ name: "Roder Extension Packages", extensions: ["rdx"] }],
+    properties: ["openFile"],
+  };
+  const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+  if (result.canceled || !result.filePaths[0]) {
+    return getExtensionCatalog().list();
+  }
+  await getExtensionCatalog().installFromArchive(result.filePaths[0]);
   return getExtensionCatalog().list();
 });
 ipcMain.handle("extensions:uninstall", async (_event, id: string) => {
