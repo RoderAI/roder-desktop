@@ -501,6 +501,13 @@ Acceptance:
 - Result: all commands passed. `pnpm build` completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`.
 - Gaps: no screenshot-based desktop visual smoke was captured in this pass.
 
+### 2026-05-18 - Persistent Extension Activity Rail
+
+- Evidence: added a persistent right-side extension activity rail that shows installed extensions as compact identity icons; selecting an icon opens that extension's sidebar area with contributed webview panels or a compact summary/management fallback.
+- Commands: `pnpm typecheck`; `pnpm test`; `pnpm build`.
+- Result: all commands passed. `pnpm build` completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`.
+- Gaps: no screenshot-based desktop visual smoke was captured in this pass.
+
 ## Open Questions
 
 - [ ] Stage 3 owner: confirm whether Electron `utilityProcess` is the right host primitive for extension execution in Electron 42, or whether a forked Node child process is more reliable for this app.
