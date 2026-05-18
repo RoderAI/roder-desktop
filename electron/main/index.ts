@@ -7,6 +7,7 @@ import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
 import { ExtensionHost } from "../extensions/extension-host";
+import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
 
@@ -92,7 +93,7 @@ ipcMain.handle("roder:start", () => roder.start());
 ipcMain.handle("roder:restart", () => roder.restart());
 ipcMain.handle("roder:appearance", () => currentAppearance());
 ipcMain.handle("roder:request", async (_event, method: string, params: unknown) => {
-  return roder.request(method, params);
+  return handleRoderRequest(method, params);
 });
 ipcMain.handle("workspace:openFolder", async (_event, defaultPath?: string) => {
   const options: Electron.OpenDialogOptions = {
@@ -251,4 +252,19 @@ function getExtensionHost(): ExtensionHost {
     catalog: getExtensionCatalog(),
   });
   return extensionHost;
+}
+
+async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
+  if (method === "tools/list") {
+    const baseTools = await roder.request(method, params);
+    return mergeExtensionTools(baseTools, await getExtensionCatalog().list());
+  }
+  if (method === "tools/call") {
+    const catalog = await getExtensionCatalog().list();
+    const toolName = extensionToolName(params, catalog);
+    if (toolName) {
+      return callExtensionTool(getExtensionHost(), toolName, params);
+    }
+  }
+  return roder.request(method, params);
 }
