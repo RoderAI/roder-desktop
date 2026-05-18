@@ -1,7 +1,7 @@
 # Desktop Custom User Extensions PRD
 
 **Status:** In progress
-**Current Stage:** 4 - Backend Tool Proxy Integration
+**Current Stage:** 6 - Developer Tooling, Packaging, And Documentation
 **Owner:** Codex
 **Created:** 2026-05-18
 **Updated:** 2026-05-18
@@ -241,7 +241,7 @@ Acceptance:
 **Status:** Ready
 **Owned Paths:** `electron/extensions/catalog.ts`, `electron/extensions/package-manager.ts`, `electron/extensions/storage.ts`, `electron/extensions/secrets.ts`, `electron/main/index.ts`, `electron/preload/index.ts`, `src/lib/extensions-ipc.ts`, `src/stores/extensions-store.ts`, `src/types/extensions.ts`, `src/components/extensions/**`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`
 
-- [x] Add main-process extension catalog APIs for list, install from folder, uninstall, enable, disable, reload, and read logs.
+- [x] Add main-process extension catalog APIs for list, install from folder, install from archive, uninstall, enable, disable, reload, and read logs.
 - [x] Add typed preload and renderer wrappers for extension catalog methods.
 - [x] Add a separate Zustand extension store instead of growing `src/stores/roder-store.ts`.
 - [x] Add an Extensions settings section with installed/dev/disabled/error states, capability review, preferences, logs, and actions.
@@ -263,7 +263,7 @@ Acceptance:
 
 ### Stage 3: Isolated Extension Host Runtime
 
-**Status:** Ready
+**Status:** In progress
 **Owned Paths:** `electron/extensions/extension-host.ts`, `electron/extensions/extension-rpc.ts`, `electron/extensions/storage.ts`, `electron/extensions/secrets.ts`, `electron/main/index.ts`, `electron/preload/index.ts`, `src/types/extensions.ts`
 
 - [ ] Choose and document the host process primitive after checking Electron 42 behavior.
@@ -343,7 +343,7 @@ Acceptance:
 
 - [ ] Add `create-roder-extension` or equivalent scaffolding for command, tool, and panel templates.
 - [ ] Add local dev mode with watch, hot reload, structured logs, and extension reload hooks.
-- [ ] Add `.rdx` package creation and validation.
+- [x] Add `.rdx` package creation and validation.
 - [ ] Add docs covering manifest fields, contribution points, activation events, capabilities, API examples, packaging, install, and security review.
 - [ ] Add a migration guide explaining what VS Code and Raycast concepts map to Roder, and what is intentionally unsupported.
 
@@ -462,12 +462,19 @@ Acceptance:
 - Evidence: built `examples/extensions/hello-roder`, installed it from its local folder into a temp catalog, executed both contributed commands, executed the contributed `hello-roder.echo` tool twice through the forked host, and added a desktop bridge that merges enabled extension tools into `tools/list` and routes matching `tools/call` requests to the extension host.
 - Commands: `pnpm --filter hello-roder-extension build`; one-off Node smoke using `ExtensionCatalog` and `ExtensionHost`; `pnpm test`; `pnpm typecheck`; `pnpm build`.
 - Result: smoke installed `roder.hello-roder-extension`; `hello-roder.sayHello` returned the configured greeting; `hello-roder.noViewHello` returned `No-view hello #1`; `hello-roder.echo` returned run counts `1` and `2`; `pnpm test`, `pnpm typecheck`, and `pnpm build` passed.
-- Gaps: Rust app-server reverse-RPC integration, cancellation/timeout behavior, and packaged `.rdx` archives remain pending.
+- Gaps: Rust app-server reverse-RPC integration and cancellation/timeout behavior remain pending.
+
+### 2026-05-18 - RDX Packaging And Archive Install
+
+- Evidence: added publishable `@roderai/extension-packager`, `roder-extension-package`, `.rdx` zip creation, archive extraction into `userData/extensions/installed/{extensionId}`, archive install IPC, an `Install .rdx` Settings action, traversal-safe archive validation, and archive source records in the catalog.
+- Commands: `pnpm --filter hello-roder-extension package`; one-off Node smoke installing `examples/extensions/hello-roder/dist/hello-roder.rdx` with `ExtensionCatalog.installFromArchive` and executing `hello-roder.sayHello` plus `hello-roder.echo`; `pnpm test`; `pnpm build`.
+- Result: `.rdx` archive was created with `dist/extension.js` and `package.json`; smoke installed `roder.hello-roder-extension` from archive storage and executed its command/tool; `pnpm test` and `pnpm build` passed.
+- Gaps: `.rdx` checksums/signatures, richer package metadata, and public docs remain pending.
 
 ## Open Questions
 
 - [ ] Stage 3 owner: confirm whether Electron `utilityProcess` is the right host primitive for extension execution in Electron 42, or whether a forked Node child process is more reliable for this app.
 - [ ] Product owner: decide whether first release should allow only local/dev extensions or also signed release URLs.
 - [ ] Backend owner: decide whether desktop extension tools should appear as native `extensions/list` entries, a separate `desktop_extensions/list`, or a merged renderer-only catalog.
-- [ ] Product owner: choose whether the archive extension should be `.rdx`, `.roderx`, or another package suffix before publishing docs.
+- [x] Product owner: choose whether the archive extension should be `.rdx`, `.roderx`, or another package suffix before publishing docs. Decision: use `.rdx`.
 - [ ] Security owner: decide the exact review model for shell/process/network capabilities before supporting non-local extension sources.

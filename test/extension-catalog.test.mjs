@@ -3,10 +3,11 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
+import { zipSync } from "fflate";
 import ts from "typescript";
 
 async function loadCatalogModule() {
-  const directory = mkdtempSync(join(tmpdir(), "roder-extension-catalog-"));
+  const directory = testModuleTemp("roder-extension-catalog-");
   writeTranspiledModule("../electron/extensions/manifest.ts", join(directory, "manifest.mjs"));
   writeTranspiledModule("../electron/extensions/package-manager.ts", join(directory, "package-manager.mjs"), {
     "./manifest": "./manifest.mjs",
@@ -16,6 +17,12 @@ async function loadCatalogModule() {
     "./package-manager": "./package-manager.mjs",
   });
   return import(`${join(directory, "catalog.mjs")}?t=${Date.now()}`);
+}
+
+function testModuleTemp(prefix) {
+  const directory = join(process.cwd(), "node_modules", ".cache");
+  mkdirSync(directory, { recursive: true });
+  return mkdtempSync(join(directory, prefix));
 }
 
 function writeTranspiledModule(sourcePath, outputPath, replacements = {}) {
@@ -87,6 +94,31 @@ test("catalog installs a local extension folder and persists its record", async 
   assert.equal(snapshot.extensions[0].manifest.displayName, "Hello Roder");
 });
 
+test("catalog installs an .rdx archive into app storage", async () => {
+  const { ExtensionCatalog } = await loadCatalogModule();
+  const userDataPath = mkdtempSync(join(tmpdir(), "roder-user-data-"));
+  const fixturePath = createExtensionFixture();
+  const archivePath = join(mkdtempSync(join(tmpdir(), "roder-rdx-")), "hello.rdx");
+  writeFileSync(
+    archivePath,
+    zipSync({
+      "package.json": readFileSync(join(fixturePath, "package.json")),
+      "extension.js": readFileSync(join(fixturePath, "extension.js")),
+    }),
+  );
+  const catalog = new ExtensionCatalog({ userDataPath, appVersion: "0.1.0" });
+
+  const installed = await catalog.installFromArchive(archivePath);
+  assert.equal(installed.id, "roder.hello-roder-extension");
+  assert.equal(installed.source.type, "archive");
+  assert.equal(installed.source.archivePath, archivePath);
+  assert.match(installed.source.path, /extensions\/installed\/roder\.hello-roder-extension$/);
+
+  const snapshot = await catalog.list();
+  assert.equal(snapshot.extensions[0].source.type, "archive");
+  assert.equal(snapshot.extensions[0].manifest.displayName, "Hello Roder");
+});
+
 test("catalog can disable, re-enable, reload, update preferences, and uninstall", async () => {
   const { ExtensionCatalog } = await loadCatalogModule();
   const catalog = new ExtensionCatalog({
@@ -122,4 +154,23 @@ test("catalog rejects folders with invalid manifests", async () => {
   writeFileSync(join(fixturePath, "package.json"), JSON.stringify(manifest, null, 2));
 
   await assert.rejects(() => catalog.installFromFolder(fixturePath), /relative path inside the extension package/);
+});
+
+test("catalog rejects .rdx archives with unsafe paths", async () => {
+  const { ExtensionCatalog } = await loadCatalogModule();
+  const catalog = new ExtensionCatalog({
+    userDataPath: mkdtempSync(join(tmpdir(), "roder-user-data-")),
+    appVersion: "0.1.0",
+  });
+  const fixturePath = createExtensionFixture();
+  const archivePath = join(mkdtempSync(join(tmpdir(), "roder-rdx-")), "unsafe.rdx");
+  writeFileSync(
+    archivePath,
+    zipSync({
+      "package.json": readFileSync(join(fixturePath, "package.json")),
+      "../escape.js": Buffer.from("export function activate() {}\n"),
+    }),
+  );
+
+  await assert.rejects(() => catalog.installFromArchive(archivePath), /Unsafe extension archive entry/);
 });

@@ -10,7 +10,9 @@ type ExtensionsStore = {
   logsByExtension: Record<string, string[]>;
   load: () => Promise<void>;
   installFromFolder: (folderPath: string) => Promise<void>;
+  installFromArchive: (archivePath: string) => Promise<void>;
   selectAndInstallFolder: () => Promise<void>;
+  selectAndInstallArchive: () => Promise<void>;
   enable: (id: string) => Promise<void>;
   disable: (id: string) => Promise<void>;
   reload: (id: string) => Promise<void>;
@@ -33,7 +35,9 @@ export const useExtensionsStore = create<ExtensionsStore>()((set) => ({
   logsByExtension: {},
   load: () => withSnapshot(set, () => extensionsIpc.list()),
   installFromFolder: (folderPath) => withSnapshot(set, () => extensionsIpc.installFromFolder(folderPath)),
+  installFromArchive: (archivePath) => withSnapshot(set, () => extensionsIpc.installFromArchive(archivePath)),
   selectAndInstallFolder: () => withSnapshot(set, () => extensionsIpc.selectAndInstallFolder()),
+  selectAndInstallArchive: () => withSnapshot(set, () => extensionsIpc.selectAndInstallArchive()),
   enable: (id) => withSnapshot(set, () => extensionsIpc.enable(id)),
   disable: (id) => withSnapshot(set, () => extensionsIpc.disable(id)),
   reload: (id) => withSnapshot(set, () => extensionsIpc.reload(id)),

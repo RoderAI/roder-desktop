@@ -186,7 +186,9 @@ declare global {
       codexOpenRateLimitHelp: () => Promise<void>;
       extensionsList: () => Promise<ExtensionCatalogSnapshot>;
       extensionsInstallFromFolder: (folderPath: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsInstallFromArchive: (archivePath: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsSelectAndInstallFolder: () => Promise<ExtensionCatalogSnapshot>;
+      extensionsSelectAndInstallArchive: () => Promise<ExtensionCatalogSnapshot>;
       extensionsUninstall: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsEnable: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsDisable: (id: string) => Promise<ExtensionCatalogSnapshot>;

@@ -1,7 +1,9 @@
 export const extensionsIpc = {
   list: () => window.roderDesktop.extensionsList(),
   installFromFolder: (folderPath: string) => window.roderDesktop.extensionsInstallFromFolder(folderPath),
+  installFromArchive: (archivePath: string) => window.roderDesktop.extensionsInstallFromArchive(archivePath),
   selectAndInstallFolder: () => window.roderDesktop.extensionsSelectAndInstallFolder(),
+  selectAndInstallArchive: () => window.roderDesktop.extensionsSelectAndInstallArchive(),
   uninstall: (id: string) => window.roderDesktop.extensionsUninstall(id),
   enable: (id: string) => window.roderDesktop.extensionsEnable(id),
   disable: (id: string) => window.roderDesktop.extensionsDisable(id),

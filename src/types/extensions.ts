@@ -43,8 +43,9 @@ export type ExtensionCatalogRecord = {
   id: string;
   manifest: RoderExtensionManifest;
   source: {
-    type: "dev";
+    type: "dev" | "archive";
     path: string;
+    archivePath?: string;
   };
   enabled: boolean;
   capabilities: ExtensionCapabilityGrant[];

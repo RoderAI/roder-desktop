@@ -2,12 +2,18 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { RoderExtensionCapability } from "@roderai/extension-api";
 import type { RoderExtensionManifest } from "./manifest";
-import { readExtensionPackageFromFolder } from "./package-manager";
+import { extractExtensionPackageArchive, readExtensionPackageFromFolder } from "./package-manager";
 
-export type ExtensionSource = {
-  type: "dev";
-  path: string;
-};
+export type ExtensionSource =
+  | {
+      type: "dev";
+      path: string;
+    }
+  | {
+      type: "archive";
+      path: string;
+      archivePath: string;
+    };
 
 export type ExtensionCapabilityGrant = {
   capability: RoderExtensionCapability;
@@ -71,25 +77,42 @@ export class ExtensionCatalog {
 
   async installFromFolder(folderPath: string): Promise<ExtensionCatalogRecord> {
     const extensionPackage = await readExtensionPackageFromFolder(folderPath, this.#appVersion);
+    return this.#installPackage(extensionPackage.manifest, extensionPackage.packageRoot, {
+      type: "dev",
+      path: extensionPackage.packageRoot,
+    });
+  }
+
+  async installFromArchive(archivePath: string): Promise<ExtensionCatalogRecord> {
+    const resolvedArchivePath = resolve(archivePath);
+    const extensionPackage = await extractExtensionPackageArchive(resolvedArchivePath, {
+      appVersion: this.#appVersion,
+      installBasePath: join(this.#basePath, "installed"),
+    });
+    return this.#installPackage(extensionPackage.manifest, extensionPackage.packageRoot, {
+      type: "archive",
+      path: extensionPackage.packageRoot,
+      archivePath: resolvedArchivePath,
+    });
+  }
+
+  async #installPackage(manifest: RoderExtensionManifest, packageRoot: string, source: ExtensionSource): Promise<ExtensionCatalogRecord> {
     const catalog = await this.#read();
-    const existing = catalog.extensions.find((extension) => extension.id === extensionPackage.manifest.id);
+    const existing = catalog.extensions.find((extension) => extension.id === manifest.id);
     const timestamp = this.#timestamp();
     const record: ExtensionCatalogRecord = {
-      id: extensionPackage.manifest.id,
-      manifest: extensionPackage.manifest,
-      source: {
-        type: "dev",
-        path: extensionPackage.packageRoot,
-      },
+      id: manifest.id,
+      manifest,
+      source,
       enabled: existing?.enabled ?? true,
-      capabilities: mergeCapabilities(extensionPackage.manifest.capabilities, existing?.capabilities),
-      preferences: mergePreferences(extensionPackage.manifest, existing?.preferences),
+      capabilities: mergeCapabilities(manifest.capabilities, existing?.capabilities),
+      preferences: mergePreferences(manifest, existing?.preferences),
       activationState: "inactive",
       installedAt: existing?.installedAt ?? timestamp,
       updatedAt: timestamp,
       lastActivatedAt: existing?.lastActivatedAt,
       lastError: undefined,
-      logs: appendLog(existing?.logs ?? [], timestamp, `Installed ${extensionPackage.manifest.displayName} from ${extensionPackage.packageRoot}`),
+      logs: appendLog(existing?.logs ?? [], timestamp, `Installed ${manifest.displayName} from ${packageRoot}`),
     };
 
     catalog.extensions = [...catalog.extensions.filter((extension) => extension.id !== record.id), record];
@@ -255,13 +278,13 @@ function appendLog(logs: string[], timestamp: string, message: string): string[]
 
 function normalizeRecord(value: unknown): ExtensionCatalogRecord | undefined {
   const record = value as Partial<ExtensionCatalogRecord> | undefined;
-  if (!record || typeof record.id !== "string" || !record.manifest || record.source?.type !== "dev") {
+  if (!record || typeof record.id !== "string" || !record.manifest || !record.source || !["dev", "archive"].includes(record.source.type)) {
     return undefined;
   }
   return {
     ...(record as ExtensionCatalogRecord),
     source: {
-      type: "dev",
+      ...record.source,
       path: resolve(record.source.path),
     },
     capabilities: Array.isArray(record.capabilities) ? record.capabilities : [],

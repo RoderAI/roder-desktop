@@ -7,10 +7,12 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "package": "pnpm build && roder-extension-package . --out dist/hello-roder.rdx",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@roderai/extension-api": "workspace:*"
+    "@roderai/extension-api": "workspace:*",
+    "@roderai/extension-packager": "workspace:*"
   },
   "devDependencies": {
     "typescript": "~6.0.2"
