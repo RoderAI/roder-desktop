@@ -72,7 +72,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     stopTurn: state.stopTurn,
     restart: state.restart,
     setSelectedModel: state.setSelectedModel,
-    cycleSelectedReasoning: state.cycleSelectedReasoning,
+    setSelectedReasoning: state.setSelectedReasoning,
     setSelectedWorkspaceCwd: state.setSelectedWorkspaceCwd,
     openWorkspaceFolder: state.openWorkspaceFolder,
   };

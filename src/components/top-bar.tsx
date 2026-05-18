@@ -173,13 +173,14 @@ function CollapsedBreadcrumb({
                 return (
                   <DropdownMenuItem
                     key={folder.path}
-                    className={cn("h-10 rounded-lg px-2 text-[14px]", selected && "bg-accent/80")}
+                    selected={selected}
+                    className="h-10 rounded-lg px-2 text-[14px]"
                     onSelect={() => onSelectFolder(folder.path)}
                   >
                     <Folder className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-foreground">{folder.name}</span>
                     <span className="shrink-0 text-[12px] text-muted-foreground">{folder.threadCount} threads</span>
-                    {selected && <Check className="size-3.5 shrink-0" />}
+                    {selected && <Check className="size-3.5 shrink-0 text-primary" />}
                   </DropdownMenuItem>
                 );
               })
@@ -209,13 +210,14 @@ function CollapsedBreadcrumb({
                 return (
                   <DropdownMenuItem
                     key={item.id}
-                    className={cn("h-10 rounded-lg px-2 text-[14px]", selected && "bg-accent/80")}
+                    selected={selected}
+                    className="h-10 rounded-lg px-2 text-[14px]"
                     onSelect={() => onSelectThread(item.id)}
                   >
                     <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-foreground">{threadTitle(item)}</span>
                     <span className="shrink-0 text-[12px] text-muted-foreground">{relativeAge(item.updatedAt)}</span>
-                    {selected && <Check className="size-3.5 shrink-0" />}
+                    {selected && <Check className="size-3.5 shrink-0 text-primary" />}
                   </DropdownMenuItem>
                 );
               })
