@@ -1,4 +1,3 @@
-import { Laptop, Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
@@ -8,7 +7,6 @@ import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
 import { Transcript } from "@/components/transcript";
-import { Badge } from "@/components/ui/badge";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
@@ -33,7 +31,6 @@ export function App(): React.JSX.Element {
       .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === selectedFolder)
       .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
   }, [activeWorkspaceCwd, agent.threads]);
-  const projectName = basename(activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.threads.find((thread) => thread.cwd)?.cwd) ?? "workspace";
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
     (threadId: string) => {
@@ -154,17 +151,6 @@ export function App(): React.JSX.Element {
               onSend={sendPrompt}
               onStop={agent.stopTurn}
             />
-            <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-border px-8 text-xs text-muted-foreground">
-              <Laptop className="size-4" />
-              <span>Local</span>
-              <span>{projectName}</span>
-              <span className="ml-auto flex items-center gap-2">
-                {agent.busy && <Loader2 className="size-3 animate-spin" />}
-                <Badge variant="muted" className="text-[11px]">
-                  {agent.status.state === "ready" ? "roder app-server" : agent.status.state}
-                </Badge>
-              </span>
-            </footer>
           </div>
           {activeTool && (
             <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
