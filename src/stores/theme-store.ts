@@ -26,7 +26,7 @@ export type ThemeSettings = {
   codeFontSize: number;
 };
 
-export type SettingsSection = "general" | "appearance" | "components" | "models" | "extensions" | "configuration" | "personalization" | "mcp" | "git" | "usage";
+export type SettingsSection = "general" | "appearance" | "components" | "models" | "extensions" | "plugins" | "configuration" | "personalization" | "mcp" | "git" | "usage";
 
 type ThemeStore = {
   settingsOpen: boolean;
