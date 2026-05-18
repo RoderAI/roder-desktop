@@ -6,7 +6,11 @@ import { useExtensionsStore } from "@/stores/extensions-store";
 import type { ExtensionCatalogRecord } from "@/types/extensions";
 import { cn } from "@/lib/utils";
 
-export function ExtensionsSettingsPanel(): React.JSX.Element {
+type ExtensionsSettingsPanelProps = {
+  surface?: "settings" | "sidebar";
+};
+
+export function ExtensionsSettingsPanel({ surface = "settings" }: ExtensionsSettingsPanelProps): React.JSX.Element {
   const extensions = useExtensionsStore((state) => state.extensions);
   const loading = useExtensionsStore((state) => state.loading);
   const error = useExtensionsStore((state) => state.error);
@@ -20,15 +24,15 @@ export function ExtensionsSettingsPanel(): React.JSX.Element {
   }, [load]);
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
-      <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
+    <section className={cn("bg-card", surface === "settings" ? "rounded-xl border border-border shadow-sm" : "min-h-full")}>
+      <header className={cn("flex items-start justify-between gap-4 border-b border-border py-4", surface === "settings" ? "px-5" : "px-3")}>
         <div>
           <h1 className="text-[16px] font-medium">Extensions</h1>
           <p className="mt-1 text-[14px] text-muted-foreground">
             {extensions.length === 0 ? "No local extensions installed" : `${extensions.length} local extension${extensions.length === 1 ? "" : "s"} installed`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button variant="ghost" size="sm" disabled={loading} onClick={() => void load()}>
             <RefreshCw className="size-3.5" />
             Refresh
@@ -42,13 +46,13 @@ export function ExtensionsSettingsPanel(): React.JSX.Element {
         </div>
       </header>
 
-      {error && <div className="border-b border-border px-5 py-3 text-[13px] text-destructive">{error}</div>}
+      {error && <div className={cn("border-b border-border py-3 text-[13px] text-destructive", surface === "settings" ? "px-5" : "px-3")}>{error}</div>}
       {lastResult && (
-        <pre className="max-h-48 overflow-auto border-b border-border bg-muted/50 px-5 py-3 text-[12px] text-muted-foreground">{lastResult}</pre>
+        <pre className={cn("max-h-48 overflow-auto border-b border-border bg-muted/50 py-3 text-[12px] text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>{lastResult}</pre>
       )}
 
       {extensions.length === 0 ? (
-        <div className="px-5 py-8 text-[14px] text-muted-foreground">
+        <div className={cn("py-8 text-[14px] text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>
           Build an extension, then install its folder or packaged .rdx archive here. Local folders stay linked; archives are copied into app storage.
         </div>
       ) : (

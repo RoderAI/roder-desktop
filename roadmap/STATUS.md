@@ -18,7 +18,7 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 
 | ID | PRD | Status | Current Stage | Updated | Verification | Next Action |
 | --- | --- | --- | --- | --- | --- | --- |
-| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 6 - Developer Tooling, Packaging, And Documentation | 2026-05-18 | `.rdx` package/install smoke passed; `pnpm test` and `pnpm build` passed | Implement Rust app-server reverse-RPC bridge, safe mode, package checksums/signatures, and docs |
+| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 5 - Webview Panels And Desktop UI Contributions | 2026-05-18 | Extensions right sidebar passed `pnpm typecheck`, `pnpm test`, and `pnpm build` | Add extension-contributed sidebar/webview panels with sandboxing |
 
 ## Completed PRDs
 
