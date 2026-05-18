@@ -39,7 +39,7 @@ export function SettingsView(): React.JSX.Element {
       <aside className="drag-region flex w-[318px] shrink-0 flex-col border-r border-border bg-sidebar px-3 pb-5 pt-[62px] text-sidebar-foreground">
         <button
           type="button"
-          className="no-drag mb-8 flex h-9 w-full items-center gap-3 rounded-lg px-2 text-left text-[15px] text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className="squircle-corners no-drag mb-8 flex h-9 w-full items-center gap-3 rounded-xl px-2 text-left text-[17px] text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
           onClick={closeSettings}
         >
           <ArrowLeft className="size-4" />
@@ -91,7 +91,7 @@ function SettingsNavItem({
     <button
       type="button"
       className={cn(
-        "flex h-9 items-center gap-3 rounded-lg px-2 text-left text-[15px]",
+        "squircle-corners flex h-9 items-center gap-3 rounded-xl px-2 text-left text-[17px]",
         active ? "bg-sidebar-active text-sidebar-active-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
       )}
       onClick={() => onClick(id)}

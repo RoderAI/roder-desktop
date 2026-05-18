@@ -1,4 +1,6 @@
-import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, PanelLeftOpen, SquareTerminal, TerminalSquare } from "lucide-react";
+import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, SquareTerminal, TerminalSquare } from "lucide-react";
 import type { RoderStatus, RoderThread } from "@/types/roder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,22 +61,20 @@ export function TopBar({
     <header
       className={cn(
         "drag-region flex h-[52px] shrink-0 items-center border-b border-transparent pr-5 text-muted-foreground",
-        sidebarOpen ? "pl-5" : "pl-[92px]",
+        sidebarOpen ? "pl-5" : "pl-[148px]",
       )}
     >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="no-drag fixed left-[104px] top-3.5 z-40 size-8 rounded-md text-muted-foreground active:scale-95"
+        aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+        title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+        onClick={onToggleSidebar}
+      >
+        <HugeiconsIcon icon={LayoutAlignLeftIcon} className="size-5" strokeWidth={1.7} />
+      </Button>
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {!sidebarOpen && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="no-drag size-8 shrink-0 translate-y-[4px] rounded-md text-muted-foreground active:scale-95"
-            aria-label="Show sidebar"
-            title="Show sidebar"
-            onClick={onToggleSidebar}
-          >
-            <PanelLeftOpen className="size-4" />
-          </Button>
-        )}
         {sidebarOpen ? (
           <>
             <h1 className="min-w-0 truncate text-[16px] font-normal">{threadTitle(thread)}</h1>

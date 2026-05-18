@@ -1,9 +1,10 @@
-import { Archive, Boxes, ChevronLeft, ChevronRight, Folder, GitBranch, PanelLeftClose, Pin, Search, Send } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Archive, CirclePlus, Store } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { RoderThread } from "@/types/roder";
-import { Button } from "@/components/ui/button";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
+import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 
 type AppSidebarProps = {
   threads: RoderThread[];
@@ -11,16 +12,6 @@ type AppSidebarProps = {
   width: number;
   onSelectThread: (threadId: string) => void;
   onNewThread: () => void;
-  onBack: () => void;
-  onForward: () => void;
-  onClose: () => void;
-  canGoBack: boolean;
-  canGoForward: boolean;
-};
-
-type PreviewState = {
-  thread: RoderThread;
-  top: number;
 };
 
 type ThreadGroup = {
@@ -37,171 +28,167 @@ export function AppSidebar({
   width,
   onSelectThread,
   onNewThread,
-  onBack,
-  onForward,
-  onClose,
-  canGoBack,
-  canGoForward,
 }: AppSidebarProps): React.JSX.Element {
-  const sidebarRef = useRef<HTMLElement | null>(null);
-  const hidePreviewTimerRef = useRef<number | null>(null);
-  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
   const threadGroups = useMemo(() => groupThreadsByFolder(threads, activeThreadId), [activeThreadId, threads]);
 
-  function clearHidePreviewTimer(): void {
-    if (hidePreviewTimerRef.current === null) {
-      return;
-    }
-    window.clearTimeout(hidePreviewTimerRef.current);
-    hidePreviewTimerRef.current = null;
+  function showMoreForGroup(groupKey: string): void {
+    setExpandedGroupKeys((current) => {
+      const next = new Set(current);
+      next.add(groupKey);
+      return next;
+    });
   }
 
-  function showPreview(thread: RoderThread, element: HTMLElement): void {
-    clearHidePreviewTimer();
-    const sidebar = sidebarRef.current;
-    const sidebarRect = sidebar?.getBoundingClientRect();
-    const rowRect = element.getBoundingClientRect();
-    const rawTop = sidebarRect ? rowRect.top - sidebarRect.top - 4 : rowRect.top;
-    const maxTop = Math.max(72, (sidebarRect?.height ?? window.innerHeight) - 158);
-    setPreview({ thread, top: Math.min(Math.max(rawTop, 76), maxTop) });
-  }
-
-  function scheduleHidePreview(): void {
-    clearHidePreviewTimer();
-    hidePreviewTimerRef.current = window.setTimeout(() => setPreview(null), 120);
+  function showLessForGroup(groupKey: string): void {
+    setExpandedGroupKeys((current) => {
+      const next = new Set(current);
+      next.delete(groupKey);
+      return next;
+    });
   }
 
   return (
     <aside
-      ref={sidebarRef}
       className="drag-region relative z-20 flex h-screen shrink-0 flex-col overflow-visible border-r border-border bg-sidebar text-sidebar-foreground"
       style={{ width }}
     >
-      <div className="flex h-[60px] items-center gap-3 px-5 pl-[104px]">
-        <button
-          className="no-drag flex size-8 items-center justify-center rounded-md opacity-70 transition-colors hover:bg-sidebar-accent hover:opacity-100 active:scale-95"
-          aria-label="Hide sidebar"
-          title="Hide sidebar"
-          onClick={onClose}
-        >
-          <PanelLeftClose className="size-4" />
-        </button>
-        <Search className="size-5 opacity-70" />
-        <div className="ml-auto flex items-center gap-3 opacity-60">
-          <button className="rounded-md p-1 disabled:opacity-30" disabled={!canGoBack} onClick={onBack}>
-            <ChevronLeft className="size-5" />
-          </button>
-          <button className="rounded-md p-1 disabled:opacity-30" disabled={!canGoForward} onClick={onForward}>
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
-      </div>
+      <div className="h-[60px]" />
 
-      <div className="no-drag flex flex-col gap-1 px-3">
-        <Button
-          variant="ghost"
-          className="h-10 justify-start gap-3 rounded-lg bg-sidebar-active px-3 text-[15px] text-sidebar-active-foreground hover:bg-sidebar-active"
-          onClick={onNewThread}
-        >
-          <Send className="size-5" />
-          New Agent
-          <span className="ml-auto text-xs text-sidebar-muted">⌘N</span>
-        </Button>
-        <Button variant="ghost" className="h-10 justify-start gap-3 px-3 text-[15px] text-sidebar-foreground">
-          <Boxes className="size-5" />
-          Marketplace
-        </Button>
+      <div className="no-drag flex flex-col gap-1 px-2">
+        <SidebarRowButton onClick={onNewThread}>
+          <CirclePlus className="size-4.5" />
+          <span className="min-w-0 flex-1 truncate">New Agent</span>
+          <Kbd className="ml-auto">⌘+N</Kbd>
+        </SidebarRowButton>
+        <SidebarRowButton>
+          <Store className="size-4.5" />
+          <span className="min-w-0 flex-1 truncate">Marketplace</span>
+        </SidebarRowButton>
       </div>
 
       <div className="sidebar-scroll no-drag mt-6 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-5">
         <div className="flex flex-col gap-7">
           {threadGroups.length > 0 ? (
-            threadGroups.map((group) => (
-              <section key={group.key}>
-                <div className="truncate px-3 text-[14px] text-sidebar-heading" title={group.path}>
-                  {group.title}
-                </div>
-                <div className="mt-3 flex flex-col gap-1">
-                  {group.threads.map((thread) => (
-                    <button
-                      key={thread.id}
-                      className={cn(
-                        "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] text-sidebar-foreground outline-none hover:bg-sidebar-accent",
-                        thread.id === activeThreadId && "bg-sidebar-active text-sidebar-active-foreground",
-                      )}
-                      onMouseEnter={(event) => showPreview(thread, event.currentTarget)}
-                      onMouseLeave={scheduleHidePreview}
-                      onFocus={(event) => showPreview(thread, event.currentTarget)}
-                      onBlur={scheduleHidePreview}
-                      onClick={() => onSelectThread(thread.id)}
-                    >
-                      {thread.id === activeThreadId ? (
-                        <Pin className="size-4 shrink-0 fill-current opacity-70" />
-                      ) : (
-                        <span className="size-1.5 shrink-0 rounded-full bg-sidebar-dot" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
-                      {thread.id === activeThreadId && (
-                        <>
-                          <span className="shrink-0 text-[13px] text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
-                          <Archive className="size-4 shrink-0 text-sidebar-muted" />
-                        </>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))
+            threadGroups.map((group) => {
+              const expanded = expandedGroupKeys.has(group.key);
+              const visibility = visibleThreadsForGroup(group.threads, expanded);
+              return (
+                <section key={group.key}>
+                  <div className="truncate px-3 text-[16px] text-sidebar-heading" title={group.path}>
+                    {group.title}
+                  </div>
+                  <div className="mt-3 flex flex-col gap-1">
+                    {visibility.primaryThreads.map((thread) => (
+                      <ThreadRow
+                        key={thread.id}
+                        thread={thread}
+                        activeThreadId={activeThreadId}
+                        onSelectThread={onSelectThread}
+                      />
+                    ))}
+                    {visibility.canShowMore && (
+                      <SidebarRowButton
+                        className="text-sm text-sidebar-muted hover:text-sidebar-foreground"
+                        onClick={() => showMoreForGroup(group.key)}
+                      >
+                        <span className="min-w-0 flex-1 truncate">Show more</span>
+                        <span className="shrink-0 text-[14px]">+{visibility.hiddenCount}</span>
+                      </SidebarRowButton>
+                    )}
+                    {visibility.overflowThreads.length > 0 && (
+                      <div
+                        className="thread-overflow-region"
+                        data-expanded={expanded ? "true" : undefined}
+                        aria-hidden={!expanded}
+                      >
+                        <div className="thread-overflow-region-inner flex flex-col gap-1">
+                          {visibility.overflowThreads.map((thread) => (
+                            <ThreadRow
+                              key={thread.id}
+                              thread={thread}
+                              activeThreadId={activeThreadId}
+                              onSelectThread={onSelectThread}
+                              disabled={!expanded}
+                            />
+                          ))}
+                          {visibility.canShowLess && (
+                            <SidebarRowButton
+                              className="text-sm text-sidebar-muted hover:text-sidebar-foreground"
+                              onClick={() => showLessForGroup(group.key)}
+                            >
+                              <span className="min-w-0 flex-1 truncate">Show less</span>
+                            </SidebarRowButton>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })
           ) : (
-            <div className="px-3 py-2 text-[14px] text-sidebar-heading">No sessions yet</div>
+            <div className="px-3 py-2 text-[16px] text-sidebar-heading">No sessions yet</div>
           )}
         </div>
       </div>
-      {preview && (
-        <ThreadPreviewCard
-          thread={preview.thread}
-          top={preview.top}
-          onMouseEnter={clearHidePreviewTimer}
-          onMouseLeave={scheduleHidePreview}
-        />
-      )}
       <SidebarAccountMenu />
     </aside>
   );
 }
 
-function ThreadPreviewCard({
+function ThreadRow({
   thread,
-  top,
-  onMouseEnter,
-  onMouseLeave,
+  activeThreadId,
+  onSelectThread,
+  disabled = false,
 }: {
   thread: RoderThread;
-  top: number;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
+  activeThreadId: string;
+  onSelectThread: (threadId: string) => void;
+  disabled?: boolean;
 }): React.JSX.Element {
-  const title = thread.name ?? (thread.preview || "Untitled agent");
   return (
-    <div
-      className="no-drag absolute left-[calc(100%-8px)] w-[342px] rounded-lg bg-popover px-4 py-3 text-popover-foreground shadow-lg ring-1 ring-border"
-      style={{ top }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+    <SidebarRowButton
+      className={cn(
+        "thread-row",
+        thread.id === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
+      )}
+      disabled={disabled}
+      onClick={() => onSelectThread(thread.id)}
     >
-      <div className="truncate text-[15px] text-foreground">{title}</div>
-      <div className="mt-3 flex items-start gap-3 text-[14px] text-muted-foreground">
-        <GitBranch className="mt-0.5 size-4 shrink-0" />
-        <div className="min-w-0">
-          <div className="truncate">{thread.modelProvider || "roder"}</div>
-          <div className="truncate">{thread.status.type || "idle"}</div>
-        </div>
-      </div>
-      <div className="mt-3 flex items-center gap-3 text-[14px] text-muted-foreground">
-        <Folder className="size-4 shrink-0" />
-        <span className="truncate">{shortPath(thread.cwd)}</span>
-      </div>
-    </div>
+      <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
+      <span className="relative flex h-5 w-10 shrink-0 items-center justify-end">
+        <span className="thread-row-age absolute right-0 text-[15px] text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
+        <Archive className="thread-row-archive absolute right-0 size-4 text-sidebar-muted" />
+      </span>
+    </SidebarRowButton>
+  );
+}
+
+function SidebarRowButton({
+  children,
+  className,
+  disabled = false,
+  onClick,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+  onClick?: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "squircle-corners flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-[17px] font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
+        className,
+      )}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -253,23 +240,6 @@ function normalizeFolderKey(path: string): string {
 
 function folderName(path: string): string {
   return path?.split("/").filter(Boolean).pop() || "workspace";
-}
-
-function shortPath(path: string): string {
-  if (!path) {
-    return "workspace";
-  }
-  const home = processHomePath(path);
-  return home ?? folderName(path);
-}
-
-function processHomePath(path: string): string | undefined {
-  const marker = "/w/";
-  const workspaceIndex = path.indexOf(marker);
-  if (workspaceIndex !== -1) {
-    return `~${path.slice(workspaceIndex)}`;
-  }
-  return undefined;
 }
 
 function relativeAge(timestamp: number): string {
