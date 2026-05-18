@@ -10,6 +10,7 @@
     "build": "pnpm bundle:roder && tsc --noEmit && electron-vite build",
     "preview": "electron-vite preview",
     "dist": "pnpm build && electron-builder",
+    "test": "node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "build": {
