@@ -1,7 +1,7 @@
 # Desktop Custom User Extensions PRD
 
 **Status:** In progress
-**Current Stage:** 2 - Desktop Extension Catalog And Settings UI
+**Current Stage:** 4 - Backend Tool Proxy Integration
 **Owner:** Codex
 **Created:** 2026-05-18
 **Updated:** 2026-05-18
@@ -456,6 +456,13 @@ Acceptance:
 - Commands: `pnpm test`; `pnpm typecheck`; `pnpm build`.
 - Result: all commands passed. `pnpm build` again completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`.
 - Gaps: safe-mode startup behavior and renderer state mapping tests remain open.
+
+### 2026-05-18 - Example Extension Smoke And Desktop Tool Proxy
+
+- Evidence: built `examples/extensions/hello-roder`, installed it from its local folder into a temp catalog, executed both contributed commands, executed the contributed `hello-roder.echo` tool twice through the forked host, and added a desktop bridge that merges enabled extension tools into `tools/list` and routes matching `tools/call` requests to the extension host.
+- Commands: `pnpm --filter hello-roder-extension build`; one-off Node smoke using `ExtensionCatalog` and `ExtensionHost`; `pnpm test`; `pnpm typecheck`; `pnpm build`.
+- Result: smoke installed `roder.hello-roder-extension`; `hello-roder.sayHello` returned the configured greeting; `hello-roder.noViewHello` returned `No-view hello #1`; `hello-roder.echo` returned run counts `1` and `2`; `pnpm test`, `pnpm typecheck`, and `pnpm build` passed.
+- Gaps: Rust app-server reverse-RPC integration, cancellation/timeout behavior, and packaged `.rdx` archives remain pending.
 
 ## Open Questions
 
