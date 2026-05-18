@@ -55,11 +55,11 @@ const defaultCodeFont = `"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono
 
 export const themePresets: ThemePreset[] = [
   {
-    id: "gode-light",
+    id: "roder-light",
     name: "Roder Light",
     scheme: "light",
     palette: {
-      presetId: "gode-light",
+      presetId: "roder-light",
       accent: "#242424",
       background: "#f7f7f7",
       foreground: "#242424",
@@ -103,11 +103,11 @@ export const themePresets: ThemePreset[] = [
     },
   },
   {
-    id: "gode-dark",
+    id: "roder-dark",
     name: "Roder Dark",
     scheme: "dark",
     palette: {
-      presetId: "gode-dark",
+      presetId: "roder-dark",
       accent: "#f0f0f0",
       background: "#141414",
       foreground: "#e0e0e0",
@@ -154,8 +154,8 @@ export const themePresets: ThemePreset[] = [
 
 export const defaultThemeSettings: ThemeSettings = {
   mode: "system",
-  light: themePresets.find((preset) => preset.id === "gode-light")!.palette,
-  dark: themePresets.find((preset) => preset.id === "gode-dark")!.palette,
+  light: themePresets.find((preset) => preset.id === "roder-light")!.palette,
+  dark: themePresets.find((preset) => preset.id === "roder-dark")!.palette,
   pointerCursors: false,
   uiFontSize: 14,
   codeFontSize: 13,
@@ -190,7 +190,7 @@ export const useThemeStore = create<ThemeStore>()(
       resetTheme: () => set({ settings: defaultThemeSettings }),
     }),
     {
-      name: "gode-desktop-theme",
+      name: "roder-desktop-theme",
       partialize: (state) => ({ settings: state.settings }),
       merge: (persisted, current) => {
         const value = persisted as Partial<ThemeStore> | undefined;

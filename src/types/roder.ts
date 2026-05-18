@@ -1,16 +1,16 @@
-export type GodeStatus = {
+export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
   cwd?: string;
   message?: string;
 };
 
-export type GodeNotification = {
+export type RoderNotification = {
   method: string;
   params: unknown;
 };
 
-export type GodeThread = {
+export type RoderThread = {
   id: string;
   sessionId: string;
   preview: string;
@@ -23,12 +23,12 @@ export type GodeThread = {
   };
   cwd: string;
   name?: string | null;
-  turns?: GodeTurn[];
+  turns?: RoderTurn[];
 };
 
-export type GodeTurn = {
+export type RoderTurn = {
   id: string;
-  items: GodeItem[];
+  items: RoderItem[];
   itemsView: string;
   status: string;
   error?: {
@@ -39,7 +39,7 @@ export type GodeTurn = {
   durationMs?: number | null;
 };
 
-export type GodeItem = {
+export type RoderItem = {
   id: string;
   type: "userMessage" | "agentMessage" | "toolMessage" | "toolCall" | "reasoning" | "compaction" | "error" | string;
   text?: string;
@@ -52,7 +52,7 @@ export type GodeItem = {
   sourceKind?: string;
 };
 
-export type GodeModel = {
+export type RoderModel = {
   id: string;
   name: string;
   description?: string;
@@ -123,7 +123,7 @@ export type CodexRateWindow = {
 
 export type CodexAccountSnapshot = {
   signedIn: boolean;
-  godeSignedIn: boolean;
+  roderSignedIn: boolean;
   codexSignedIn: boolean;
   displayName: string | null;
   accountId: string | null;
@@ -155,11 +155,11 @@ export type TurnInputItem = {
 
 declare global {
   interface Window {
-    godeDesktop: {
+    roderDesktop: {
       request: (method: string, params?: unknown) => Promise<unknown>;
-      start: () => Promise<GodeStatus>;
-      restart: () => Promise<GodeStatus>;
-      status: () => Promise<GodeStatus>;
+      start: () => Promise<RoderStatus>;
+      restart: () => Promise<RoderStatus>;
+      status: () => Promise<RoderStatus>;
       appearance: () => Promise<SystemAppearance>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       terminalStart: (options?: { cols?: number; rows?: number }) => Promise<TerminalSnapshot>;
@@ -183,8 +183,8 @@ declare global {
       codexLogout: () => Promise<CodexAccountSnapshot>;
       codexOpenRateLimitHelp: () => Promise<void>;
       resolveDroppedFiles: (files: File[]) => ResolvedDesktopFile[];
-      onNotification: (callback: (notification: GodeNotification) => void) => () => void;
-      onStatus: (callback: (status: GodeStatus) => void) => () => void;
+      onNotification: (callback: (notification: RoderNotification) => void) => () => void;
+      onStatus: (callback: (status: RoderStatus) => void) => () => void;
       onStderr: (callback: (message: string) => void) => () => void;
       onAppearance: (callback: (appearance: SystemAppearance) => void) => () => void;
       onTerminalData: (callback: (payload: { id: string; data: string }) => void) => () => void;

@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
-import { GodeAppServerClient } from "../gode/app-server-client";
+import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
 
-const gode = new GodeAppServerClient();
+const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
-const cdpPort = process.env.GODE_DESKTOP_CDP_PORT || "9334";
+const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort);
 let mainWindow: BrowserWindow | null = null;
 const appName = "Roder";
@@ -76,18 +76,18 @@ function sendToRenderer(channel: string, payload: unknown): void {
   mainWindow?.webContents.send(channel, payload);
 }
 
-gode.on("notification", (payload) => sendToRenderer("gode:notification", payload));
-gode.on("status", (payload) => sendToRenderer("gode:status", payload));
-gode.on("stderr", (payload) => sendToRenderer("gode:stderr", payload));
+roder.on("notification", (payload) => sendToRenderer("roder:notification", payload));
+roder.on("status", (payload) => sendToRenderer("roder:status", payload));
+roder.on("stderr", (payload) => sendToRenderer("roder:stderr", payload));
 terminal.on("data", (payload) => sendToRenderer("terminal:data", payload));
 terminal.on("exit", (payload) => sendToRenderer("terminal:exit", payload));
 
-ipcMain.handle("gode:status", () => gode.status());
-ipcMain.handle("gode:start", () => gode.start());
-ipcMain.handle("gode:restart", () => gode.restart());
-ipcMain.handle("gode:appearance", () => currentAppearance());
-ipcMain.handle("gode:request", async (_event, method: string, params: unknown) => {
-  return gode.request(method, params);
+ipcMain.handle("roder:status", () => roder.status());
+ipcMain.handle("roder:start", () => roder.start());
+ipcMain.handle("roder:restart", () => roder.restart());
+ipcMain.handle("roder:appearance", () => currentAppearance());
+ipcMain.handle("roder:request", async (_event, method: string, params: unknown) => {
+  return roder.request(method, params);
 });
 ipcMain.handle("workspace:openFolder", async (_event, defaultPath?: string) => {
   const options: Electron.OpenDialogOptions = {
@@ -120,15 +120,15 @@ ipcMain.handle("codex:logout", () => logoutCodex());
 ipcMain.handle("codex:openRateLimitHelp", () => openRateLimitHelp());
 
 nativeTheme.on("updated", () => {
-  sendToRenderer("gode:appearance", currentAppearance());
+  sendToRenderer("roder:appearance", currentAppearance());
 });
 
 app.whenReady().then(async () => {
   createWindow();
   try {
-    await gode.start();
+    await roder.start();
   } catch (error) {
-    sendToRenderer("gode:status", {
+    sendToRenderer("roder:status", {
       state: "error",
       binary: "unresolved",
       message: (error as Error).message,
@@ -143,7 +143,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
-  void gode.stop();
+  void roder.stop();
   terminal.stop();
   browser.destroy();
 });
@@ -171,7 +171,7 @@ async function saveCanvasPng(dataUrl: string): Promise<{ name: string; path: str
     throw new Error("Canvas capture must be a PNG data URL");
   }
   const data = Buffer.from(dataUrl.slice(prefix.length), "base64");
-  const dir = join(tmpdir(), "gode-desktop-canvas");
+  const dir = join(tmpdir(), "roder-desktop-canvas");
   await mkdir(dir, { recursive: true });
   const name = `canvas-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
   const path = join(dir, name);

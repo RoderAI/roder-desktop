@@ -34,23 +34,23 @@ export function TerminalPanel(): React.JSX.Element {
 
     const fitAndResize = (): void => {
       fit.fit();
-      void window.godeDesktop.terminalResize(terminal.cols, terminal.rows);
+      void window.roderDesktop.terminalResize(terminal.cols, terminal.rows);
     };
 
-    const offData = window.godeDesktop.onTerminalData((payload) => terminal.write(payload.data));
-    const offExit = window.godeDesktop.onTerminalExit((payload) => {
+    const offData = window.roderDesktop.onTerminalData((payload) => terminal.write(payload.data));
+    const offExit = window.roderDesktop.onTerminalExit((payload) => {
       terminal.writeln("");
       terminal.writeln(`[process exited: ${payload.exitCode}]`);
     });
     const inputDisposable = terminal.onData((data) => {
-      void window.godeDesktop.terminalWrite(data);
+      void window.roderDesktop.terminalWrite(data);
     });
     const resizeObserver = new ResizeObserver(fitAndResize);
     resizeObserver.observe(host);
 
     requestAnimationFrame(() => {
       fitAndResize();
-      void window.godeDesktop.terminalStart({ cols: terminal.cols, rows: terminal.rows });
+      void window.roderDesktop.terminalStart({ cols: terminal.cols, rows: terminal.rows });
       terminal.focus();
     });
 

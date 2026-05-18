@@ -92,7 +92,7 @@ export class BrowserManager {
     this.#ensureView();
     const image = await this.#view!.webContents.capturePage();
     const data = image.toPNG();
-    const dir = join(tmpdir(), "gode-desktop-browser");
+    const dir = join(tmpdir(), "roder-desktop-browser");
     await mkdir(dir, { recursive: true });
     const name = `browser-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
     const path = join(dir, name);
@@ -201,14 +201,14 @@ function navigationHistory(webContents: WebContents): {
 function annotationScript(): string {
   return `
 (() => {
-  const existing = document.getElementById("gode-browser-annotations");
+  const existing = document.getElementById("roder-browser-annotations");
   if (existing) {
     existing.remove();
     return false;
   }
 
   const root = document.createElement("div");
-  root.id = "gode-browser-annotations";
+  root.id = "roder-browser-annotations";
   root.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;";
 
   const selectors = [

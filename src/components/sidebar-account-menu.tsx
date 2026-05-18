@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CodexAccountSnapshot, CodexRateWindow } from "@/types/gode";
+import type { CodexAccountSnapshot, CodexRateWindow } from "@/types/roder";
 import { useThemeStore } from "@/stores/theme-store";
 
 export function SidebarAccountMenu(): React.JSX.Element {
@@ -21,7 +21,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    void window.godeDesktop.codexAccount().then((snapshot) => {
+    void window.roderDesktop.codexAccount().then((snapshot) => {
       if (!cancelled) {
         setAccount(snapshot);
         setLimitsOpen(Boolean(snapshot.limits));
@@ -33,13 +33,13 @@ export function SidebarAccountMenu(): React.JSX.Element {
   }, []);
 
   async function refresh(): Promise<void> {
-    setAccount(await window.godeDesktop.codexAccount());
+    setAccount(await window.roderDesktop.codexAccount());
   }
 
   async function login(): Promise<void> {
     setBusy("login");
     try {
-      setAccount(await window.godeDesktop.codexLogin());
+      setAccount(await window.roderDesktop.codexLogin());
     } finally {
       setBusy(null);
     }
@@ -48,7 +48,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
   async function logout(): Promise<void> {
     setBusy("logout");
     try {
-      setAccount(await window.godeDesktop.codexLogout());
+      setAccount(await window.roderDesktop.codexLogout());
     } finally {
       setBusy(null);
     }
@@ -56,7 +56,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
 
   const signedIn = account?.signedIn ?? false;
   const label = account?.displayName ?? (signedIn ? "Codex account" : "Sign in to Codex");
-  const secondary = account?.godeSignedIn ? "Roder connected" : account?.codexSignedIn ? "Codex detected" : "Connect provider";
+  const secondary = account?.roderSignedIn ? "Roder connected" : account?.codexSignedIn ? "Codex detected" : "Connect provider";
 
   return (
     <div className="no-drag shrink-0 border-t border-border/70 p-3">
@@ -111,7 +111,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
               <button
                 type="button"
                 className="mt-1 flex h-8 w-full items-center justify-between rounded-lg text-left text-[15px] text-foreground hover:text-muted-foreground"
-                onClick={() => void window.godeDesktop.codexOpenRateLimitHelp()}
+                onClick={() => void window.roderDesktop.codexOpenRateLimitHelp()}
               >
                 Learn more
                 <ExternalLink className="size-4 text-muted-foreground" />
@@ -121,7 +121,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
 
           <div className="my-1 h-px bg-border/70" />
 
-          {account?.godeSignedIn ? (
+          {account?.roderSignedIn ? (
             <button
               type="button"
               className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] text-foreground outline-none hover:bg-accent disabled:opacity-60"
