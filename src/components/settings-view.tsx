@@ -3,6 +3,7 @@ import {
   Bot,
   Braces,
   Cog,
+  Component,
   Database,
   GitBranch,
   Laptop,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import {
   presetsForScheme,
@@ -46,6 +48,7 @@ export function SettingsView(): React.JSX.Element {
         <nav className="no-drag flex flex-col gap-1">
           <SettingsNavItem id="general" active={settingsSection === "general"} icon={<Cog className="size-4" />} label="General" onClick={setSettingsSection} />
           <SettingsNavItem id="appearance" active={settingsSection === "appearance"} icon={<Paintbrush className="size-4" />} label="Appearance" onClick={setSettingsSection} />
+          <SettingsNavItem id="components" active={settingsSection === "components"} icon={<Component className="size-4" />} label="Components" onClick={setSettingsSection} />
           <SettingsNavItem id="models" active={settingsSection === "models"} icon={<Bot className="size-4" />} label="Models" onClick={setSettingsSection} />
           <SettingsNavItem id="configuration" active={settingsSection === "configuration"} icon={<Braces className="size-4" />} label="Configuration" onClick={setSettingsSection} />
           <SettingsNavItem id="personalization" active={settingsSection === "personalization"} icon={<UserRound className="size-4" />} label="Personalization" onClick={setSettingsSection} />
@@ -55,9 +58,11 @@ export function SettingsView(): React.JSX.Element {
         </nav>
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto px-10 py-12">
-        <div className="mx-auto w-full max-w-[720px]">
+        <div className="mx-auto w-full max-w-[860px]">
           {settingsSection === "appearance" ? (
             <AppearancePanel onReset={resetTheme} />
+          ) : settingsSection === "components" ? (
+            <ComponentsSettingsPanel />
           ) : settingsSection === "models" ? (
             <ModelsSettingsPanel />
           ) : (

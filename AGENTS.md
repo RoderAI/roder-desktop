@@ -4,6 +4,18 @@
 
 - The Roder app-server API contract is documented in `docs/api.md`.
 
+## UI Styling
+
+Prefer Tailwind's standard spacing scale for margins, padding, gaps, sizing,
+positioning, and layout measurements. Avoid arbitrary values such as `px-[13px]`,
+`gap-[18px]`, `w-[347px]`, or `z-[80]` unless the value is tied to a real
+external constraint, asset size, or one-off integration requirement.
+
+When a design appears to need a custom value, first choose the nearest Tailwind
+scale token and adjust the surrounding layout to fit the system. If an arbitrary
+value is still necessary, keep it local, document the reason when it is not
+obvious, and avoid spreading similar one-off values across multiple components.
+
 ## TDD
 
 Use TDD when the change affects behavior that can be proven with a meaningful
