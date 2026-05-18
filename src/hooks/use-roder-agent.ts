@@ -1,15 +1,15 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { godeIpc } from "@/lib/gode-ipc";
-import { visibleModelsFor } from "@/lib/gode-models";
-import { useGodeStore } from "@/stores/gode-store";
-import type { ConversationMessage } from "@/types/gode";
+import { roderIpc } from "@/lib/roder-ipc";
+import { visibleModelsFor } from "@/lib/roder-models";
+import { useRoderStore } from "@/stores/roder-store";
+import type { ConversationMessage } from "@/types/roder";
 
 const emptyMessages: ConversationMessage[] = [];
 
-export function useGodeAgent() {
-  useGodeStoreBootstrap();
-  const state = useGodeStore(useShallow(selectAgentState));
+export function useRoderAgent() {
+  useRoderStoreBootstrap();
+  const state = useRoderStore(useShallow(selectAgentState));
   const models = useMemo(() => visibleModelsFor(state.allModels, state.visibleModelIds), [state.allModels, state.visibleModelIds]);
 
   return {
@@ -18,20 +18,20 @@ export function useGodeAgent() {
   };
 }
 
-function useGodeStoreBootstrap(): void {
-  const bootstrap = useGodeStore((state) => state.bootstrap);
-  const applyAppearance = useGodeStore((state) => state.applyAppearance);
-  const applyStatus = useGodeStore((state) => state.applyStatus);
-  const applyStderr = useGodeStore((state) => state.applyStderr);
-  const applyNotification = useGodeStore((state) => state.applyNotification);
+function useRoderStoreBootstrap(): void {
+  const bootstrap = useRoderStore((state) => state.bootstrap);
+  const applyAppearance = useRoderStore((state) => state.applyAppearance);
+  const applyStatus = useRoderStore((state) => state.applyStatus);
+  const applyStderr = useRoderStore((state) => state.applyStderr);
+  const applyNotification = useRoderStore((state) => state.applyNotification);
 
   useEffect(() => {
-    const offAppearance = godeIpc.onAppearance(applyAppearance);
-    const offStatus = godeIpc.onStatus(applyStatus);
-    const offStderr = godeIpc.onStderr(applyStderr);
-    const offNotification = godeIpc.onNotification(applyNotification);
+    const offAppearance = roderIpc.onAppearance(applyAppearance);
+    const offStatus = roderIpc.onStatus(applyStatus);
+    const offStderr = roderIpc.onStderr(applyStderr);
+    const offNotification = roderIpc.onNotification(applyNotification);
 
-    void godeIpc.appearance().then(applyAppearance);
+    void roderIpc.appearance().then(applyAppearance);
     void bootstrap();
 
     return () => {
@@ -43,7 +43,7 @@ function useGodeStoreBootstrap(): void {
   }, [applyAppearance, applyNotification, applyStatus, applyStderr, bootstrap]);
 }
 
-function selectAgentState(state: ReturnType<typeof useGodeStore.getState>) {
+function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
   const messages = state.messagesByThread[state.activeThreadId] ?? emptyMessages;
   return {
     status: state.status,

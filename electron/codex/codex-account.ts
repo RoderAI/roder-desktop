@@ -17,7 +17,7 @@ export type CodexRateWindow = {
 
 export type CodexAccountSnapshot = {
   signedIn: boolean;
-  godeSignedIn: boolean;
+  roderSignedIn: boolean;
   codexSignedIn: boolean;
   displayName: string | null;
   accountId: string | null;
@@ -60,7 +60,7 @@ type CodexIdTokenPayload = {
   name?: string;
 };
 
-type GodeAuthJson = {
+type RoderAuthJson = {
   refresh?: string;
   account_id?: string;
 };
@@ -82,14 +82,14 @@ let loginPending = false;
 
 export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {
   try {
-    const [codexAuth, godeAuth, limits] = await Promise.all([readCodexAuth(), readGodeAuth(), readLatestLimits()]);
-    const displayName = codexAuth.displayName ?? (godeAuth.accountId ? `Codex account ${shortId(godeAuth.accountId)}` : null);
+    const [codexAuth, roderAuth, limits] = await Promise.all([readCodexAuth(), readRoderAuth(), readLatestLimits()]);
+    const displayName = codexAuth.displayName ?? (roderAuth.accountId ? `Codex account ${shortId(roderAuth.accountId)}` : null);
     return {
-      signedIn: codexAuth.signedIn || godeAuth.signedIn,
-      godeSignedIn: godeAuth.signedIn,
+      signedIn: codexAuth.signedIn || roderAuth.signedIn,
+      roderSignedIn: roderAuth.signedIn,
       codexSignedIn: codexAuth.signedIn,
       displayName,
-      accountId: godeAuth.accountId ?? codexAuth.accountId,
+      accountId: roderAuth.accountId ?? codexAuth.accountId,
       planType: limits?.planType ?? codexAuth.planType,
       loginPending,
       limits: limits
@@ -103,7 +103,7 @@ export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {
   } catch (error) {
     return {
       signedIn: false,
-      godeSignedIn: false,
+      roderSignedIn: false,
       codexSignedIn: false,
       displayName: null,
       accountId: null,
@@ -169,8 +169,8 @@ async function readCodexAuth(): Promise<{
   };
 }
 
-async function readGodeAuth(): Promise<{ signedIn: boolean; accountId: string | null }> {
-  const auth = await readJson<GodeAuthJson>(roderAuthPath());
+async function readRoderAuth(): Promise<{ signedIn: boolean; accountId: string | null }> {
+  const auth = await readJson<RoderAuthJson>(roderAuthPath());
   return {
     signedIn: Boolean(auth?.refresh),
     accountId: firstText(auth?.account_id),

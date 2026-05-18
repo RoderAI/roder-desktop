@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, Camera, ExternalLink, Highlighter, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { DesktopAttachment, BrowserSnapshot } from "@/types/gode";
+import type { DesktopAttachment, BrowserSnapshot } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +32,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
         width: rect.width,
         height: rect.height,
       };
-      const next = await window.godeDesktop.browserShow(bounds);
+      const next = await window.roderDesktop.browserShow(bounds);
       if (!disposed) {
         setSnapshot(next);
       }
@@ -47,12 +47,12 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
       disposed = true;
       resizeObserver.disconnect();
       window.removeEventListener("resize", syncBounds);
-      void window.godeDesktop.browserHide();
+      void window.roderDesktop.browserHide();
     };
   }, []);
 
   async function navigate(): Promise<void> {
-    const next = await window.godeDesktop.browserNavigate(location);
+    const next = await window.roderDesktop.browserNavigate(location);
     setSnapshot(next);
     setLocation(next.url);
   }
@@ -60,7 +60,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
   async function captureScreenshot(): Promise<void> {
     setCapturing(true);
     try {
-      const file = await window.godeDesktop.browserCaptureScreenshot();
+      const file = await window.roderDesktop.browserCaptureScreenshot();
       onAttach({ ...file, id: crypto.randomUUID() });
     } finally {
       setCapturing(false);
@@ -74,7 +74,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
           label="Back"
           disabled={!snapshot?.canGoBack}
           onClick={async () => {
-            const next = await window.godeDesktop.browserBack();
+            const next = await window.roderDesktop.browserBack();
             setSnapshot(next);
             setLocation(next.url);
           }}
@@ -85,7 +85,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
           label="Forward"
           disabled={!snapshot?.canGoForward}
           onClick={async () => {
-            const next = await window.godeDesktop.browserForward();
+            const next = await window.roderDesktop.browserForward();
             setSnapshot(next);
             setLocation(next.url);
           }}
@@ -95,7 +95,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
         <ToolbarButton
           label="Refresh"
           onClick={async () => {
-            const next = await window.godeDesktop.browserRefresh();
+            const next = await window.roderDesktop.browserRefresh();
             setSnapshot(next);
           }}
         >
@@ -125,7 +125,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
           label={snapshot?.annotating ? "Hide HTML annotations" : "Annotate HTML"}
           className={cn(snapshot?.annotating && "bg-accent text-accent-foreground")}
           onClick={async () => {
-            const next = await window.godeDesktop.browserToggleAnnotation();
+            const next = await window.roderDesktop.browserToggleAnnotation();
             setSnapshot(next);
           }}
         >

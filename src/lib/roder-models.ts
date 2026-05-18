@@ -1,10 +1,10 @@
-import type { GodeModel } from "@/types/gode";
+import type { RoderModel } from "@/types/roder";
 
-export function selectedModelProvider(models: GodeModel[], selectedModel: string): string | undefined {
+export function selectedModelProvider(models: RoderModel[], selectedModel: string): string | undefined {
   return models.find((model) => model.id === selectedModel)?.modelProvider;
 }
 
-export function visibleModelIdsFor(models: GodeModel[], explicitIds: string[]): string[] {
+export function visibleModelIdsFor(models: RoderModel[], explicitIds: string[]): string[] {
   const allIds = models.map((model) => model.id);
   if (explicitIds.length === 0) {
     return allIds;
@@ -14,7 +14,7 @@ export function visibleModelIdsFor(models: GodeModel[], explicitIds: string[]): 
   return visibleIds.length > 0 ? visibleIds : allIds;
 }
 
-export function compactVisibleModelIds(models: GodeModel[], visibleIds: string[]): string[] {
+export function compactVisibleModelIds(models: RoderModel[], visibleIds: string[]): string[] {
   const allIds = models.map((model) => model.id);
   if (visibleIds.length === allIds.length && visibleIds.every((id, index) => id === allIds[index])) {
     return [];
@@ -22,13 +22,13 @@ export function compactVisibleModelIds(models: GodeModel[], visibleIds: string[]
   return visibleIds;
 }
 
-export function visibleModelsFor(models: GodeModel[], explicitIds: string[]): GodeModel[] {
+export function visibleModelsFor(models: RoderModel[], explicitIds: string[]): RoderModel[] {
   const visibleIds = visibleModelIdsFor(models, explicitIds);
   const visible = new Set(visibleIds);
   return models.filter((model) => visible.has(model.id));
 }
 
-export function effectiveSelectedModel(models: GodeModel[], visibleModelIds: string[], selectedModel: string): GodeModel | undefined {
+export function effectiveSelectedModel(models: RoderModel[], visibleModelIds: string[], selectedModel: string): RoderModel | undefined {
   const visibleModels = visibleModelsFor(models, visibleModelIds);
   return visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
 }

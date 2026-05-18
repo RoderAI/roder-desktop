@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, PanelLeftOpen, SquareTerminal, TerminalSquare } from "lucide-react";
-import type { GodeStatus, GodeThread } from "@/types/gode";
+import type { RoderStatus, RoderThread } from "@/types/roder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +21,11 @@ type FolderOption = {
 };
 
 type TopBarProps = {
-  thread?: GodeThread;
-  threads: GodeThread[];
+  thread?: RoderThread;
+  threads: RoderThread[];
   folders: FolderOption[];
   activeFolderPath: string;
-  status: GodeStatus;
+  status: RoderStatus;
   activeTool: ToolPanel;
   sidebarOpen: boolean;
   onRestart: () => void;
@@ -142,8 +142,8 @@ function CollapsedBreadcrumb({
   onSelectFolder,
   onSelectThread,
 }: {
-  thread?: GodeThread;
-  threads: GodeThread[];
+  thread?: RoderThread;
+  threads: RoderThread[];
   folders: FolderOption[];
   activeFolder?: FolderOption;
   activeFolderPath: string;
@@ -229,7 +229,7 @@ function CollapsedBreadcrumb({
   );
 }
 
-function threadTitle(thread: GodeThread | undefined): string {
+function threadTitle(thread: RoderThread | undefined): string {
   if (!thread) {
     return "New Agent";
   }

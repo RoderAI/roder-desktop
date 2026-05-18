@@ -1,12 +1,12 @@
 import { Archive, Boxes, ChevronLeft, ChevronRight, Folder, GitBranch, PanelLeftClose, Pin, Search, Send } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import type { GodeThread } from "@/types/gode";
+import type { RoderThread } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { cn } from "@/lib/utils";
 
 type AppSidebarProps = {
-  threads: GodeThread[];
+  threads: RoderThread[];
   activeThreadId: string;
   width: number;
   onSelectThread: (threadId: string) => void;
@@ -19,7 +19,7 @@ type AppSidebarProps = {
 };
 
 type PreviewState = {
-  thread: GodeThread;
+  thread: RoderThread;
   top: number;
 };
 
@@ -28,7 +28,7 @@ type ThreadGroup = {
   title: string;
   path: string;
   updatedAt: number;
-  threads: GodeThread[];
+  threads: RoderThread[];
 };
 
 export function AppSidebar({
@@ -56,7 +56,7 @@ export function AppSidebar({
     hidePreviewTimerRef.current = null;
   }
 
-  function showPreview(thread: GodeThread, element: HTMLElement): void {
+  function showPreview(thread: RoderThread, element: HTMLElement): void {
     clearHidePreviewTimer();
     const sidebar = sidebarRef.current;
     const sidebarRect = sidebar?.getBoundingClientRect();
@@ -176,7 +176,7 @@ function ThreadPreviewCard({
   onMouseEnter,
   onMouseLeave,
 }: {
-  thread: GodeThread;
+  thread: RoderThread;
   top: number;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -193,7 +193,7 @@ function ThreadPreviewCard({
       <div className="mt-3 flex items-start gap-3 text-[14px] text-muted-foreground">
         <GitBranch className="mt-0.5 size-4 shrink-0" />
         <div className="min-w-0">
-          <div className="truncate">{thread.modelProvider || "gode"}</div>
+          <div className="truncate">{thread.modelProvider || "roder"}</div>
           <div className="truncate">{thread.status.type || "idle"}</div>
         </div>
       </div>
@@ -205,7 +205,7 @@ function ThreadPreviewCard({
   );
 }
 
-function groupThreadsByFolder(threads: GodeThread[], activeThreadId: string): ThreadGroup[] {
+function groupThreadsByFolder(threads: RoderThread[], activeThreadId: string): ThreadGroup[] {
   const groups = new Map<string, ThreadGroup>();
   let activeFolderKey = "";
 

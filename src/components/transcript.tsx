@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ConversationMessage } from "@/types/gode";
+import type { ConversationMessage } from "@/types/roder";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { MessageContent } from "./message-content";

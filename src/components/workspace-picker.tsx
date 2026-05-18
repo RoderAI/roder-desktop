@@ -1,6 +1,6 @@
 import { Check, ChevronDown, Folder, FolderOpen, Home, Laptop, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { GodeThread, WorkspaceFolder } from "@/types/gode";
+import type { RoderThread, WorkspaceFolder } from "@/types/roder";
 import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ type WorkspacePickerProps = {
   selectedCwd: string;
   statusCwd?: string;
   recents: WorkspaceFolder[];
-  threads: GodeThread[];
+  threads: RoderThread[];
   onSelect: (cwd: string) => void;
   onOpenFolder: () => void;
 };
@@ -100,7 +100,7 @@ function buildWorkspaceOptions(
   selectedCwd: string,
   statusCwd: string | undefined,
   recents: WorkspaceFolder[],
-  threads: GodeThread[],
+  threads: RoderThread[],
 ): WorkspaceOption[] {
   const byPath = new Map<string, WorkspaceOption>();
 
