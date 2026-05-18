@@ -76,6 +76,32 @@ export type RoderPreferenceType = "text" | "password" | "checkbox" | "dropdown" 
 
 export type RoderPreferenceValue = string | boolean | null;
 
+export type RoderThemeScheme = "light" | "dark";
+
+export type RoderThemeContribution = {
+  id: string;
+  label: string;
+  path: string;
+  scheme: RoderThemeScheme;
+};
+
+export type RoderThemeDefinition = {
+  name: string;
+  scheme: RoderThemeScheme;
+  colors: {
+    accent: string;
+    background: string;
+    foreground: string;
+    sidebar: string;
+  };
+  translucentSidebar?: boolean;
+  contrast?: number;
+  uiFont?: string;
+  codeFont?: string;
+  uiFontSize?: number;
+  codeFontSize?: number;
+};
+
 export type RoderExtensionStorage = {
   get<T extends JsonValue = JsonValue>(key: string, defaultValue?: T): Promise<T | undefined>;
   update(key: string, value: JsonValue | undefined): Promise<void>;

@@ -13,7 +13,7 @@ export type CreateRdxPackageResult = {
 };
 
 const allowedRootFiles = new Set(["package.json", "README.md", "README", "LICENSE", "LICENSE.md"]);
-const allowedRootDirectories = new Set(["dist", "assets"]);
+const allowedRootDirectories = new Set(["dist", "assets", "themes"]);
 
 export async function createRdxPackage(options: CreateRdxPackageOptions): Promise<CreateRdxPackageResult> {
   const packageRoot = resolve(options.packageRoot);

@@ -1,4 +1,4 @@
-import type { ExtensionCatalogSnapshot } from "@/types/extensions";
+import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
 
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
@@ -207,6 +207,7 @@ declare global {
       extensionsExecuteCommand: (commandId: string, args?: unknown[]) => Promise<unknown>;
       extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) => Promise<unknown>;
       extensionsReadPanel: (extensionId: string, panelId: string) => Promise<string>;
+      extensionsReadTheme: (extensionId: string, themeId: string) => Promise<ExtensionTheme>;
       appServerEvents: () => Promise<AppServerEvent[]>;
       resolveDroppedFiles: (files: File[]) => ResolvedDesktopFile[];
       onNotification: (callback: (notification: RoderNotification) => void) => () => void;

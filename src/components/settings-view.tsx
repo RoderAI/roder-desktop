@@ -26,6 +26,7 @@ import {
   type SettingsSection,
   type ThemeMode,
   type ThemePalette,
+  type ThemePreset,
   type ThemeScheme,
 } from "@/stores/theme-store";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
   const setPointerCursors = useThemeStore((state) => state.setPointerCursors);
   const setUiFontSize = useThemeStore((state) => state.setUiFontSize);
   const setCodeFontSize = useThemeStore((state) => state.setCodeFontSize);
+  const extensionThemePresets = useThemeStore((state) => state.extensionThemePresets);
   const themeJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
 
   async function copyTheme(): Promise<void> {
@@ -163,6 +165,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         title="Light theme"
         scheme="light"
         palette={settings.light}
+        extensionThemePresets={extensionThemePresets}
         onPreset={(presetId) => applyPreset("light", presetId)}
         onChange={(patch) => updatePalette("light", patch)}
       />
@@ -170,6 +173,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         title="Dark theme"
         scheme="dark"
         palette={settings.dark}
+        extensionThemePresets={extensionThemePresets}
         onPreset={(presetId) => applyPreset("dark", presetId)}
         onChange={(patch) => updatePalette("dark", patch)}
       />
@@ -240,12 +244,14 @@ function ThemeEditor({
   title,
   scheme,
   palette,
+  extensionThemePresets,
   onPreset,
   onChange,
 }: {
   title: string;
   scheme: ThemeScheme;
   palette: ThemePalette;
+  extensionThemePresets: ThemePreset[];
   onPreset: (presetId: string) => void;
   onChange: (patch: Partial<ThemePalette>) => void;
 }): React.JSX.Element {
@@ -259,7 +265,7 @@ function ThemeEditor({
           onChange={(event) => onPreset(event.currentTarget.value)}
         >
           <option value="custom">Custom</option>
-          {presetsForScheme(scheme).map((preset) => (
+          {presetsForScheme(scheme, extensionThemePresets).map((preset) => (
             <option key={preset.id} value={preset.id}>{preset.name}</option>
           ))}
         </select>

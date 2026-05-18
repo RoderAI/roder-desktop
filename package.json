@@ -11,7 +11,7 @@
     "preview": "electron-vite preview",
     "dist": "pnpm build && electron-builder",
     "test": "node --test test/*.test.mjs",
-    "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck"
+    "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck && pnpm --filter aurora-theme-extension typecheck"
   },
   "build": {
     "appId": "sc.roder.desktop",

@@ -97,6 +97,19 @@ importers:
         specifier: ^9.0.10
         version: 9.0.10
 
+  examples/extensions/aurora-theme:
+    dependencies:
+      '@roderai/extension-api':
+        specifier: workspace:*
+        version: link:../../../packages/extension-api
+      '@roderai/extension-packager':
+        specifier: workspace:*
+        version: link:../../../packages/extension-packager
+    devDependencies:
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+
   examples/extensions/hello-roder:
     dependencies:
       '@roderai/extension-api':

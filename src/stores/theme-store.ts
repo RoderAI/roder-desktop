@@ -31,9 +31,11 @@ type ThemeStore = {
   settingsOpen: boolean;
   settingsSection: SettingsSection;
   settings: ThemeSettings;
+  extensionThemePresets: ThemePreset[];
   openSettings: (section?: SettingsSection) => void;
   closeSettings: () => void;
   setSettingsSection: (section: SettingsSection) => void;
+  setExtensionThemePresets: (presets: ThemePreset[]) => void;
   setMode: (mode: ThemeMode) => void;
   applyPreset: (scheme: ThemeScheme, presetId: string) => void;
   updatePalette: (scheme: ThemeScheme, patch: Partial<ThemePalette>) => void;
@@ -167,12 +169,14 @@ export const useThemeStore = create<ThemeStore>()(
       settingsOpen: false,
       settingsSection: "appearance",
       settings: defaultThemeSettings,
+      extensionThemePresets: [],
       openSettings: (section = "appearance") => set({ settingsOpen: true, settingsSection: section }),
       closeSettings: () => set({ settingsOpen: false }),
       setSettingsSection: (settingsSection) => set({ settingsSection }),
+      setExtensionThemePresets: (extensionThemePresets) => set({ extensionThemePresets }),
       setMode: (mode) => set((state) => ({ settings: { ...state.settings, mode } })),
       applyPreset: (scheme, presetId) => set((state) => {
-        const preset = themePresets.find((item) => item.id === presetId && item.scheme === scheme);
+        const preset = [...themePresets, ...state.extensionThemePresets].find((item) => item.id === presetId && item.scheme === scheme);
         if (!preset) {
           return {};
         }
@@ -203,6 +207,7 @@ export const useThemeStore = create<ThemeStore>()(
           settingsOpen: value?.settingsOpen ?? current.settingsOpen,
           settingsSection: value?.settingsSection ?? current.settingsSection,
           settings: mergeThemeSettings(current.settings, value?.settings),
+          extensionThemePresets: [],
         };
       },
     },
@@ -243,6 +248,6 @@ function normalizeLegacyPalette(palette: ThemePalette, current: ThemePalette): T
   return palette;
 }
 
-export function presetsForScheme(scheme: ThemeScheme): ThemePreset[] {
-  return themePresets.filter((preset) => preset.scheme === scheme);
+export function presetsForScheme(scheme: ThemeScheme, extensionPresets: ThemePreset[] = []): ThemePreset[] {
+  return [...themePresets, ...extensionPresets].filter((preset) => preset.scheme === scheme);
 }
