@@ -517,6 +517,10 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const nextMessages = activeMessages(state.messagesByThread, threadId).map((message) =>
       message.status === "streaming" ? { ...message, status: "complete" as const } : message,
     );
+    const failedMessage = turnFailureMessage(threadId, turnId, turn);
+    if (failedMessage) {
+      upsertConversationMessage(nextMessages, failedMessage);
+    }
     return {
       messagesByThread: {
         ...state.messagesByThread,
@@ -536,6 +540,22 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
   }
 
   return {};
+}
+
+function turnFailureMessage(threadId: string, turnId: string, turn: Record<string, unknown>): ConversationMessage | null {
+  if (turn.status !== "failed") {
+    return null;
+  }
+  const error = isRecord(turn.error) ? turn.error : {};
+  const message = typeof error.message === "string" && error.message.trim() ? error.message.trim() : "The agent turn failed.";
+  return {
+    id: `turn-error:${turnId || threadId}`,
+    threadId,
+    turnId,
+    role: "system",
+    text: message,
+    status: "failed",
+  };
 }
 
 function userMessageText(prompt: string, attachments: DesktopAttachment[]): string {

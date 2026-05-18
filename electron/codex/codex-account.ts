@@ -83,9 +83,11 @@ let loginPending = false;
 export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {
   try {
     const [codexAuth, roderAuth, limits] = await Promise.all([readCodexAuth(), readRoderAuth(), readLatestLimits()]);
-    const displayName = codexAuth.displayName ?? (roderAuth.accountId ? `Codex account ${shortId(roderAuth.accountId)}` : null);
+    const displayName = roderAuth.signedIn
+      ? codexAuth.displayName ?? (roderAuth.accountId ? `Codex account ${shortId(roderAuth.accountId)}` : null)
+      : null;
     return {
-      signedIn: codexAuth.signedIn || roderAuth.signedIn,
+      signedIn: roderAuth.signedIn,
       roderSignedIn: roderAuth.signedIn,
       codexSignedIn: codexAuth.signedIn,
       displayName,
