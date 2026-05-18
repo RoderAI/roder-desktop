@@ -1,7 +1,7 @@
 # Desktop Custom User Extensions PRD
 
 **Status:** In progress
-**Current Stage:** 6 - Developer Tooling, Packaging, And Documentation
+**Current Stage:** 5 - Webview Panels And Desktop UI Contributions
 **Owner:** Codex
 **Created:** 2026-05-18
 **Updated:** 2026-05-18
@@ -315,9 +315,10 @@ Acceptance:
 
 ### Stage 5: Webview Panels And Desktop UI Contributions
 
-**Status:** Ready
+**Status:** In progress
 **Owned Paths:** `electron/extensions/webview-panels.ts`, `src/components/extensions/**`, `src/App.tsx`, `src/components/top-bar.tsx`, `src/components/settings-view.tsx`, `src/types/extensions.ts`
 
+- [x] Add a right-side Extensions tool panel and top-bar button so installed extensions have a persistent home outside Settings.
 - [ ] Implement `views.panels` contribution support for extension-owned panels in the existing right-side tool panel area or a dedicated Extensions panel area.
 - [ ] Add strict webview sandboxing, CSP, URI rewriting, and message passing.
 - [ ] Add extension panel commands to open, close, reload, and inspect logs.
@@ -470,6 +471,13 @@ Acceptance:
 - Commands: `pnpm --filter hello-roder-extension package`; one-off Node smoke installing `examples/extensions/hello-roder/dist/hello-roder.rdx` with `ExtensionCatalog.installFromArchive` and executing `hello-roder.sayHello` plus `hello-roder.echo`; `pnpm test`; `pnpm build`.
 - Result: `.rdx` archive was created with `dist/extension.js` and `package.json`; smoke installed `roder.hello-roder-extension` from archive storage and executed its command/tool; `pnpm test` and `pnpm build` passed.
 - Gaps: `.rdx` checksums/signatures, richer package metadata, and public docs remain pending.
+
+### 2026-05-18 - Extensions Right Sidebar
+
+- Evidence: added an Extensions top-bar button next to Terminal, Browser, and Canvas; mounted the extension manager in the resizable right-side tool panel; kept the Settings page as a reusable management surface.
+- Commands: `pnpm typecheck`; `pnpm test`; `pnpm build`.
+- Result: all commands passed.
+- Gaps: extension-contributed webview/sidebar panels still need sandboxing and contribution routing.
 
 ## Open Questions
 

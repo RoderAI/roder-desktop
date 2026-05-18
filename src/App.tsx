@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { Composer } from "@/components/composer";
+import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
 import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
@@ -128,6 +129,7 @@ export function App(): React.JSX.Element {
           onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
           onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
           onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
+          onToggleExtensions={() => setActiveTool((tool) => (tool === "extensions" ? null : "extensions"))}
         />
         <div className="flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
@@ -166,6 +168,7 @@ export function App(): React.JSX.Element {
               {activeTool === "terminal" && <TerminalPanel />}
               {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
               {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
+              {activeTool === "extensions" && <ExtensionsPanel />}
             </div>
           )}
         </div>
