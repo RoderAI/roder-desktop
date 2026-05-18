@@ -57,6 +57,13 @@ export type RoderCommandRegistration = {
   icon?: string;
 };
 
+export type RoderPanelRegistration = {
+  id: string;
+  title: string;
+  html: string;
+  icon?: string;
+};
+
 export type RoderToolRegistration<TInput extends JsonObject = JsonObject, TResult extends JsonValue = JsonValue> = {
   id: string;
   title: string;

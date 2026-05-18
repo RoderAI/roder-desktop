@@ -25,7 +25,7 @@ export type RoderExtensionManifest = {
       options?: Array<{ label: string; value: string }>;
     }>;
     views: {
-      panels: Array<{ id: string; title: string; icon?: string }>;
+      panels: Array<{ id: string; title: string; html?: string; icon?: string }>;
     };
   };
   capabilities: RoderExtensionCapability[];

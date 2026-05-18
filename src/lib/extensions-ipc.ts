@@ -13,6 +13,7 @@ export const extensionsIpc = {
   activate: (id: string) => window.roderDesktop.extensionsActivate(id),
   executeCommand: (commandId: string, args?: unknown[]) => window.roderDesktop.extensionsExecuteCommand(commandId, args),
   executeTool: (toolId: string, input?: Record<string, unknown>) => window.roderDesktop.extensionsExecuteTool(toolId, input),
+  readPanel: (extensionId: string, panelId: string) => window.roderDesktop.extensionsReadPanel(extensionId, panelId),
 };
 
 export type ExtensionsIpc = typeof extensionsIpc;

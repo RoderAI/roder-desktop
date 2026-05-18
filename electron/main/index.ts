@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, type Rectangle } from "electron";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
@@ -18,8 +18,17 @@ const browser = new BrowserManager(cdpPort);
 let mainWindow: BrowserWindow | null = null;
 let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
+const appServerEvents: AppServerEvent[] = [];
 const appName = "Roder";
 const rendererZoomFactor = 0.84;
+
+type AppServerEvent = {
+  id: number;
+  at: string;
+  kind: "request" | "response" | "error" | "notification" | "status" | "stderr";
+  method?: string;
+  payload: unknown;
+};
 
 app.setName(appName);
 app.setAboutPanelOptions({ applicationName: appName });
@@ -82,9 +91,18 @@ function sendToRenderer(channel: string, payload: unknown): void {
   mainWindow?.webContents.send(channel, payload);
 }
 
-roder.on("notification", (payload) => sendToRenderer("roder:notification", payload));
-roder.on("status", (payload) => sendToRenderer("roder:status", payload));
-roder.on("stderr", (payload) => sendToRenderer("roder:stderr", payload));
+roder.on("notification", (payload) => {
+  recordAppServerEvent("notification", payload.method, payload.params);
+  sendToRenderer("roder:notification", payload);
+});
+roder.on("status", (payload) => {
+  recordAppServerEvent("status", undefined, payload);
+  sendToRenderer("roder:status", payload);
+});
+roder.on("stderr", (payload) => {
+  recordAppServerEvent("stderr", undefined, payload);
+  sendToRenderer("roder:stderr", payload);
+});
 terminal.on("data", (payload) => sendToRenderer("terminal:data", payload));
 terminal.on("exit", (payload) => sendToRenderer("terminal:exit", payload));
 
@@ -186,6 +204,20 @@ ipcMain.handle("extensions:activate", async (_event, id: string) => {
 });
 ipcMain.handle("extensions:executeCommand", (_event, commandId: string, args?: unknown[]) => getExtensionHost().executeCommand(commandId, args ?? []));
 ipcMain.handle("extensions:executeTool", (_event, toolId: string, input?: Record<string, unknown>) => getExtensionHost().executeTool(toolId, (input ?? {}) as JsonObject));
+ipcMain.handle("extensions:readPanel", async (_event, extensionId: string, panelId: string) => {
+  const extension = await getExtensionCatalog().get(extensionId);
+  const panel = extension?.manifest.contributes.views.panels.find((candidate) => candidate.id === panelId);
+  if (!extension || !panel || !panel.html) {
+    throw new Error(`Extension panel ${panelId} is not available`);
+  }
+  const panelPath = resolve(extension.source.path, panel.html);
+  const extensionRoot = resolve(extension.source.path);
+  if (!panelPath.startsWith(`${extensionRoot}/`) && panelPath !== extensionRoot) {
+    throw new Error(`Extension panel ${panelId} points outside the extension package`);
+  }
+  return readFile(panelPath, "utf8");
+});
+ipcMain.handle("appserver:events", () => appServerEvents);
 
 nativeTheme.on("updated", () => {
   sendToRenderer("roder:appearance", currentAppearance());
@@ -272,16 +304,48 @@ function getExtensionHost(): ExtensionHost {
 }
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
+  recordAppServerEvent("request", method, params ?? {});
   if (method === "tools/list") {
-    const baseTools = await roder.request(method, params);
-    return mergeExtensionTools(baseTools, await getExtensionCatalog().list());
+    try {
+      const baseTools = await roder.request(method, params);
+      const result = mergeExtensionTools(baseTools, await getExtensionCatalog().list());
+      recordAppServerEvent("response", method, result);
+      return result;
+    } catch (error) {
+      recordAppServerEvent("error", method, (error as Error).message);
+      throw error;
+    }
   }
   if (method === "tools/call") {
     const catalog = await getExtensionCatalog().list();
     const toolName = extensionToolName(params, catalog);
     if (toolName) {
-      return callExtensionTool(getExtensionHost(), toolName, params);
+      const result = await callExtensionTool(getExtensionHost(), toolName, params);
+      recordAppServerEvent(result.is_error ? "error" : "response", method, result);
+      return result;
     }
   }
-  return roder.request(method, params);
+  try {
+    const result = await roder.request(method, params);
+    recordAppServerEvent("response", method, result);
+    return result;
+  } catch (error) {
+    recordAppServerEvent("error", method, (error as Error).message);
+    throw error;
+  }
+}
+
+function recordAppServerEvent(kind: AppServerEvent["kind"], method: string | undefined, payload: unknown): void {
+  const event = {
+    id: appServerEvents.length > 0 ? appServerEvents[appServerEvents.length - 1].id + 1 : 1,
+    at: new Date().toISOString(),
+    kind,
+    method,
+    payload,
+  };
+  appServerEvents.push(event);
+  if (appServerEvents.length > 500) {
+    appServerEvents.splice(0, appServerEvents.length - 500);
+  }
+  sendToRenderer("appserver:event", event);
 }
