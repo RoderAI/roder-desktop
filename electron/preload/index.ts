@@ -105,6 +105,11 @@ const api = {
   extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) =>
     ipcRenderer.invoke("extensions:updatePreference", id, key, value) as Promise<ExtensionCatalogSnapshot>,
   extensionsReadLogs: (id: string) => ipcRenderer.invoke("extensions:readLogs", id) as Promise<string[]>,
+  extensionsActivate: (id: string) => ipcRenderer.invoke("extensions:activate", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsExecuteCommand: (commandId: string, args?: unknown[]) =>
+    ipcRenderer.invoke("extensions:executeCommand", commandId, args ?? []) as Promise<unknown>,
+  extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) =>
+    ipcRenderer.invoke("extensions:executeTool", toolId, input ?? {}) as Promise<unknown>,
   resolveDroppedFiles: (files: File[]) =>
     files
       .map((file) => ({

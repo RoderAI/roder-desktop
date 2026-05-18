@@ -18,7 +18,7 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 
 | ID | PRD | Status | Current Stage | Updated | Verification | Next Action |
 | --- | --- | --- | --- | --- | --- | --- |
-| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 2 - Desktop Extension Catalog And Settings UI | 2026-05-18 | Stage 2 catalog IPC slice passed `pnpm test` and `pnpm typecheck` | Add extension runtime activation and Settings UI controls |
+| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 2 - Desktop Extension Catalog And Settings UI | 2026-05-18 | Stage 3 host runtime slice passed focused host tests, `pnpm test`, and `pnpm typecheck` | Add Settings UI controls for install, command, tool, logs, and preferences |
 
 ## Completed PRDs
 

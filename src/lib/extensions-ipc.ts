@@ -8,6 +8,9 @@ export const extensionsIpc = {
   reload: (id: string) => window.roderDesktop.extensionsReload(id),
   updatePreference: (id: string, key: string, value: string | boolean | null) => window.roderDesktop.extensionsUpdatePreference(id, key, value),
   readLogs: (id: string) => window.roderDesktop.extensionsReadLogs(id),
+  activate: (id: string) => window.roderDesktop.extensionsActivate(id),
+  executeCommand: (commandId: string, args?: unknown[]) => window.roderDesktop.extensionsExecuteCommand(commandId, args),
+  executeTool: (toolId: string, input?: Record<string, unknown>) => window.roderDesktop.extensionsExecuteTool(toolId, input),
 };
 
 export type ExtensionsIpc = typeof extensionsIpc;

@@ -193,6 +193,9 @@ declare global {
       extensionsReload: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) => Promise<ExtensionCatalogSnapshot>;
       extensionsReadLogs: (id: string) => Promise<string[]>;
+      extensionsActivate: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsExecuteCommand: (commandId: string, args?: unknown[]) => Promise<unknown>;
+      extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) => Promise<unknown>;
       resolveDroppedFiles: (files: File[]) => ResolvedDesktopFile[];
       onNotification: (callback: (notification: RoderNotification) => void) => () => void;
       onStatus: (callback: (status: RoderStatus) => void) => () => void;

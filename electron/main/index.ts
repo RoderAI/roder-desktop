@@ -2,9 +2,11 @@ import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, type Rec
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
+import { ExtensionHost } from "../extensions/extension-host";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
 
@@ -14,6 +16,7 @@ const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort);
 let mainWindow: BrowserWindow | null = null;
 let extensionCatalog: ExtensionCatalog | null = null;
+let extensionHost: ExtensionHost | null = null;
 const appName = "Roder";
 const rendererZoomFactor = 0.84;
 
@@ -137,17 +140,21 @@ ipcMain.handle("extensions:selectAndInstallFolder", async () => {
   await getExtensionCatalog().installFromFolder(result.filePaths[0]);
   return getExtensionCatalog().list();
 });
-ipcMain.handle("extensions:uninstall", async (_event, id: string) => getExtensionCatalog().uninstall(id));
+ipcMain.handle("extensions:uninstall", async (_event, id: string) => {
+  await getExtensionHost().deactivateExtension(id);
+  return getExtensionCatalog().uninstall(id);
+});
 ipcMain.handle("extensions:enable", async (_event, id: string) => {
   await getExtensionCatalog().enable(id);
   return getExtensionCatalog().list();
 });
 ipcMain.handle("extensions:disable", async (_event, id: string) => {
+  await getExtensionHost().deactivateExtension(id);
   await getExtensionCatalog().disable(id);
   return getExtensionCatalog().list();
 });
 ipcMain.handle("extensions:reload", async (_event, id: string) => {
-  await getExtensionCatalog().reload(id);
+  await getExtensionHost().reloadExtension(id);
   return getExtensionCatalog().list();
 });
 ipcMain.handle("extensions:updatePreference", async (_event, id: string, key: string, value: string | boolean | null) => {
@@ -155,6 +162,12 @@ ipcMain.handle("extensions:updatePreference", async (_event, id: string, key: st
   return getExtensionCatalog().list();
 });
 ipcMain.handle("extensions:readLogs", (_event, id: string) => getExtensionCatalog().readLogs(id));
+ipcMain.handle("extensions:activate", async (_event, id: string) => {
+  await getExtensionHost().activateExtension(id);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:executeCommand", (_event, commandId: string, args?: unknown[]) => getExtensionHost().executeCommand(commandId, args ?? []));
+ipcMain.handle("extensions:executeTool", (_event, toolId: string, input?: Record<string, unknown>) => getExtensionHost().executeTool(toolId, (input ?? {}) as JsonObject));
 
 nativeTheme.on("updated", () => {
   sendToRenderer("roder:appearance", currentAppearance());
@@ -180,6 +193,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  void extensionHost?.stopAll();
   void roder.stop();
   terminal.stop();
   browser.destroy();
@@ -227,4 +241,14 @@ function getExtensionCatalog(): ExtensionCatalog {
     appVersion: app.getVersion(),
   });
   return extensionCatalog;
+}
+
+function getExtensionHost(): ExtensionHost {
+  extensionHost ??= new ExtensionHost({
+    userDataPath: app.getPath("userData"),
+    appName,
+    appVersion: app.getVersion(),
+    catalog: getExtensionCatalog(),
+  });
+  return extensionHost;
 }

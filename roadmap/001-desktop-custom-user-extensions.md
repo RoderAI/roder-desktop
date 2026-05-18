@@ -443,6 +443,13 @@ Acceptance:
 - Result: both commands passed.
 - Gaps: Settings UI wiring and runtime activation remain open in Stage 2/3.
 
+### 2026-05-18 - Stage 3 Host Runtime Slice
+
+- Evidence: added a forked extension host process, generated runner script, activation routing, command and tool execution, notification log capture, extension-scoped storage paths, and tests proving disabled extensions cannot execute contributions.
+- Commands: `node --test test/extension-host.test.mjs`; `pnpm test`; `pnpm typecheck`.
+- Result: all commands passed.
+- Gaps: crash isolation and capability-denied API tests remain open; Settings UI controls and backend tool proxy are still pending.
+
 ## Open Questions
 
 - [ ] Stage 3 owner: confirm whether Electron `utilityProcess` is the right host primitive for extension execution in Electron 42, or whether a forked Node child process is more reliable for this app.
