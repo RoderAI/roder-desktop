@@ -72,13 +72,14 @@ export function WorkspacePicker({
             filteredOptions.map((option) => (
               <DropdownMenuItem
                 key={`${option.source}:${option.path}`}
-                className={cn("h-9 rounded-lg px-2 text-[14px] focus:bg-accent", option.path === normalizedSelected && "bg-accent/80")}
+                selected={option.path === normalizedSelected}
+                className="h-9 rounded-lg px-2 text-[14px] focus:bg-accent"
                 onSelect={() => onSelect(option.path)}
               >
                 <WorkspaceIcon path={option.path} source={option.source} />
                 <span className="min-w-0 flex-1 truncate text-foreground">{option.name}</span>
                 <span className="max-w-[160px] truncate text-[13px] text-muted-foreground">{shortPath(option.path)}</span>
-                {option.path === normalizedSelected && <Check className="ml-0.5 size-3.5 text-fuchsia-300" />}
+                {option.path === normalizedSelected && <Check className="ml-0.5 size-3.5 text-primary" />}
               </DropdownMenuItem>
             ))
           ) : (

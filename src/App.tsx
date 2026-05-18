@@ -143,7 +143,7 @@ export function App(): React.JSX.Element {
               threads={agent.threads}
               attachments={composerAttachments}
               onSelectedModelChange={agent.setSelectedModel}
-              onCycleReasoning={agent.cycleSelectedReasoning}
+              onSelectedReasoningChange={agent.setSelectedReasoning}
               onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
               onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
               onScrollToBottom={followBottom}
