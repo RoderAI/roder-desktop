@@ -508,6 +508,13 @@ Acceptance:
 - Result: all commands passed. `pnpm build` completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`.
 - Gaps: no screenshot-based desktop visual smoke was captured in this pass.
 
+### 2026-05-18 - Sidebar Contribution Filtering And Theme Labels
+
+- Evidence: removed the selected-extension header/detail/summary area from the right Extensions sidebar, filtered the persistent extension rail/sidebar to extensions with HTML panels, commands, or tools, kept theme-only extensions in Settings/Appearance only, and persisted/reconciled selected extension theme names so the Appearance dropdown does not fall back to `Custom` while installed presets reload.
+- Commands: `pnpm typecheck`; `pnpm test`; `pnpm build`; `python3 "${CODEX_HOME:-$HOME/.codex}/skills/roadmap-prd-verifier/scripts/validate_roadmap.py" roadmap/001-desktop-custom-user-extensions.md`; one-process regex-shim rerun of the same roadmap validator.
+- Result: typecheck, tests, and build passed, including new tests for sidebar relevance filtering and selected extension theme labels. `pnpm build` completed Electron/Vite output after `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w`. The stock roadmap validator still crashed on its known malformed placeholder regex; the shimmed validator reported `roadmap validation passed`.
+- Gaps: no screenshot-based desktop visual smoke was captured in this pass.
+
 ## Open Questions
 
 - [ ] Stage 3 owner: confirm whether Electron `utilityProcess` is the right host primitive for extension execution in Electron 42, or whether a forked Node child process is more reliable for this app.
