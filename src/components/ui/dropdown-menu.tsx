@@ -69,7 +69,7 @@ export const DropdownMenuContent = React.forwardRef<React.ElementRef<typeof Menu
 }, ref) {
   return (
     <Menu.Portal>
-      <Menu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-50">
+      <Menu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
         <Menu.Popup
           ref={ref}
           className={cn(dropdownMenuContentClassName, className)}

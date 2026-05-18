@@ -25,7 +25,7 @@ export type ThemeSettings = {
   codeFontSize: number;
 };
 
-export type SettingsSection = "general" | "appearance" | "models" | "configuration" | "personalization" | "mcp" | "git" | "usage";
+export type SettingsSection = "general" | "appearance" | "components" | "models" | "configuration" | "personalization" | "mcp" | "git" | "usage";
 
 type ThemeStore = {
   settingsOpen: boolean;
@@ -191,11 +191,17 @@ export const useThemeStore = create<ThemeStore>()(
     }),
     {
       name: "roder-desktop-theme",
-      partialize: (state) => ({ settings: state.settings }),
+      partialize: (state) => ({
+        settingsOpen: state.settingsOpen,
+        settingsSection: state.settingsSection,
+        settings: state.settings,
+      }),
       merge: (persisted, current) => {
         const value = persisted as Partial<ThemeStore> | undefined;
         return {
           ...current,
+          settingsOpen: value?.settingsOpen ?? current.settingsOpen,
+          settingsSection: value?.settingsSection ?? current.settingsSection,
           settings: mergeThemeSettings(current.settings, value?.settings),
         };
       },

@@ -40,7 +40,7 @@ export const SelectContent = React.forwardRef<
   SelectContentProps
 >(({ align = "start", className, children, position: _position, side, sideOffset = 6, ...props }, ref) => (
   <SelectPrimitive.Portal>
-    <SelectPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-50">
+    <SelectPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
       <SelectPrimitive.Popup
         ref={ref}
         className={cn("min-w-48 overflow-hidden rounded-md border border-border bg-popover shadow-md outline-none", className)}
