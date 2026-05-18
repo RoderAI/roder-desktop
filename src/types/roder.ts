@@ -12,6 +12,14 @@ export type RoderNotification = {
   params: unknown;
 };
 
+export type AppServerEvent = {
+  id: number;
+  at: string;
+  kind: "request" | "response" | "error" | "notification" | "status" | "stderr";
+  method?: string;
+  payload: unknown;
+};
+
 export type RoderThread = {
   id: string;
   sessionId: string;
@@ -198,11 +206,14 @@ declare global {
       extensionsActivate: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsExecuteCommand: (commandId: string, args?: unknown[]) => Promise<unknown>;
       extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) => Promise<unknown>;
+      extensionsReadPanel: (extensionId: string, panelId: string) => Promise<string>;
+      appServerEvents: () => Promise<AppServerEvent[]>;
       resolveDroppedFiles: (files: File[]) => ResolvedDesktopFile[];
       onNotification: (callback: (notification: RoderNotification) => void) => () => void;
       onStatus: (callback: (status: RoderStatus) => void) => () => void;
       onStderr: (callback: (message: string) => void) => () => void;
       onAppearance: (callback: (appearance: SystemAppearance) => void) => () => void;
+      onAppServerEvent: (callback: (event: AppServerEvent) => void) => () => void;
       onTerminalData: (callback: (payload: { id: string; data: string }) => void) => () => void;
       onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => () => void;
     };

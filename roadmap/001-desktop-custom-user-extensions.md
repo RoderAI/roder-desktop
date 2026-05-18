@@ -319,9 +319,9 @@ Acceptance:
 **Owned Paths:** `electron/extensions/webview-panels.ts`, `src/components/extensions/**`, `src/App.tsx`, `src/components/top-bar.tsx`, `src/components/settings-view.tsx`, `src/types/extensions.ts`
 
 - [x] Add a right-side Extensions tool panel and top-bar button so installed extensions have a persistent home outside Settings.
-- [ ] Implement `views.panels` contribution support for extension-owned panels in the existing right-side tool panel area or a dedicated Extensions panel area.
-- [ ] Add strict webview sandboxing, CSP, URI rewriting, and message passing.
-- [ ] Add extension panel commands to open, close, reload, and inspect logs.
+- [x] Implement `views.panels` contribution support for extension-owned panels in the existing right-side tool panel area or a dedicated Extensions panel area.
+- [x] Add strict webview sandboxing, CSP, URI rewriting, and message passing.
+- [x] Add extension panel commands to open, close, reload, and inspect logs.
 - [ ] Add responsive layout checks so extension UI cannot break the desktop minimum size.
 
 Run:
@@ -478,6 +478,13 @@ Acceptance:
 - Commands: `pnpm typecheck`; `pnpm test`; `pnpm build`.
 - Result: all commands passed.
 - Gaps: extension-contributed webview/sidebar panels still need sandboxing and contribution routing.
+
+### 2026-05-18 - Event Log Panel POC
+
+- Evidence: added static extension panel rendering in the Extensions sidebar, sandboxed iframe loading from extension package assets, app-server event history/live event delivery through `postMessage`, and created `~/tmp/event-log` as a POC extension with an `Event Log` panel that pretty-prints IPC requests, responses, notifications, status updates, and stderr.
+- Commands: `npm run package` in `~/tmp/event-log`; one-off Node smoke installing `~/tmp/event-log/dist/event-log.rdx`, validating the `event-log.panel` view contribution, and executing `event-log.clear`; `pnpm test`; `pnpm build`.
+- Result: the POC packaged to `dist/event-log.rdx`; archive install recognized `roder.event-log-extension`; panel contribution resolved `assets/panel.html`; command returned `{ "cleared": true }`; `pnpm test` and `pnpm build` passed.
+- Gaps: panels currently support static HTML plus host-delivered app-server events; richer bidirectional extension panel APIs and per-extension CSP/resource rewriting remain pending.
 
 ## Open Questions
 

@@ -68,6 +68,14 @@ export type DroppedFile = {
   size: number;
 };
 
+export type AppServerEvent = {
+  id: number;
+  at: string;
+  kind: "request" | "response" | "error" | "notification" | "status" | "stderr";
+  method?: string;
+  payload: unknown;
+};
+
 const api = {
   request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
@@ -112,6 +120,8 @@ const api = {
     ipcRenderer.invoke("extensions:executeCommand", commandId, args ?? []) as Promise<unknown>,
   extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) =>
     ipcRenderer.invoke("extensions:executeTool", toolId, input ?? {}) as Promise<unknown>,
+  extensionsReadPanel: (extensionId: string, panelId: string) => ipcRenderer.invoke("extensions:readPanel", extensionId, panelId) as Promise<string>,
+  appServerEvents: () => ipcRenderer.invoke("appserver:events") as Promise<AppServerEvent[]>,
   resolveDroppedFiles: (files: File[]) =>
     files
       .map((file) => ({
@@ -140,6 +150,11 @@ const api = {
     const listener = (_event: Electron.IpcRendererEvent, appearance: SystemAppearance) => callback(appearance);
     ipcRenderer.on("roder:appearance", listener);
     return () => ipcRenderer.removeListener("roder:appearance", listener);
+  },
+  onAppServerEvent: (callback: (event: AppServerEvent) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, appServerEvent: AppServerEvent) => callback(appServerEvent);
+    ipcRenderer.on("appserver:event", listener);
+    return () => ipcRenderer.removeListener("appserver:event", listener);
   },
   onTerminalData: (callback: (payload: { id: string; data: string }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; data: string }) => callback(payload);

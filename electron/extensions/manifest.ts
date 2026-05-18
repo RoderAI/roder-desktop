@@ -60,6 +60,7 @@ export type RoderConfigurationContribution = {
 export type RoderPanelContribution = {
   id: string;
   title: string;
+  html?: string;
   icon?: string;
 };
 
@@ -295,9 +296,14 @@ function validatePanels(value: unknown, issues: ManifestValidationIssue[]): Rode
     const id = requiredString(record?.id, `roder.contributes.views.panels[${index}].id`, issues);
     const title = requiredString(record?.title, `roder.contributes.views.panels[${index}].title`, issues);
     validateContributionId(id, `roder.contributes.views.panels[${index}].id`, issues);
+    const html = optionalStringValue(record?.html);
+    if (html) {
+      validateRelativePackagePath(html, `roder.contributes.views.panels[${index}].html`, undefined, false, issues);
+    }
     return {
       id,
       title,
+      html,
       icon: optionalStringValue(record?.icon),
     };
   });
