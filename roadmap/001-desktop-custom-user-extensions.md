@@ -1,7 +1,7 @@
 # Desktop Custom User Extensions PRD
 
 **Status:** In progress
-**Current Stage:** 5 - Webview Panels And Desktop UI Contributions
+**Current Stage:** 6 - Developer Tooling, Packaging, And Documentation
 **Owner:** Codex
 **Created:** 2026-05-18
 **Updated:** 2026-05-18
@@ -238,7 +238,7 @@ Acceptance:
 
 ### Stage 2: Desktop Extension Catalog And Settings UI
 
-**Status:** Ready
+**Status:** In progress
 **Owned Paths:** `electron/extensions/catalog.ts`, `electron/extensions/package-manager.ts`, `electron/extensions/storage.ts`, `electron/extensions/secrets.ts`, `electron/main/index.ts`, `electron/preload/index.ts`, `src/lib/extensions-ipc.ts`, `src/stores/extensions-store.ts`, `src/types/extensions.ts`, `src/components/extensions/**`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`
 
 - [x] Add main-process extension catalog APIs for list, install from folder, install from archive, uninstall, enable, disable, reload, and read logs.
@@ -346,7 +346,7 @@ Acceptance:
 - [ ] Add `create-roder-extension` or equivalent scaffolding for command, tool, and panel templates.
 - [ ] Add local dev mode with watch, hot reload, structured logs, and extension reload hooks.
 - [x] Add `.rdx` package creation and validation.
-- [ ] Add docs covering manifest fields, contribution points, activation events, capabilities, API examples, packaging, install, and security review.
+- [x] Add docs covering manifest fields, contribution points, activation events, capabilities, API examples, packaging, install, and security review.
 - [ ] Add a migration guide explaining what VS Code and Raycast concepts map to Roder, and what is intentionally unsupported.
 
 Run:
@@ -493,6 +493,13 @@ Acceptance:
 - Commands: `pnpm test`; `pnpm typecheck`; `pnpm --filter aurora-theme-extension package`; one-off Node smoke installing `examples/extensions/aurora-theme/dist/aurora-theme.rdx` and reading both contributed themes; `pnpm build`.
 - Result: theme validation tests passed; `Aurora Dark` and `Aurora Light` were read from an installed `.rdx`; `pnpm test`, `pnpm typecheck`, and `pnpm build` passed.
 - Gaps: theme marketplace docs, preview thumbnails, and granular CSS token coverage remain pending.
+
+### 2026-05-18 - Extension Developer Documentation
+
+- Evidence: added `docs/extensions.md` covering architecture, manifest fields, activation events, capabilities, the public API, commands, tools, preferences, storage, panels, themes, packaging, install flows, validation, testing, distribution, and known gaps; linked it from `docs/api.md`.
+- Commands: `pnpm test`; `pnpm typecheck`.
+- Result: both commands passed.
+- Gaps: screenshots, marketplace review policy, and signed-package docs remain pending.
 
 ### 2026-05-18 - Compact Extensions Sidebar And Composer Theming
 

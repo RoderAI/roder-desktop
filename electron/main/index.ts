@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, type Rectangle } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
@@ -22,6 +23,7 @@ let extensionHost: ExtensionHost | null = null;
 const appServerEvents: AppServerEvent[] = [];
 const appName = "Roder";
 const rendererZoomFactor = 0.84;
+const mainDir = dirname(fileURLToPath(import.meta.url));
 
 type AppServerEvent = {
   id: number;
@@ -64,7 +66,7 @@ function createWindow(): void {
     trafficLightPosition: { x: 18, y: 18 },
     backgroundColor: currentAppearance() === "dark" ? "#171717" : "#f5f5f4",
     webPreferences: {
-      preload: join(__dirname, "../preload/index.mjs"),
+      preload: join(mainDir, "../preload/index.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -74,7 +76,7 @@ function createWindow(): void {
   if (process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    void mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+    void mainWindow.loadFile(join(mainDir, "../renderer/index.html"));
   }
 
   mainWindow.webContents.on("did-finish-load", () => {

@@ -5,6 +5,9 @@ app-server API. It describes the JSON-RPC methods implemented by
 `crates/roder-app-server`, the shared wire DTOs in `crates/roder-protocol`, and
 the notification stream emitted to desktop or sibling clients.
 
+For Roder Desktop user extensions, package manifests, `.rdx` archives, commands,
+tools, panels, and theme contributions, see `docs/extensions.md`.
+
 > Maintenance note: update this document with the `roder-app-server-docs` skill
 > whenever app-server methods, request/response types, events, auth/config
 > behavior, provider/model behavior, or session/thread semantics change.
