@@ -81,7 +81,7 @@ The sibling Roder backend already has a hardened native Rust extension model for
 
 - `P0`: Extension packages use a root `package.json` manifest with Roder-specific fields under `roder` plus standard npm metadata.
 - `P0`: Manifest validation supports `name`, `displayName`, `publisher`, `version`, `description`, `engines.roder`, `main`, `activationEvents`, `contributes`, `capabilities`, and optional `icon`, `repository`, `homepage`, `license`, `keywords`, and `categories`.
-- `P0`: Contribution points support `commands`, `tools`, `configuration`, and `views.panels` in the first product slice.
+- `P0`: Contribution points support `commands`, `tools`, `configuration`, `themes`, and `views.panels` in the first product slice.
 - `P0`: Activation supports `onStartupFinished`, `onCommand:<id>`, `onTool:<id>`, `onView:<id>`, `onWorkspace`, and manual activation from the Extensions panel.
 - `P0`: Extensions run in an isolated extension host process with a narrow RPC API, not in the renderer.
 - `P0`: Users must approve sensitive capabilities before activation or first use. Capabilities should align with backend capability names where practical, such as `fs.read.workspace`, `fs.write.workspace`, `process.spawn.shell`, `network.web`, `secret.read`, `desktop.notification`, `appserver.request`, and `ui.panel`.
@@ -322,6 +322,7 @@ Acceptance:
 - [x] Implement `views.panels` contribution support for extension-owned panels in the existing right-side tool panel area or a dedicated Extensions panel area.
 - [x] Add strict webview sandboxing, CSP, URI rewriting, and message passing.
 - [x] Add extension panel commands to open, close, reload, and inspect logs.
+- [x] Add theme contribution support so extensions can contribute fonts and color palettes to Appearance settings.
 - [ ] Add responsive layout checks so extension UI cannot break the desktop minimum size.
 
 Run:
@@ -485,6 +486,13 @@ Acceptance:
 - Commands: `npm run package` in `~/tmp/event-log`; one-off Node smoke installing `~/tmp/event-log/dist/event-log.rdx`, validating the `event-log.panel` view contribution, and executing `event-log.clear`; `pnpm test`; `pnpm build`.
 - Result: the POC packaged to `dist/event-log.rdx`; archive install recognized `roder.event-log-extension`; panel contribution resolved `assets/panel.html`; command returned `{ "cleared": true }`; `pnpm test` and `pnpm build` passed.
 - Gaps: panels currently support static HTML plus host-delivered app-server events; richer bidirectional extension panel APIs and per-extension CSP/resource rewriting remain pending.
+
+### 2026-05-18 - Theme Extension Contributions
+
+- Evidence: added `contributes.themes` manifest support, validated theme JSON loading, renderer-side extension theme registration, Appearance dropdown integration, and the `examples/extensions/aurora-theme` distributable theme extension with light and dark themes affecting app colors and fonts.
+- Commands: `pnpm test`; `pnpm typecheck`; `pnpm --filter aurora-theme-extension package`; one-off Node smoke installing `examples/extensions/aurora-theme/dist/aurora-theme.rdx` and reading both contributed themes; `pnpm build`.
+- Result: theme validation tests passed; `Aurora Dark` and `Aurora Light` were read from an installed `.rdx`; `pnpm test`, `pnpm typecheck`, and `pnpm build` passed.
+- Gaps: theme marketplace docs, preview thumbnails, and granular CSS token coverage remain pending.
 
 ## Open Questions
 

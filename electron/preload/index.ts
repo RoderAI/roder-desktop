@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
+import type { ExtensionTheme } from "../extensions/theme";
 
 export type RoderNotification = {
   method: string;
@@ -121,6 +122,7 @@ const api = {
   extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) =>
     ipcRenderer.invoke("extensions:executeTool", toolId, input ?? {}) as Promise<unknown>,
   extensionsReadPanel: (extensionId: string, panelId: string) => ipcRenderer.invoke("extensions:readPanel", extensionId, panelId) as Promise<string>,
+  extensionsReadTheme: (extensionId: string, themeId: string) => ipcRenderer.invoke("extensions:readTheme", extensionId, themeId) as Promise<ExtensionTheme>,
   appServerEvents: () => ipcRenderer.invoke("appserver:events") as Promise<AppServerEvent[]>,
   resolveDroppedFiles: (files: File[]) =>
     files

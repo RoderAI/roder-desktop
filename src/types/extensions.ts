@@ -1,4 +1,4 @@
-import type { JsonSchema, RoderExtensionActivationEvent, RoderExtensionCapability, RoderPreferenceType } from "@roderai/extension-api";
+import type { JsonSchema, RoderExtensionActivationEvent, RoderExtensionCapability, RoderPreferenceType, RoderThemeDefinition, RoderThemeScheme } from "@roderai/extension-api";
 
 export type RoderExtensionManifest = {
   id: string;
@@ -24,6 +24,7 @@ export type RoderExtensionManifest = {
       default?: string | boolean | null;
       options?: Array<{ label: string; value: string }>;
     }>;
+    themes: Array<{ id: string; label: string; path: string; scheme: RoderThemeScheme }>;
     views: {
       panels: Array<{ id: string; title: string; html?: string; icon?: string }>;
     };
@@ -60,4 +61,10 @@ export type ExtensionCatalogRecord = {
 
 export type ExtensionCatalogSnapshot = {
   extensions: ExtensionCatalogRecord[];
+};
+
+export type ExtensionTheme = RoderThemeDefinition & {
+  id: string;
+  extensionId: string;
+  label: string;
 };

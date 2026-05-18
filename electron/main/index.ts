@@ -7,6 +7,7 @@ import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
 import { ExtensionHost } from "../extensions/extension-host";
+import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
@@ -216,6 +217,13 @@ ipcMain.handle("extensions:readPanel", async (_event, extensionId: string, panel
     throw new Error(`Extension panel ${panelId} points outside the extension package`);
   }
   return readFile(panelPath, "utf8");
+});
+ipcMain.handle("extensions:readTheme", async (_event, extensionId: string, themeId: string) => {
+  const extension = await getExtensionCatalog().get(extensionId);
+  if (!extension || !extension.enabled) {
+    throw new Error(`Extension ${extensionId} is not installed or enabled`);
+  }
+  return readExtensionTheme(extension, themeId);
 });
 ipcMain.handle("appserver:events", () => appServerEvents);
 

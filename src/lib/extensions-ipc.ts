@@ -14,6 +14,7 @@ export const extensionsIpc = {
   executeCommand: (commandId: string, args?: unknown[]) => window.roderDesktop.extensionsExecuteCommand(commandId, args),
   executeTool: (toolId: string, input?: Record<string, unknown>) => window.roderDesktop.extensionsExecuteTool(toolId, input),
   readPanel: (extensionId: string, panelId: string) => window.roderDesktop.extensionsReadPanel(extensionId, panelId),
+  readTheme: (extensionId: string, themeId: string) => window.roderDesktop.extensionsReadTheme(extensionId, themeId),
 };
 
 export type ExtensionsIpc = typeof extensionsIpc;

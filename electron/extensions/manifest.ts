@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, normalize, resolve, sep } from "node:path";
-import type { JsonSchema, RoderExtensionActivationEvent, RoderExtensionCapability, RoderPreferenceType } from "@roderai/extension-api";
+import type { JsonSchema, RoderExtensionActivationEvent, RoderExtensionCapability, RoderPreferenceType, RoderThemeScheme } from "@roderai/extension-api";
 
 export type RoderExtensionManifest = {
   id: string;
@@ -28,6 +28,7 @@ export type RoderExtensionContributions = {
   commands: RoderCommandContribution[];
   tools: RoderToolContribution[];
   configuration: RoderConfigurationContribution[];
+  themes: RoderThemeContribution[];
   views: {
     panels: RoderPanelContribution[];
   };
@@ -62,6 +63,13 @@ export type RoderPanelContribution = {
   title: string;
   html?: string;
   icon?: string;
+};
+
+export type RoderThemeContribution = {
+  id: string;
+  label: string;
+  path: string;
+  scheme: RoderThemeScheme;
 };
 
 export type ManifestValidationOptions = {
@@ -200,6 +208,7 @@ function validateContributions(value: unknown, issues: ManifestValidationIssue[]
     commands: validateCommands(contributes.commands, issues),
     tools: validateTools(contributes.tools, issues),
     configuration: validateConfiguration(contributes.configuration, issues),
+    themes: validateThemes(contributes.themes, issues),
     views: {
       panels: validatePanels(views.panels, issues),
     },
@@ -305,6 +314,36 @@ function validatePanels(value: unknown, issues: ManifestValidationIssue[]): Rode
       title,
       html,
       icon: optionalStringValue(record?.icon),
+    };
+  });
+}
+
+function validateThemes(value: unknown, issues: ManifestValidationIssue[]): RoderThemeContribution[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    issues.push({ path: "roder.contributes.themes", message: "must be an array" });
+    return [];
+  }
+  return value.map((item, index) => {
+    const record = asRecord(item);
+    const id = requiredString(record?.id, `roder.contributes.themes[${index}].id`, issues);
+    const label = requiredString(record?.label, `roder.contributes.themes[${index}].label`, issues);
+    const path = requiredString(record?.path, `roder.contributes.themes[${index}].path`, issues);
+    const scheme = requiredString(record?.scheme, `roder.contributes.themes[${index}].scheme`, issues) as RoderThemeScheme;
+    validateContributionId(id, `roder.contributes.themes[${index}].id`, issues);
+    if (scheme !== "light" && scheme !== "dark") {
+      issues.push({ path: `roder.contributes.themes[${index}].scheme`, message: "must be light or dark" });
+    }
+    if (path) {
+      validateRelativePackagePath(path, `roder.contributes.themes[${index}].path`, undefined, false, issues);
+    }
+    return {
+      id,
+      label,
+      path,
+      scheme,
     };
   });
 }

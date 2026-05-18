@@ -8,6 +8,7 @@ import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
 import { Transcript } from "@/components/transcript";
+import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
@@ -16,6 +17,7 @@ import type { DesktopAttachment, RoderThread } from "@/types/roder";
 export function App(): React.JSX.Element {
   const agent = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
+  useExtensionThemes();
   useThemeApplication(agent.appearance);
   const [followSignal, setFollowSignal] = useState(0);
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
