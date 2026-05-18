@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
@@ -83,24 +83,27 @@ export function App(): React.JSX.Element {
       setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
     });
   }, [toolPanelWidth]);
+  const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
       {settingsOpen && <SettingsView />}
+      <div
+        className="sidebar-shell shrink-0"
+        data-open={sidebarOpen ? "true" : undefined}
+        style={sidebarRailStyle}
+        aria-hidden={!sidebarOpen}
+      >
+        <AppSidebar
+          threads={agent.threads}
+          activeThreadId={agent.activeThreadId}
+          width={leftSidebarWidth}
+          onSelectThread={selectThread}
+          onNewThread={newThread}
+        />
+      </div>
       {sidebarOpen && (
         <>
-          <AppSidebar
-            threads={agent.threads}
-            activeThreadId={agent.activeThreadId}
-            width={leftSidebarWidth}
-            onSelectThread={selectThread}
-            onNewThread={newThread}
-            onBack={() => void agent.goBack()}
-            onForward={() => void agent.goForward()}
-            canGoBack={agent.canGoBack}
-            canGoForward={agent.canGoForward}
-            onClose={() => setSidebarOpen(false)}
-          />
           <div
             className="no-drag relative z-30 h-screen w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
             aria-label="Resize thread sidebar"
@@ -170,6 +173,10 @@ export function App(): React.JSX.Element {
     </div>
   );
 }
+
+type SidebarRailStyle = CSSProperties & {
+  "--sidebar-width": string;
+};
 
 function basename(path: string | undefined): string | undefined {
   return path?.split("/").filter(Boolean).pop();
