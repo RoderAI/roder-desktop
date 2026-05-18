@@ -209,19 +209,20 @@ code {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-8px);
+  /* Temporarily disabled to compare sidebar text rendering without compositor blur. */
+  /* transform: translateX(-8px); */
   transition:
     width var(--sidebar-shell-duration) var(--sidebar-shell-ease),
-    opacity 140ms ease-out,
-    transform var(--sidebar-shell-duration) var(--sidebar-shell-ease);
-  will-change: width, opacity, transform;
+    opacity 140ms ease-out;
+  /* transform var(--sidebar-shell-duration) var(--sidebar-shell-ease); */
+  /* will-change: width, opacity, transform; */
 }
 
 .sidebar-shell[data-open="true"] {
   width: var(--sidebar-width);
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0);
+  /* transform: translateX(0); */
 }
 
 /*
