@@ -78,7 +78,7 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
                   message.role === "tool" && "my-0",
                   message.role === "tool" && !previousIsTool && "mt-2",
                   message.role === "tool" && !nextIsTool && "mb-2",
-                  message.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-[17px] shadow-sm ring-1 ring-border",
+                  message.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-[17px]",
                 )}
               >
                 {message.role === "tool" ? (
