@@ -1,4 +1,5 @@
 import { Settings } from "lucide-react";
+import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { ExtensionCatalogRecord } from "@/types/extensions";
@@ -17,15 +18,16 @@ export function ExtensionActivityRail({
 }: ExtensionActivityRailProps): React.JSX.Element | null {
   const extensions = useExtensionsStore((state) => state.extensions);
   const openSettings = useThemeStore((state) => state.openSettings);
+  const sidebarExtensions = getSidebarExtensions(extensions);
 
-  if (extensions.length === 0) {
+  if (sidebarExtensions.length === 0) {
     return null;
   }
 
   return (
     <aside className="no-drag flex h-full w-12 shrink-0 flex-col items-center border-l border-border bg-sidebar py-2 text-sidebar-foreground">
       <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto sidebar-scroll">
-        {extensions.map((extension) => {
+        {sidebarExtensions.map((extension) => {
           const selected = active && extension.id === activeExtensionId;
           return (
             <button

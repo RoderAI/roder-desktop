@@ -22,6 +22,7 @@ import { ComponentsSettingsPanel } from "@/components/settings-components-panel"
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import {
   presetsForScheme,
+  selectedPresetLabel,
   useThemeStore,
   type SettingsSection,
   type ThemeMode,
@@ -255,6 +256,9 @@ function ThemeEditor({
   onPreset: (presetId: string) => void;
   onChange: (patch: Partial<ThemePalette>) => void;
 }): React.JSX.Element {
+  const presets = presetsForScheme(scheme, extensionThemePresets);
+  const hasSelectedPreset = palette.presetId === "custom" || presets.some((preset) => preset.id === palette.presetId);
+  const selectedLabel = selectedPresetLabel(scheme, palette, extensionThemePresets);
   return (
     <section className="border-b border-border px-5 py-4">
       <div className="mb-3 flex items-center gap-3">
@@ -265,7 +269,8 @@ function ThemeEditor({
           onChange={(event) => onPreset(event.currentTarget.value)}
         >
           <option value="custom">Custom</option>
-          {presetsForScheme(scheme, extensionThemePresets).map((preset) => (
+          {!hasSelectedPreset && <option value={palette.presetId}>{selectedLabel}</option>}
+          {presets.map((preset) => (
             <option key={preset.id} value={preset.id}>{preset.name}</option>
           ))}
         </select>

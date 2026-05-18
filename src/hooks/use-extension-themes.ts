@@ -48,18 +48,20 @@ export function useExtensionThemes(): void {
 }
 
 function themePresetFromExtensionTheme(theme: ExtensionTheme): ThemePreset {
+  const name = theme.name === theme.label ? theme.name : `${theme.name} (${theme.label})`;
   const fallback = defaultThemeSettings[theme.scheme];
   return {
     id: `${theme.extensionId}:${theme.id}`,
-    name: `${theme.name} (${theme.label})`,
+    name,
     scheme: theme.scheme,
-    palette: themePalette(theme, fallback, `${theme.extensionId}:${theme.id}`),
+    palette: themePalette(theme, fallback, `${theme.extensionId}:${theme.id}`, name),
   };
 }
 
-function themePalette(theme: ExtensionTheme, fallback: ThemePalette, presetId: string): ThemePalette {
+function themePalette(theme: ExtensionTheme, fallback: ThemePalette, presetId: string, presetName: string): ThemePalette {
   return {
     presetId,
+    presetName,
     accent: theme.colors.accent,
     background: theme.colors.background,
     foreground: theme.colors.foreground,

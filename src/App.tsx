@@ -12,6 +12,7 @@ import { Transcript } from "@/components/transcript";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
+import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
@@ -29,7 +30,8 @@ export function App(): React.JSX.Element {
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const extensions = useExtensionsStore((state) => state.extensions);
-  const selectedExtension = extensions.find((extension) => extension.id === selectedExtensionId) ?? extensions[0];
+  const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
+  const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
   const activeWorkspaceCwd = activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.status.cwd ?? "";
   const folderOptions = useMemo(() => buildFolderOptions(agent.threads, activeWorkspaceCwd), [activeWorkspaceCwd, agent.threads]);
@@ -82,14 +84,14 @@ export function App(): React.JSX.Element {
     [agent, followBottom],
   );
   useEffect(() => {
-    if (extensions.length === 0) {
+    if (sidebarExtensions.length === 0) {
       setSelectedExtensionId(null);
       return;
     }
-    if (!selectedExtensionId || !extensions.some((extension) => extension.id === selectedExtensionId)) {
-      setSelectedExtensionId(extensions[0].id);
+    if (!selectedExtensionId || !sidebarExtensions.some((extension) => extension.id === selectedExtensionId)) {
+      setSelectedExtensionId(sidebarExtensions[0].id);
     }
-  }, [extensions, selectedExtensionId]);
+  }, [sidebarExtensions, selectedExtensionId]);
   const toggleExtensionsPanel = useCallback(() => {
     if (activeTool === "extensions") {
       setActiveTool(null);
