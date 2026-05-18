@@ -1,8 +1,7 @@
 import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, SquareTerminal, TerminalSquare } from "lucide-react";
+import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, TerminalSquare } from "lucide-react";
 import type { RoderStatus, RoderThread } from "@/types/roder";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -55,19 +54,19 @@ export function TopBar({
   onToggleBrowser,
   onToggleCanvas,
 }: TopBarProps): React.JSX.Element {
-  const connected = status.state === "ready";
   const activeFolder = folders.find((folder) => normalizePath(folder.path) === normalizePath(activeFolderPath));
+  const activeFolderLabel = activeFolder?.name ?? folderName(activeFolderPath);
   return (
     <header
       className={cn(
-        "drag-region flex h-[52px] shrink-0 items-center border-b border-transparent pr-5 text-muted-foreground",
+        "drag-region flex h-[60px] shrink-0 items-center border-b border-transparent pr-5 text-muted-foreground",
         sidebarOpen ? "pl-5" : "pl-[148px]",
       )}
     >
       <Button
         variant="ghost"
         size="icon"
-        className="no-drag fixed left-[104px] top-3.5 z-40 size-8 rounded-md text-muted-foreground active:scale-95"
+        className="squircle-corners no-drag fixed left-[104px] top-3.5 z-40 size-8 rounded-xl text-muted-foreground/85 hover:bg-accent/60 hover:text-foreground active:scale-95"
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         onClick={onToggleSidebar}
@@ -76,10 +75,13 @@ export function TopBar({
       </Button>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {sidebarOpen ? (
-          <>
-            <h1 className="min-w-0 truncate text-[16px] font-normal">{threadTitle(thread)}</h1>
-            <SquareTerminal className="size-4 opacity-70" />
-          </>
+          <h1 className="flex min-w-0 items-baseline gap-1.5 text-[16px]">
+            <span className="max-w-48 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>
+            <span className="shrink-0 text-muted-foreground/60" aria-hidden="true">
+              /
+            </span>
+            <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
+          </h1>
         ) : (
           <CollapsedBreadcrumb
             thread={thread}
@@ -91,9 +93,6 @@ export function TopBar({
             onSelectThread={onSelectThread}
           />
         )}
-        <Badge variant={connected ? "secondary" : "muted"} className="no-drag hidden shrink-0 text-[11px] lg:inline-flex">
-          {connected ? "app-server ready" : status.state}
-        </Badge>
       </div>
       <div className="no-drag ml-auto flex items-center gap-2">
         {status.state === "error" && (
