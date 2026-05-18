@@ -18,7 +18,7 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 
 | ID | PRD | Status | Current Stage | Updated | Verification | Next Action |
 | --- | --- | --- | --- | --- | --- | --- |
-| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | Ready | 1 - Extension Contract And Package Format | 2026-05-18 | Passed with validator regex shim; stock validator crashes before checks | Start Stage 1 manifest/API contract |
+| 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 2 - Desktop Extension Catalog And Settings UI | 2026-05-18 | Stage 1 passed `pnpm test`, `pnpm typecheck`, and `pnpm build` | Implement local extension catalog and Settings UI |
 
 ## Completed PRDs
 

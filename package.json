@@ -7,11 +7,11 @@
   "scripts": {
     "bundle:roder": "node scripts/bundle-roder.mjs",
     "dev": "pnpm bundle:roder && electron-vite dev",
-    "build": "pnpm bundle:roder && tsc --noEmit && electron-vite build",
+    "build": "pnpm bundle:roder && pnpm typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "dist": "pnpm build && electron-builder",
     "test": "node --test test/*.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm --filter @roderai/extension-api build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter hello-roder-extension typecheck"
   },
   "build": {
     "appId": "sc.roder.desktop",
@@ -61,6 +61,7 @@
     "wait-on": "^9.0.10"
   },
   "dependencies": {
+    "@roderai/extension-api": "workspace:*",
     "@base-ui/react": "^1.4.1",
     "@fontsource/geist": "^5.2.9",
     "@hugeicons/core-free-icons": "^4.1.4",
