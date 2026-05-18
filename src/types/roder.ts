@@ -1,3 +1,5 @@
+import type { ExtensionCatalogSnapshot } from "@/types/extensions";
+
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
@@ -182,6 +184,15 @@ declare global {
       codexLogin: () => Promise<CodexAccountSnapshot>;
       codexLogout: () => Promise<CodexAccountSnapshot>;
       codexOpenRateLimitHelp: () => Promise<void>;
+      extensionsList: () => Promise<ExtensionCatalogSnapshot>;
+      extensionsInstallFromFolder: (folderPath: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsSelectAndInstallFolder: () => Promise<ExtensionCatalogSnapshot>;
+      extensionsUninstall: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsEnable: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsDisable: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsReload: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) => Promise<ExtensionCatalogSnapshot>;
+      extensionsReadLogs: (id: string) => Promise<string[]>;
       resolveDroppedFiles: (files: File[]) => ResolvedDesktopFile[];
       onNotification: (callback: (notification: RoderNotification) => void) => () => void;
       onStatus: (callback: (status: RoderStatus) => void) => () => void;

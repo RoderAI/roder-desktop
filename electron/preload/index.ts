@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 
 export type RoderNotification = {
   method: string;
@@ -94,6 +95,16 @@ const api = {
   codexLogin: () => ipcRenderer.invoke("codex:login") as Promise<CodexAccountSnapshot>,
   codexLogout: () => ipcRenderer.invoke("codex:logout") as Promise<CodexAccountSnapshot>,
   codexOpenRateLimitHelp: () => ipcRenderer.invoke("codex:openRateLimitHelp") as Promise<void>,
+  extensionsList: () => ipcRenderer.invoke("extensions:list") as Promise<ExtensionCatalogSnapshot>,
+  extensionsInstallFromFolder: (folderPath: string) => ipcRenderer.invoke("extensions:installFromFolder", folderPath) as Promise<ExtensionCatalogSnapshot>,
+  extensionsSelectAndInstallFolder: () => ipcRenderer.invoke("extensions:selectAndInstallFolder") as Promise<ExtensionCatalogSnapshot>,
+  extensionsUninstall: (id: string) => ipcRenderer.invoke("extensions:uninstall", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsEnable: (id: string) => ipcRenderer.invoke("extensions:enable", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsDisable: (id: string) => ipcRenderer.invoke("extensions:disable", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsReload: (id: string) => ipcRenderer.invoke("extensions:reload", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) =>
+    ipcRenderer.invoke("extensions:updatePreference", id, key, value) as Promise<ExtensionCatalogSnapshot>,
+  extensionsReadLogs: (id: string) => ipcRenderer.invoke("extensions:readLogs", id) as Promise<string[]>,
   resolveDroppedFiles: (files: File[]) =>
     files
       .map((file) => ({
