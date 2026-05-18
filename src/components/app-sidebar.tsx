@@ -75,7 +75,7 @@ export function AppSidebar({
               const visibility = visibleThreadsForGroup(group.threads, expanded);
               return (
                 <section key={group.key}>
-                  <div className="truncate px-3 text-[16px] text-sidebar-heading" title={group.path}>
+                  <div className="truncate px-3 text-[15px] text-sidebar-heading" title={group.path}>
                     {group.title}
                   </div>
                   <div className="mt-3 flex flex-col gap-1">
@@ -93,7 +93,7 @@ export function AppSidebar({
                         onClick={() => showMoreForGroup(group.key)}
                       >
                         <span className="min-w-0 flex-1 truncate">Show more</span>
-                        <span className="shrink-0 text-[14px]">+{visibility.hiddenCount}</span>
+                        <span className="shrink-0 text-[13px]">+{visibility.hiddenCount}</span>
                       </SidebarRowButton>
                     )}
                     {visibility.overflowThreads.length > 0 && (
@@ -128,7 +128,7 @@ export function AppSidebar({
               );
             })
           ) : (
-            <div className="px-3 py-2 text-[16px] text-sidebar-heading">No sessions yet</div>
+            <div className="px-3 py-2 text-[15px] text-sidebar-heading">No sessions yet</div>
           )}
         </div>
       </div>
@@ -159,7 +159,7 @@ function ThreadRow({
     >
       <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
       <span className="relative flex h-5 w-10 shrink-0 items-center justify-end">
-        <span className="thread-row-age absolute right-0 text-[15px] text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
+        <span className="thread-row-age absolute right-0 text-[14px] text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
         <Archive className="thread-row-archive absolute right-0 size-4 text-sidebar-muted" />
       </span>
     </SidebarRowButton>
@@ -181,7 +181,7 @@ function SidebarRowButton({
     <button
       type="button"
       className={cn(
-        "squircle-corners flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-[17px] font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
+        "squircle-corners flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-[16px] font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
         className,
       )}
       disabled={disabled}
