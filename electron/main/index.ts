@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { BrowserManager } from "../browser/browser-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
+import { ExtensionCatalog } from "../extensions/catalog";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
 
@@ -12,6 +13,7 @@ const terminal = new TerminalManager();
 const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort);
 let mainWindow: BrowserWindow | null = null;
+let extensionCatalog: ExtensionCatalog | null = null;
 const appName = "Roder";
 const rendererZoomFactor = 0.84;
 
@@ -118,6 +120,41 @@ ipcMain.handle("codex:account", () => getCodexAccountSnapshot());
 ipcMain.handle("codex:login", () => startCodexLogin());
 ipcMain.handle("codex:logout", () => logoutCodex());
 ipcMain.handle("codex:openRateLimitHelp", () => openRateLimitHelp());
+ipcMain.handle("extensions:list", () => getExtensionCatalog().list());
+ipcMain.handle("extensions:installFromFolder", async (_event, folderPath: string) => {
+  await getExtensionCatalog().installFromFolder(folderPath);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:selectAndInstallFolder", async () => {
+  const options: Electron.OpenDialogOptions = {
+    title: "Install Extension From Folder",
+    properties: ["openDirectory"],
+  };
+  const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+  if (result.canceled || !result.filePaths[0]) {
+    return getExtensionCatalog().list();
+  }
+  await getExtensionCatalog().installFromFolder(result.filePaths[0]);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:uninstall", async (_event, id: string) => getExtensionCatalog().uninstall(id));
+ipcMain.handle("extensions:enable", async (_event, id: string) => {
+  await getExtensionCatalog().enable(id);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:disable", async (_event, id: string) => {
+  await getExtensionCatalog().disable(id);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:reload", async (_event, id: string) => {
+  await getExtensionCatalog().reload(id);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:updatePreference", async (_event, id: string, key: string, value: string | boolean | null) => {
+  await getExtensionCatalog().updatePreference(id, key, value);
+  return getExtensionCatalog().list();
+});
+ipcMain.handle("extensions:readLogs", (_event, id: string) => getExtensionCatalog().readLogs(id));
 
 nativeTheme.on("updated", () => {
   sendToRenderer("roder:appearance", currentAppearance());
@@ -182,4 +219,12 @@ async function saveCanvasPng(dataUrl: string): Promise<{ name: string; path: str
     type: "image/png",
     size: data.byteLength,
   };
+}
+
+function getExtensionCatalog(): ExtensionCatalog {
+  extensionCatalog ??= new ExtensionCatalog({
+    userDataPath: app.getPath("userData"),
+    appVersion: app.getVersion(),
+  });
+  return extensionCatalog;
 }

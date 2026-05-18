@@ -1,0 +1,13 @@
+export const extensionsIpc = {
+  list: () => window.roderDesktop.extensionsList(),
+  installFromFolder: (folderPath: string) => window.roderDesktop.extensionsInstallFromFolder(folderPath),
+  selectAndInstallFolder: () => window.roderDesktop.extensionsSelectAndInstallFolder(),
+  uninstall: (id: string) => window.roderDesktop.extensionsUninstall(id),
+  enable: (id: string) => window.roderDesktop.extensionsEnable(id),
+  disable: (id: string) => window.roderDesktop.extensionsDisable(id),
+  reload: (id: string) => window.roderDesktop.extensionsReload(id),
+  updatePreference: (id: string, key: string, value: string | boolean | null) => window.roderDesktop.extensionsUpdatePreference(id, key, value),
+  readLogs: (id: string) => window.roderDesktop.extensionsReadLogs(id),
+};
+
+export type ExtensionsIpc = typeof extensionsIpc;

@@ -436,6 +436,13 @@ Acceptance:
 - Result: all three commands passed. `pnpm build` completed Electron/Vite output; `scripts/bundle-roder.mjs` reported `skipping: no Cargo workspace at /Users/pz/w/w` before continuing, so no backend binary was rebuilt in this environment.
 - Gaps: extension install/catalog, runtime activation, settings UI, and backend tool bridge remain for later stages.
 
+### 2026-05-18 - Stage 2 Catalog IPC Slice
+
+- Evidence: added main-process local folder package reading, persisted extension catalog state, typed preload methods, renderer IPC wrappers, and tests for install persistence, enable/disable/reload/preference changes, uninstall, and invalid manifest rejection.
+- Commands: `pnpm test`; `pnpm typecheck`.
+- Result: both commands passed.
+- Gaps: Settings UI wiring and runtime activation remain open in Stage 2/3.
+
 ## Open Questions
 
 - [ ] Stage 3 owner: confirm whether Electron `utilityProcess` is the right host primitive for extension execution in Electron 42, or whether a forked Node child process is more reliable for this app.
