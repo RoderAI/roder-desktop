@@ -1,6 +1,6 @@
 # Roadmap Status
 
-Last updated: **2026-05-18**
+Last updated: **2026-05-19**
 
 This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain the source of truth for detailed tasks, acceptance criteria, implementation stage, and evidence.
 
@@ -19,12 +19,12 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 | ID | PRD | Status | Current Stage | Updated | Verification | Next Action |
 | --- | --- | --- | --- | --- | --- | --- |
 | 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 6 - Developer Tooling, Packaging, And Documentation | 2026-05-18 | Sidebar cleanup and theme label persistence passed `pnpm typecheck`, `pnpm test`, and `pnpm build` | Add richer bidirectional panel APIs, safe mode, signed-package docs, and Rust app-server reverse-RPC bridge |
-| 002 | [Desktop Plugins Marketplace](002-desktop-plugins-marketplace.md) | In progress | 1 - Desktop API And Screen | 2026-05-18 | Discovery complete; implementation in progress | Add typed app-server APIs, Plugins screen, and verification evidence |
 
 ## Completed PRDs
 
 | ID | PRD | Completed | Evidence |
 | --- | --- | --- | --- |
+| 002 | [Desktop Plugins Marketplace](002-desktop-plugins-marketplace.md) | 2026-05-19 | Plugins main view no longer mounts the app title top bar; per-marketplace `Enable` buttons are visible for inactive defaults; `pnpm test`, `pnpm typecheck`, `git diff --check`, `pnpm build`, and shimmed roadmap validation passed |
 
 ## Superseded PRDs
 

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { pluginVariantKeyFromParts } from "@/lib/plugins-marketplace";
+import { defaultSelectionForMarketplace, pluginVariantKeyFromParts } from "@/lib/plugins-marketplace";
 import { pluginsIpc } from "@/lib/plugins-ipc";
 import type {
   DedupedMarketplacePlugin,
@@ -23,6 +23,7 @@ type PluginsStore = {
   setQuery: (query: string) => void;
   search: (query?: string) => Promise<void>;
   installDefaults: (selection: DefaultMarketplaceSelection) => Promise<void>;
+  enableMarketplace: (marketplace: MarketplaceDescriptor) => Promise<void>;
   addLocalMarketplace: (params: { id: string; displayName: string; path: string; kind?: MarketplaceKind }) => Promise<void>;
   removeMarketplace: (marketplaceId: string) => Promise<void>;
   refreshMarketplace: (marketplaceId: string) => Promise<void>;
@@ -63,6 +64,18 @@ export const usePluginsStore = create<PluginsStore>()((set, get) => ({
     withAction(set, async () => {
       const result = await pluginsIpc.installDefaultMarketplaces(selection);
       set({ lastResult: `${result.marketplaces.length} default marketplace${result.marketplaces.length === 1 ? "" : "s"} installed` });
+      await reloadSnapshot(set, get, false);
+    }),
+  enableMarketplace: (marketplace) =>
+    withAction(set, async () => {
+      const selection = defaultSelectionForMarketplace(marketplace);
+      if (!selection) {
+        set({ lastResult: `${marketplace.displayName} cannot be enabled from defaults` });
+        return;
+      }
+      const result = await pluginsIpc.installDefaultMarketplaces(selection);
+      const enabled = result.marketplaces.find((item) => item.id === marketplace.id);
+      set({ lastResult: `Enabled ${enabled?.displayName ?? marketplace.displayName}` });
       await reloadSnapshot(set, get, false);
     }),
   addLocalMarketplace: ({ id, displayName, path, kind }) =>
