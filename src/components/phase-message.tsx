@@ -7,7 +7,7 @@ type PhaseMessageProps = {
 
 export function PhaseMessage({ isStreaming = false, text }: PhaseMessageProps): React.JSX.Element {
   return (
-    <div className="text-[17px] leading-[1.62] text-muted-foreground">
+    <div className="text-base leading-[1.62] text-muted-foreground">
       <MessageContent isStreaming={isStreaming} text={text} />
     </div>
   );

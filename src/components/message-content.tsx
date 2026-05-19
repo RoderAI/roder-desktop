@@ -101,7 +101,7 @@ export function MessageContent({ isStreaming = false, text }: MessageContentProp
   return (
     <Streamdown
       caret="block"
-      className="message-markdown font-medium text-[17px] leading-[1.55]"
+      className="message-markdown font-medium text-base leading-[1.55]"
       components={markdownComponents}
       controls={{ code: { copy: true, download: false }, table: { copy: true, download: false, fullscreen: false } }}
       isAnimating={isStreaming}

@@ -24,8 +24,8 @@ export function ModelsSettingsPanel(): React.JSX.Element {
     <section className="rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
         <div>
-          <h1 className="text-[16px] font-medium">Models</h1>
-          <p className="mt-1 text-[14px] text-muted-foreground">
+          <h1 className="text-base font-medium">Models</h1>
+          <p className="mt-1 text-base text-muted-foreground">
             {visibleIds.length} of {models.length} shown in the composer
           </p>
         </div>
@@ -39,21 +39,21 @@ export function ModelsSettingsPanel(): React.JSX.Element {
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
-          className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="Search models"
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
       </div>
 
       {models.length === 0 ? (
-        <div className="px-5 py-8 text-[14px] text-muted-foreground">No models loaded from the app-server.</div>
+        <div className="px-5 py-8 text-base text-muted-foreground">No models loaded from the app-server.</div>
       ) : filteredModels.length === 0 ? (
-        <div className="px-5 py-8 text-[14px] text-muted-foreground">No matching models.</div>
+        <div className="px-5 py-8 text-base text-muted-foreground">No matching models.</div>
       ) : (
         <div className="divide-y divide-border">
           {grouped.map((group) => (
             <section key={group.provider} className="px-5 py-4">
-              <h2 className="mb-2 text-[13px] font-medium text-muted-foreground">{providerName(group.provider)}</h2>
+              <h2 className="mb-2 text-base font-medium text-muted-foreground">{providerName(group.provider)}</h2>
               <div className="space-y-1">
                 {group.models.map((model) => {
                   const visible = visibleSet.has(model.id);
@@ -103,12 +103,12 @@ function ModelVisibilityRow({
       <VisibilitySwitch checked={visible} disabled={disabled} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[14px]">{model.name || model.id}</span>
+          <span className="truncate text-base">{model.name || model.id}</span>
           {selected && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Selected</span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-base text-muted-foreground">Selected</span>
           )}
         </div>
-        {model.description && <div className="mt-0.5 truncate text-[12px] text-muted-foreground">{model.description}</div>}
+        {model.description && <div className="mt-0.5 truncate text-base text-muted-foreground">{model.description}</div>}
       </div>
       {visible && <Check className="size-4 shrink-0 text-primary" />}
     </button>
