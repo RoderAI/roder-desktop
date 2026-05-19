@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { RoderThread } from "@/types/roder";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { Kbd } from "@/components/ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 
@@ -12,6 +13,7 @@ type AppSidebarProps = {
   activeView: "chat" | "plugins";
   width: number;
   onSelectThread: (threadId: string) => void;
+  onArchiveThread: (threadId: string) => void;
   onNewThread: () => void;
   onOpenPlugins: () => void;
 };
@@ -30,6 +32,7 @@ export function AppSidebar({
   activeView,
   width,
   onSelectThread,
+  onArchiveThread,
   onNewThread,
   onOpenPlugins,
 }: AppSidebarProps): React.JSX.Element {
@@ -82,7 +85,7 @@ export function AppSidebar({
               const visibility = visibleThreadsForGroup(group.threads, expanded);
               return (
                 <section key={group.key}>
-                  <div className="truncate px-3 text-[15px] text-sidebar-heading" title={group.path}>
+                  <div className="truncate px-3 text-base text-sidebar-heading" title={group.path}>
                     {group.title}
                   </div>
                   <div className="mt-3 flex flex-col gap-1">
@@ -92,15 +95,16 @@ export function AppSidebar({
                         thread={thread}
                         active={activeView === "chat" && thread.id === activeThreadId}
                         onSelectThread={onSelectThread}
+                        onArchiveThread={onArchiveThread}
                       />
                     ))}
                     {visibility.canShowMore && (
                       <SidebarRowButton
-                        className="text-sm text-sidebar-muted hover:text-sidebar-foreground"
+                        className="text-base text-sidebar-muted hover:text-sidebar-foreground"
                         onClick={() => showMoreForGroup(group.key)}
                       >
                         <span className="min-w-0 flex-1 truncate">Show more</span>
-                        <span className="shrink-0 text-[13px]">+{visibility.hiddenCount}</span>
+                        <span className="shrink-0 text-base">+{visibility.hiddenCount}</span>
                       </SidebarRowButton>
                     )}
                     {visibility.overflowThreads.length > 0 && (
@@ -116,12 +120,13 @@ export function AppSidebar({
                               thread={thread}
                               active={activeView === "chat" && thread.id === activeThreadId}
                               onSelectThread={onSelectThread}
+                              onArchiveThread={onArchiveThread}
                               disabled={!expanded}
                             />
                           ))}
                           {visibility.canShowLess && (
                             <SidebarRowButton
-                              className="text-sm text-sidebar-muted hover:text-sidebar-foreground"
+                              className="text-base text-sidebar-muted hover:text-sidebar-foreground"
                               onClick={() => showLessForGroup(group.key)}
                             >
                               <span className="min-w-0 flex-1 truncate">Show less</span>
@@ -135,7 +140,7 @@ export function AppSidebar({
               );
             })
           ) : (
-            <div className="px-3 py-2 text-[15px] text-sidebar-heading">No sessions yet</div>
+            <div className="px-3 py-2 text-base text-sidebar-heading">No sessions yet</div>
           )}
         </div>
       </div>
@@ -148,28 +153,45 @@ function ThreadRow({
   thread,
   active,
   onSelectThread,
+  onArchiveThread,
   disabled = false,
 }: {
   thread: RoderThread;
   active: boolean;
   onSelectThread: (threadId: string) => void;
+  onArchiveThread: (threadId: string) => void;
   disabled?: boolean;
 }): React.JSX.Element {
   return (
-    <SidebarRowButton
+    <div
       className={cn(
-        "thread-row",
+        "thread-row squircle-corners relative flex h-9 w-full items-center rounded-xl text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20",
         active && "bg-sidebar-active/20 text-sidebar-active-foreground",
+        disabled && "pointer-events-none opacity-50",
       )}
-      disabled={disabled}
-      onClick={() => onSelectThread(thread.id)}
     >
-      <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
-      <span className="relative flex h-5 w-10 shrink-0 items-center justify-end">
-        <span className="thread-row-age absolute right-0 text-[14px] text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
-        <Archive className="thread-row-archive absolute right-0 size-4 text-sidebar-muted" />
-      </span>
-    </SidebarRowButton>
+      <button
+        type="button"
+        className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-xl px-3 pr-14 text-left outline-none"
+        disabled={disabled}
+        onClick={() => onSelectThread(thread.id)}
+      >
+        <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
+        <span className="thread-row-age absolute right-3 text-base text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
+      </button>
+      <Tooltip>
+        <TooltipTrigger
+          type="button"
+          className="thread-row-archive absolute right-3 flex size-7 items-center justify-center rounded-md text-sidebar-muted outline-none hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+          disabled={disabled}
+          aria-label={`Archive ${(thread.name ?? thread.preview) || "thread"}`}
+          onClick={() => onArchiveThread(thread.id)}
+        >
+          <Archive className="size-4" />
+        </TooltipTrigger>
+        <TooltipContent side="right">Archive</TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -188,7 +210,7 @@ function SidebarRowButton({
     <button
       type="button"
       className={cn(
-        "squircle-corners flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-[16px] font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
+        "squircle-corners flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
         className,
       )}
       disabled={disabled}
