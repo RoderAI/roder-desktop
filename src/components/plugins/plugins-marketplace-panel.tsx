@@ -1,10 +1,13 @@
-import { Ban, Download, PackageCheck, PackagePlus, Plus, RefreshCw, Search, Store, Trash2 } from "lucide-react";
+import { Ban, CircleCheck, Download, PackageCheck, PackagePlus, Plus, RefreshCw, Search, Store, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   activeComponentLabels,
   installedVariantSet,
+  marketplaceIsActive,
+  marketplaceNeedsEnable,
+  marketplaceStateLabel,
   pluginVariantKey,
   recommendedVariant,
   riskLabel,
@@ -35,6 +38,7 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
   const setQuery = usePluginsStore((state) => state.setQuery);
   const search = usePluginsStore((state) => state.search);
   const installDefaults = usePluginsStore((state) => state.installDefaults);
+  const enableMarketplace = usePluginsStore((state) => state.enableMarketplace);
   const addLocalMarketplace = usePluginsStore((state) => state.addLocalMarketplace);
   const removeMarketplace = usePluginsStore((state) => state.removeMarketplace);
   const refreshMarketplace = usePluginsStore((state) => state.refreshMarketplace);
@@ -55,7 +59,7 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
+    <section className="flex h-full min-h-0 flex-col bg-background">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4">
         <div>
           <h1 className="text-[16px] font-medium">Plugins</h1>
@@ -89,8 +93,8 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
       {error && <div className="border-b border-border px-5 py-3 text-[13px] text-destructive">{error}</div>}
       {lastResult && <div className="border-b border-border px-5 py-3 text-[13px] text-muted-foreground">{lastResult}</div>}
 
-      <div className="grid gap-0 lg:grid-cols-3">
-        <div className="border-b border-border lg:col-span-2 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-3">
+        <div className="min-h-0 overflow-y-auto border-b border-border lg:col-span-2 lg:border-b-0 lg:border-r">
           <form className="flex gap-2 border-b border-border px-5 py-4" onSubmit={submitSearch}>
             <label className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -127,10 +131,11 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
           )}
         </div>
 
-        <aside className="space-y-4 px-5 py-4">
+        <aside className="min-h-0 space-y-4 overflow-y-auto px-5 py-4">
           <MarketplacesList
             marketplaces={marketplaces}
             loading={loading}
+            onEnable={enableMarketplace}
             onRefresh={refreshMarketplace}
             onRemove={removeMarketplace}
           />
@@ -254,11 +259,13 @@ function VariantRow({
 function MarketplacesList({
   marketplaces,
   loading,
+  onEnable,
   onRefresh,
   onRemove,
 }: {
   marketplaces: MarketplaceDescriptor[];
   loading: boolean;
+  onEnable: (marketplace: MarketplaceDescriptor) => Promise<void>;
   onRefresh: (marketplaceId: string) => Promise<void>;
   onRemove: (marketplaceId: string) => Promise<void>;
 }): React.JSX.Element {
@@ -272,27 +279,54 @@ function MarketplacesList({
         <div className="rounded-md border border-border px-3 py-3 text-[13px] text-muted-foreground">No marketplaces configured.</div>
       ) : (
         <div className="divide-y divide-border rounded-md border border-border">
-          {marketplaces.map((marketplace) => (
-            <div key={marketplace.id} className="px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[13px] font-medium text-foreground">{marketplace.displayName}</span>
-                    <Badge variant={marketplace.enabled ? "secondary" : "muted"}>{marketplace.state}</Badge>
+          {marketplaces.map((marketplace) => {
+            const active = marketplaceIsActive(marketplace);
+            const canEnable = marketplaceNeedsEnable(marketplace);
+            return (
+              <div key={marketplace.id} className={cn("px-3 py-3", !active && "bg-muted/20")}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[13px] font-medium text-foreground">{marketplace.displayName}</span>
+                      <Badge variant={active ? "secondary" : "muted"}>{active ? "Enabled" : "Not enabled"}</Badge>
+                      <Badge variant="outline">{marketplaceStateLabel(marketplace.state)}</Badge>
+                    </div>
+                    <p className="mt-1 truncate text-[12px] text-muted-foreground">{marketplace.id}</p>
                   </div>
-                  <p className="mt-1 truncate text-[12px] text-muted-foreground">{marketplace.id}</p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" className="size-7" disabled={loading || !marketplace.enabled} aria-label={`Refresh ${marketplace.displayName}`} onClick={() => void onRefresh(marketplace.id)}>
-                    <RefreshCw className="size-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="size-7" disabled={loading} aria-label={`Remove ${marketplace.displayName}`} onClick={() => void onRemove(marketplace.id)}>
-                    <Trash2 className="size-3.5" />
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {canEnable && (
+                      <Button variant="secondary" size="sm" disabled={loading} onClick={() => void onEnable(marketplace)}>
+                        <CircleCheck className="size-3.5" />
+                        Enable
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      disabled={loading || !active}
+                      aria-label={`Refresh ${marketplace.displayName}`}
+                      title={active ? `Refresh ${marketplace.displayName}` : "Enable this marketplace before refreshing"}
+                      onClick={() => void onRefresh(marketplace.id)}
+                    >
+                      <RefreshCw className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      disabled={loading}
+                      aria-label={`${marketplace.isDefault ? "Disable" : "Remove"} ${marketplace.displayName}`}
+                      title={marketplace.isDefault ? "Disable marketplace" : "Remove marketplace"}
+                      onClick={() => void onRemove(marketplace.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

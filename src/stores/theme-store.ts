@@ -26,7 +26,7 @@ export type ThemeSettings = {
   codeFontSize: number;
 };
 
-export type SettingsSection = "general" | "appearance" | "components" | "models" | "extensions" | "plugins" | "configuration" | "personalization" | "mcp" | "git" | "usage";
+export type SettingsSection = "general" | "appearance" | "components" | "models" | "extensions" | "configuration" | "personalization" | "mcp" | "git" | "usage";
 
 type ThemeStore = {
   settingsOpen: boolean;
@@ -164,6 +164,19 @@ export const defaultThemeSettings: ThemeSettings = {
   codeFontSize: 13,
 };
 
+const validSettingsSections = new Set<SettingsSection>([
+  "general",
+  "appearance",
+  "components",
+  "models",
+  "extensions",
+  "configuration",
+  "personalization",
+  "mcp",
+  "git",
+  "usage",
+]);
+
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
@@ -209,7 +222,7 @@ export const useThemeStore = create<ThemeStore>()(
         return {
           ...current,
           settingsOpen: value?.settingsOpen ?? current.settingsOpen,
-          settingsSection: value?.settingsSection ?? current.settingsSection,
+          settingsSection: normalizeSettingsSection(value?.settingsSection, current.settingsSection),
           settings: mergeThemeSettings(current.settings, value?.settings),
           extensionThemePresets: [],
         };
@@ -217,6 +230,13 @@ export const useThemeStore = create<ThemeStore>()(
     },
   ),
 );
+
+function normalizeSettingsSection(section: unknown, fallback: SettingsSection): SettingsSection {
+  if (typeof section === "string" && validSettingsSections.has(section as SettingsSection)) {
+    return section as SettingsSection;
+  }
+  return fallback;
+}
 
 function mergeThemeSettings(current: ThemeSettings, persisted: Partial<ThemeSettings> | undefined): ThemeSettings {
   return {

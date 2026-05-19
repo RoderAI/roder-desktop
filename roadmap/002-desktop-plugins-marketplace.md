@@ -1,10 +1,10 @@
 # Desktop Plugins Marketplace PRD
 
-**Status:** In progress
-**Current Stage:** 1 - Desktop API And Screen
+**Status:** Complete
+**Current Stage:** 2 - Runtime Smoke And Follow-Up Gaps
 **Owner:** Codex
 **Created:** 2026-05-18
-**Updated:** 2026-05-18
+**Updated:** 2026-05-19
 **Related:** `/Users/pz/w/gode/docs/app-server/api.md`, `/Users/pz/w/gode/crates/roder-app-server/src/marketplaces.rs`, `roadmap/001-desktop-custom-user-extensions.md`
 
 ---
@@ -13,15 +13,15 @@
 
 ### Problem
 
-Roder Desktop has a local Extensions surface for `.rdx` packages and development folders, but it does not expose the app-server's plugin marketplace APIs. The sidebar also has an inert Marketplace row. Users need a first-class Plugins screen that can list marketplaces, search de-duplicated plugin groups, preview risk/component metadata, install variants, and manage installed plugin records through the bundled app-server.
+Roder Desktop has a local Extensions surface for `.rdx` packages and development folders, but it does not expose the app-server's plugin marketplace APIs. The sidebar also has an inert Marketplace row. Users need a first-class, full-width Plugins view in the main app surface that can list marketplaces, search de-duplicated plugin groups, preview risk/component metadata, install variants, and manage installed plugin records through the bundled app-server.
 
 ### Goals
 
-- [ ] Rename the user-facing marketplace entry point to Plugins.
-- [ ] Add typed desktop renderer APIs for the app-server `marketplaces/*` and `plugins/*` methods.
-- [ ] Build a Plugins screen that lists marketplaces, searches plugins, installs plugin variants, and manages installed records.
-- [ ] Keep the existing local Extensions screen intact for desktop `.rdx` and dev-folder extensions.
-- [ ] Record verification evidence for the UI wiring and API contract.
+- [x] Rename the user-facing marketplace entry point to Plugins.
+- [x] Add typed desktop renderer APIs for the app-server `marketplaces/*` and `plugins/*` methods.
+- [x] Build a full-width main Plugins view that lists marketplaces, searches plugins, installs plugin variants, and manages installed records.
+- [x] Keep the existing local Extensions screen intact for desktop `.rdx` and dev-folder extensions.
+- [x] Record verification evidence for the UI wiring and API contract.
 
 ### Non-goals
 
@@ -32,7 +32,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 
 ### Success Metrics
 
-- The left sidebar opens a screen labeled Plugins, not Marketplace.
+- The left sidebar opens a main app view labeled Plugins, not Marketplace or a nested Settings section.
 - The Plugins screen can call `marketplaces/list`, `marketplaces/install_default`, `marketplaces/refresh`, `marketplaces/search`, `plugins/preview_install`, `plugins/install`, `plugins/install_all_variants`, `plugins/list_installed`, `plugins/disable`, and `plugins/uninstall`.
 - Installed variants show state, source marketplace, install path, and disable/uninstall actions.
 - Search results show provider variants, component hints, risk, and install controls.
@@ -40,9 +40,9 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 
 ## Current Repo State
 
-- `src/components/app-sidebar.tsx` has a `Marketplace` row with no click handler.
-- `src/components/settings-view.tsx` already hosts a settings overlay and an Extensions section.
-- `src/stores/theme-store.ts` persists `settingsSection` and currently knows the `extensions` section but not `plugins`.
+- At discovery, `src/components/app-sidebar.tsx` had a `Marketplace` row with no click handler.
+- `src/components/settings-view.tsx` hosts a settings overlay and an Extensions section; Plugins should remain outside Settings.
+- `src/stores/theme-store.ts` persists `settingsSection` and should normalize any older persisted `plugins` setting back to a valid Settings section.
 - `src/lib/roder-ipc.ts` wraps a small subset of app-server methods through `window.roderDesktop.request`.
 - `src/types/roder.ts` exposes the generic `request(method, params)` bridge; no new main-process IPC is required for app-server method calls.
 - `src/stores/roder-store.ts` is over 500 lines, so marketplace state must live in a separate store.
@@ -54,13 +54,13 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 
 ### Users And Workflows
 
-- User opens Plugins from the sidebar to discover or manage marketplace-backed plugin records.
+- User opens Plugins from the main sidebar to discover or manage marketplace-backed plugin records without entering Settings.
 - User installs built-in marketplace descriptors, refreshes a marketplace, searches plugins, previews install risk, and installs the recommended or all variants.
 - User can see installed plugin variants and disable or uninstall a variant without changing local `.rdx` extensions.
 
 ### Functional Requirements
 
-- `P0`: Add a Plugins navigation entry that replaces the inert Marketplace sidebar label.
+- `P0`: Add a Plugins navigation entry that replaces the inert Marketplace sidebar label and selects a full-width main view.
 - `P0`: Add app-server client wrappers for every documented marketplace/plugin method in this slice.
 - `P0`: Add a separate Plugins store with loading/error/result state, marketplace list, search results, previews, and installed variants.
 - `P0`: List marketplaces with enabled/default/state/source metadata and actions for install defaults, refresh, and remove.
@@ -73,7 +73,8 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 
 ### UX Requirements
 
-- Use the visible label `Plugins` for the marketplace screen.
+- Use the visible label `Plugins` for the marketplace view.
+- Keep Plugins outside Settings; selecting Plugins in the app sidebar should replace the chat transcript/composer area.
 - Keep the screen dense and operational, matching the desktop settings/tooling style.
 - Avoid a marketing landing page; the first view should show controls, marketplace state, search results, and installed records.
 - Use standard Tailwind spacing tokens and existing UI primitives.
@@ -97,8 +98,11 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 - Create: `src/stores/plugins-store.ts`
 - Create: `src/components/plugins/plugins-marketplace-panel.tsx`
 - Modify: `src/components/app-sidebar.tsx`
+- Modify: `src/components/top-bar.tsx`
 - Modify: `src/components/settings-view.tsx`
 - Modify: `src/stores/theme-store.ts`
+- Modify: `scripts/bundle-roder.mjs`
+- Sibling modify: `/Users/pz/w/gode/crates/roder-extension-host/src/marketplace/mod.rs`
 - Verify: `test/*.test.mjs`, `package.json`
 
 ### Dependency Checks
@@ -109,7 +113,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 
 ### Architecture
 
-The renderer calls the existing constrained app-server bridge through a typed `pluginsIpc` wrapper. `plugins-store` owns transient state and composes calls such as reload, refresh, install, disable, and uninstall. The Plugins panel is a normal settings screen opened from the sidebar and settings navigation. It intentionally does not use the local Extensions catalog because marketplace-backed plugins are app-server records, while Extensions are desktop-hosted `.rdx` packages.
+The renderer calls the existing constrained app-server bridge through a typed `pluginsIpc` wrapper. `plugins-store` owns transient state and composes calls such as reload, refresh, install, disable, and uninstall. The Plugins panel is a main app view opened from the primary sidebar and rendered full width in the content area. It intentionally does not use the local Extensions catalog because marketplace-backed plugins are app-server records, while Extensions are desktop-hosted `.rdx` packages.
 
 ## Implementation Stages
 
@@ -137,14 +141,14 @@ Acceptance:
 
 ### Stage 1: Desktop API And Screen
 
-**Status:** In progress
-**Owned Paths:** `src/types/plugins.ts`, `src/lib/plugins-ipc.ts`, `src/lib/plugins-marketplace.ts`, `src/stores/plugins-store.ts`, `src/components/plugins/plugins-marketplace-panel.tsx`, `src/components/app-sidebar.tsx`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`
+**Status:** Complete
+**Owned Paths:** `src/types/plugins.ts`, `src/lib/plugins-ipc.ts`, `src/lib/plugins-marketplace.ts`, `src/stores/plugins-store.ts`, `src/components/plugins/plugins-marketplace-panel.tsx`, `src/components/app-sidebar.tsx`, `src/components/top-bar.tsx`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`
 
-- [ ] Add TypeScript types matching the app-server marketplace/plugin DTOs.
-- [ ] Add typed IPC wrappers for the documented marketplace/plugin methods.
-- [ ] Add a dedicated Plugins store with load/search/refresh/install/disable/uninstall operations.
-- [ ] Add a Plugins screen and wire it from the sidebar and settings navigation.
-- [ ] Add focused utility tests for variant selection/state mapping.
+- [x] Add TypeScript types matching the app-server marketplace/plugin DTOs.
+- [x] Add typed IPC wrappers for the documented marketplace/plugin methods.
+- [x] Add a dedicated Plugins store with load/search/refresh/install/disable/uninstall operations.
+- [x] Add a Plugins view and wire it from the sidebar as a main app view, not a Settings subsection.
+- [x] Add focused utility tests for variant selection/state mapping.
 
 Run:
 
@@ -156,18 +160,18 @@ pnpm build
 
 Acceptance:
 
-- The sidebar opens a Plugins screen.
+- The sidebar opens a full-width Plugins main view.
 - The Plugins screen has visible controls for marketplace list, default install, local marketplace add, refresh, search, preview, install, install all variants, disable, and uninstall.
 - Typed wrappers call the exact app-server methods documented in `/Users/pz/w/gode/docs/app-server/api.md`.
 
 ### Stage 2: Runtime Smoke And Follow-Up Gaps
 
-**Status:** Ready
+**Status:** Complete
 **Owned Paths:** desktop app runtime, `roadmap/002-desktop-plugins-marketplace.md`, `roadmap/STATUS.md`
 
-- [ ] Build with the bundled sibling app-server.
-- [ ] Smoke the Plugins screen against the running app when feasible.
-- [ ] Record app-server/API gaps that should move to `/Users/pz/w/gode` instead of papering them over in the renderer.
+- [x] Build with the bundled sibling app-server.
+- [x] Smoke the Plugins screen against the running app when feasible.
+- [x] Record app-server/API gaps that should move to `/Users/pz/w/gode` instead of papering them over in the renderer.
 
 Run:
 
@@ -190,13 +194,13 @@ Acceptance:
 
 ### Manual Checks
 
-- Open Plugins from the sidebar and confirm the UI is labeled Plugins.
+- Open Plugins from the sidebar and confirm the full-width main UI is labeled Plugins.
 - Confirm app-server error states are visible if the bundled binary cannot satisfy a method.
 - Confirm marketplace/plugin result data is not confused with local Extensions catalog data.
 
 ### Rollback Or Recovery
 
-- Remove the `plugins` settings section, sidebar handler, Plugins component/store, and typed wrappers.
+- Remove the `plugins` main view state, sidebar handler, Plugins component/store, and typed wrappers.
 - Existing Extensions APIs remain separate and should continue to work.
 - Backend marketplace state can be manually reset by removing `~/.roder/marketplaces.json` and plugin cache markers if test installs are undesirable.
 
@@ -207,6 +211,42 @@ Acceptance:
 - Evidence: inspected existing roadmap, dirty worktree, desktop settings/sidebar/store boundaries, and `/Users/pz/w/gode` app-server marketplace/plugin methods.
 - Commands: `git status --short`; `find roadmap -maxdepth 1 -type f -name '*.md' -print`; `rg -n "marketplaces/|plugins/" /Users/pz/w/gode/docs/app-server/api.md /Users/pz/w/gode/crates/roder-protocol/src/lib.rs /Users/pz/w/gode/crates/roder-app-server/src`; targeted `sed -n` reads.
 - Gaps: implementation and verification still in progress.
+
+### 2026-05-18 - Desktop Plugins Screen And API Wrappers
+
+- Evidence: added typed marketplace/plugin DTOs, app-server method wrappers, a dedicated Plugins store, focused marketplace utility helpers, the initial Plugins settings screen, settings navigation, and the sidebar Plugins entry. Fixed `scripts/bundle-roder.mjs` so desktop builds infer `/Users/pz/w/gode` instead of `/Users/pz/w/w`.
+- Commands: `pnpm test` passed 31 tests; `pnpm typecheck` passed; `pnpm build` passed after rebundling and signing `resources/bin/roder` from `/Users/pz/w/gode`.
+- Gaps: interactive Electron click-through of the Plugins screen has not been run.
+
+### 2026-05-18 - App-Server Marketplace Contract Fixes
+
+- Evidence: app-server stdio smoke initially exposed live default-marketplace failures for invalid homepage/author identity keys and Codex `"source": "github"` plugin manifests. Fixed the normalizer in `/Users/pz/w/gode/crates/roder-extension-host/src/marketplace/mod.rs` and added regression tests. A concurrent TUI module issue briefly blocked rebundling, but the current sibling checkout now builds the desktop binary.
+- Commands: `cargo fmt -p roder-extension-host --check`; `cargo test -p roder-extension-host marketplace::tests`; `cargo test -p roder-app-server --test e2e marketplace_methods -- --test-threads=1`; `pnpm build`; stdio smoke with temp `RODER_MARKETPLACES_PATH`, `marketplaces/install_default`, `marketplaces/search`, and `plugins/list_installed` returned marketplace/search results without errors.
+- Gaps: `cargo test -p roder-app-server marketplace_methods` without `--test-threads=1` failed because the existing tests mutate shared marketplace environment variables in parallel.
+
+### 2026-05-18 - Roadmap Validation
+
+- Evidence: direct validator invocation still crashes on the installed skill's malformed placeholder regex; the same validator passed when run through a one-process regex shim without editing the installed skill.
+- Commands: `python3 "${CODEX_HOME:-$HOME/.codex}/skills/roadmap-prd-verifier/scripts/validate_roadmap.py" roadmap/002-desktop-plugins-marketplace.md` crashed with `re.PatternError`; shimmed single-file and full-roadmap validation both passed.
+- Gaps: installed validator script still has the regex bug.
+
+### 2026-05-19 - Plugins Promoted To Main View
+
+- Evidence: moved Plugins out of Settings into a main app view selected by the primary sidebar. Removed the Settings nav item, normalized persisted legacy `settingsSection: "plugins"` values, changed the top bar title for the Plugins view, and changed the marketplace panel shell to fill the content area without the Settings max-width/card wrapper.
+- Commands: `pnpm test` passed 31 tests; `pnpm typecheck` passed; `git diff --check` passed; `pnpm build` passed after rebundling/signing `/Users/pz/w/gode-desktop/resources/bin/roder` from `/Users/pz/w/gode`; shimmed full-roadmap validation passed; `pnpm run dev` launched the Electron app, `/opt/homebrew/bin/cliclick c:300,160` selected Plugins from the main sidebar, and `/Users/pz/tmp/roder-plugin-smoke-after4.png` confirmed the full-width main Plugins view without the Settings shell.
+- Gaps: `pnpm build` still emits the existing `/Users/pz/w/gode` `roder-tui` dead-code warning for `push_assistant_delta`; direct roadmap validation remains blocked by the installed validator regex bug, so validation used the documented one-process shim.
+
+### 2026-05-19 - Marketplace Enable CTA
+
+- Evidence: default marketplaces in `bakedIn`, `removedByUser`, or otherwise inactive states now render as `Not enabled` and expose a per-row `Enable` button. The button calls the existing `marketplaces/install_default` app-server method for that specific default marketplace, while active marketplaces show `Enabled` and keep refresh available.
+- Commands: `pnpm test` passed 32 tests including a new marketplace enablement utility regression; `pnpm typecheck` passed; `git diff --check` passed; `pnpm build` passed; `pnpm run dev` launched the Electron app, `/opt/homebrew/bin/cliclick c:300,160` selected Plugins, and `/Users/pz/tmp/roder-marketplace-enable-smoke.png` confirmed visible `Not enabled` badges and `Enable` buttons for Codex and Cursor defaults.
+- Gaps: visual smoke intentionally did not click `Enable`, to avoid mutating the user's local marketplace state during verification.
+
+### 2026-05-19 - Plugins Top Bar Removed
+
+- Evidence: the app-level `TopBar` is now mounted only for the chat view, so the Plugins view no longer shows the duplicate title/tool row above the Plugins panel header. Removed the `TopBar` `mainTitle` special case because Plugins no longer uses the top bar.
+- Commands: `pnpm test` passed 32 tests; `pnpm typecheck` passed; `git diff --check` passed; `pnpm build` passed. `pnpm run dev` launched, but screenshot capture was blocked by the macOS loginwindow display shield in this environment.
+- Gaps: no interactive screenshot artifact was captured for this specific title-bar removal because the desktop was shielded by loginwindow during the smoke attempt.
 
 ## Open Questions
 

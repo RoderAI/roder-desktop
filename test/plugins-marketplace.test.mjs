@@ -89,6 +89,53 @@ test("summarizes component hints and marketplace sources for the UI", async () =
   assert.equal(riskLabel("startsProcess"), "Starts process");
 });
 
+test("marks baked-in default marketplaces as needing explicit enablement", async () => {
+  const { defaultSelectionForMarketplace, marketplaceIsActive, marketplaceNeedsEnable } = await loadMarketplaceModule();
+  const bakedIn = {
+    id: "codex-plugins",
+    isDefault: true,
+    enabled: true,
+    state: "bakedIn",
+  };
+  const refreshed = {
+    id: "codex-plugins",
+    isDefault: true,
+    enabled: true,
+    state: "refreshed",
+  };
+
+  assert.equal(defaultSelectionForMarketplace(bakedIn), "codex");
+  assert.equal(marketplaceIsActive(bakedIn), false);
+  assert.equal(marketplaceNeedsEnable(bakedIn), true);
+  assert.equal(marketplaceIsActive(refreshed), true);
+  assert.equal(marketplaceNeedsEnable(refreshed), false);
+});
+
+test("builds source code links for marketplace plugin variants", async () => {
+  const { sourceCodeUrl } = await loadMarketplaceModule();
+  const marketplaces = [
+    {
+      id: "codex-plugins",
+      source: {
+        kind: "github",
+        repo: "openai/plugins",
+        refName: "main",
+        pluginRoot: "plugins",
+      },
+    },
+  ];
+
+  assert.equal(
+    sourceCodeUrl({ kind: "marketplacePath", marketplace_id: "codex-plugins", path: "browser" }, marketplaces),
+    "https://github.com/openai/plugins/tree/main/plugins/browser",
+  );
+  assert.equal(
+    sourceCodeUrl({ kind: "git", url: "https://github.com/example/tools.git", path: "plugins/lint", refName: "stable" }, []),
+    "https://github.com/example/tools/tree/stable/plugins/lint",
+  );
+  assert.equal(sourceCodeUrl({ kind: "npm", package: "@example/plugin", version: "1.2.3" }, []), "https://www.npmjs.com/package/%40example%2Fplugin");
+});
+
 function variant(marketplaceId, pluginId) {
   return {
     marketplaceId,
