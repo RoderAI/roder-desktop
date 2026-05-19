@@ -123,6 +123,9 @@ export type MarketplacePluginVariant = {
   pluginId: string;
   kind: MarketplaceKind;
   source: PluginSource;
+  homepage?: string | null;
+  category?: string | null;
+  tags: string[];
   componentHints: PluginComponentHints;
   capabilityHints: string[];
   version?: string | null;
