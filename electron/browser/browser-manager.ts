@@ -2,6 +2,7 @@ import { BrowserWindow, WebContentsView, type Rectangle, type WebContents } from
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { installNewThreadShortcut } from "../main/shortcuts";
 
 export type BrowserSnapshot = {
   visible: boolean;
@@ -26,7 +27,10 @@ export class BrowserManager {
   #url = "https://www.google.com/search?q=roder";
   #annotating = false;
 
-  constructor(private readonly cdpPort: string) {}
+  constructor(
+    private readonly cdpPort: string,
+    private readonly onNewThreadShortcut: () => void,
+  ) {}
 
   attach(window: BrowserWindow): void {
     this.#window = window;
@@ -152,6 +156,7 @@ export class BrowserManager {
       },
     });
     this.#view.setBackgroundColor("#111111");
+    installNewThreadShortcut(this.#view.webContents, this.onNewThreadShortcut);
     this.#view.webContents.on("did-navigate", (_event, url) => {
       this.#url = url;
       this.#annotating = false;

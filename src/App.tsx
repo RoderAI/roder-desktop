@@ -76,6 +76,13 @@ export function App(): React.JSX.Element {
     followBottom();
     void agent.newThread();
   }, [agent, followBottom, showChat]);
+  useEffect(() => {
+    return window.roderDesktop.onAppCommand((appCommand) => {
+      if (appCommand.command === "newThread") {
+        newThread();
+      }
+    });
+  }, [newThread]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>
