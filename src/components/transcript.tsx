@@ -84,11 +84,11 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
                 {message.role === "tool" ? (
                   <ToolTimelineItem message={message} />
                 ) : isPhaseMessage ? (
-                  <PhaseMessage text={message.text || (message.status === "streaming" ? " " : "")} />
+                  <PhaseMessage isStreaming={message.status === "streaming"} text={message.text || (message.status === "streaming" ? " " : "")} />
                 ) : message.role === "assistant" ? (
-                  <MessageContent text={message.text || (message.status === "streaming" ? " " : "")} />
+                  <MessageContent isStreaming={message.status === "streaming"} text={message.text || (message.status === "streaming" ? " " : "")} />
                 ) : (
-                  <div className="text-[17px] leading-[1.55]">{message.text}</div>
+                  <div className="font-medium text-[17px] leading-[1.55]">{message.text}</div>
                 )}
               </article>
             );
