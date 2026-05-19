@@ -1,0 +1,16 @@
+{
+  "name": "Aurora Dark",
+  "scheme": "dark",
+  "colors": {
+    "accent": "#7dd3fc",
+    "background": "#111827",
+    "foreground": "#e5edf7",
+    "sidebar": "#0b1220"
+  },
+  "translucentSidebar": true,
+  "contrast": 54,
+  "uiFont": "Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+  "codeFont": "\"SFMono-Regular\", \"SF Mono\", Consolas, \"Liberation Mono\", monospace",
+  "uiFontSize": 14,
+  "codeFontSize": 13
+}

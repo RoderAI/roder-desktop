@@ -1,0 +1,87 @@
+{
+  "name": "hello-roder-extension",
+  "version": "0.1.0",
+  "description": "Minimal local extension used to verify the Roder Desktop extension host.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "package": "pnpm build && roder-extension-package . --out dist/hello-roder.rdx",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@roderai/extension-api": "workspace:*",
+    "@roderai/extension-packager": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  },
+  "roder": {
+    "displayName": "Hello Roder",
+    "publisher": "roder",
+    "engines": {
+      "roder": ">=0.0.0"
+    },
+    "main": "dist/extension.js",
+    "activationEvents": [
+      "onStartupFinished",
+      "onCommand:hello-roder.sayHello",
+      "onCommand:hello-roder.noViewHello",
+      "onTool:hello-roder.echo"
+    ],
+    "capabilities": [
+      "desktop.notification"
+    ],
+    "categories": [
+      "Other"
+    ],
+    "contributes": {
+      "commands": [
+        {
+          "id": "hello-roder.sayHello",
+          "title": "Say Hello",
+          "category": "Hello Roder"
+        },
+        {
+          "id": "hello-roder.noViewHello",
+          "title": "No-View Hello",
+          "category": "Hello Roder"
+        }
+      ],
+      "tools": [
+        {
+          "id": "hello-roder.echo",
+          "title": "Echo Text",
+          "description": "Echoes text from the user and records how many times the tool has run.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Text to echo back."
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "configuration": [
+        {
+          "key": "hello-roder.greeting",
+          "title": "Greeting",
+          "description": "Greeting used by the command.",
+          "type": "text",
+          "required": true,
+          "default": "Hello from a local extension"
+        }
+      ],
+      "views": {
+        "panels": []
+      }
+    }
+  }
+}

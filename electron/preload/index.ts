@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
+import type { ExtensionTheme } from "../extensions/theme";
 
 export type RoderNotification = {
   method: string;
@@ -67,12 +69,21 @@ export type DroppedFile = {
   size: number;
 };
 
+export type AppServerEvent = {
+  id: number;
+  at: string;
+  kind: "request" | "response" | "error" | "notification" | "status" | "stderr";
+  method?: string;
+  payload: unknown;
+};
+
 const api = {
   request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
   restart: () => ipcRenderer.invoke("roder:restart") as Promise<RoderStatus>,
   status: () => ipcRenderer.invoke("roder:status") as Promise<RoderStatus>,
   appearance: () => ipcRenderer.invoke("roder:appearance") as Promise<SystemAppearance>,
+  openExternal: (url: string) => ipcRenderer.invoke("openExternal", url) as Promise<void>,
   openWorkspaceFolder: (defaultPath?: string) => ipcRenderer.invoke("workspace:openFolder", defaultPath) as Promise<string | null>,
   terminalStart: (options?: { cols?: number; rows?: number }) => ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
   terminalWrite: (data: string) => ipcRenderer.invoke("terminal:write", data) as Promise<void>,
@@ -94,6 +105,26 @@ const api = {
   codexLogin: () => ipcRenderer.invoke("codex:login") as Promise<CodexAccountSnapshot>,
   codexLogout: () => ipcRenderer.invoke("codex:logout") as Promise<CodexAccountSnapshot>,
   codexOpenRateLimitHelp: () => ipcRenderer.invoke("codex:openRateLimitHelp") as Promise<void>,
+  extensionsList: () => ipcRenderer.invoke("extensions:list") as Promise<ExtensionCatalogSnapshot>,
+  extensionsInstallFromFolder: (folderPath: string) => ipcRenderer.invoke("extensions:installFromFolder", folderPath) as Promise<ExtensionCatalogSnapshot>,
+  extensionsInstallFromArchive: (archivePath: string) => ipcRenderer.invoke("extensions:installFromArchive", archivePath) as Promise<ExtensionCatalogSnapshot>,
+  extensionsSelectAndInstallFolder: () => ipcRenderer.invoke("extensions:selectAndInstallFolder") as Promise<ExtensionCatalogSnapshot>,
+  extensionsSelectAndInstallArchive: () => ipcRenderer.invoke("extensions:selectAndInstallArchive") as Promise<ExtensionCatalogSnapshot>,
+  extensionsUninstall: (id: string) => ipcRenderer.invoke("extensions:uninstall", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsEnable: (id: string) => ipcRenderer.invoke("extensions:enable", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsDisable: (id: string) => ipcRenderer.invoke("extensions:disable", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsReload: (id: string) => ipcRenderer.invoke("extensions:reload", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) =>
+    ipcRenderer.invoke("extensions:updatePreference", id, key, value) as Promise<ExtensionCatalogSnapshot>,
+  extensionsReadLogs: (id: string) => ipcRenderer.invoke("extensions:readLogs", id) as Promise<string[]>,
+  extensionsActivate: (id: string) => ipcRenderer.invoke("extensions:activate", id) as Promise<ExtensionCatalogSnapshot>,
+  extensionsExecuteCommand: (commandId: string, args?: unknown[]) =>
+    ipcRenderer.invoke("extensions:executeCommand", commandId, args ?? []) as Promise<unknown>,
+  extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) =>
+    ipcRenderer.invoke("extensions:executeTool", toolId, input ?? {}) as Promise<unknown>,
+  extensionsReadPanel: (extensionId: string, panelId: string) => ipcRenderer.invoke("extensions:readPanel", extensionId, panelId) as Promise<string>,
+  extensionsReadTheme: (extensionId: string, themeId: string) => ipcRenderer.invoke("extensions:readTheme", extensionId, themeId) as Promise<ExtensionTheme>,
+  appServerEvents: () => ipcRenderer.invoke("appserver:events") as Promise<AppServerEvent[]>,
   resolveDroppedFiles: (files: File[]) =>
     files
       .map((file) => ({
@@ -122,6 +153,11 @@ const api = {
     const listener = (_event: Electron.IpcRendererEvent, appearance: SystemAppearance) => callback(appearance);
     ipcRenderer.on("roder:appearance", listener);
     return () => ipcRenderer.removeListener("roder:appearance", listener);
+  },
+  onAppServerEvent: (callback: (event: AppServerEvent) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, appServerEvent: AppServerEvent) => callback(appServerEvent);
+    ipcRenderer.on("appserver:event", listener);
+    return () => ipcRenderer.removeListener("appserver:event", listener);
   },
   onTerminalData: (callback: (payload: { id: string; data: string }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; data: string }) => callback(payload);

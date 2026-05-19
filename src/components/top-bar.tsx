@@ -1,6 +1,6 @@
 import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, TerminalSquare } from "lucide-react";
+import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
 import type { RoderStatus, RoderThread } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-export type ToolPanel = "terminal" | "browser" | "canvas" | null;
+export type ToolPanel = "terminal" | "browser" | "canvas" | "extensions" | null;
 
 type FolderOption = {
   path: string;
@@ -36,6 +36,7 @@ type TopBarProps = {
   onToggleTerminal: () => void;
   onToggleBrowser: () => void;
   onToggleCanvas: () => void;
+  onToggleExtensions: () => void;
 };
 
 export function TopBar({
@@ -53,6 +54,7 @@ export function TopBar({
   onToggleTerminal,
   onToggleBrowser,
   onToggleCanvas,
+  onToggleExtensions,
 }: TopBarProps): React.JSX.Element {
   const activeFolder = folders.find((folder) => normalizePath(folder.path) === normalizePath(activeFolderPath));
   const activeFolderLabel = activeFolder?.name ?? folderName(activeFolderPath);
@@ -126,6 +128,15 @@ export function TopBar({
           onClick={onToggleCanvas}
         >
           <Paintbrush className="size-5" />
+        </Button>
+        <Button
+          variant={activeTool === "extensions" ? "secondary" : "ghost"}
+          size="icon"
+          aria-label="Toggle extensions"
+          title="Toggle extensions"
+          onClick={onToggleExtensions}
+        >
+          <Puzzle className="size-5" />
         </Button>
       </div>
     </header>

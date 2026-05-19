@@ -9,7 +9,8 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@roderai/extension-api": ["packages/extension-api/src/index.ts"]
     },
 
     /* Bundler mode */
@@ -24,5 +25,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["electron", "src", "electron.vite.config.ts"]
+  "include": ["electron", "src", "packages/extension-api/src", "electron.vite.config.ts"]
 }

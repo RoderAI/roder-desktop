@@ -6,6 +6,7 @@ export type ThemeScheme = "light" | "dark";
 
 export type ThemePalette = {
   presetId: string;
+  presetName?: string;
   accent: string;
   background: string;
   foreground: string;
@@ -25,15 +26,17 @@ export type ThemeSettings = {
   codeFontSize: number;
 };
 
-export type SettingsSection = "general" | "appearance" | "components" | "models" | "configuration" | "personalization" | "mcp" | "git" | "usage";
+export type SettingsSection = "general" | "appearance" | "components" | "models" | "extensions" | "configuration" | "personalization" | "mcp" | "git" | "usage";
 
 type ThemeStore = {
   settingsOpen: boolean;
   settingsSection: SettingsSection;
   settings: ThemeSettings;
+  extensionThemePresets: ThemePreset[];
   openSettings: (section?: SettingsSection) => void;
   closeSettings: () => void;
   setSettingsSection: (section: SettingsSection) => void;
+  setExtensionThemePresets: (presets: ThemePreset[]) => void;
   setMode: (mode: ThemeMode) => void;
   applyPreset: (scheme: ThemeScheme, presetId: string) => void;
   updatePalette: (scheme: ThemeScheme, patch: Partial<ThemePalette>) => void;
@@ -161,22 +164,40 @@ export const defaultThemeSettings: ThemeSettings = {
   codeFontSize: 13,
 };
 
+const validSettingsSections = new Set<SettingsSection>([
+  "general",
+  "appearance",
+  "components",
+  "models",
+  "extensions",
+  "configuration",
+  "personalization",
+  "mcp",
+  "git",
+  "usage",
+]);
+
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
       settingsOpen: false,
       settingsSection: "appearance",
       settings: defaultThemeSettings,
+      extensionThemePresets: [],
       openSettings: (section = "appearance") => set({ settingsOpen: true, settingsSection: section }),
       closeSettings: () => set({ settingsOpen: false }),
       setSettingsSection: (settingsSection) => set({ settingsSection }),
+      setExtensionThemePresets: (extensionThemePresets) => set((state) => ({
+        extensionThemePresets,
+        settings: reconcileSelectedPresets(state.settings, extensionThemePresets),
+      })),
       setMode: (mode) => set((state) => ({ settings: { ...state.settings, mode } })),
       applyPreset: (scheme, presetId) => set((state) => {
-        const preset = themePresets.find((item) => item.id === presetId && item.scheme === scheme);
+        const preset = [...themePresets, ...state.extensionThemePresets].find((item) => item.id === presetId && item.scheme === scheme);
         if (!preset) {
           return {};
         }
-        return { settings: { ...state.settings, [scheme]: preset.palette } };
+        return { settings: { ...state.settings, [scheme]: paletteFromPreset(preset) } };
       }),
       updatePalette: (scheme, patch) => set((state) => ({
         settings: {
@@ -201,13 +222,21 @@ export const useThemeStore = create<ThemeStore>()(
         return {
           ...current,
           settingsOpen: value?.settingsOpen ?? current.settingsOpen,
-          settingsSection: value?.settingsSection ?? current.settingsSection,
+          settingsSection: normalizeSettingsSection(value?.settingsSection, current.settingsSection),
           settings: mergeThemeSettings(current.settings, value?.settings),
+          extensionThemePresets: [],
         };
       },
     },
   ),
 );
+
+function normalizeSettingsSection(section: unknown, fallback: SettingsSection): SettingsSection {
+  if (typeof section === "string" && validSettingsSections.has(section as SettingsSection)) {
+    return section as SettingsSection;
+  }
+  return fallback;
+}
 
 function mergeThemeSettings(current: ThemeSettings, persisted: Partial<ThemeSettings> | undefined): ThemeSettings {
   return {
@@ -224,9 +253,33 @@ function mergePalette(current: ThemePalette, persisted: Partial<ThemePalette> | 
   }
   const preset = themePresets.find((item) => item.id === persisted.presetId);
   if (preset) {
-    return preset.palette;
+    return paletteFromPreset(preset);
   }
   return normalizeLegacyPalette({ ...current, ...persisted }, current);
+}
+
+function reconcileSelectedPresets(settings: ThemeSettings, extensionPresets: ThemePreset[]): ThemeSettings {
+  return {
+    ...settings,
+    light: reconcileSelectedPreset("light", settings.light, extensionPresets),
+    dark: reconcileSelectedPreset("dark", settings.dark, extensionPresets),
+  };
+}
+
+function reconcileSelectedPreset(scheme: ThemeScheme, palette: ThemePalette, extensionPresets: ThemePreset[]): ThemePalette {
+  if (palette.presetId === "custom") {
+    return palette;
+  }
+  const preset = presetsForScheme(scheme, extensionPresets).find((item) => item.id === palette.presetId);
+  return preset ? paletteFromPreset(preset) : palette;
+}
+
+function paletteFromPreset(preset: ThemePreset): ThemePalette {
+  return {
+    ...preset.palette,
+    presetId: preset.id,
+    presetName: preset.name,
+  };
 }
 
 function normalizeLegacyPalette(palette: ThemePalette, current: ThemePalette): ThemePalette {
@@ -243,6 +296,13 @@ function normalizeLegacyPalette(palette: ThemePalette, current: ThemePalette): T
   return palette;
 }
 
-export function presetsForScheme(scheme: ThemeScheme): ThemePreset[] {
-  return themePresets.filter((preset) => preset.scheme === scheme);
+export function presetsForScheme(scheme: ThemeScheme, extensionPresets: ThemePreset[] = []): ThemePreset[] {
+  return [...themePresets, ...extensionPresets].filter((preset) => preset.scheme === scheme);
+}
+
+export function selectedPresetLabel(scheme: ThemeScheme, palette: ThemePalette, extensionPresets: ThemePreset[] = []): string {
+  if (palette.presetId === "custom") {
+    return "Custom";
+  }
+  return presetsForScheme(scheme, extensionPresets).find((preset) => preset.id === palette.presetId)?.name ?? palette.presetName ?? palette.presetId;
 }

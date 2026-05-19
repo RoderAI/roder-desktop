@@ -1,27 +1,42 @@
-import { useCallback, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { Composer } from "@/components/composer";
+import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
+import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
+import { PluginsMarketplacePanel } from "@/components/plugins/plugins-marketplace-panel";
 import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
 import { Transcript } from "@/components/transcript";
+import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
+import { getSidebarExtensions } from "@/lib/extension-sidebar";
+import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
+
+type MainView = "chat" | "plugins";
 
 export function App(): React.JSX.Element {
   const agent = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
+  const closeSettings = useThemeStore((state) => state.closeSettings);
+  useExtensionThemes();
   useThemeApplication(agent.appearance);
   const [followSignal, setFollowSignal] = useState(0);
+  const [mainView, setMainView] = useState<MainView>("chat");
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
+  const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
+  const extensions = useExtensionsStore((state) => state.extensions);
+  const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
+  const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
   const activeWorkspaceCwd = activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.status.cwd ?? "";
   const folderOptions = useMemo(() => buildFolderOptions(agent.threads, activeWorkspaceCwd), [activeWorkspaceCwd, agent.threads]);
@@ -32,15 +47,18 @@ export function App(): React.JSX.Element {
       .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
   }, [activeWorkspaceCwd, agent.threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
+  const showChat = useCallback(() => setMainView("chat"), []);
   const selectThread = useCallback(
     (threadId: string) => {
+      showChat();
       followBottom();
       void agent.selectThread(threadId);
     },
-    [agent, followBottom],
+    [agent, followBottom, showChat],
   );
   const selectFolder = useCallback(
     (path: string) => {
+      showChat();
       const normalizedPath = normalizePath(path);
       const latestThread = agent.threads
         .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === normalizedPath)
@@ -51,12 +69,13 @@ export function App(): React.JSX.Element {
         selectThread(latestThread.id);
       }
     },
-    [agent, selectThread],
+    [agent, selectThread, showChat],
   );
   const newThread = useCallback(() => {
+    showChat();
     followBottom();
     void agent.newThread();
-  }, [agent, followBottom]);
+  }, [agent, followBottom, showChat]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>
@@ -73,6 +92,38 @@ export function App(): React.JSX.Element {
     },
     [agent, followBottom],
   );
+  useEffect(() => {
+    if (sidebarExtensions.length === 0) {
+      setSelectedExtensionId(null);
+      return;
+    }
+    if (!selectedExtensionId || !sidebarExtensions.some((extension) => extension.id === selectedExtensionId)) {
+      setSelectedExtensionId(sidebarExtensions[0].id);
+    }
+  }, [sidebarExtensions, selectedExtensionId]);
+  const toggleExtensionsPanel = useCallback(() => {
+    showChat();
+    if (activeTool === "extensions") {
+      setActiveTool(null);
+      return;
+    }
+    setSelectedExtensionId((extensionId) => extensionId ?? selectedExtension?.id ?? null);
+    setActiveTool("extensions");
+  }, [activeTool, selectedExtension, showChat]);
+  const selectExtensionFromRail = useCallback((extensionId: string) => {
+    showChat();
+    setSelectedExtensionId(extensionId);
+    setActiveTool("extensions");
+  }, [showChat]);
+  const toggleToolPanel = useCallback((toolName: NonNullable<ToolPanel>) => {
+    showChat();
+    setActiveTool((tool) => (tool === toolName ? null : toolName));
+  }, [showChat]);
+  const openPlugins = useCallback(() => {
+    closeSettings();
+    setActiveTool(null);
+    setMainView("plugins");
+  }, [closeSettings]);
   const beginSidebarResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     beginHorizontalResize(event, leftSidebarWidth, (startWidth, deltaX) => {
       setLeftSidebarWidth(clamp(startWidth + deltaX, 220, 420));
@@ -97,9 +148,11 @@ export function App(): React.JSX.Element {
         <AppSidebar
           threads={agent.threads}
           activeThreadId={agent.activeThreadId}
+          activeView={mainView}
           width={leftSidebarWidth}
           onSelectThread={selectThread}
           onNewThread={newThread}
+          onOpenPlugins={openPlugins}
         />
       </div>
       {sidebarOpen && (
@@ -113,62 +166,73 @@ export function App(): React.JSX.Element {
         </>
       )}
       <section className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          thread={activeThread}
-          threads={threadOptions}
-          folders={folderOptions}
-          activeFolderPath={activeWorkspaceCwd}
-          status={agent.status}
-          activeTool={activeTool}
-          sidebarOpen={sidebarOpen}
-          onRestart={() => void agent.restart()}
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onSelectFolder={selectFolder}
-          onSelectThread={selectThread}
-          onToggleTerminal={() => setActiveTool((tool) => (tool === "terminal" ? null : "terminal"))}
-          onToggleBrowser={() => setActiveTool((tool) => (tool === "browser" ? null : "browser"))}
-          onToggleCanvas={() => setActiveTool((tool) => (tool === "canvas" ? null : "canvas"))}
-        />
-        <div className="flex min-h-0 flex-1">
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Transcript messages={agent.messages} followSignal={followSignal} />
-            {agent.error && (
-              <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-sm text-destructive">{agent.error}</div>
-            )}
-            <Composer
-              busy={agent.busy}
-              models={agent.models}
-              selectedModel={agent.selectedModel}
-              selectedReasoning={agent.selectedReasoning}
-              selectedWorkspaceCwd={agent.selectedWorkspaceCwd}
-              statusCwd={agent.status.cwd}
-              workspaceRecents={agent.workspaceRecents}
-              threads={agent.threads}
-              attachments={composerAttachments}
-              onSelectedModelChange={agent.setSelectedModel}
-              onSelectedReasoningChange={agent.setSelectedReasoning}
-              onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
-              onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
-              onScrollToBottom={followBottom}
-              onAttachmentsChange={setComposerAttachments}
-              onSend={sendPrompt}
-              onStop={agent.stopTurn}
-            />
+        {mainView === "plugins" ? (
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <PluginsMarketplacePanel />
           </div>
-          {activeTool && (
-            <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
-              <div
-                className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
-                aria-label="Resize tool panel"
-                role="separator"
-                onPointerDown={beginToolPanelResize}
-              />
-              {activeTool === "terminal" && <TerminalPanel />}
-              {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
-              {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
+        ) : (
+          <>
+            <TopBar
+              thread={activeThread}
+              threads={threadOptions}
+              folders={folderOptions}
+              activeFolderPath={activeWorkspaceCwd}
+              status={agent.status}
+              activeTool={activeTool}
+              sidebarOpen={sidebarOpen}
+              onRestart={() => void agent.restart()}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onSelectFolder={selectFolder}
+              onSelectThread={selectThread}
+              onToggleTerminal={() => toggleToolPanel("terminal")}
+              onToggleBrowser={() => toggleToolPanel("browser")}
+              onToggleCanvas={() => toggleToolPanel("canvas")}
+              onToggleExtensions={toggleExtensionsPanel}
+            />
+            <div className="flex min-h-0 flex-1">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <Transcript messages={agent.messages} followSignal={followSignal} />
+                {agent.error && (
+                  <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-sm text-destructive">{agent.error}</div>
+                )}
+                <Composer
+                  busy={agent.busy}
+                  models={agent.models}
+                  selectedModel={agent.selectedModel}
+                  selectedReasoning={agent.selectedReasoning}
+                  selectedWorkspaceCwd={agent.selectedWorkspaceCwd}
+                  statusCwd={agent.status.cwd}
+                  workspaceRecents={agent.workspaceRecents}
+                  threads={agent.threads}
+                  attachments={composerAttachments}
+                  onSelectedModelChange={agent.setSelectedModel}
+                  onSelectedReasoningChange={agent.setSelectedReasoning}
+                  onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
+                  onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
+                  onScrollToBottom={followBottom}
+                  onAttachmentsChange={setComposerAttachments}
+                  onSend={sendPrompt}
+                  onStop={agent.stopTurn}
+                />
+              </div>
+              {activeTool && (
+                <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
+                  <div
+                    className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
+                    aria-label="Resize tool panel"
+                    role="separator"
+                    onPointerDown={beginToolPanelResize}
+                  />
+                  {activeTool === "terminal" && <TerminalPanel />}
+                  {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
+                  {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
+                  {activeTool === "extensions" && <ExtensionsPanel selectedExtensionId={selectedExtensionId} onSelectedExtensionChange={setSelectedExtensionId} />}
+                </div>
+              )}
+              <ExtensionActivityRail active={activeTool === "extensions"} activeExtensionId={selectedExtensionId} onSelectExtension={selectExtensionFromRail} />
             </div>
-          )}
-        </div>
+          </>
+        )}
       </section>
     </div>
   );

@@ -1,0 +1,57 @@
+{
+  "name": "aurora-theme-extension",
+  "version": "0.1.0",
+  "description": "Example Roder Desktop theme extension.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "package": "pnpm build && roder-extension-package . --out dist/aurora-theme.rdx",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@roderai/extension-api": "workspace:*",
+    "@roderai/extension-packager": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  },
+  "roder": {
+    "displayName": "Aurora Theme",
+    "publisher": "roder",
+    "engines": {
+      "roder": ">=0.0.0"
+    },
+    "main": "dist/extension.js",
+    "activationEvents": [
+      "onStartupFinished"
+    ],
+    "capabilities": [],
+    "categories": [
+      "Themes"
+    ],
+    "contributes": {
+      "commands": [],
+      "tools": [],
+      "configuration": [],
+      "themes": [
+        {
+          "id": "aurora-dark",
+          "label": "Aurora Dark",
+          "scheme": "dark",
+          "path": "themes/aurora-dark.json"
+        },
+        {
+          "id": "aurora-light",
+          "label": "Aurora Light",
+          "scheme": "light",
+          "path": "themes/aurora-light.json"
+        }
+      ],
+      "views": {
+        "panels": []
+      }
+    }
+  }
+}
