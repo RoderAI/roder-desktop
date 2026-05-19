@@ -9,10 +9,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         outline: "border border-border bg-card hover:bg-accent",
-        subtle: "bg-card/70 text-foreground shadow-sm ring-1 ring-border hover:bg-card",
+        subtle:
+          "bg-card/70 text-foreground shadow-sm ring-1 ring-border hover:bg-card",
       },
       size: {
         default: "h-10 px-4",
@@ -33,26 +35,31 @@ export type ButtonProps = React.ComponentPropsWithoutRef<typeof BaseButton> &
     asChild?: boolean;
   };
 
-export const Button = React.forwardRef<React.ElementRef<typeof BaseButton>, ButtonProps>(
-  ({ asChild = false, children, className, variant, size, ...props }, ref) => {
-    if (asChild && React.isValidElement(children)) {
-      return (
-        <BaseButton
-          className={cn(buttonVariants({ variant, size, className }))}
-          ref={ref}
-          render={children}
-          {...props}
-        />
-      );
-    }
-
+export const Button = React.forwardRef<
+  React.ElementRef<typeof BaseButton>,
+  ButtonProps
+>(({ asChild = false, children, className, variant, size, ...props }, ref) => {
+  if (asChild && React.isValidElement(children)) {
     return (
-      <BaseButton className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
-        {children}
-      </BaseButton>
+      <BaseButton
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        render={children}
+        {...props}
+      />
     );
-  },
-);
+  }
+
+  return (
+    <BaseButton
+      className={cn(buttonVariants({ variant, size, className }))}
+      ref={ref}
+      {...props}
+    >
+      {children}
+    </BaseButton>
+  );
+});
 
 Button.displayName = "Button";
 

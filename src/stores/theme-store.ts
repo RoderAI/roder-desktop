@@ -25,7 +25,7 @@ export type ThemeSettings = {
   codeFontSize: number;
 };
 
-export type SettingsSection = "general" | "appearance" | "models" | "configuration" | "personalization" | "mcp" | "git" | "usage";
+export type SettingsSection = "general" | "appearance" | "components" | "models" | "configuration" | "personalization" | "mcp" | "git" | "usage";
 
 type ThemeStore = {
   settingsOpen: boolean;
@@ -50,7 +50,7 @@ export type ThemePreset = {
   palette: ThemePalette;
 };
 
-const defaultUiFont = `Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+const defaultUiFont = `Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 const defaultCodeFont = `"SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace`;
 
 export const themePresets: ThemePreset[] = [
@@ -61,9 +61,9 @@ export const themePresets: ThemePreset[] = [
     palette: {
       presetId: "roder-light",
       accent: "#242424",
-      background: "#f7f7f7",
+      background: "#ffffff",
       foreground: "#242424",
-      sidebar: "#e8e8e8",
+      sidebar: "#fbfbfb",
       translucentSidebar: false,
       contrast: 48,
       uiFont: defaultUiFont,
@@ -191,22 +191,57 @@ export const useThemeStore = create<ThemeStore>()(
     }),
     {
       name: "roder-desktop-theme",
-      partialize: (state) => ({ settings: state.settings }),
+      partialize: (state) => ({
+        settingsOpen: state.settingsOpen,
+        settingsSection: state.settingsSection,
+        settings: state.settings,
+      }),
       merge: (persisted, current) => {
         const value = persisted as Partial<ThemeStore> | undefined;
         return {
           ...current,
-          settings: {
-            ...current.settings,
-            ...value?.settings,
-            light: { ...current.settings.light, ...value?.settings?.light },
-            dark: { ...current.settings.dark, ...value?.settings?.dark },
-          },
+          settingsOpen: value?.settingsOpen ?? current.settingsOpen,
+          settingsSection: value?.settingsSection ?? current.settingsSection,
+          settings: mergeThemeSettings(current.settings, value?.settings),
         };
       },
     },
   ),
 );
+
+function mergeThemeSettings(current: ThemeSettings, persisted: Partial<ThemeSettings> | undefined): ThemeSettings {
+  return {
+    ...current,
+    ...persisted,
+    light: mergePalette(current.light, persisted?.light),
+    dark: mergePalette(current.dark, persisted?.dark),
+  };
+}
+
+function mergePalette(current: ThemePalette, persisted: Partial<ThemePalette> | undefined): ThemePalette {
+  if (!persisted) {
+    return current;
+  }
+  const preset = themePresets.find((item) => item.id === persisted.presetId);
+  if (preset) {
+    return preset.palette;
+  }
+  return normalizeLegacyPalette({ ...current, ...persisted }, current);
+}
+
+function normalizeLegacyPalette(palette: ThemePalette, current: ThemePalette): ThemePalette {
+  const legacyWhiteTrialValues = new Set(["#fbfbfb", "#f7f7f7", "#f5f5f5"]);
+  const normalizedBackground = palette.background.toLowerCase();
+  const normalizedSidebar = palette.sidebar.toLowerCase();
+  if (current.presetId === "roder-light") {
+    return {
+      ...palette,
+      background: legacyWhiteTrialValues.has(normalizedBackground) ? current.background : palette.background,
+      sidebar: normalizedSidebar === "#e8e8e8" ? current.sidebar : palette.sidebar,
+    };
+  }
+  return palette;
+}
 
 export function presetsForScheme(scheme: ThemeScheme): ThemePreset[] {
   return themePresets.filter((preset) => preset.scheme === scheme);

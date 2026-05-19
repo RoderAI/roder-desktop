@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: hsl(0 0% 97%);
+  --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(0 0% 14%);
   --color-card: hsl(0 0% 100%);
   --color-card-foreground: hsl(0 0% 14%);
@@ -17,10 +17,10 @@
   --color-accent-foreground: hsl(0 0% 17%);
   --color-destructive: hsl(0 84% 60%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(0 0% 84%);
+  --color-border: hsl(0 0% 89%);
   --color-input: hsl(0 0% 84%);
   --color-ring: hsl(0 0% 54%);
-  --color-sidebar: hsl(0 0% 91%);
+  --color-sidebar: hsl(0 0% 98.5%);
   --color-sidebar-foreground: hsl(0 0% 35%);
   --color-sidebar-heading: hsl(0 0% 49%);
   --color-sidebar-muted: hsl(0 0% 60%);
@@ -33,8 +33,8 @@
 
 :root {
   color-scheme: light;
-  --transcript-fade-clear: hsl(0 0% 97% / 0);
-  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --transcript-fade-clear: hsl(0 0% 100% / 0);
+  --font-ui: Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-size-ui: 14px;
   --font-size-code: 13px;
@@ -62,7 +62,7 @@
   --color-accent-foreground: hsl(0 0% 88%);
   --color-destructive: hsl(0 70% 58%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(0 0% 24%);
+  --color-border: hsl(0 0% 20%);
   --color-input: hsl(0 0% 28%);
   --color-ring: hsl(0 0% 48%);
   --color-sidebar: hsl(0 0% 13%);
@@ -99,7 +99,7 @@
     --color-accent-foreground: hsl(0 0% 88%);
     --color-destructive: hsl(0 70% 58%);
     --color-destructive-foreground: hsl(0 0% 98%);
-    --color-border: hsl(0 0% 24%);
+    --color-border: hsl(0 0% 20%);
     --color-input: hsl(0 0% 28%);
     --color-ring: hsl(0 0% 48%);
     --color-sidebar: hsl(0 0% 13%);
@@ -143,7 +143,7 @@ body {
 
 button,
 textarea {
-  font: inherit;
+  font-family: inherit;
 }
 
 code {
@@ -167,6 +167,153 @@ code {
 
 .no-drag {
   -webkit-app-region: no-drag;
+}
+
+.dropdown-menu-popup {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 140ms ease-out,
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-menu-popup[data-starting-style],
+.dropdown-menu-popup[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97) translateY(-2px);
+}
+
+.dropdown-menu-popup[data-side="top"][data-starting-style],
+.dropdown-menu-popup[data-side="top"][data-ending-style] {
+  transform: scale(0.97) translateY(2px);
+}
+
+.dropdown-menu-popup[data-instant] {
+  transition: none;
+}
+
+/*
+ * SIDEBAR SHELL ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Each value is relative to the open/close trigger.
+ *
+ *   0ms   shell width begins 0px ↔ saved sidebar width
+ *   0ms   panel slides -8px ↔ 0px with the width change
+ * 140ms   panel opacity settles 0 ↔ 1
+ * 240ms   layout finishes resizing around the sidebar
+ */
+.sidebar-shell {
+  --sidebar-shell-duration: 240ms;
+  --sidebar-shell-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  /* Temporarily disabled to compare sidebar text rendering without compositor blur. */
+  /* transform: translateX(-8px); */
+  transition:
+    width var(--sidebar-shell-duration) var(--sidebar-shell-ease),
+    opacity 140ms ease-out;
+  /* transform var(--sidebar-shell-duration) var(--sidebar-shell-ease); */
+  /* will-change: width, opacity, transform; */
+}
+
+.sidebar-shell[data-open="true"] {
+  width: var(--sidebar-width);
+  opacity: 1;
+  pointer-events: auto;
+  /* transform: translateX(0); */
+}
+
+/*
+ * THREAD LIST ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Each value is relative to the expand/collapse trigger.
+ *
+ *   0ms   overflow rows are clipped to height 0 and slightly lifted
+ *  40ms   overflow rows fade toward readable opacity
+ * 220ms   overflow region settles at natural height
+ */
+.thread-overflow-region {
+  --thread-overflow-duration: 220ms;
+  --thread-overflow-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    grid-template-rows var(--thread-overflow-duration) var(--thread-overflow-ease),
+    opacity 140ms ease-out,
+    transform var(--thread-overflow-duration) var(--thread-overflow-ease);
+}
+
+.thread-overflow-region[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.thread-overflow-region-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.squircle-corners {
+  corner-shape: squircle;
+}
+
+.thread-row-age,
+.thread-row-archive {
+  transition:
+    opacity 120ms ease-out,
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.thread-row-archive {
+  opacity: 0;
+  transform: scale(0.92);
+}
+
+.thread-row:hover .thread-row-age,
+.thread-row:focus-visible .thread-row-age {
+  opacity: 0;
+  transform: translateX(-2px);
+}
+
+.thread-row:hover .thread-row-archive,
+.thread-row:focus-visible .thread-row-archive {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu-popup {
+    transition: none;
+  }
+
+  .dropdown-menu-popup[data-starting-style],
+  .dropdown-menu-popup[data-ending-style],
+  .dropdown-menu-popup[data-side="top"][data-starting-style],
+  .dropdown-menu-popup[data-side="top"][data-ending-style] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .thread-overflow-region {
+    transition: none;
+    transform: none;
+  }
+
+  .sidebar-shell {
+    transition: none;
+    transform: none;
+  }
+
+  .thread-row-age,
+  .thread-row-archive {
+    transition: none;
+  }
 }
 
 .sidebar-scroll {
