@@ -34,7 +34,7 @@ export function ExtensionActivityRail({
               key={extension.id}
               type="button"
               className={cn(
-                "relative grid size-9 place-items-center rounded-lg text-[12px] font-semibold uppercase text-sidebar-muted outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                "relative grid size-9 place-items-center rounded-lg text-base font-semibold uppercase text-sidebar-muted outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 selected && "bg-sidebar-active text-sidebar-active-foreground",
               )}
               aria-label={`Open ${extension.manifest.displayName}`}

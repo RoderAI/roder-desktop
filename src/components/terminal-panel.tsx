@@ -67,7 +67,7 @@ export function TerminalPanel(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-[#111]">
-      <div className="flex h-10 shrink-0 items-center border-b border-border px-3 text-sm text-muted-foreground">
+      <div className="flex h-10 shrink-0 items-center border-b border-border px-3 text-base text-muted-foreground">
         Terminal
       </div>
       <div ref={hostRef} className="min-h-0 flex-1 p-2" />

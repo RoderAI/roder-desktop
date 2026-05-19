@@ -70,8 +70,8 @@ function themeVariables(
     "--transcript-fade-clear": transparent(bg),
     "--font-ui": palette.uiFont,
     "--font-code": palette.codeFont,
-    "--font-size-ui": `${clamp(uiFontSize, 11, 18)}px`,
-    "--font-size-composer": `${clamp(uiFontSize + 3, 14, 21)}px`,
+    "--font-size-ui": `${clamp(uiFontSize, 11, 24)}px`,
+    "--font-size-composer": `${clamp(uiFontSize + 3, 14, 27)}px`,
     "--font-size-code": `${clamp(codeFontSize, 11, 18)}px`,
   };
 }

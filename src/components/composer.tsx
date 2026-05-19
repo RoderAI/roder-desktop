@@ -284,7 +284,7 @@ function AttachmentChip({
 }): React.JSX.Element {
   const isImage = attachment.type.startsWith("image/");
   return (
-    <span className="flex max-w-[220px] items-center gap-2 rounded-full bg-muted px-3 py-1 text-[13px] text-muted-foreground">
+    <span className="flex max-w-[220px] items-center gap-2 rounded-full bg-muted px-3 py-1 text-base text-muted-foreground">
       {isImage ? (
         <ImageIcon className="size-4 shrink-0" />
       ) : (
@@ -371,12 +371,12 @@ function ModelPicker({
               <div className="flex h-11 items-center gap-2.5 border-b border-border px-3.5">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
                 <Combobox.Input
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
                   placeholder="Search models"
                 />
               </div>
               <Combobox.Empty>
-                <div className="px-3.5 py-4 text-sm text-muted-foreground">
+                <div className="px-3.5 py-4 text-base text-muted-foreground">
                   No matching models
                 </div>
               </Combobox.Empty>
@@ -420,7 +420,7 @@ function ModelPicker({
               <DropdownMenuItem
                 key={reasoning}
                 selected={reasoning === selectedReasoning}
-                className="h-9 text-sm"
+                className="h-9 text-base"
                 onSelect={() => onReasoningChange(reasoning)}
               >
                 <span className="min-w-0 flex-1">

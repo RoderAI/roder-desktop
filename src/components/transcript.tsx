@@ -78,7 +78,7 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
                   message.role === "tool" && "my-0",
                   message.role === "tool" && !previousIsTool && "mt-2",
                   message.role === "tool" && !nextIsTool && "mb-2",
-                  message.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-[17px]",
+                  message.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-base",
                 )}
               >
                 {message.role === "tool" ? (
@@ -88,7 +88,7 @@ export function Transcript({ messages, followSignal }: TranscriptProps): React.J
                 ) : message.role === "assistant" ? (
                   <MessageContent isStreaming={message.status === "streaming"} text={message.text || (message.status === "streaming" ? " " : "")} />
                 ) : (
-                  <div className="font-medium text-[17px] leading-[1.55]">{message.text}</div>
+                  <div className="font-medium text-base leading-[1.55]">{message.text}</div>
                 )}
               </article>
             );

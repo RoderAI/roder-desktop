@@ -103,7 +103,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
         </ToolbarButton>
         <input
           value={location}
-          className="mx-1 h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+          className="mx-1 h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
           onChange={(event) => setLocation(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -133,7 +133,7 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
         </ToolbarButton>
       </div>
       <div ref={viewportRef} className="min-h-0 flex-1 bg-[#111]" />
-      <div className="flex h-7 shrink-0 items-center gap-2 border-t border-border px-3 text-[11px] text-muted-foreground">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-t border-border px-3 text-base text-muted-foreground">
         <span>CDP</span>
         <span className="truncate">{snapshot?.cdpUrl ?? "starting..."}</span>
       </div>

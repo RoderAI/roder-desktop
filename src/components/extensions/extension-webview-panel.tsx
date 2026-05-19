@@ -66,7 +66,7 @@ export function ExtensionWebviewPanel({ extensionId, panelId, title }: Extension
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-destructive">
+      <div className="flex h-full items-center justify-center px-4 text-center text-base text-destructive">
         {error}
       </div>
     );
@@ -74,7 +74,7 @@ export function ExtensionWebviewPanel({ extensionId, panelId, title }: Extension
 
   if (!html) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-muted-foreground">
+      <div className="flex h-full items-center justify-center px-4 text-center text-base text-muted-foreground">
         Loading {title}...
       </div>
     );

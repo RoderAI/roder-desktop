@@ -10,7 +10,7 @@ export function ToolTimelineItem({ message }: ToolTimelineItemProps): React.JSX.
   const summary = message.toolSummary || message.text;
 
   return (
-    <div className="flex min-h-7 items-center gap-2 font-mono text-[14px] leading-7">
+    <div className="flex min-h-7 items-center gap-2 font-mono text-base leading-7">
       <span className="select-none text-[var(--tool-rail)]">└</span>
       <span className={cn("size-2 rounded-full", tone.dot)} />
       <span className={cn("font-semibold", tone.text)}>{message.toolName || "tool"}</span>

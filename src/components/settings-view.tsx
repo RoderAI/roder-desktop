@@ -43,7 +43,7 @@ export function SettingsView(): React.JSX.Element {
       <aside className="drag-region flex w-[318px] shrink-0 flex-col border-r border-border bg-sidebar px-3 pb-5 pt-[62px] text-sidebar-foreground">
         <button
           type="button"
-          className="squircle-corners no-drag mb-8 flex h-9 w-full items-center gap-3 rounded-xl px-2 text-left text-[17px] text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className="squircle-corners no-drag mb-8 flex h-9 w-full items-center gap-3 rounded-xl px-2 text-left text-base text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
           onClick={closeSettings}
         >
           <ArrowLeft className="size-4" />
@@ -98,7 +98,7 @@ function SettingsNavItem({
     <button
       type="button"
       className={cn(
-        "squircle-corners flex h-9 items-center gap-3 rounded-xl px-2 text-left text-[17px]",
+        "squircle-corners flex h-9 items-center gap-3 rounded-xl px-2 text-left text-base",
         active ? "bg-sidebar-active text-sidebar-active-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
       )}
       onClick={() => onClick(id)}
@@ -113,8 +113,8 @@ function SettingsPlaceholder({ section }: { section: SettingsSection }): React.J
   const title = sectionLabel(section);
   return (
     <section className="rounded-xl border border-border bg-card px-5 py-5 shadow-sm">
-      <h1 className="text-[16px] font-medium">{title}</h1>
-      <p className="mt-2 max-w-[560px] text-[14px] text-muted-foreground">
+      <h1 className="text-base font-medium">{title}</h1>
+      <p className="mt-2 max-w-[560px] text-base text-muted-foreground">
         This section is wired into settings navigation. Controls for {title.toLowerCase()} can be added here without changing the settings shell.
       </p>
     </section>
@@ -140,8 +140,8 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
     <section className="rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
         <div>
-          <h1 className="text-[16px] font-medium">Theme</h1>
-          <p className="mt-1 text-[14px] text-muted-foreground">Use light, dark, or match your system</p>
+          <h1 className="text-base font-medium">Theme</h1>
+          <p className="mt-1 text-base text-muted-foreground">Use light, dark, or match your system</p>
         </div>
         <div className="flex rounded-xl bg-muted p-1">
           <ModeButton mode="light" active={settings.mode === "light"} onClick={() => setMode("light")} />
@@ -184,7 +184,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
           <Switch checked={settings.pointerCursors} onChange={setPointerCursors} />
         </SettingsRow>
         <SettingsRow label="UI font size" description="Adjust the base size used for the Roder UI">
-          <NumberStepper value={settings.uiFontSize} min={11} max={18} suffix="px" onChange={setUiFontSize} />
+          <NumberStepper value={settings.uiFontSize} min={11} max={24} suffix="px" onChange={setUiFontSize} />
         </SettingsRow>
         <SettingsRow label="Code font size" description="Adjust inline code and transcript code text">
           <NumberStepper value={settings.codeFontSize} min={11} max={18} suffix="px" onChange={setCodeFontSize} />
@@ -200,7 +200,7 @@ function ModeButton({ mode, active, onClick }: { mode: ThemeMode; active: boolea
   return (
     <button
       type="button"
-      className={cn("flex h-8 items-center gap-2 rounded-lg px-3 text-[14px] text-muted-foreground", active && "bg-card text-foreground shadow-sm")}
+      className={cn("flex h-8 items-center gap-2 rounded-lg px-3 text-base text-muted-foreground", active && "bg-card text-foreground shadow-sm")}
       onClick={onClick}
     >
       <Icon className="size-4" />
@@ -211,7 +211,7 @@ function ModeButton({ mode, active, onClick }: { mode: ThemeMode; active: boolea
 
 function ThemePreview({ light, dark }: { light: ThemePalette; dark: ThemePalette }): React.JSX.Element {
   return (
-    <div className="grid grid-cols-2 overflow-hidden border-b border-border font-mono text-[13px]">
+    <div className="grid grid-cols-2 overflow-hidden border-b border-border font-mono text-base">
       <PreviewPane palette={light} side="left" />
       <PreviewPane palette={dark} side="right" />
     </div>
@@ -262,10 +262,10 @@ function ThemeEditor({
   return (
     <section className="border-b border-border px-5 py-4">
       <div className="mb-3 flex items-center gap-3">
-        <h2 className="min-w-0 flex-1 text-[15px] text-muted-foreground">{title}</h2>
+        <h2 className="min-w-0 flex-1 text-base text-muted-foreground">{title}</h2>
         <select
           value={palette.presetId}
-          className="h-8 w-[210px] rounded-lg border border-border bg-muted px-3 text-[14px] text-foreground outline-none"
+          className="h-8 w-[210px] rounded-lg border border-border bg-muted px-3 text-base text-foreground outline-none"
           onChange={(event) => onPreset(event.currentTarget.value)}
         >
           <option value="custom">Custom</option>
@@ -294,7 +294,7 @@ function ThemeEditor({
               className="min-w-0 flex-1 accent-primary"
               onChange={(event) => onChange({ contrast: Number(event.currentTarget.value) })}
             />
-            <span className="w-8 text-right text-[14px] text-muted-foreground">{palette.contrast}</span>
+            <span className="w-8 text-right text-base text-muted-foreground">{palette.contrast}</span>
           </div>
         </SettingsRow>
       </div>
@@ -305,7 +305,7 @@ function ThemeEditor({
 function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }): React.JSX.Element {
   return (
     <SettingsRow label={label}>
-      <label className="flex h-8 w-[174px] items-center gap-2 rounded-lg bg-muted px-2 text-[14px] text-foreground">
+      <label className="flex h-8 w-[174px] items-center gap-2 rounded-lg bg-muted px-2 text-base text-foreground">
         <input type="color" value={value} className="size-5 border-0 bg-transparent p-0" onChange={(event) => onChange(event.currentTarget.value)} />
         <input
           value={value.toUpperCase()}
@@ -327,7 +327,7 @@ function TextRow({ label, value, onChange }: { label: string; value: string; onC
     <SettingsRow label={label}>
       <input
         value={value}
-        className="h-8 w-[260px] rounded-lg border border-border bg-transparent px-3 font-mono text-[13px] text-foreground outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 w-[260px] rounded-lg border border-border bg-transparent px-3 font-mono text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
         onChange={(event) => onChange(event.currentTarget.value)}
       />
     </SettingsRow>
@@ -338,8 +338,8 @@ function SettingsRow({ label, description, children }: { label: string; descript
   return (
     <div className="flex min-h-11 items-center gap-5 py-2">
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] text-foreground">{label}</div>
-        {description && <div className="mt-0.5 text-[13px] text-muted-foreground">{description}</div>}
+        <div className="text-base text-foreground">{label}</div>
+        {description && <div className="mt-0.5 text-base text-muted-foreground">{description}</div>}
       </div>
       {children}
     </div>
@@ -379,10 +379,10 @@ function NumberStepper({
         min={min}
         max={max}
         value={value}
-        className="h-8 w-20 rounded-lg border border-border bg-transparent px-3 text-right text-[14px] text-foreground outline-none"
+        className="h-8 w-20 rounded-lg border border-border bg-transparent px-3 text-right text-base text-foreground outline-none"
         onChange={(event) => onChange(clamp(Number(event.currentTarget.value), min, max))}
       />
-      <span className="text-[14px] text-muted-foreground">{suffix}</span>
+      <span className="text-base text-muted-foreground">{suffix}</span>
     </div>
   );
 }
