@@ -174,6 +174,7 @@ Sessions, threads, and turns:
 | `thread/start` | Create a desktop thread/session. |
 | `thread/list` | List desktop threads. |
 | `thread/read` | Read a desktop thread with optional turns. |
+| `thread/archive` | Archive a desktop thread so it no longer appears in active lists. |
 | `turn/start` | Start a desktop turn from rich text input. |
 | `turn/steer` | Add user input to an active desktop turn. |
 | `turn/interrupt` | Interrupt an active desktop turn. |
@@ -626,6 +627,33 @@ Behavior:
 - Reads a persisted session snapshot first.
 - Falls back to persisted session metadata and then in-memory desktop threads.
 - Returns `{"thread": null}` when the thread is unknown.
+
+### `thread/archive`
+
+Purpose: Move a desktop thread/session out of the active session list.
+
+Request:
+
+```json
+{
+  "threadId": "thread-123"
+}
+```
+
+Response:
+
+```json
+{
+  "threadId": "thread-123",
+  "archived": true
+}
+```
+
+Behavior:
+
+- Archives the persisted session when the active session store supports it.
+- Removes transient desktop bookkeeping for the thread.
+- Subsequent `thread/list` calls omit the archived thread.
 
 ### `turn/start`
 

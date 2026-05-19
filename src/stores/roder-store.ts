@@ -49,6 +49,7 @@ type RoderStore = {
   bootstrap: () => Promise<void>;
   refreshThreads: () => Promise<void>;
   selectThread: (threadId: string, options?: { pushHistory?: boolean }) => Promise<void>;
+  archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
   goForward: () => Promise<void>;
   newThread: () => Promise<void>;
@@ -219,6 +220,38 @@ export const useRoderStore = create<RoderStore>()(
             selectedWorkspaceCwd: thread.cwd,
             workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
           }));
+        } catch (error) {
+          set({ error: (error as Error).message });
+        }
+      },
+
+      archiveThread: async (threadId) => {
+        if (!threadId) {
+          return;
+        }
+        set({ error: null });
+        try {
+          await roderIpc.archiveThread(threadId);
+          const current = get();
+          const nextThreads = current.threads.filter((thread) => thread.id !== threadId);
+          const nextActiveThreadId = current.activeThreadId === threadId
+            ? firstThreadId(nextThreads, "")
+            : current.activeThreadId;
+          set((state) => {
+            const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
+            const { [threadId]: _archivedMessages, ...messagesByThread } = state.messagesByThread;
+            return {
+              threads: state.threads.filter((thread) => thread.id !== threadId),
+              threadDetails,
+              messagesByThread,
+              activeThreadId: nextActiveThreadId,
+              backStack: state.backStack.filter((entry) => entry.threadId !== threadId),
+              forwardStack: state.forwardStack.filter((entry) => entry.threadId !== threadId),
+            };
+          });
+          if (current.activeThreadId === threadId && nextActiveThreadId) {
+            await get().selectThread(nextActiveThreadId, { pushHistory: false });
+          }
         } catch (error) {
           set({ error: (error as Error).message });
         }

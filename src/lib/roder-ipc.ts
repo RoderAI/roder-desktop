@@ -17,6 +17,11 @@ export type ThreadStartResult = {
   cwd?: string;
 };
 
+export type ThreadArchiveResult = {
+  threadId: string;
+  archived: boolean;
+};
+
 export type ModelListResult = {
   models?: RoderModel[];
 };
@@ -30,6 +35,8 @@ export const roderIpc = {
   listThreads: (limit = 100) => window.roderDesktop.request("thread/list", { limit }) as Promise<ThreadListResult>,
   readThread: (threadId: string) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
+  archiveThread: (threadId: string) =>
+    window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
   startThread: (model: string, cwd?: string, modelProvider?: string) =>
     window.roderDesktop.request("thread/start", { model, cwd, modelProvider, ephemeral: false }) as Promise<ThreadStartResult>,
   startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
