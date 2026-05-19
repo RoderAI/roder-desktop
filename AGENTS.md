@@ -3,8 +3,13 @@
 ## Project References
 
 - The Roder app-server API contract is documented in `docs/api.md`.
+- Product UI principles and current desktop design decisions are documented in
+  `docs/design.md`.
 
 ## UI Styling
+
+Use Base UI for headless primitives and local shadcn-style wrappers. Do not add
+or use Radix UI primitives in this project.
 
 Prefer Tailwind's standard spacing scale for margins, padding, gaps, sizing,
 positioning, and layout measurements. Avoid arbitrary values such as `px-[13px]`,
