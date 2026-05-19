@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../node_modules/streamdown/dist/*.js";
 
 @theme {
   --color-background: hsl(0 0% 100%);
@@ -151,6 +152,41 @@ textarea {
 code {
   font-family: var(--font-code);
   font-size: var(--font-size-code);
+}
+
+.message-inline-code,
+code[data-streamdown="inline-code"] {
+  background-color: color-mix(in oklab, var(--color-foreground) 5%, var(--color-background));
+  font-size: inherit;
+}
+
+[data-streamdown="code-block-body"] pre > code > span {
+  display: block;
+  min-height: 1lh;
+}
+
+.message-markdown > * {
+  margin-block: 0;
+}
+
+.message-markdown > :not(:last-child) {
+  margin-block-end: 0;
+}
+
+.message-markdown > * + * {
+  margin-block-start: 0.75rem;
+}
+
+.message-markdown > .message-heading:not(:first-child) {
+  margin-block-start: 1rem;
+}
+
+.message-markdown > .message-heading + * {
+  margin-block-start: 0.75rem;
+}
+
+.message-markdown > .message-code-label + * {
+  margin-block-start: 0.25rem;
 }
 
 .pointer-cursors button,
