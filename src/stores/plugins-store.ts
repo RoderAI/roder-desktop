@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { defaultSelectionForMarketplace, pluginVariantKeyFromParts } from "@/lib/plugins-marketplace";
+import { defaultSelectionForMarketplace, marketplaceNeedsEnable, pluginVariantKeyFromParts } from "@/lib/plugins-marketplace";
 import { pluginsIpc } from "@/lib/plugins-ipc";
 import type {
   DedupedMarketplacePlugin,
@@ -20,9 +20,11 @@ type PluginsStore = {
   error: string | null;
   lastResult: string | null;
   load: () => Promise<void>;
+  initializeMarketplaces: (selection: DefaultMarketplaceSelection) => Promise<void>;
   setQuery: (query: string) => void;
   search: (query?: string) => Promise<void>;
   installDefaults: (selection: DefaultMarketplaceSelection) => Promise<void>;
+  ensureDefaultMarketplaces: (selection: DefaultMarketplaceSelection) => Promise<boolean>;
   enableMarketplace: (marketplace: MarketplaceDescriptor) => Promise<void>;
   addLocalMarketplace: (params: { id: string; displayName: string; path: string; kind?: MarketplaceKind }) => Promise<void>;
   removeMarketplace: (marketplaceId: string) => Promise<void>;
@@ -48,6 +50,7 @@ export const usePluginsStore = create<PluginsStore>()((set, get) => ({
   error: null,
   lastResult: null,
   load: () => reloadSnapshot(set, get),
+  initializeMarketplaces: (selection) => initializeMarketplaceSnapshot(set, get, selection),
   setQuery: (query) => set({ query }),
   search: async (query) => {
     const nextQuery = query ?? get().query;
@@ -63,9 +66,10 @@ export const usePluginsStore = create<PluginsStore>()((set, get) => ({
   installDefaults: (selection) =>
     withAction(set, async () => {
       const result = await pluginsIpc.installDefaultMarketplaces(selection);
-      set({ lastResult: `${result.marketplaces.length} default marketplace${result.marketplaces.length === 1 ? "" : "s"} installed` });
+      set({ lastResult: `${result.marketplaces.length} default provider${result.marketplaces.length === 1 ? "" : "s"} ready` });
       await reloadSnapshot(set, get, false);
     }),
+  ensureDefaultMarketplaces: (selection) => ensureDefaultMarketplaceSnapshot(set, get, selection),
   enableMarketplace: (marketplace) =>
     withAction(set, async () => {
       const selection = defaultSelectionForMarketplace(marketplace);
@@ -141,19 +145,81 @@ async function reloadSnapshot(set: StoreSet, get: StoreGet, markLoading = true):
   await withAction(
     set,
     async () => {
-      const [marketplacesResult, searchResult, installedResult] = await Promise.all([
-        pluginsIpc.listMarketplaces(),
-        pluginsIpc.searchMarketplacePlugins(get().query),
-        pluginsIpc.listInstalledPlugins(),
-      ]);
-      set({
-        marketplaces: marketplacesResult.marketplaces,
-        plugins: searchResult.plugins,
-        installedPlugins: installedResult.plugins,
-      });
+      set(await readSnapshot(get));
     },
     markLoading,
   );
+}
+
+async function initializeMarketplaceSnapshot(
+  set: StoreSet,
+  get: StoreGet,
+  selection: DefaultMarketplaceSelection,
+): Promise<void> {
+  await withAction(set, async () => {
+    const snapshot = await readSnapshot(get);
+    set(snapshot);
+
+    if (defaultMarketplacesNeedEnablement(snapshot.marketplaces, selection)) {
+      await pluginsIpc.installDefaultMarketplaces(selection);
+      set(await readSnapshot(get));
+    }
+  });
+}
+
+async function ensureDefaultMarketplaceSnapshot(
+  set: StoreSet,
+  get: StoreGet,
+  selection: DefaultMarketplaceSelection,
+): Promise<boolean> {
+  let changed = false;
+  await withAction(
+    set,
+    async () => {
+      const marketplaces = get().marketplaces.length > 0
+        ? get().marketplaces
+        : (await pluginsIpc.listMarketplaces()).marketplaces;
+
+      if (!defaultMarketplacesNeedEnablement(marketplaces, selection)) {
+        return;
+      }
+
+      await pluginsIpc.installDefaultMarketplaces(selection);
+      changed = true;
+      await reloadSnapshot(set, get, false);
+    },
+    false,
+  );
+  return changed;
+}
+
+async function readSnapshot(get: StoreGet): Promise<Pick<PluginsStore, "marketplaces" | "plugins" | "installedPlugins">> {
+  const [marketplacesResult, searchResult, installedResult] = await Promise.all([
+    pluginsIpc.listMarketplaces(),
+    pluginsIpc.searchMarketplacePlugins(get().query),
+    pluginsIpc.listInstalledPlugins(),
+  ]);
+  return {
+    marketplaces: marketplacesResult.marketplaces,
+    plugins: searchResult.plugins,
+    installedPlugins: installedResult.plugins,
+  };
+}
+
+function defaultMarketplacesNeedEnablement(
+  marketplaces: MarketplaceDescriptor[],
+  selection: DefaultMarketplaceSelection,
+): boolean {
+  if (selection === "none") {
+    return false;
+  }
+
+  const matchingMarketplaces = marketplaces.filter((marketplace) => {
+    const marketplaceSelection = defaultSelectionForMarketplace(marketplace);
+    return selection === "all" ? Boolean(marketplaceSelection) : marketplaceSelection === selection;
+  });
+
+  return matchingMarketplaces.length === 0 || matchingMarketplaces.some(marketplaceNeedsEnable);
 }
 
 async function withAction(set: StoreSet, action: () => Promise<void>, markLoading = true): Promise<void> {
