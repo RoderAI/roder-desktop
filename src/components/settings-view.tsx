@@ -9,6 +9,7 @@ import {
   Laptop,
   Moon,
   Paintbrush,
+  Puzzle,
   RotateCcw,
   Server,
   Sun,
@@ -16,14 +17,17 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import {
   presetsForScheme,
+  selectedPresetLabel,
   useThemeStore,
   type SettingsSection,
   type ThemeMode,
   type ThemePalette,
+  type ThemePreset,
   type ThemeScheme,
 } from "@/stores/theme-store";
 import { cn } from "@/lib/utils";
@@ -50,6 +54,7 @@ export function SettingsView(): React.JSX.Element {
           <SettingsNavItem id="appearance" active={settingsSection === "appearance"} icon={<Paintbrush className="size-4" />} label="Appearance" onClick={setSettingsSection} />
           <SettingsNavItem id="components" active={settingsSection === "components"} icon={<Component className="size-4" />} label="Components" onClick={setSettingsSection} />
           <SettingsNavItem id="models" active={settingsSection === "models"} icon={<Bot className="size-4" />} label="Models" onClick={setSettingsSection} />
+          <SettingsNavItem id="extensions" active={settingsSection === "extensions"} icon={<Puzzle className="size-4" />} label="Extensions" onClick={setSettingsSection} />
           <SettingsNavItem id="configuration" active={settingsSection === "configuration"} icon={<Braces className="size-4" />} label="Configuration" onClick={setSettingsSection} />
           <SettingsNavItem id="personalization" active={settingsSection === "personalization"} icon={<UserRound className="size-4" />} label="Personalization" onClick={setSettingsSection} />
           <SettingsNavItem id="mcp" active={settingsSection === "mcp"} icon={<Server className="size-4" />} label="MCP servers" onClick={setSettingsSection} />
@@ -65,6 +70,8 @@ export function SettingsView(): React.JSX.Element {
             <ComponentsSettingsPanel />
           ) : settingsSection === "models" ? (
             <ModelsSettingsPanel />
+          ) : settingsSection === "extensions" ? (
+            <ExtensionsSettingsPanel />
           ) : (
             <SettingsPlaceholder section={settingsSection} />
           )}
@@ -122,6 +129,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
   const setPointerCursors = useThemeStore((state) => state.setPointerCursors);
   const setUiFontSize = useThemeStore((state) => state.setUiFontSize);
   const setCodeFontSize = useThemeStore((state) => state.setCodeFontSize);
+  const extensionThemePresets = useThemeStore((state) => state.extensionThemePresets);
   const themeJson = useMemo(() => JSON.stringify(settings, null, 2), [settings]);
 
   async function copyTheme(): Promise<void> {
@@ -158,6 +166,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         title="Light theme"
         scheme="light"
         palette={settings.light}
+        extensionThemePresets={extensionThemePresets}
         onPreset={(presetId) => applyPreset("light", presetId)}
         onChange={(patch) => updatePalette("light", patch)}
       />
@@ -165,6 +174,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         title="Dark theme"
         scheme="dark"
         palette={settings.dark}
+        extensionThemePresets={extensionThemePresets}
         onPreset={(presetId) => applyPreset("dark", presetId)}
         onChange={(patch) => updatePalette("dark", patch)}
       />
@@ -235,15 +245,20 @@ function ThemeEditor({
   title,
   scheme,
   palette,
+  extensionThemePresets,
   onPreset,
   onChange,
 }: {
   title: string;
   scheme: ThemeScheme;
   palette: ThemePalette;
+  extensionThemePresets: ThemePreset[];
   onPreset: (presetId: string) => void;
   onChange: (patch: Partial<ThemePalette>) => void;
 }): React.JSX.Element {
+  const presets = presetsForScheme(scheme, extensionThemePresets);
+  const hasSelectedPreset = palette.presetId === "custom" || presets.some((preset) => preset.id === palette.presetId);
+  const selectedLabel = selectedPresetLabel(scheme, palette, extensionThemePresets);
   return (
     <section className="border-b border-border px-5 py-4">
       <div className="mb-3 flex items-center gap-3">
@@ -254,7 +269,8 @@ function ThemeEditor({
           onChange={(event) => onPreset(event.currentTarget.value)}
         >
           <option value="custom">Custom</option>
-          {presetsForScheme(scheme).map((preset) => (
+          {!hasSelectedPreset && <option value={palette.presetId}>{selectedLabel}</option>}
+          {presets.map((preset) => (
             <option key={preset.id} value={preset.id}>{preset.name}</option>
           ))}
         </select>

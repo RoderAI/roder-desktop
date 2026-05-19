@@ -1,3 +1,5 @@
+import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
+
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
@@ -8,6 +10,14 @@ export type RoderStatus = {
 export type RoderNotification = {
   method: string;
   params: unknown;
+};
+
+export type AppServerEvent = {
+  id: number;
+  at: string;
+  kind: "request" | "response" | "error" | "notification" | "status" | "stderr";
+  method?: string;
+  payload: unknown;
 };
 
 export type RoderThread = {
@@ -161,6 +171,7 @@ declare global {
       restart: () => Promise<RoderStatus>;
       status: () => Promise<RoderStatus>;
       appearance: () => Promise<SystemAppearance>;
+      openExternal: (url: string) => Promise<void>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       terminalStart: (options?: { cols?: number; rows?: number }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string) => Promise<void>;
@@ -182,11 +193,29 @@ declare global {
       codexLogin: () => Promise<CodexAccountSnapshot>;
       codexLogout: () => Promise<CodexAccountSnapshot>;
       codexOpenRateLimitHelp: () => Promise<void>;
+      extensionsList: () => Promise<ExtensionCatalogSnapshot>;
+      extensionsInstallFromFolder: (folderPath: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsInstallFromArchive: (archivePath: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsSelectAndInstallFolder: () => Promise<ExtensionCatalogSnapshot>;
+      extensionsSelectAndInstallArchive: () => Promise<ExtensionCatalogSnapshot>;
+      extensionsUninstall: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsEnable: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsDisable: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsReload: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) => Promise<ExtensionCatalogSnapshot>;
+      extensionsReadLogs: (id: string) => Promise<string[]>;
+      extensionsActivate: (id: string) => Promise<ExtensionCatalogSnapshot>;
+      extensionsExecuteCommand: (commandId: string, args?: unknown[]) => Promise<unknown>;
+      extensionsExecuteTool: (toolId: string, input?: Record<string, unknown>) => Promise<unknown>;
+      extensionsReadPanel: (extensionId: string, panelId: string) => Promise<string>;
+      extensionsReadTheme: (extensionId: string, themeId: string) => Promise<ExtensionTheme>;
+      appServerEvents: () => Promise<AppServerEvent[]>;
       resolveDroppedFiles: (files: File[]) => ResolvedDesktopFile[];
       onNotification: (callback: (notification: RoderNotification) => void) => () => void;
       onStatus: (callback: (status: RoderStatus) => void) => () => void;
       onStderr: (callback: (message: string) => void) => () => void;
       onAppearance: (callback: (appearance: SystemAppearance) => void) => () => void;
+      onAppServerEvent: (callback: (event: AppServerEvent) => void) => () => void;
       onTerminalData: (callback: (payload: { id: string; data: string }) => void) => () => void;
       onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => () => void;
     };

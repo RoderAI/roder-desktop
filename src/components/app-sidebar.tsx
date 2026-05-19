@@ -9,9 +9,11 @@ import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 type AppSidebarProps = {
   threads: RoderThread[];
   activeThreadId: string;
+  activeView: "chat" | "plugins";
   width: number;
   onSelectThread: (threadId: string) => void;
   onNewThread: () => void;
+  onOpenPlugins: () => void;
 };
 
 type ThreadGroup = {
@@ -25,9 +27,11 @@ type ThreadGroup = {
 export function AppSidebar({
   threads,
   activeThreadId,
+  activeView,
   width,
   onSelectThread,
   onNewThread,
+  onOpenPlugins,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
   const threadGroups = useMemo(() => groupThreadsByFolder(threads, activeThreadId), [activeThreadId, threads]);
@@ -61,9 +65,12 @@ export function AppSidebar({
           <span className="min-w-0 flex-1 truncate">New Agent</span>
           <Kbd className="ml-auto">⌘+N</Kbd>
         </SidebarRowButton>
-        <SidebarRowButton>
+        <SidebarRowButton
+          className={cn(activeView === "plugins" && "bg-sidebar-active/20 text-sidebar-active-foreground")}
+          onClick={onOpenPlugins}
+        >
           <Store className="size-4.5" />
-          <span className="min-w-0 flex-1 truncate">Marketplace</span>
+          <span className="min-w-0 flex-1 truncate">Plugins</span>
         </SidebarRowButton>
       </div>
 
@@ -83,7 +90,7 @@ export function AppSidebar({
                       <ThreadRow
                         key={thread.id}
                         thread={thread}
-                        activeThreadId={activeThreadId}
+                        active={activeView === "chat" && thread.id === activeThreadId}
                         onSelectThread={onSelectThread}
                       />
                     ))}
@@ -107,7 +114,7 @@ export function AppSidebar({
                             <ThreadRow
                               key={thread.id}
                               thread={thread}
-                              activeThreadId={activeThreadId}
+                              active={activeView === "chat" && thread.id === activeThreadId}
                               onSelectThread={onSelectThread}
                               disabled={!expanded}
                             />
@@ -139,12 +146,12 @@ export function AppSidebar({
 
 function ThreadRow({
   thread,
-  activeThreadId,
+  active,
   onSelectThread,
   disabled = false,
 }: {
   thread: RoderThread;
-  activeThreadId: string;
+  active: boolean;
   onSelectThread: (threadId: string) => void;
   disabled?: boolean;
 }): React.JSX.Element {
@@ -152,7 +159,7 @@ function ThreadRow({
     <SidebarRowButton
       className={cn(
         "thread-row",
-        thread.id === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
+        active && "bg-sidebar-active/20 text-sidebar-active-foreground",
       )}
       disabled={disabled}
       onClick={() => onSelectThread(thread.id)}
