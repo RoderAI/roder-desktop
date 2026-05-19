@@ -142,7 +142,7 @@ export function sourceCodeUrl(
     case "git":
       return gitSourceCodeUrl(source.url, source.path ?? undefined, source.refName ?? source.sha ?? undefined);
     case "http":
-      return source.url;
+      return webUrl(source.url);
     case "npm":
       return `https://www.npmjs.com/package/${encodeURIComponent(source.package)}`;
     case "localPath":
@@ -159,13 +159,17 @@ function marketplaceSourceCodeUrl(source: MarketplaceSource, pluginPath: string)
     case "git":
       return gitSourceCodeUrl(source.url, pluginPath, source.refName ?? undefined);
     case "httpJson":
-      return source.url;
+      return webUrl(source.url);
     case "localPath":
       return fileUrlForPath(joinedLocalPath(source.path, pluginPath));
   }
 }
 
 function githubSourceCodeUrl(repo: string, path?: string, refName?: string | null): string | undefined {
+  const parsedRepoUrl = githubRepoUrl(repo);
+  if (parsedRepoUrl) {
+    return appendRepoPath(parsedRepoUrl, path, refName);
+  }
   const normalizedRepo = normalizeRelativePath(trimGitSuffix(repo));
   if (!normalizedRepo) {
     return undefined;
@@ -173,10 +177,10 @@ function githubSourceCodeUrl(repo: string, path?: string, refName?: string | nul
   return appendRepoPath(`https://github.com/${normalizedRepo}`, path, refName);
 }
 
-function gitSourceCodeUrl(url: string, path?: string, refName?: string | null): string {
+function gitSourceCodeUrl(url: string, path?: string, refName?: string | null): string | undefined {
   const githubUrl = githubRepoUrl(url);
   if (!githubUrl) {
-    return url;
+    return webUrl(url);
   }
   return appendRepoPath(githubUrl, path, refName) ?? githubUrl;
 }
@@ -245,6 +249,15 @@ function fileUrlForPath(path?: string): string | undefined {
     return undefined;
   }
   return `file://${encodePathSegments(trimmed)}`;
+}
+
+function webUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeRelativePath(path?: string | null): string | undefined {

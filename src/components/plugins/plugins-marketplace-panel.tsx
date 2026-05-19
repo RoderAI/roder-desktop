@@ -1,4 +1,4 @@
-import { Ban, CircleCheck, Download, PackageCheck, PackagePlus, Plus, RefreshCw, Search, Store, Trash2 } from "lucide-react";
+import { Ban, CircleCheck, Download, ExternalLink, PackageCheck, PackagePlus, Plus, RefreshCw, Search, Store, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   pluginVariantKey,
   recommendedVariant,
   riskLabel,
+  sourceCodeUrl,
   sourceLabel,
 } from "@/lib/plugins-marketplace";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,10 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
   function submitSearch(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     void search(query);
+  }
+
+  function openSourceCode(url: string): void {
+    void window.roderDesktop.openExternal(url);
   }
 
   return (
@@ -120,11 +125,13 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
                 <PluginSearchRow
                   key={plugin.identityKey.canonicalSlug}
                   plugin={plugin}
+                  marketplaces={marketplaces}
                   installedPlugins={installedPlugins}
                   previewsByVariant={previewsByVariant}
                   onPreview={previewPlugin}
                   onInstall={installPlugin}
                   onInstallAll={installAllVariants}
+                  onOpenSource={openSourceCode}
                 />
               ))}
             </div>
@@ -154,22 +161,27 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
 
 function PluginSearchRow({
   plugin,
+  marketplaces,
   installedPlugins,
   previewsByVariant,
   onPreview,
   onInstall,
   onInstallAll,
+  onOpenSource,
 }: {
   plugin: DedupedMarketplacePlugin;
+  marketplaces: MarketplaceDescriptor[];
   installedPlugins: InstalledPluginRecord[];
   previewsByVariant: Record<string, PluginInstallPreview>;
   onPreview: (marketplaceId: string, pluginId: string) => Promise<void>;
   onInstall: (marketplaceId: string, pluginId: string) => Promise<void>;
   onInstallAll: (marketplaceId: string, pluginId: string) => Promise<void>;
+  onOpenSource: (url: string) => void;
 }): React.JSX.Element {
   const variant = recommendedVariant(plugin);
   const installedKeys = useMemo(() => installedVariantSet(plugin, installedPlugins), [installedPlugins, plugin]);
   const preview = variant ? previewsByVariant[pluginVariantKey(variant)] : undefined;
+  const sourceUrl = variant ? sourceCodeUrl(variant.source, marketplaces) : undefined;
 
   return (
     <article className="px-5 py-4">
@@ -190,6 +202,12 @@ function PluginSearchRow({
         </div>
         {variant && (
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {sourceUrl && (
+              <Button variant="ghost" size="sm" title="Open plugin source code" onClick={() => onOpenSource(sourceUrl)}>
+                <ExternalLink className="size-3.5" />
+                Source
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => void onPreview(variant.marketplaceId, variant.pluginId)}>
               Preview
             </Button>
@@ -211,9 +229,11 @@ function PluginSearchRow({
           <VariantRow
             key={pluginVariantKey(candidate)}
             variant={candidate}
+            marketplaces={marketplaces}
             installed={installedKeys.has(pluginVariantKey(candidate))}
             onPreview={onPreview}
             onInstall={onInstall}
+            onOpenSource={onOpenSource}
           />
         ))}
       </div>
@@ -229,16 +249,21 @@ function PluginSearchRow({
 
 function VariantRow({
   variant,
+  marketplaces,
   installed,
   onPreview,
   onInstall,
+  onOpenSource,
 }: {
   variant: MarketplacePluginVariant;
+  marketplaces: MarketplaceDescriptor[];
   installed: boolean;
   onPreview: (marketplaceId: string, pluginId: string) => Promise<void>;
   onInstall: (marketplaceId: string, pluginId: string) => Promise<void>;
+  onOpenSource: (url: string) => void;
 }): React.JSX.Element {
   const components = activeComponentLabels(variant.componentHints);
+  const sourceUrl = sourceCodeUrl(variant.source, marketplaces);
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-[12px]">
       <span className="font-medium text-foreground">{variant.marketplaceId}</span>
@@ -246,6 +271,12 @@ function VariantRow({
       {variant.version && <span className="text-muted-foreground">{variant.version}</span>}
       {components.length > 0 && <span className="min-w-0 flex-1 truncate text-muted-foreground">{components.join(", ")}</span>}
       {installed && <Badge variant="secondary">Installed</Badge>}
+      {sourceUrl && (
+        <Button variant="ghost" size="sm" title="Open plugin source code" onClick={() => onOpenSource(sourceUrl)}>
+          <ExternalLink className="size-3.5" />
+          Source
+        </Button>
+      )}
       <Button variant="ghost" size="sm" onClick={() => void onPreview(variant.marketplaceId, variant.pluginId)}>
         Preview
       </Button>

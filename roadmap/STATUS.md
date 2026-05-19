@@ -24,7 +24,7 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 
 | ID | PRD | Completed | Evidence |
 | --- | --- | --- | --- |
-| 002 | [Desktop Plugins Marketplace](002-desktop-plugins-marketplace.md) | 2026-05-19 | Plugins main view no longer mounts the app title top bar; per-marketplace `Enable` buttons are visible for inactive defaults; `pnpm test`, `pnpm typecheck`, `git diff --check`, `pnpm build`, and shimmed roadmap validation passed |
+| 002 | [Desktop Plugins Marketplace](002-desktop-plugins-marketplace.md) | 2026-05-19 | Plugins main view no longer mounts the app title top bar; inactive default marketplaces expose `Enable`; plugin rows expose `Source` links; `pnpm test`, `pnpm typecheck`, `git diff --check`, `pnpm build`, and shimmed roadmap validation passed |
 
 ## Superseded PRDs
 

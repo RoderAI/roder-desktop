@@ -134,6 +134,7 @@ test("builds source code links for marketplace plugin variants", async () => {
     "https://github.com/example/tools/tree/stable/plugins/lint",
   );
   assert.equal(sourceCodeUrl({ kind: "npm", package: "@example/plugin", version: "1.2.3" }, []), "https://www.npmjs.com/package/%40example%2Fplugin");
+  assert.equal(sourceCodeUrl({ kind: "git", url: "git@example.com:internal/tools.git", path: "plugins/lint" }, []), undefined);
 });
 
 function variant(marketplaceId, pluginId) {
