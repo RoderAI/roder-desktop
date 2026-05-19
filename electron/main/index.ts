@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, type Rectangle } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, shell, type Rectangle } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -41,6 +41,21 @@ if (!app.commandLine.hasSwitch("remote-debugging-port")) {
 
 function currentAppearance(): "dark" | "light" {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
+}
+
+async function openExternalTarget(value: string): Promise<void> {
+  const target = new URL(value);
+  if (target.protocol === "file:") {
+    const result = await shell.openPath(fileURLToPath(target));
+    if (result) {
+      throw new Error(result);
+    }
+    return;
+  }
+  if (target.protocol !== "http:" && target.protocol !== "https:") {
+    throw new Error(`Unsupported link protocol: ${target.protocol}`);
+  }
+  await shell.openExternal(target.toString());
 }
 
 function appIconPath(): string {
@@ -113,6 +128,7 @@ ipcMain.handle("roder:status", () => roder.status());
 ipcMain.handle("roder:start", () => roder.start());
 ipcMain.handle("roder:restart", () => roder.restart());
 ipcMain.handle("roder:appearance", () => currentAppearance());
+ipcMain.handle("openExternal", (_event, url: string) => openExternalTarget(url));
 ipcMain.handle("roder:request", async (_event, method: string, params: unknown) => {
   return handleRoderRequest(method, params);
 });

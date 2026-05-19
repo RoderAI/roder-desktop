@@ -21,6 +21,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 - [x] Add typed desktop renderer APIs for the app-server `marketplaces/*` and `plugins/*` methods.
 - [x] Build a full-width main Plugins view that lists marketplaces, searches plugins, installs plugin variants, and manages installed records.
 - [x] Keep the existing local Extensions screen intact for desktop `.rdx` and dev-folder extensions.
+- [x] Link marketplace plugin rows to the underlying plugin source code when the source can be resolved.
 - [x] Record verification evidence for the UI wiring and API contract.
 
 ### Non-goals
@@ -35,7 +36,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 - The left sidebar opens a main app view labeled Plugins, not Marketplace or a nested Settings section.
 - The Plugins screen can call `marketplaces/list`, `marketplaces/install_default`, `marketplaces/refresh`, `marketplaces/search`, `plugins/preview_install`, `plugins/install`, `plugins/install_all_variants`, `plugins/list_installed`, `plugins/disable`, and `plugins/uninstall`.
 - Installed variants show state, source marketplace, install path, and disable/uninstall actions.
-- Search results show provider variants, component hints, risk, and install controls.
+- Search results show provider variants, component hints, risk, source-code links, and install controls.
 - `pnpm test`, `pnpm typecheck`, `pnpm build`, and the roadmap validator pass or record actionable gaps.
 
 ## Current Repo State
@@ -44,7 +45,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 - `src/components/settings-view.tsx` hosts a settings overlay and an Extensions section; Plugins should remain outside Settings.
 - `src/stores/theme-store.ts` persists `settingsSection` and should normalize any older persisted `plugins` setting back to a valid Settings section.
 - `src/lib/roder-ipc.ts` wraps a small subset of app-server methods through `window.roderDesktop.request`.
-- `src/types/roder.ts` exposes the generic `request(method, params)` bridge; no new main-process IPC is required for app-server method calls.
+- `src/types/roder.ts` exposes the generic `request(method, params)` bridge for app-server method calls and a constrained `openExternal` bridge for source-code links.
 - `src/stores/roder-store.ts` is over 500 lines, so marketplace state must live in a separate store.
 - `/Users/pz/w/gode/docs/app-server/api.md` documents the app-server marketplace/plugin methods and DTO behavior.
 - `/Users/pz/w/gode/crates/roder-protocol/src/lib.rs` defines the marketplace and plugin request/result structs.
@@ -69,6 +70,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 - `P0`: Preview install metadata before install and display the risk/component hints returned by the app-server.
 - `P0`: List installed variants with disable and uninstall actions.
 - `P1`: Allow adding a local marketplace path through typed form inputs.
+- `P1`: Show a plugin source-code action for marketplace rows and variant rows when the source can be resolved to GitHub, npm, HTTP, or local file URLs.
 - `P1`: Preserve app-server errors as visible UI messages.
 
 ### UX Requirements
@@ -97,9 +99,12 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 - Create: `src/lib/plugins-marketplace.ts`
 - Create: `src/stores/plugins-store.ts`
 - Create: `src/components/plugins/plugins-marketplace-panel.tsx`
+- Modify: `electron/main/index.ts`
+- Modify: `electron/preload/index.ts`
 - Modify: `src/components/app-sidebar.tsx`
 - Modify: `src/components/top-bar.tsx`
 - Modify: `src/components/settings-view.tsx`
+- Modify: `src/types/roder.ts`
 - Modify: `src/stores/theme-store.ts`
 - Modify: `scripts/bundle-roder.mjs`
 - Sibling modify: `/Users/pz/w/gode/crates/roder-extension-host/src/marketplace/mod.rs`
@@ -113,7 +118,7 @@ Roder Desktop has a local Extensions surface for `.rdx` packages and development
 
 ### Architecture
 
-The renderer calls the existing constrained app-server bridge through a typed `pluginsIpc` wrapper. `plugins-store` owns transient state and composes calls such as reload, refresh, install, disable, and uninstall. The Plugins panel is a main app view opened from the primary sidebar and rendered full width in the content area. It intentionally does not use the local Extensions catalog because marketplace-backed plugins are app-server records, while Extensions are desktop-hosted `.rdx` packages.
+The renderer calls the existing constrained app-server bridge through a typed `pluginsIpc` wrapper. `plugins-store` owns transient state and composes calls such as reload, refresh, install, disable, and uninstall. Source-code buttons resolve structured plugin sources to GitHub, npm, HTTP, or local file URLs and open them through a narrow Electron bridge that rejects non-web/non-file protocols. The Plugins panel is a main app view opened from the primary sidebar and rendered full width in the content area. It intentionally does not use the local Extensions catalog because marketplace-backed plugins are app-server records, while Extensions are desktop-hosted `.rdx` packages.
 
 ## Implementation Stages
 
@@ -142,12 +147,13 @@ Acceptance:
 ### Stage 1: Desktop API And Screen
 
 **Status:** Complete
-**Owned Paths:** `src/types/plugins.ts`, `src/lib/plugins-ipc.ts`, `src/lib/plugins-marketplace.ts`, `src/stores/plugins-store.ts`, `src/components/plugins/plugins-marketplace-panel.tsx`, `src/components/app-sidebar.tsx`, `src/components/top-bar.tsx`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`
+**Owned Paths:** `src/types/plugins.ts`, `src/lib/plugins-ipc.ts`, `src/lib/plugins-marketplace.ts`, `src/stores/plugins-store.ts`, `src/components/plugins/plugins-marketplace-panel.tsx`, `src/components/app-sidebar.tsx`, `src/components/top-bar.tsx`, `src/components/settings-view.tsx`, `src/stores/theme-store.ts`, `src/types/roder.ts`, `electron/main/index.ts`, `electron/preload/index.ts`
 
 - [x] Add TypeScript types matching the app-server marketplace/plugin DTOs.
 - [x] Add typed IPC wrappers for the documented marketplace/plugin methods.
 - [x] Add a dedicated Plugins store with load/search/refresh/install/disable/uninstall operations.
 - [x] Add a Plugins view and wire it from the sidebar as a main app view, not a Settings subsection.
+- [x] Add source-code link resolution and a constrained Electron external-open bridge.
 - [x] Add focused utility tests for variant selection/state mapping.
 
 Run:
@@ -162,6 +168,7 @@ Acceptance:
 
 - The sidebar opens a full-width Plugins main view.
 - The Plugins screen has visible controls for marketplace list, default install, local marketplace add, refresh, search, preview, install, install all variants, disable, and uninstall.
+- The Plugins screen shows Source actions for resolvable plugin and variant sources.
 - Typed wrappers call the exact app-server methods documented in `/Users/pz/w/gode/docs/app-server/api.md`.
 
 ### Stage 2: Runtime Smoke And Follow-Up Gaps
@@ -247,6 +254,12 @@ Acceptance:
 - Evidence: the app-level `TopBar` is now mounted only for the chat view, so the Plugins view no longer shows the duplicate title/tool row above the Plugins panel header. Removed the `TopBar` `mainTitle` special case because Plugins no longer uses the top bar.
 - Commands: `pnpm test` passed 32 tests; `pnpm typecheck` passed; `git diff --check` passed; `pnpm build` passed. `pnpm run dev` launched, but screenshot capture was blocked by the macOS loginwindow display shield in this environment.
 - Gaps: no interactive screenshot artifact was captured for this specific title-bar removal because the desktop was shielded by loginwindow during the smoke attempt.
+
+### 2026-05-19 - Plugin Source Links
+
+- Evidence: Plugins search rows and per-variant rows now show a `Source` action when the structured source can be resolved. Marketplace paths resolve through their marketplace descriptor to GitHub tree URLs, direct git sources resolve to GitHub tree URLs when possible, npm sources resolve to npm package pages, HTTP sources open directly, and absolute local paths resolve to file URLs through a constrained Electron bridge.
+- Commands: `pnpm test` passed 33 tests including source-code URL regression coverage; `pnpm typecheck` passed; `git diff --check` passed; `pnpm build` passed after rebundling/signing `/Users/pz/w/gode-desktop/resources/bin/roder` from `/Users/pz/w/gode`.
+- Gaps: source buttons were verified through automated URL and build/type checks; no browser/window click smoke was captured for this small follow-up.
 
 ## Open Questions
 

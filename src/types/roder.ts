@@ -171,6 +171,7 @@ declare global {
       restart: () => Promise<RoderStatus>;
       status: () => Promise<RoderStatus>;
       appearance: () => Promise<SystemAppearance>;
+      openExternal: (url: string) => Promise<void>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       terminalStart: (options?: { cols?: number; rows?: number }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string) => Promise<void>;
