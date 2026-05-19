@@ -63,16 +63,16 @@ export function SidebarAccountMenu(): React.JSX.Element {
         <DropdownMenuTrigger
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "h-12 w-full justify-start gap-3 rounded-lg px-2.5 text-[15px] text-sidebar-foreground hover:bg-sidebar-accent",
+            "squircle-corners h-12 w-full justify-start gap-3 rounded-xl px-2.5 text-[17px] text-sidebar-foreground hover:bg-sidebar-accent",
           )}
           onClick={() => void refresh()}
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-[13px] text-sidebar-active-foreground">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-[15px] text-sidebar-active-foreground">
             {account?.displayName ? initials(account.displayName) : "G"}
           </div>
           <span className="min-w-0 flex-1 text-left">
             <span className="block truncate text-sidebar-active-foreground">{label}</span>
-            <span className="block truncate text-[12px] text-sidebar-muted">{secondary}</span>
+            <span className="block truncate text-[14px] text-sidebar-muted">{secondary}</span>
           </span>
           <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted" />
         </DropdownMenuTrigger>
@@ -80,12 +80,12 @@ export function SidebarAccountMenu(): React.JSX.Element {
           side="top"
           align="start"
           sideOffset={10}
-          className="w-[306px] rounded-2xl border-border/80 bg-popover p-1.5 text-[14px] shadow-2xl"
+          className="w-[306px] rounded-2xl border-border/80 bg-popover p-1.5 text-[16px] shadow-2xl"
         >
           <DropdownMenuGroup className="space-y-1">
             <MenuRow muted icon={<UserCircle className="size-4" />} label={label} />
             <MenuRow muted icon={<Settings className="size-4" />} label="Personal account" detail={account?.planType ?? undefined} />
-            <DropdownMenuItem className="h-10 rounded-xl px-3 text-[15px] focus:bg-accent" onSelect={() => openSettings("appearance")}>
+            <DropdownMenuItem className="h-10 rounded-xl px-3 text-[17px] focus:bg-accent" onSelect={() => openSettings("appearance")}>
               <Settings className="size-4" />
               Settings
             </DropdownMenuItem>
@@ -95,7 +95,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
 
           <button
             type="button"
-            className="flex h-10 w-full items-center gap-3 rounded-xl bg-accent/70 px-3 text-left text-[15px] text-foreground outline-none hover:bg-accent"
+            className="flex h-10 w-full items-center gap-3 rounded-xl bg-accent/70 px-3 text-left text-[17px] text-foreground outline-none hover:bg-accent"
             onClick={() => setLimitsOpen((value) => !value)}
           >
             <Gauge className="size-4 shrink-0" />
@@ -109,7 +109,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
               <LimitLine window={account?.limits?.secondary ?? null} fallback="Weekly" />
               <button
                 type="button"
-                className="mt-1 flex h-8 w-full items-center justify-between rounded-lg text-left text-[15px] text-foreground hover:text-muted-foreground"
+                className="mt-1 flex h-8 w-full items-center justify-between rounded-lg text-left text-[17px] text-foreground hover:text-muted-foreground"
                 onClick={() => void window.roderDesktop.codexOpenRateLimitHelp()}
               >
                 Learn more
@@ -123,7 +123,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
           {account?.roderSignedIn ? (
             <button
               type="button"
-              className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] text-foreground outline-none hover:bg-accent disabled:opacity-60"
+              className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[17px] text-foreground outline-none hover:bg-accent disabled:opacity-60"
               disabled={busy === "logout"}
               onClick={() => void logout()}
             >
@@ -133,7 +133,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
           ) : (
             <button
               type="button"
-              className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] text-foreground outline-none hover:bg-accent disabled:opacity-60"
+              className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[17px] text-foreground outline-none hover:bg-accent disabled:opacity-60"
               disabled={busy === "login" || account?.loginPending}
               onClick={() => void login()}
             >
@@ -162,14 +162,14 @@ function MenuRow({
     <div className={cn("flex h-10 items-center gap-3 rounded-xl px-3", muted ? "text-muted-foreground" : "text-foreground")}>
       {icon}
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {detail && <span className="shrink-0 text-[13px] uppercase tracking-normal">{detail}</span>}
+      {detail && <span className="shrink-0 text-[15px] uppercase tracking-normal">{detail}</span>}
     </div>
   );
 }
 
 function LimitLine({ window, fallback }: { window: CodexRateWindow | null; fallback: string }): React.JSX.Element {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-[15px]">
+    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-[17px]">
       <span className="truncate text-foreground">{window?.label ?? fallback}</span>
       <span className="font-mono text-muted-foreground">{window ? `${Math.round(window.remainingPercent)}%` : "--"}</span>
       <span className="w-14 text-right font-mono text-muted-foreground">{window?.resetLabel || "--"}</span>

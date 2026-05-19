@@ -56,9 +56,9 @@ type RoderStore = {
   stopTurn: () => Promise<void>;
   restart: () => Promise<void>;
   setSelectedModel: (model: string) => void;
+  setSelectedReasoning: (reasoning: ReasoningEffort) => void;
   setModelVisibility: (modelId: string, visible: boolean) => void;
   resetVisibleModels: () => void;
-  cycleSelectedReasoning: () => void;
   setSelectedWorkspaceCwd: (cwd: string) => void;
   openWorkspaceFolder: () => Promise<void>;
   applyAppearance: (appearance: SystemAppearance) => void;
@@ -72,8 +72,6 @@ const initialStatus: RoderStatus = {
   binary: "unresolved",
 };
 
-const reasoningCycle: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
-
 function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
   if (value === "medium") {
     return "medium";
@@ -85,11 +83,6 @@ function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
     return "xhigh";
   }
   return "low";
-}
-
-function nextReasoningEffort(value: ReasoningEffort): ReasoningEffort {
-  const index = reasoningCycle.indexOf(value);
-  return reasoningCycle[(index + 1) % reasoningCycle.length] ?? "low";
 }
 
 function realThreads(threads: RoderThread[]): RoderThread[] {
@@ -378,7 +371,7 @@ export const useRoderStore = create<RoderStore>()(
         };
       }),
       resetVisibleModels: () => set({ visibleModelIds: [] }),
-      cycleSelectedReasoning: () => set((state) => ({ selectedReasoning: nextReasoningEffort(state.selectedReasoning) })),
+      setSelectedReasoning: (selectedReasoning) => set({ selectedReasoning }),
       setSelectedWorkspaceCwd: (cwd) => set((state) => {
         const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
         return {

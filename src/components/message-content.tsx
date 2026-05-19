@@ -7,7 +7,7 @@ type MessageContentProps = {
 export function MessageContent({ text }: MessageContentProps): React.JSX.Element {
   const paragraphs = text.split(/\n{2,}/).filter(Boolean);
   return (
-    <div className="flex flex-col gap-3 text-[16px] leading-[1.55]">
+    <div className="flex flex-col gap-3 text-[17px] leading-[1.55]">
       {paragraphs.map((paragraph, index) => (
         <Paragraph key={`${paragraph.slice(0, 24)}-${index}`} text={paragraph} />
       ))}

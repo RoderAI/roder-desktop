@@ -1,5 +1,4 @@
-import { Laptop, Loader2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
@@ -8,7 +7,6 @@ import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
 import { Transcript } from "@/components/transcript";
-import { Badge } from "@/components/ui/badge";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { useThemeStore } from "@/stores/theme-store";
@@ -33,7 +31,6 @@ export function App(): React.JSX.Element {
       .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === selectedFolder)
       .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
   }, [activeWorkspaceCwd, agent.threads]);
-  const projectName = basename(activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.threads.find((thread) => thread.cwd)?.cwd) ?? "workspace";
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
     (threadId: string) => {
@@ -86,24 +83,27 @@ export function App(): React.JSX.Element {
       setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
     });
   }, [toolPanelWidth]);
+  const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
       {settingsOpen && <SettingsView />}
+      <div
+        className="sidebar-shell shrink-0"
+        data-open={sidebarOpen ? "true" : undefined}
+        style={sidebarRailStyle}
+        aria-hidden={!sidebarOpen}
+      >
+        <AppSidebar
+          threads={agent.threads}
+          activeThreadId={agent.activeThreadId}
+          width={leftSidebarWidth}
+          onSelectThread={selectThread}
+          onNewThread={newThread}
+        />
+      </div>
       {sidebarOpen && (
         <>
-          <AppSidebar
-            threads={agent.threads}
-            activeThreadId={agent.activeThreadId}
-            width={leftSidebarWidth}
-            onSelectThread={selectThread}
-            onNewThread={newThread}
-            onBack={() => void agent.goBack()}
-            onForward={() => void agent.goForward()}
-            canGoBack={agent.canGoBack}
-            canGoForward={agent.canGoForward}
-            onClose={() => setSidebarOpen(false)}
-          />
           <div
             className="no-drag relative z-30 h-screen w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
             aria-label="Resize thread sidebar"
@@ -146,7 +146,7 @@ export function App(): React.JSX.Element {
               threads={agent.threads}
               attachments={composerAttachments}
               onSelectedModelChange={agent.setSelectedModel}
-              onCycleReasoning={agent.cycleSelectedReasoning}
+              onSelectedReasoningChange={agent.setSelectedReasoning}
               onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
               onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
               onScrollToBottom={followBottom}
@@ -154,17 +154,6 @@ export function App(): React.JSX.Element {
               onSend={sendPrompt}
               onStop={agent.stopTurn}
             />
-            <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-border px-8 text-xs text-muted-foreground">
-              <Laptop className="size-4" />
-              <span>Local</span>
-              <span>{projectName}</span>
-              <span className="ml-auto flex items-center gap-2">
-                {agent.busy && <Loader2 className="size-3 animate-spin" />}
-                <Badge variant="muted" className="text-[11px]">
-                  {agent.status.state === "ready" ? "roder app-server" : agent.status.state}
-                </Badge>
-              </span>
-            </footer>
           </div>
           {activeTool && (
             <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
@@ -184,6 +173,10 @@ export function App(): React.JSX.Element {
     </div>
   );
 }
+
+type SidebarRailStyle = CSSProperties & {
+  "--sidebar-width": string;
+};
 
 function basename(path: string | undefined): string | undefined {
   return path?.split("/").filter(Boolean).pop();
