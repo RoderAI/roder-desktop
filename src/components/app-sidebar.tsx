@@ -1,4 +1,4 @@
-import { Archive, CirclePlus, Store } from "lucide-react";
+import { Archive, CirclePlus, FolderPlus, Store } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RoderThread } from "@/types/roder";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
@@ -14,7 +14,9 @@ type AppSidebarProps = {
   width: number;
   onSelectThread: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
+  onNewProject: () => void;
   onNewThread: () => void;
+  onNewThreadInFolder: (path: string) => void;
   onOpenPlugins: () => void;
 };
 
@@ -33,7 +35,9 @@ export function AppSidebar({
   width,
   onSelectThread,
   onArchiveThread,
+  onNewProject,
   onNewThread,
+  onNewThreadInFolder,
   onOpenPlugins,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
@@ -63,6 +67,11 @@ export function AppSidebar({
       <div className="h-[60px]" />
 
       <div className="no-drag flex flex-col gap-1 px-2">
+        <SidebarRowButton onClick={onNewProject}>
+          <FolderPlus className="size-4.5" />
+          <span className="min-w-0 flex-1 truncate">Add Project</span>
+          <Kbd className="ml-auto">⌘+O</Kbd>
+        </SidebarRowButton>
         <SidebarRowButton onClick={onNewThread}>
           <CirclePlus className="size-4.5" />
           <span className="min-w-0 flex-1 truncate">New Agent</span>
@@ -85,8 +94,21 @@ export function AppSidebar({
               const visibility = visibleThreadsForGroup(group.threads, expanded);
               return (
                 <section key={group.key}>
-                  <div className="truncate px-3 text-base text-sidebar-heading" title={group.path}>
-                    {group.title}
+                  <div className="group squircle-corners relative flex h-9 items-center rounded-xl px-3 pr-10 text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
+                    <div className="min-w-0 flex-1 truncate" title={group.path || group.title}>
+                      {group.title}
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger
+                        type="button"
+                        className="absolute right-1 flex size-7 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+                        aria-label={`New thread in ${group.title}`}
+                        onClick={() => onNewThreadInFolder(group.path)}
+                      >
+                        <CirclePlus className="size-4" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right">New thread</TooltipContent>
+                    </Tooltip>
                   </div>
                   <div className="mt-3 flex flex-col gap-1">
                     {visibility.primaryThreads.map((thread) => (
@@ -234,7 +256,7 @@ function groupThreadsByFolder(threads: RoderThread[], activeThreadId: string): T
     const group = existing ?? {
       key,
       title: folderName(thread.cwd),
-      path: thread.cwd || "workspace",
+      path: thread.cwd || "",
       updatedAt: 0,
       threads: [],
     };

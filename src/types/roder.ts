@@ -12,6 +12,108 @@ export type RoderNotification = {
   params: unknown;
 };
 
+export type RoderActiveFlag = "approvalRequired" | "userInputRequired" | "planExitRequired" | string;
+
+export type RoderQuestionOption = {
+  label: string;
+  description?: string;
+};
+
+export type RoderUserInputQuestion = {
+  id: string;
+  question: string;
+  options?: RoderQuestionOption[];
+};
+
+export type ApprovalRequestedNotification = {
+  threadId: string;
+  turnId?: string;
+  approvalId: string;
+  toolId?: string;
+  toolName?: string;
+  reason?: string;
+};
+
+export type ApprovalResolvedNotification = {
+  threadId: string;
+  turnId?: string;
+  approvalId: string;
+  toolId?: string;
+  toolName?: string;
+  approved: boolean;
+};
+
+export type UserInputRequestedNotification = {
+  threadId: string;
+  turnId?: string;
+  requestId: string;
+  questions: RoderUserInputQuestion[];
+};
+
+export type UserInputResolvedNotification = {
+  threadId: string;
+  turnId?: string;
+  requestId: string;
+  answers: Record<string, string>;
+};
+
+export type PlanExitRequestedNotification = {
+  threadId: string;
+  turnId?: string;
+  requestId: string;
+  targetMode?: string;
+  planSummary?: string;
+};
+
+export type PlanExitResolvedNotification = {
+  threadId: string;
+  turnId?: string;
+  requestId: string;
+  approved: boolean;
+  targetMode?: string;
+  resolvedMode?: string;
+};
+
+export type ApprovalWaitRequest = {
+  kind: "approval";
+  id: string;
+  approvalId: string;
+  threadId: string;
+  turnId?: string;
+  toolId?: string;
+  toolName: string;
+  reason?: string;
+  resolving?: boolean;
+  error?: string;
+};
+
+export type UserInputWaitRequest = {
+  kind: "userInput";
+  id: string;
+  requestId: string;
+  threadId: string;
+  turnId?: string;
+  questions: RoderUserInputQuestion[];
+  resolving?: boolean;
+  error?: string;
+};
+
+export type PlanExitWaitRequest = {
+  kind: "planExit";
+  id: string;
+  requestId: string;
+  threadId: string;
+  turnId?: string;
+  targetMode?: string;
+  planSummary?: string;
+  resolving?: boolean;
+  error?: string;
+};
+
+export type AgentWaitRequest = ApprovalWaitRequest | UserInputWaitRequest | PlanExitWaitRequest;
+
+export type PendingWaitRequestsByThread = Record<string, AgentWaitRequest[]>;
+
 export type AppServerEvent = {
   id: number;
   at: string;
@@ -29,7 +131,7 @@ export type RoderThread = {
   updatedAt: number;
   status: {
     type: string;
-    activeFlags?: string[];
+    activeFlags?: RoderActiveFlag[];
   };
   cwd: string;
   name?: string | null;
@@ -73,6 +175,8 @@ export type RoderModel = {
 };
 
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+
+export type PolicyMode = "default" | "accept_all" | "plan" | "bypass";
 
 export type ConversationMessage = {
   id: string;
@@ -164,7 +268,7 @@ export type TurnInputItem = {
 };
 
 export type AppCommand = {
-  command: "newThread";
+  command: "newProject" | "newThread";
 };
 
 declare global {

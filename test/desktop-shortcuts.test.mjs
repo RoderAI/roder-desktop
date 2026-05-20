@@ -14,7 +14,7 @@ const compiled = ts.transpileModule(helperSource, {
 
 const module = { exports: {} };
 new Script(compiled).runInNewContext({ exports: module.exports, module });
-const { createApplicationMenuTemplate, isNewThreadShortcutInput } = module.exports;
+const { createApplicationMenuTemplate, isNewProjectShortcutInput, isNewThreadShortcutInput } = module.exports;
 
 function input(overrides = {}) {
   return {
@@ -41,6 +41,16 @@ test("recognizes Control+N as the new thread shortcut off macOS", () => {
   assert.equal(isNewThreadShortcutInput(input({ meta: true }), "linux"), false);
 });
 
+test("recognizes Command+O as the new project shortcut on macOS", () => {
+  assert.equal(isNewProjectShortcutInput(input({ key: "o", code: "KeyO", meta: true }), "darwin"), true);
+  assert.equal(isNewProjectShortcutInput(input({ key: "o", code: "KeyO", control: true }), "darwin"), false);
+});
+
+test("recognizes Control+O as the new project shortcut off macOS", () => {
+  assert.equal(isNewProjectShortcutInput(input({ key: "o", code: "KeyO", control: true }), "linux"), true);
+  assert.equal(isNewProjectShortcutInput(input({ key: "o", code: "KeyO", meta: true }), "linux"), false);
+});
+
 test("ignores repeat, composing, modified, and key-up shortcut events", () => {
   assert.equal(isNewThreadShortcutInput(input({ meta: true, isAutoRepeat: true }), "darwin"), false);
   assert.equal(isNewThreadShortcutInput(input({ meta: true, isComposing: true }), "darwin"), false);
@@ -61,4 +71,18 @@ test("application menu exposes CommandOrControl+N for new threads", () => {
   newThreadItem.click();
 
   assert.deepEqual(commands, ["newThread"]);
+});
+
+test("application menu exposes CommandOrControl+O for new projects", () => {
+  const commands = [];
+  const template = createApplicationMenuTemplate((command) => commands.push(command), "darwin");
+  const fileMenu = template.find((item) => item.label === "File");
+  const newProjectItem = fileMenu.submenu.find((item) => item.id === "new-project");
+
+  assert.equal(newProjectItem.label, "Add Project...");
+  assert.equal(newProjectItem.accelerator, "CommandOrControl+O");
+
+  newProjectItem.click();
+
+  assert.deepEqual(commands, ["newProject"]);
 });
