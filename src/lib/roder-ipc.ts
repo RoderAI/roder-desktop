@@ -1,4 +1,4 @@
-import type { DesktopAttachment, RoderModel, RoderStatus, RoderThread, SystemAppearance, TurnInputItem } from "@/types/roder";
+import type { DesktopAttachment, PolicyMode, RoderModel, RoderStatus, RoderThread, SystemAppearance, TurnInputItem } from "@/types/roder";
 
 export type ThreadListResult = {
   data?: RoderThread[];
@@ -25,6 +25,10 @@ export type ThreadArchiveResult = {
 export type ModelListResult = {
   models?: RoderModel[];
 };
+export type SessionSetModeResult = {
+  mode: PolicyMode;
+};
+
 
 export const roderIpc = {
   start: () => window.roderDesktop.start(),
@@ -53,6 +57,8 @@ export const roderIpc = {
   },
   interruptTurn: (threadId: string, turnId?: string) =>
     window.roderDesktop.request("turn/interrupt", { threadId, turnId: turnId || undefined }),
+  setSessionMode: (mode: PolicyMode, reason: string) =>
+    window.roderDesktop.request("session/set_mode", { mode, reason }) as Promise<SessionSetModeResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),
   onNotification: window.roderDesktop.onNotification,

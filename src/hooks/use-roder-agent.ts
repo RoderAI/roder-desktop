@@ -55,6 +55,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     visibleModelIds: state.visibleModelIds,
     selectedModel: state.selectedModel,
     selectedReasoning: state.selectedReasoning,
+    selectedPolicyMode: state.selectedPolicyMode,
     selectedWorkspaceCwd: state.selectedWorkspaceCwd,
     workspaceRecents: state.workspaceRecents,
     appearance: state.appearance,
@@ -75,6 +76,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     restart: state.restart,
     setSelectedModel: state.setSelectedModel,
     setSelectedReasoning: state.setSelectedReasoning,
+    setSelectedPolicyMode: state.setSelectedPolicyMode,
     setSelectedWorkspaceCwd: state.setSelectedWorkspaceCwd,
     openWorkspaceFolder: state.openWorkspaceFolder,
   };
