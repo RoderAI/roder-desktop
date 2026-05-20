@@ -25,10 +25,10 @@ export type ThreadArchiveResult = {
 export type ModelListResult = {
   models?: RoderModel[];
 };
+
 export type SessionSetModeResult = {
   mode: PolicyMode;
 };
-
 
 export const roderIpc = {
   start: () => window.roderDesktop.start(),
@@ -57,6 +57,12 @@ export const roderIpc = {
   },
   interruptTurn: (threadId: string, turnId?: string) =>
     window.roderDesktop.request("turn/interrupt", { threadId, turnId: turnId || undefined }),
+  resolveApproval: (params: { approvalId: string; approved: boolean }) =>
+    window.roderDesktop.request("session/resolve_approval", { approval_id: params.approvalId, approved: params.approved }),
+  resolveUserInput: (params: { requestId: string; answers: Record<string, string> }) =>
+    window.roderDesktop.request("session/resolve_user_input", { request_id: params.requestId, answers: params.answers }),
+  exitPlan: (params: { requestId: string; approved: boolean }) =>
+    window.roderDesktop.request("session/exit_plan", { request_id: params.requestId, approved: params.approved }),
   setSessionMode: (mode: PolicyMode, reason: string) =>
     window.roderDesktop.request("session/set_mode", { mode, reason }) as Promise<SessionSetModeResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
