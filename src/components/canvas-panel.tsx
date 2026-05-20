@@ -399,7 +399,7 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
             }}
           />
         </div>
-        <label className="ml-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <label className="ml-2 flex items-center gap-2 text-base text-muted-foreground">
           Size
           <input
             value={width}
@@ -464,13 +464,13 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
             }}
           />
           {dragActive && (
-            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-lg border border-dashed border-ring bg-background/70 text-sm text-muted-foreground backdrop-blur-sm">
+            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-lg border border-dashed border-ring bg-background/70 text-base text-muted-foreground backdrop-blur-sm">
               Drop images to annotate
             </div>
           )}
         </div>
       </div>
-      <div className="flex h-7 shrink-0 items-center gap-2 border-t border-border px-3 text-[11px] text-muted-foreground">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-t border-border px-3 text-base text-muted-foreground">
         <span>Canvas</span>
         <span className="truncate">Drop images, resize them, add shapes or pencil notes, then attach the PNG to the prompt.</span>
       </div>

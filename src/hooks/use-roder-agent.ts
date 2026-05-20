@@ -65,6 +65,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     canGoBack: state.backStack.length > 0,
     canGoForward: state.forwardStack.length > 0,
     selectThread: state.selectThread,
+    archiveThread: state.archiveThread,
     goBack: state.goBack,
     goForward: state.goForward,
     newThread: state.newThread,
