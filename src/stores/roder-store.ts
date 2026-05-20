@@ -52,6 +52,7 @@ type RoderStore = {
   archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
   goForward: () => Promise<void>;
+  newProject: () => Promise<void>;
   newThread: () => Promise<void>;
   sendPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
   stopTurn: () => Promise<void>;
@@ -283,28 +284,26 @@ export const useRoderStore = create<RoderStore>()(
         await get().selectThread(next.threadId, { pushHistory: false });
       },
 
+      newProject: async () => {
+        set({ error: null });
+        try {
+          const current = get();
+          const folder = await roderIpc.openWorkspaceFolder(current.selectedWorkspaceCwd || current.status.cwd);
+          if (!folder) {
+            return;
+          }
+          set({ busy: true });
+          await startThreadForWorkspace(folder, set, get);
+        } catch (error) {
+          set({ busy: false, error: (error as Error).message });
+        }
+      },
+
       newThread: async () => {
         set({ busy: true, error: null });
         try {
-          const cwd = get().selectedWorkspaceCwd || get().status.cwd;
-          const state = get();
-          const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
-          const selectedModel = model?.id ?? state.selectedModel;
-          const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
-          if (!result.thread) {
-            throw new Error("roder app-server did not return a thread");
-          }
-          const thread = normalizeThreadCwd(result.thread, get().status.cwd);
-          set((state) => ({
-            threads: upsertThread(state.threads, thread),
-            activeThreadId: thread.id,
-            selectedWorkspaceCwd: thread.cwd,
-            workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-            messagesByThread: { ...state.messagesByThread, [thread.id]: [] },
-            backStack: state.activeThreadId ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80) : state.backStack,
-            forwardStack: [],
-            busy: false,
-          }));
+          const cwd = get().selectedWorkspaceCwd || get().status.cwd || "";
+          await startThreadForWorkspace(cwd, set, get);
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
         }
@@ -442,6 +441,29 @@ export const useRoderStore = create<RoderStore>()(
     },
   ),
 );
+
+type RoderStoreSet = (partial: Partial<RoderStore> | ((state: RoderStore) => Partial<RoderStore>)) => void;
+
+async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () => RoderStore): Promise<void> {
+  const state = get();
+  const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
+  const selectedModel = model?.id ?? state.selectedModel;
+  const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
+  if (!result.thread) {
+    throw new Error("roder app-server did not return a thread");
+  }
+  const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+  set((state) => ({
+    threads: upsertThread(state.threads, thread),
+    activeThreadId: thread.id,
+    selectedWorkspaceCwd: thread.cwd,
+    workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+    messagesByThread: { ...state.messagesByThread, [thread.id]: [] },
+    backStack: state.activeThreadId ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80) : state.backStack,
+    forwardStack: [],
+    busy: false,
+  }));
+}
 
 function reduceNotification(state: RoderStore, notification: RoderNotification): Partial<RoderStore> {
   const params = notificationParams(notification);

@@ -29,6 +29,7 @@ export function App(): React.JSX.Element {
     error,
     messages,
     models,
+    newProject: createProjectThread,
     newThread: createAgentThread,
     openWorkspaceFolder,
     restart,
@@ -106,13 +107,28 @@ export function App(): React.JSX.Element {
     followBottom();
     void createAgentThread();
   }, [createAgentThread, followBottom, showChat]);
+  const newThreadInFolder = useCallback((path: string) => {
+    showChat();
+    followBottom();
+    setSelectedWorkspaceCwd(path);
+    void createAgentThread();
+  }, [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat]);
+  const newProject = useCallback(() => {
+    showChat();
+    followBottom();
+    void createProjectThread();
+  }, [createProjectThread, followBottom, showChat]);
   useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
+      if (appCommand.command === "newProject") {
+        newProject();
+        return;
+      }
       if (appCommand.command === "newThread") {
         newThread();
       }
     });
-  }, [newThread]);
+  }, [newProject, newThread]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>
@@ -189,7 +205,9 @@ export function App(): React.JSX.Element {
           width={leftSidebarWidth}
           onSelectThread={selectThread}
           onArchiveThread={archiveThread}
+          onNewProject={newProject}
           onNewThread={newThread}
+          onNewThreadInFolder={newThreadInFolder}
           onOpenPlugins={openPlugins}
         />
       </div>
