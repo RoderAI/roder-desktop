@@ -12,7 +12,7 @@ import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
-import { createApplicationMenuTemplate, installNewThreadShortcut } from "./shortcuts";
+import { createApplicationMenuTemplate, installNewProjectShortcut, installNewThreadShortcut, type AppCommand } from "./shortcuts";
 
 const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
@@ -98,6 +98,7 @@ function createWindow(): void {
   mainWindow.webContents.on("did-finish-load", () => {
     mainWindow?.webContents.setZoomFactor(rendererZoomFactor);
   });
+  installNewProjectShortcut(mainWindow.webContents, () => sendAppCommand("newProject"));
   installNewThreadShortcut(mainWindow.webContents, () => sendAppCommand("newThread"));
 
   mainWindow.on("closed", () => {
@@ -111,7 +112,7 @@ function sendToRenderer(channel: string, payload: unknown): void {
   mainWindow?.webContents.send(channel, payload);
 }
 
-function sendAppCommand(command: "newThread"): void {
+function sendAppCommand(command: AppCommand): void {
   sendToRenderer("app:command", { command });
 }
 

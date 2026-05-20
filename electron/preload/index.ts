@@ -78,7 +78,7 @@ export type AppServerEvent = {
 };
 
 export type AppCommand = {
-  command: "newThread";
+  command: "newProject" | "newThread";
 };
 
 const api = {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AgentWaitCards } from "@/components/agent-wait-card";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { Composer } from "@/components/composer";
@@ -29,21 +30,28 @@ export function App(): React.JSX.Element {
     error,
     messages,
     models,
+    newProject: createProjectThread,
     newThread: createAgentThread,
     openWorkspaceFolder,
     restart,
     selectedModel,
+    selectedPolicyMode,
     selectedReasoning,
     selectedWorkspaceCwd,
     selectThread: selectAgentThread,
     sendPrompt: sendAgentPrompt,
     setSelectedModel,
+    setSelectedPolicyMode,
     setSelectedReasoning,
     setSelectedWorkspaceCwd,
     status,
     stopTurn,
     threads,
+    waitRequests,
     workspaceRecents,
+    resolveApproval,
+    resolveUserInput,
+    exitPlan,
   } = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
   const closeSettings = useThemeStore((state) => state.closeSettings);
@@ -106,13 +114,28 @@ export function App(): React.JSX.Element {
     followBottom();
     void createAgentThread();
   }, [createAgentThread, followBottom, showChat]);
+  const newThreadInFolder = useCallback((path: string) => {
+    showChat();
+    followBottom();
+    setSelectedWorkspaceCwd(path);
+    void createAgentThread();
+  }, [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat]);
+  const newProject = useCallback(() => {
+    showChat();
+    followBottom();
+    void createProjectThread();
+  }, [createProjectThread, followBottom, showChat]);
   useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
+      if (appCommand.command === "newProject") {
+        newProject();
+        return;
+      }
       if (appCommand.command === "newThread") {
         newThread();
       }
     });
-  }, [newThread]);
+  }, [newProject, newThread]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>
@@ -189,7 +212,9 @@ export function App(): React.JSX.Element {
           width={leftSidebarWidth}
           onSelectThread={selectThread}
           onArchiveThread={archiveThread}
+          onNewProject={newProject}
           onNewThread={newThread}
+          onNewThreadInFolder={newThreadInFolder}
           onOpenPlugins={openPlugins}
         />
       </div>
@@ -230,6 +255,12 @@ export function App(): React.JSX.Element {
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
                 <Transcript messages={messages} followSignal={followSignal} />
+                <AgentWaitCards
+                  requests={waitRequests}
+                  onResolveApproval={resolveApproval}
+                  onResolveUserInput={resolveUserInput}
+                  onExitPlan={exitPlan}
+                />
                 {error && (
                   <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{error}</div>
                 )}
@@ -237,6 +268,7 @@ export function App(): React.JSX.Element {
                   busy={busy}
                   models={models}
                   selectedModel={selectedModel}
+                  selectedPolicyMode={selectedPolicyMode}
                   selectedReasoning={selectedReasoning}
                   selectedWorkspaceCwd={selectedWorkspaceCwd}
                   statusCwd={status.cwd}
@@ -244,6 +276,7 @@ export function App(): React.JSX.Element {
                   threads={threads}
                   attachments={composerAttachments}
                   onSelectedModelChange={setSelectedModel}
+                  onSelectedPolicyModeChange={(mode) => void setSelectedPolicyMode(mode)}
                   onSelectedReasoningChange={setSelectedReasoning}
                   onWorkspaceSelect={setSelectedWorkspaceCwd}
                   onOpenWorkspaceFolder={() => void openWorkspaceFolder()}

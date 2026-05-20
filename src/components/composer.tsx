@@ -5,6 +5,7 @@ import {
   ImageIcon,
   Plus,
   Search,
+  ShieldCheck,
   Square,
   X,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import type {
   DesktopAttachment,
+  PolicyMode,
   RoderModel,
   RoderThread,
   ReasoningEffort,
@@ -37,6 +39,7 @@ type ComposerProps = {
   busy: boolean;
   models: RoderModel[];
   selectedModel: string;
+  selectedPolicyMode: PolicyMode;
   selectedReasoning: ReasoningEffort;
   selectedWorkspaceCwd: string;
   statusCwd?: string;
@@ -44,6 +47,7 @@ type ComposerProps = {
   threads: RoderThread[];
   attachments: DesktopAttachment[];
   onSelectedModelChange: (model: string) => void;
+  onSelectedPolicyModeChange: (mode: PolicyMode) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onWorkspaceSelect: (cwd: string) => void;
   onOpenWorkspaceFolder: () => void;
@@ -57,6 +61,7 @@ export function Composer({
   busy,
   models,
   selectedModel,
+  selectedPolicyMode,
   selectedReasoning,
   selectedWorkspaceCwd,
   statusCwd,
@@ -64,6 +69,7 @@ export function Composer({
   threads,
   attachments,
   onSelectedModelChange,
+  onSelectedPolicyModeChange,
   onSelectedReasoningChange,
   onWorkspaceSelect,
   onOpenWorkspaceFolder,
@@ -239,15 +245,21 @@ export function Composer({
             }}
           />
           <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 shrink-0 rounded-full text-muted-foreground"
-              aria-label="Attach files"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Plus className="size-5" />
-            </Button>
+            <div className="flex min-w-0 items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-9 shrink-0 rounded-full text-muted-foreground"
+                aria-label="Attach files"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus className="size-5" />
+              </Button>
+              <PolicyModePicker
+                selectedMode={selectedPolicyMode}
+                onChange={onSelectedPolicyModeChange}
+              />
+            </div>
             <div className="flex items-center gap-2">
               {busy && (
                 <Button
@@ -274,6 +286,78 @@ export function Composer({
     </div>
   );
 }
+
+function PolicyModePicker({
+  selectedMode,
+  onChange,
+}: {
+  selectedMode: PolicyMode;
+  onChange: (mode: PolicyMode) => void;
+}): React.JSX.Element {
+  const selected = policyModeOptions.find((option) => option.mode === selectedMode) ?? policyModeOptions[0];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        variant="pill"
+        className="max-w-40 px-2.5 text-base text-muted-foreground sm:max-w-none sm:px-3"
+        aria-label={`Choose permission mode: ${selected.label}`}
+      >
+        <ShieldCheck className="size-4 shrink-0" />
+        <span className="truncate">{selected.label}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-64">
+        <DropdownMenuGroup>
+          {policyModeOptions.map((option) => (
+            <DropdownMenuItem
+              key={option.mode}
+              selected={option.mode === selected.mode}
+              className="items-start gap-2 py-2"
+              onSelect={() => onChange(option.mode)}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-foreground">{option.label}</div>
+                <div className="mt-0.5 text-sm leading-5 text-muted-foreground">
+                  {option.description}
+                </div>
+              </div>
+              {option.mode === selected.mode && (
+                <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              )}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const policyModeOptions: Array<{
+  mode: PolicyMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    mode: "accept_all",
+    label: "Accept all",
+    description: "Run edits and commands without stopping for approval.",
+  },
+  {
+    mode: "default",
+    label: "Ask before changes",
+    description: "Pause before writes, commands, and other side effects.",
+  },
+  {
+    mode: "plan",
+    label: "Plan only",
+    description: "Read and reason while blocking edits and commands.",
+  },
+  {
+    mode: "bypass",
+    label: "Full access",
+    description: "Auto-approve every tool the harness allows.",
+  },
+];
 
 function AttachmentChip({
   attachment,
