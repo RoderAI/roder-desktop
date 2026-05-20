@@ -164,7 +164,7 @@ export type TurnInputItem = {
 };
 
 export type AppCommand = {
-  command: "newThread";
+  command: "newProject" | "newThread";
 };
 
 declare global {
