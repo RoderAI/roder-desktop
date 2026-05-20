@@ -163,6 +163,10 @@ export type TurnInputItem = {
   path?: string;
 };
 
+export type AppCommand = {
+  command: "newThread";
+};
+
 declare global {
   interface Window {
     roderDesktop: {
@@ -216,6 +220,7 @@ declare global {
       onStderr: (callback: (message: string) => void) => () => void;
       onAppearance: (callback: (appearance: SystemAppearance) => void) => () => void;
       onAppServerEvent: (callback: (event: AppServerEvent) => void) => () => void;
+      onAppCommand: (callback: (command: AppCommand) => void) => () => void;
       onTerminalData: (callback: (payload: { id: string; data: string }) => void) => () => void;
       onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => () => void;
     };

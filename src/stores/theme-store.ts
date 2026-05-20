@@ -160,7 +160,7 @@ export const defaultThemeSettings: ThemeSettings = {
   light: themePresets.find((preset) => preset.id === "roder-light")!.palette,
   dark: themePresets.find((preset) => preset.id === "roder-dark")!.palette,
   pointerCursors: false,
-  uiFontSize: 14,
+  uiFontSize: 18,
   codeFontSize: 13,
 };
 
@@ -176,6 +176,8 @@ const validSettingsSections = new Set<SettingsSection>([
   "git",
   "usage",
 ]);
+
+const themeStorageVersion = 1;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -212,6 +214,8 @@ export const useThemeStore = create<ThemeStore>()(
     }),
     {
       name: "roder-desktop-theme",
+      version: themeStorageVersion,
+      migrate: (persisted, version) => migratePersistedTheme(persisted, version),
       partialize: (state) => ({
         settingsOpen: state.settingsOpen,
         settingsSection: state.settingsSection,
@@ -230,6 +234,20 @@ export const useThemeStore = create<ThemeStore>()(
     },
   ),
 );
+
+function migratePersistedTheme(persisted: unknown, version: number): unknown {
+  const value = persisted as Partial<ThemeStore> | undefined;
+  if (version >= themeStorageVersion || !value?.settings) {
+    return persisted;
+  }
+  return {
+    ...value,
+    settings: {
+      ...value.settings,
+      uiFontSize: value.settings.uiFontSize === 14 ? defaultThemeSettings.uiFontSize : value.settings.uiFontSize,
+    },
+  };
+}
 
 function normalizeSettingsSection(section: unknown, fallback: SettingsSection): SettingsSection {
   if (typeof section === "string" && validSettingsSections.has(section as SettingsSection)) {

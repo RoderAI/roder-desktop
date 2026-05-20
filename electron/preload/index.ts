@@ -77,6 +77,10 @@ export type AppServerEvent = {
   payload: unknown;
 };
 
+export type AppCommand = {
+  command: "newThread";
+};
+
 const api = {
   request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
@@ -158,6 +162,11 @@ const api = {
     const listener = (_event: Electron.IpcRendererEvent, appServerEvent: AppServerEvent) => callback(appServerEvent);
     ipcRenderer.on("appserver:event", listener);
     return () => ipcRenderer.removeListener("appserver:event", listener);
+  },
+  onAppCommand: (callback: (command: AppCommand) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, command: AppCommand) => callback(command);
+    ipcRenderer.on("app:command", listener);
+    return () => ipcRenderer.removeListener("app:command", listener);
   },
   onTerminalData: (callback: (payload: { id: string; data: string }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; data: string }) => callback(payload);

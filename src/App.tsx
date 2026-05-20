@@ -21,11 +21,34 @@ import type { DesktopAttachment, RoderThread } from "@/types/roder";
 type MainView = "chat" | "plugins";
 
 export function App(): React.JSX.Element {
-  const agent = useRoderAgent();
+  const {
+    activeThreadId,
+    appearance,
+    archiveThread: archiveAgentThread,
+    busy,
+    error,
+    messages,
+    models,
+    newThread: createAgentThread,
+    openWorkspaceFolder,
+    restart,
+    selectedModel,
+    selectedReasoning,
+    selectedWorkspaceCwd,
+    selectThread: selectAgentThread,
+    sendPrompt: sendAgentPrompt,
+    setSelectedModel,
+    setSelectedReasoning,
+    setSelectedWorkspaceCwd,
+    status,
+    stopTurn,
+    threads,
+    workspaceRecents,
+  } = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
   const closeSettings = useThemeStore((state) => state.closeSettings);
   useExtensionThemes();
-  useThemeApplication(agent.appearance);
+  useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
   const [mainView, setMainView] = useState<MainView>("chat");
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
@@ -37,45 +60,59 @@ export function App(): React.JSX.Element {
   const extensions = useExtensionsStore((state) => state.extensions);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
   const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
-  const activeThread = agent.threads.find((thread) => thread.id === agent.activeThreadId);
-  const activeWorkspaceCwd = activeThread?.cwd ?? agent.selectedWorkspaceCwd ?? agent.status.cwd ?? "";
-  const folderOptions = useMemo(() => buildFolderOptions(agent.threads, activeWorkspaceCwd), [activeWorkspaceCwd, agent.threads]);
+  const activeThread = threads.find((thread) => thread.id === activeThreadId);
+  const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
+  const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => {
     const selectedFolder = normalizePath(activeWorkspaceCwd);
-    return agent.threads
+    return threads
       .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === selectedFolder)
       .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
-  }, [activeWorkspaceCwd, agent.threads]);
+  }, [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const showChat = useCallback(() => setMainView("chat"), []);
   const selectThread = useCallback(
     (threadId: string) => {
       showChat();
       followBottom();
-      void agent.selectThread(threadId);
+      void selectAgentThread(threadId);
     },
-    [agent, followBottom, showChat],
+    [followBottom, selectAgentThread, showChat],
+  );
+  const archiveThread = useCallback(
+    (threadId: string) => {
+      showChat();
+      void archiveAgentThread(threadId);
+    },
+    [archiveAgentThread, showChat],
   );
   const selectFolder = useCallback(
     (path: string) => {
       showChat();
       const normalizedPath = normalizePath(path);
-      const latestThread = agent.threads
+      const latestThread = threads
         .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === normalizedPath)
         .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt))[0];
 
-      agent.setSelectedWorkspaceCwd(path);
+      setSelectedWorkspaceCwd(path);
       if (latestThread) {
         selectThread(latestThread.id);
       }
     },
-    [agent, selectThread, showChat],
+    [selectThread, setSelectedWorkspaceCwd, showChat, threads],
   );
   const newThread = useCallback(() => {
     showChat();
     followBottom();
-    void agent.newThread();
-  }, [agent, followBottom, showChat]);
+    void createAgentThread();
+  }, [createAgentThread, followBottom, showChat]);
+  useEffect(() => {
+    return window.roderDesktop.onAppCommand((appCommand) => {
+      if (appCommand.command === "newThread") {
+        newThread();
+      }
+    });
+  }, [newThread]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>
@@ -88,9 +125,9 @@ export function App(): React.JSX.Element {
   const sendPrompt = useCallback(
     async (prompt: string, attachments: DesktopAttachment[]) => {
       followBottom();
-      await agent.sendPrompt(prompt, attachments);
+      await sendAgentPrompt(prompt, attachments);
     },
-    [agent, followBottom],
+    [followBottom, sendAgentPrompt],
   );
   useEffect(() => {
     if (sidebarExtensions.length === 0) {
@@ -146,11 +183,12 @@ export function App(): React.JSX.Element {
         aria-hidden={!sidebarOpen}
       >
         <AppSidebar
-          threads={agent.threads}
-          activeThreadId={agent.activeThreadId}
+          threads={threads}
+          activeThreadId={activeThreadId}
           activeView={mainView}
           width={leftSidebarWidth}
           onSelectThread={selectThread}
+          onArchiveThread={archiveThread}
           onNewThread={newThread}
           onOpenPlugins={openPlugins}
         />
@@ -158,7 +196,7 @@ export function App(): React.JSX.Element {
       {sidebarOpen && (
         <>
           <div
-            className="no-drag relative z-30 h-screen w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+            className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
             aria-label="Resize thread sidebar"
             role="separator"
             onPointerDown={beginSidebarResize}
@@ -177,10 +215,10 @@ export function App(): React.JSX.Element {
               threads={threadOptions}
               folders={folderOptions}
               activeFolderPath={activeWorkspaceCwd}
-              status={agent.status}
+              status={status}
               activeTool={activeTool}
               sidebarOpen={sidebarOpen}
-              onRestart={() => void agent.restart()}
+              onRestart={() => void restart()}
               onToggleSidebar={() => setSidebarOpen((open) => !open)}
               onSelectFolder={selectFolder}
               onSelectThread={selectThread}
@@ -191,28 +229,28 @@ export function App(): React.JSX.Element {
             />
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
-                <Transcript messages={agent.messages} followSignal={followSignal} />
-                {agent.error && (
-                  <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-sm text-destructive">{agent.error}</div>
+                <Transcript messages={messages} followSignal={followSignal} />
+                {error && (
+                  <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{error}</div>
                 )}
                 <Composer
-                  busy={agent.busy}
-                  models={agent.models}
-                  selectedModel={agent.selectedModel}
-                  selectedReasoning={agent.selectedReasoning}
-                  selectedWorkspaceCwd={agent.selectedWorkspaceCwd}
-                  statusCwd={agent.status.cwd}
-                  workspaceRecents={agent.workspaceRecents}
-                  threads={agent.threads}
+                  busy={busy}
+                  models={models}
+                  selectedModel={selectedModel}
+                  selectedReasoning={selectedReasoning}
+                  selectedWorkspaceCwd={selectedWorkspaceCwd}
+                  statusCwd={status.cwd}
+                  workspaceRecents={workspaceRecents}
+                  threads={threads}
                   attachments={composerAttachments}
-                  onSelectedModelChange={agent.setSelectedModel}
-                  onSelectedReasoningChange={agent.setSelectedReasoning}
-                  onWorkspaceSelect={agent.setSelectedWorkspaceCwd}
-                  onOpenWorkspaceFolder={() => void agent.openWorkspaceFolder()}
+                  onSelectedModelChange={setSelectedModel}
+                  onSelectedReasoningChange={setSelectedReasoning}
+                  onWorkspaceSelect={setSelectedWorkspaceCwd}
+                  onOpenWorkspaceFolder={() => void openWorkspaceFolder()}
                   onScrollToBottom={followBottom}
                   onAttachmentsChange={setComposerAttachments}
                   onSend={sendPrompt}
-                  onStop={agent.stopTurn}
+                  onStop={stopTurn}
                 />
               </div>
               {activeTool && (

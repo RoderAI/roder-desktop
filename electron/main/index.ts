@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, shell, type Rectangle } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, type Rectangle } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -12,11 +12,12 @@ import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
+import { createApplicationMenuTemplate, installNewThreadShortcut } from "./shortcuts";
 
 const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
 const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
-const browser = new BrowserManager(cdpPort);
+const browser = new BrowserManager(cdpPort, () => sendAppCommand("newThread"));
 let mainWindow: BrowserWindow | null = null;
 let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
@@ -97,6 +98,7 @@ function createWindow(): void {
   mainWindow.webContents.on("did-finish-load", () => {
     mainWindow?.webContents.setZoomFactor(rendererZoomFactor);
   });
+  installNewThreadShortcut(mainWindow.webContents, () => sendAppCommand("newThread"));
 
   mainWindow.on("closed", () => {
     browser.destroy();
@@ -107,6 +109,10 @@ function createWindow(): void {
 
 function sendToRenderer(channel: string, payload: unknown): void {
   mainWindow?.webContents.send(channel, payload);
+}
+
+function sendAppCommand(command: "newThread"): void {
+  sendToRenderer("app:command", { command });
 }
 
 roder.on("notification", (payload) => {
@@ -250,6 +256,7 @@ nativeTheme.on("updated", () => {
 });
 
 app.whenReady().then(async () => {
+  Menu.setApplicationMenu(Menu.buildFromTemplate(createApplicationMenuTemplate(sendAppCommand)));
   createWindow();
   try {
     await roder.start();

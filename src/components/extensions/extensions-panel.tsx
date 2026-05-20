@@ -53,14 +53,14 @@ export function ExtensionsPanel({ selectedExtensionId, onSelectedExtensionChange
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-sidebar text-sidebar-foreground">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-[13px] font-medium text-foreground">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-base font-medium text-foreground">
         <Puzzle className="size-4 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate">Extension Sidebar</span>
-        <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-[11px] font-normal text-sidebar-muted">{sidebarExtensions.length}</span>
+        <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-base font-normal text-sidebar-muted">{sidebarExtensions.length}</span>
       </div>
       {error && (
         <div className="border-b border-border px-3 py-2">
-          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-[12px] text-destructive">
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-base text-destructive">
             <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
             <span className="min-w-0 flex-1">{error}</span>
           </div>
@@ -75,7 +75,7 @@ export function ExtensionsPanel({ selectedExtensionId, onSelectedExtensionChange
                   key={panel.id}
                   type="button"
                   className={cn(
-                    "flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2 text-base text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
                     selectedPanel?.id === panel.id && "bg-sidebar-active text-sidebar-active-foreground",
                   )}
                   onClick={() => setSelectedPanelId(panel.id)}
@@ -120,25 +120,25 @@ function ContributionShortcuts({
   const tool = extension.manifest.contributes.tools[0];
   if (!command && !tool) {
     return (
-      <div className="px-3 py-4 text-[13px] text-muted-foreground">
+      <div className="px-3 py-4 text-base text-muted-foreground">
         This extension has no sidebar panel. Manage it from Settings.
       </div>
     );
   }
   return (
-    <section className="px-3 py-3 text-[12px] text-muted-foreground">
+    <section className="px-3 py-3 text-base text-muted-foreground">
       <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
         <TerminalSquare className="size-3.5 text-muted-foreground" />
         Actions
       </div>
       <div className="flex flex-wrap gap-1.5">
       {command && (
-        <button type="button" className="h-6 rounded-md bg-sidebar-accent px-2 text-[11px] text-sidebar-foreground hover:bg-accent" onClick={() => void onCommand(command.id)}>
+        <button type="button" className="h-8 rounded-md bg-sidebar-accent px-2 text-base text-sidebar-foreground hover:bg-accent" onClick={() => void onCommand(command.id)}>
           Run {command.title}
         </button>
       )}
       {tool && (
-        <button type="button" className="h-6 rounded-md bg-sidebar-accent px-2 text-[11px] text-sidebar-foreground hover:bg-accent" onClick={() => void onTool(tool.id)}>
+        <button type="button" className="h-8 rounded-md bg-sidebar-accent px-2 text-base text-sidebar-foreground hover:bg-accent" onClick={() => void onTool(tool.id)}>
           Call {tool.title}
         </button>
       )}
@@ -161,7 +161,7 @@ function EmptyExtensions({
   onSettings: () => void;
 }): React.JSX.Element {
   return (
-    <div className="space-y-3 px-3 py-4 text-[13px] text-muted-foreground">
+    <div className="space-y-3 px-3 py-4 text-base text-muted-foreground">
       <p>Extensions with panels, commands, or tools appear here. Manage installed extensions and themes in Settings.</p>
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" onClick={onInstallFolder}>Folder</Button>
@@ -175,4 +175,3 @@ function EmptyExtensions({
     </div>
   );
 }
-

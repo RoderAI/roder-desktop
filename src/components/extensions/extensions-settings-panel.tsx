@@ -27,8 +27,8 @@ export function ExtensionsSettingsPanel({ surface = "settings" }: ExtensionsSett
     <section className={cn("bg-card", surface === "settings" ? "rounded-xl border border-border shadow-sm" : "min-h-full")}>
       <header className={cn("flex items-start justify-between gap-4 border-b border-border py-4", surface === "settings" ? "px-5" : "px-3")}>
         <div>
-          <h1 className="text-[16px] font-medium">Extensions</h1>
-          <p className="mt-1 text-[14px] text-muted-foreground">
+          <h1 className="text-base font-medium">Extensions</h1>
+          <p className="mt-1 text-base text-muted-foreground">
             {extensions.length === 0 ? "No local extensions installed" : `${extensions.length} local extension${extensions.length === 1 ? "" : "s"} installed`}
           </p>
         </div>
@@ -46,13 +46,13 @@ export function ExtensionsSettingsPanel({ surface = "settings" }: ExtensionsSett
         </div>
       </header>
 
-      {error && <div className={cn("border-b border-border py-3 text-[13px] text-destructive", surface === "settings" ? "px-5" : "px-3")}>{error}</div>}
+      {error && <div className={cn("border-b border-border py-3 text-base text-destructive", surface === "settings" ? "px-5" : "px-3")}>{error}</div>}
       {lastResult && (
-        <pre className={cn("max-h-48 overflow-auto border-b border-border bg-muted/50 py-3 text-[12px] text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>{lastResult}</pre>
+        <pre className={cn("max-h-48 overflow-auto border-b border-border bg-muted/50 py-3 text-base text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>{lastResult}</pre>
       )}
 
       {extensions.length === 0 ? (
-        <div className={cn("py-8 text-[14px] text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>
+        <div className={cn("py-8 text-base text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>
           Build an extension, then install its folder or packaged .rdx archive here. Local folders stay linked; archives are copied into app storage.
         </div>
       ) : (
@@ -95,16 +95,16 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-[15px] font-medium">{extension.manifest.displayName}</h2>
+            <h2 className="truncate text-base font-medium">{extension.manifest.displayName}</h2>
             <Badge variant={extension.enabled ? "secondary" : "muted"}>{extension.enabled ? "Enabled" : "Disabled"}</Badge>
             <Badge variant={extension.activationState === "failed" ? "outline" : "muted"}>{extension.activationState}</Badge>
           </div>
-          <p className="mt-1 max-w-[620px] text-[13px] text-muted-foreground">{extension.manifest.description}</p>
-          <p className="mt-2 truncate text-[12px] text-muted-foreground">
+          <p className="mt-1 max-w-[620px] text-base text-muted-foreground">{extension.manifest.description}</p>
+          <p className="mt-2 truncate text-base text-muted-foreground">
             {extension.source.type === "archive" ? `Packaged archive: ${extension.source.archivePath ?? extension.source.path}` : extension.source.path}
           </p>
-          <p className="mt-1 text-[12px] text-muted-foreground">{capabilitySummary}</p>
-          {extension.lastError && <p className="mt-2 text-[13px] text-destructive">{extension.lastError}</p>}
+          <p className="mt-1 text-base text-muted-foreground">{capabilitySummary}</p>
+          {extension.lastError && <p className="mt-2 text-base text-destructive">{extension.lastError}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {extension.enabled ? (
@@ -157,13 +157,13 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
 
       {extension.manifest.contributes.configuration.length > 0 && (
         <div className="mt-4 rounded-lg border border-border">
-          <div className="border-b border-border px-3 py-2 text-[13px] font-medium text-muted-foreground">Preferences</div>
+          <div className="border-b border-border px-3 py-2 text-base font-medium text-muted-foreground">Preferences</div>
           <div className="divide-y divide-border">
             {extension.manifest.contributes.configuration.map((preference) => (
-              <label key={preference.key} className="flex items-center justify-between gap-4 px-3 py-2 text-[13px]">
+              <label key={preference.key} className="flex items-center justify-between gap-4 px-3 py-2 text-base">
                 <span className="min-w-0">
                   <span className="block text-foreground">{preference.title}</span>
-                  {preference.description && <span className="block text-[12px] text-muted-foreground">{preference.description}</span>}
+                  {preference.description && <span className="block text-base text-muted-foreground">{preference.description}</span>}
                 </span>
                 {preference.type === "checkbox" ? (
                   <input
@@ -173,7 +173,7 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
                   />
                 ) : (
                   <input
-                    className="h-8 w-64 rounded-lg border border-border bg-muted px-3 text-[13px] text-foreground outline-none"
+                    className="h-8 w-64 rounded-lg border border-border bg-muted px-3 text-base text-foreground outline-none"
                     value={String(extension.preferences[preference.key] ?? "")}
                     onChange={(event) => void updatePreference(extension.id, preference.key, event.currentTarget.value)}
                   />
@@ -189,7 +189,7 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
           {logsOpen ? "Hide logs" : "Show logs"}
         </Button>
         {logsOpen && (
-          <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-muted px-3 py-2 text-[12px] text-muted-foreground">
+          <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-muted px-3 py-2 text-base text-muted-foreground">
             {logs.length > 0 ? logs.join("\n") : "No logs yet."}
           </pre>
         )}
@@ -209,16 +209,16 @@ function ContributionList({
 }): React.JSX.Element {
   return (
     <section className="rounded-lg border border-border">
-      <div className="border-b border-border px-3 py-2 text-[13px] font-medium text-muted-foreground">{title}</div>
+      <div className="border-b border-border px-3 py-2 text-base font-medium text-muted-foreground">{title}</div>
       {items.length === 0 ? (
-        <div className="px-3 py-3 text-[13px] text-muted-foreground">{empty}</div>
+        <div className="px-3 py-3 text-base text-muted-foreground">{empty}</div>
       ) : (
         <div className="divide-y divide-border">
           {items.map((item) => (
             <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2">
               <div className="min-w-0">
-                <div className="truncate text-[13px] text-foreground">{item.label}</div>
-                <div className="truncate text-[12px] text-muted-foreground">{item.description ?? item.id}</div>
+                <div className="truncate text-base text-foreground">{item.label}</div>
+                <div className="truncate text-base text-muted-foreground">{item.description ?? item.id}</div>
               </div>
               <Button variant="ghost" size="sm" onClick={item.onAction}>
                 {item.actionLabel}

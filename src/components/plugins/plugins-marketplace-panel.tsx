@@ -1,30 +1,33 @@
-import { Ban, CircleCheck, Download, ExternalLink, PackageCheck, PackagePlus, Plus, RefreshCw, Search, Store, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import * as React from "react";
+import { Compass, PackageCheck, Search, Store } from "lucide-react";
+import {
+  CategoryFilterDropdown,
+  InstalledPluginsTab,
+  MarketplaceSettingsDialog,
+  PanelEmpty,
+  PluginSearchRow,
+} from "@/components/plugins/plugin-marketplace-views";
 import { Button } from "@/components/ui/button";
 import {
-  activeComponentLabels,
-  installedVariantSet,
-  marketplaceIsActive,
-  marketplaceNeedsEnable,
-  marketplaceStateLabel,
+  buildMarketplacePluginLookups,
+  categoryOptionsForPlugins,
+  defaultSelectionForProvider,
+  pluginForProvider,
+  pluginInstallStatusFromLookups,
+  pluginMatchesCategories,
+  pluginSearchRowKey,
   pluginVariantKey,
+  pluginVariantKeyFromParts,
   recommendedVariant,
-  riskLabel,
-  sourceCodeUrl,
-  sourceLabel,
+  visibleInstalledPlugins,
+} from "@/lib/plugins-marketplace";
+import type {
+  MarketplaceProviderSelection,
+  PluginInstallStatus,
 } from "@/lib/plugins-marketplace";
 import { cn } from "@/lib/utils";
 import { usePluginsStore } from "@/stores/plugins-store";
-import type {
-  DedupedMarketplacePlugin,
-  DefaultMarketplaceSelection,
-  InstalledPluginRecord,
-  MarketplaceDescriptor,
-  MarketplaceKind,
-  MarketplacePluginVariant,
-  PluginInstallPreview,
-} from "@/types/plugins";
+import type { DedupedMarketplacePlugin } from "@/types/plugins";
 
 export function PluginsMarketplacePanel(): React.JSX.Element {
   const marketplaces = usePluginsStore((state) => state.marketplaces);
@@ -34,427 +37,260 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
   const query = usePluginsStore((state) => state.query);
   const loading = usePluginsStore((state) => state.loading);
   const error = usePluginsStore((state) => state.error);
-  const lastResult = usePluginsStore((state) => state.lastResult);
-  const load = usePluginsStore((state) => state.load);
+  const initializeMarketplaces = usePluginsStore((state) => state.initializeMarketplaces);
   const setQuery = usePluginsStore((state) => state.setQuery);
   const search = usePluginsStore((state) => state.search);
-  const installDefaults = usePluginsStore((state) => state.installDefaults);
-  const enableMarketplace = usePluginsStore((state) => state.enableMarketplace);
+  const ensureDefaultMarketplaces = usePluginsStore((state) => state.ensureDefaultMarketplaces);
   const addLocalMarketplace = usePluginsStore((state) => state.addLocalMarketplace);
-  const removeMarketplace = usePluginsStore((state) => state.removeMarketplace);
-  const refreshMarketplace = usePluginsStore((state) => state.refreshMarketplace);
   const previewPlugin = usePluginsStore((state) => state.previewPlugin);
   const installPlugin = usePluginsStore((state) => state.installPlugin);
-  const installAllVariants = usePluginsStore((state) => state.installAllVariants);
-  const disablePlugin = usePluginsStore((state) => state.disablePlugin);
   const uninstallPlugin = usePluginsStore((state) => state.uninstallPlugin);
-  const [defaultSelection, setDefaultSelection] = useState<DefaultMarketplaceSelection>("all");
+  const [activeTab, setActiveTab] = React.useState<"installed" | "explore">("installed");
+  const [provider, setProvider] = React.useState<MarketplaceProviderSelection>("all");
+  const [selectedCategories, setSelectedCategories] = React.useState<string[]>([]);
+  const [installingVariants, setInstallingVariants] = React.useState<Set<string>>(() => new Set());
+  const [uninstallingVariants, setUninstallingVariants] = React.useState<Set<string>>(() => new Set());
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const visibleInstalled = React.useMemo(() => visibleInstalledPlugins(installedPlugins), [installedPlugins]);
+  const lookups = React.useMemo(
+    () => buildMarketplacePluginLookups(plugins, installedPlugins),
+    [installedPlugins, plugins],
+  );
+  const providerPlugins = React.useMemo(
+    () => plugins.map((plugin) => pluginForProvider(plugin, provider, marketplaces)).filter((plugin): plugin is DedupedMarketplacePlugin => Boolean(plugin)),
+    [marketplaces, plugins, provider],
+  );
+  const categoryOptions = React.useMemo(() => categoryOptionsForPlugins(providerPlugins), [providerPlugins]);
+  const visiblePlugins = React.useMemo(
+    () => providerPlugins.filter((plugin) => pluginMatchesCategories(plugin, selectedCategories)),
+    [providerPlugins, selectedCategories],
+  );
+  const installStatusByVariant = React.useMemo(
+    () => buildRecommendedInstallStatuses(providerPlugins, lookups),
+    [lookups, providerPlugins],
+  );
+
+  React.useEffect(() => {
+    void initializeMarketplaces("all");
+  }, [initializeMarketplaces]);
+
+  React.useEffect(() => {
+    setSelectedCategories((current) => current.filter((category) => categoryOptions.includes(category)));
+  }, [categoryOptions]);
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    void search(query);
+    void ensureProvider(provider).then((changed) => {
+      if (!changed) {
+        void search(query);
+      }
+    });
+  }
+
+  function changeProvider(nextProvider: MarketplaceProviderSelection): void {
+    setProvider(nextProvider);
+    void ensureProvider(nextProvider);
+  }
+
+  async function ensureProvider(nextProvider: MarketplaceProviderSelection): Promise<boolean> {
+    const selection = defaultSelectionForProvider(nextProvider);
+    return selection ? ensureDefaultMarketplaces(selection) : false;
   }
 
   function openSourceCode(url: string): void {
     void window.roderDesktop.openExternal(url);
   }
 
-  return (
-    <section className="flex h-full min-h-0 flex-col bg-background">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4">
-        <div>
-          <h1 className="text-[16px] font-medium">Plugins</h1>
-          <p className="mt-1 text-[14px] text-muted-foreground">
-            {installedPlugins.length} installed variants, {marketplaces.length} marketplaces
-          </p>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" size="sm" disabled={loading} onClick={() => void load()}>
-            <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
-            Refresh
-          </Button>
-          <select
-            className="h-8 rounded-md border border-border bg-muted px-2 text-[13px] text-foreground outline-none"
-            value={defaultSelection}
-            onChange={(event) => setDefaultSelection(event.currentTarget.value as DefaultMarketplaceSelection)}
-          >
-            <option value="all">All defaults</option>
-            <option value="anthropic">Claude</option>
-            <option value="cursor">Cursor</option>
-            <option value="codex">Codex</option>
-            <option value="none">None</option>
-          </select>
-          <Button variant="secondary" size="sm" disabled={loading} onClick={() => void installDefaults(defaultSelection)}>
-            <Download className="size-3.5" />
-            Install defaults
-          </Button>
-        </div>
-      </header>
+  async function refreshProvider(): Promise<void> {
+    await initializeMarketplaces(defaultSelectionForProvider(provider) ?? "none");
+  }
 
-      {error && <div className="border-b border-border px-5 py-3 text-[13px] text-destructive">{error}</div>}
-      {lastResult && <div className="border-b border-border px-5 py-3 text-[13px] text-muted-foreground">{lastResult}</div>}
-
-      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-3">
-        <div className="min-h-0 overflow-y-auto border-b border-border lg:col-span-2 lg:border-b-0 lg:border-r">
-          <form className="flex gap-2 border-b border-border px-5 py-4" onSubmit={submitSearch}>
-            <label className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
-              <input
-                className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-[14px] text-foreground outline-none focus:ring-2 focus:ring-ring"
-                value={query}
-                placeholder="Search plugins"
-                onChange={(event) => setQuery(event.currentTarget.value)}
-              />
-            </label>
-            <Button type="submit" variant="secondary" size="compact" disabled={loading}>
-              Search
-            </Button>
-          </form>
-
-          {plugins.length === 0 ? (
-            <div className="px-5 py-8 text-[14px] text-muted-foreground">
-              No marketplace plugins found. Install defaults or add and refresh a local marketplace, then search again.
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {plugins.map((plugin) => (
-                <PluginSearchRow
-                  key={plugin.identityKey.canonicalSlug}
-                  plugin={plugin}
-                  marketplaces={marketplaces}
-                  installedPlugins={installedPlugins}
-                  previewsByVariant={previewsByVariant}
-                  onPreview={previewPlugin}
-                  onInstall={installPlugin}
-                  onInstallAll={installAllVariants}
-                  onOpenSource={openSourceCode}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <aside className="min-h-0 space-y-4 overflow-y-auto px-5 py-4">
-          <MarketplacesList
-            marketplaces={marketplaces}
-            loading={loading}
-            onEnable={enableMarketplace}
-            onRefresh={refreshMarketplace}
-            onRemove={removeMarketplace}
-          />
-          <LocalMarketplaceForm loading={loading} onAdd={addLocalMarketplace} />
-          <InstalledPluginsList
-            plugins={installedPlugins}
-            loading={loading}
-            onDisable={disablePlugin}
-            onUninstall={uninstallPlugin}
-          />
-        </aside>
-      </div>
-    </section>
-  );
-}
-
-function PluginSearchRow({
-  plugin,
-  marketplaces,
-  installedPlugins,
-  previewsByVariant,
-  onPreview,
-  onInstall,
-  onInstallAll,
-  onOpenSource,
-}: {
-  plugin: DedupedMarketplacePlugin;
-  marketplaces: MarketplaceDescriptor[];
-  installedPlugins: InstalledPluginRecord[];
-  previewsByVariant: Record<string, PluginInstallPreview>;
-  onPreview: (marketplaceId: string, pluginId: string) => Promise<void>;
-  onInstall: (marketplaceId: string, pluginId: string) => Promise<void>;
-  onInstallAll: (marketplaceId: string, pluginId: string) => Promise<void>;
-  onOpenSource: (url: string) => void;
-}): React.JSX.Element {
-  const variant = recommendedVariant(plugin);
-  const installedKeys = useMemo(() => installedVariantSet(plugin, installedPlugins), [installedPlugins, plugin]);
-  const preview = variant ? previewsByVariant[pluginVariantKey(variant)] : undefined;
-  const sourceUrl = variant ? sourceCodeUrl(variant.source, marketplaces) : undefined;
-
-  return (
-    <article className="px-5 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-[15px] font-medium">{plugin.displayName}</h2>
-            {variant && <Badge variant="muted">{variant.kind}</Badge>}
-            {variant && <Badge variant={variant.risk === "passive" ? "secondary" : "outline"}>{riskLabel(variant.risk)}</Badge>}
-            {plugin.installedVariants.length > 0 && <Badge variant="secondary">Installed</Badge>}
-          </div>
-          <p className="mt-1 max-w-2xl text-[13px] text-muted-foreground">{plugin.description || "No description provided."}</p>
-          {variant && (
-            <p className="mt-2 truncate text-[12px] text-muted-foreground" title={sourceLabel(variant.source)}>
-              {sourceLabel(variant.source)}
-            </p>
-          )}
-        </div>
-        {variant && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            {sourceUrl && (
-              <Button variant="ghost" size="sm" title="Open plugin source code" onClick={() => onOpenSource(sourceUrl)}>
-                <ExternalLink className="size-3.5" />
-                Source
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => void onPreview(variant.marketplaceId, variant.pluginId)}>
-              Preview
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => void onInstall(variant.marketplaceId, variant.pluginId)}>
-              <PackagePlus className="size-3.5" />
-              Install
-            </Button>
-            {plugin.variants.length > 1 && (
-              <Button variant="ghost" size="sm" onClick={() => void onInstallAll(variant.marketplaceId, variant.pluginId)}>
-                All variants
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 grid gap-2">
-        {plugin.variants.map((candidate) => (
-          <VariantRow
-            key={pluginVariantKey(candidate)}
-            variant={candidate}
-            marketplaces={marketplaces}
-            installed={installedKeys.has(pluginVariantKey(candidate))}
-            onPreview={onPreview}
-            onInstall={onInstall}
-            onOpenSource={onOpenSource}
-          />
-        ))}
-      </div>
-
-      {preview && (
-        <pre className="mt-3 max-h-48 overflow-auto rounded-md bg-muted px-3 py-2 text-[12px] text-muted-foreground">
-          {JSON.stringify(preview, null, 2)}
-        </pre>
-      )}
-    </article>
-  );
-}
-
-function VariantRow({
-  variant,
-  marketplaces,
-  installed,
-  onPreview,
-  onInstall,
-  onOpenSource,
-}: {
-  variant: MarketplacePluginVariant;
-  marketplaces: MarketplaceDescriptor[];
-  installed: boolean;
-  onPreview: (marketplaceId: string, pluginId: string) => Promise<void>;
-  onInstall: (marketplaceId: string, pluginId: string) => Promise<void>;
-  onOpenSource: (url: string) => void;
-}): React.JSX.Element {
-  const components = activeComponentLabels(variant.componentHints);
-  const sourceUrl = sourceCodeUrl(variant.source, marketplaces);
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-[12px]">
-      <span className="font-medium text-foreground">{variant.marketplaceId}</span>
-      <Badge variant="muted">{variant.kind}</Badge>
-      {variant.version && <span className="text-muted-foreground">{variant.version}</span>}
-      {components.length > 0 && <span className="min-w-0 flex-1 truncate text-muted-foreground">{components.join(", ")}</span>}
-      {installed && <Badge variant="secondary">Installed</Badge>}
-      {sourceUrl && (
-        <Button variant="ghost" size="sm" title="Open plugin source code" onClick={() => onOpenSource(sourceUrl)}>
-          <ExternalLink className="size-3.5" />
-          Source
-        </Button>
-      )}
-      <Button variant="ghost" size="sm" onClick={() => void onPreview(variant.marketplaceId, variant.pluginId)}>
-        Preview
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => void onInstall(variant.marketplaceId, variant.pluginId)}>
-        Install
-      </Button>
-    </div>
-  );
-}
-
-function MarketplacesList({
-  marketplaces,
-  loading,
-  onEnable,
-  onRefresh,
-  onRemove,
-}: {
-  marketplaces: MarketplaceDescriptor[];
-  loading: boolean;
-  onEnable: (marketplace: MarketplaceDescriptor) => Promise<void>;
-  onRefresh: (marketplaceId: string) => Promise<void>;
-  onRemove: (marketplaceId: string) => Promise<void>;
-}): React.JSX.Element {
-  return (
-    <section>
-      <div className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
-        <Store className="size-3.5" />
-        Marketplaces
-      </div>
-      {marketplaces.length === 0 ? (
-        <div className="rounded-md border border-border px-3 py-3 text-[13px] text-muted-foreground">No marketplaces configured.</div>
-      ) : (
-        <div className="divide-y divide-border rounded-md border border-border">
-          {marketplaces.map((marketplace) => {
-            const active = marketplaceIsActive(marketplace);
-            const canEnable = marketplaceNeedsEnable(marketplace);
-            return (
-              <div key={marketplace.id} className={cn("px-3 py-3", !active && "bg-muted/20")}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-[13px] font-medium text-foreground">{marketplace.displayName}</span>
-                      <Badge variant={active ? "secondary" : "muted"}>{active ? "Enabled" : "Not enabled"}</Badge>
-                      <Badge variant="outline">{marketplaceStateLabel(marketplace.state)}</Badge>
-                    </div>
-                    <p className="mt-1 truncate text-[12px] text-muted-foreground">{marketplace.id}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    {canEnable && (
-                      <Button variant="secondary" size="sm" disabled={loading} onClick={() => void onEnable(marketplace)}>
-                        <CircleCheck className="size-3.5" />
-                        Enable
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled={loading || !active}
-                      aria-label={`Refresh ${marketplace.displayName}`}
-                      title={active ? `Refresh ${marketplace.displayName}` : "Enable this marketplace before refreshing"}
-                      onClick={() => void onRefresh(marketplace.id)}
-                    >
-                      <RefreshCw className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled={loading}
-                      aria-label={`${marketplace.isDefault ? "Disable" : "Remove"} ${marketplace.displayName}`}
-                      title={marketplace.isDefault ? "Disable marketplace" : "Remove marketplace"}
-                      onClick={() => void onRemove(marketplace.id)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function LocalMarketplaceForm({
-  loading,
-  onAdd,
-}: {
-  loading: boolean;
-  onAdd: (params: { id: string; displayName: string; path: string; kind?: MarketplaceKind }) => Promise<void>;
-}): React.JSX.Element {
-  const [id, setId] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [path, setPath] = useState("");
-  const [kind, setKind] = useState<MarketplaceKind | "">("");
-  const disabled = loading || !id.trim() || !displayName.trim() || !path.trim();
-
-  function submit(event: React.FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    if (disabled) {
-      return;
+  async function installPluginWithPending(marketplaceId: string, pluginId: string): Promise<void> {
+    const variantKey = pluginVariantKeyFromParts(marketplaceId, pluginId);
+    setInstallingVariants((current) => new Set(current).add(variantKey));
+    try {
+      await installPlugin(marketplaceId, pluginId);
+    } finally {
+      setInstallingVariants((current) => {
+        const next = new Set(current);
+        next.delete(variantKey);
+        return next;
+      });
     }
-    void onAdd({ id: id.trim(), displayName: displayName.trim(), path: path.trim(), kind: kind || undefined });
+  }
+
+  async function uninstallPluginWithPending(variantKey: string): Promise<void> {
+    setUninstallingVariants((current) => new Set(current).add(variantKey));
+    try {
+      await uninstallPlugin(variantKey);
+    } finally {
+      setUninstallingVariants((current) => {
+        const next = new Set(current);
+        next.delete(variantKey);
+        return next;
+      });
+    }
   }
 
   return (
-    <form className="space-y-2" onSubmit={submit}>
-      <div className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
-        <Plus className="size-3.5" />
-        Add local marketplace
-      </div>
-      <input className="h-8 w-full rounded-md border border-border bg-background px-2 text-[13px] outline-none focus:ring-2 focus:ring-ring" value={id} placeholder="id" onChange={(event) => setId(event.currentTarget.value)} />
-      <input className="h-8 w-full rounded-md border border-border bg-background px-2 text-[13px] outline-none focus:ring-2 focus:ring-ring" value={displayName} placeholder="Display name" onChange={(event) => setDisplayName(event.currentTarget.value)} />
-      <input className="h-8 w-full rounded-md border border-border bg-background px-2 text-[13px] outline-none focus:ring-2 focus:ring-ring" value={path} placeholder="/path/to/marketplace" onChange={(event) => setPath(event.currentTarget.value)} />
-      <div className="flex gap-2">
-        <select className="h-8 min-w-0 flex-1 rounded-md border border-border bg-muted px-2 text-[13px] outline-none" value={kind} onChange={(event) => setKind(event.currentTarget.value as MarketplaceKind | "")}>
-          <option value="">Infer kind</option>
-          <option value="claude">Claude</option>
-          <option value="cursor">Cursor</option>
-          <option value="codex">Codex</option>
-          <option value="roder">Roder</option>
-          <option value="custom">Custom</option>
-        </select>
-        <Button type="submit" variant="secondary" size="sm" disabled={disabled}>
-          Add
-        </Button>
-      </div>
-    </form>
-  );
-}
+    <section className="flex h-full min-h-0 flex-col bg-background">
+      <header className="drag-region flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Store className="size-4 text-muted-foreground" />
+            <h1 className="truncate text-base font-medium">Plugins</h1>
+          </div>
+        </div>
+        <div className="no-drag flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Plugins sections">
+            <PluginsTabButton active={activeTab === "installed"} onClick={() => setActiveTab("installed")}>
+              <PackageCheck className="size-3.5" />
+              Installed
+              <span className="text-muted-foreground">{visibleInstalled.length}</span>
+            </PluginsTabButton>
+            <PluginsTabButton active={activeTab === "explore"} onClick={() => setActiveTab("explore")}>
+              <Compass className="size-3.5" />
+              Explore
+            </PluginsTabButton>
+          </div>
+          <MarketplaceSettingsDialog
+            loading={loading}
+            onAdd={addLocalMarketplace}
+            onRefresh={refreshProvider}
+          />
+        </div>
+      </header>
 
-function InstalledPluginsList({
-  plugins,
-  loading,
-  onDisable,
-  onUninstall,
-}: {
-  plugins: InstalledPluginRecord[];
-  loading: boolean;
-  onDisable: (variantKey: string) => Promise<void>;
-  onUninstall: (variantKey: string) => Promise<void>;
-}): React.JSX.Element {
-  return (
-    <section>
-      <div className="mb-2 flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
-        <PackageCheck className="size-3.5" />
-        Installed
-      </div>
-      {plugins.length === 0 ? (
-        <div className="rounded-md border border-border px-3 py-3 text-[13px] text-muted-foreground">No plugin variants installed.</div>
+      {error && <div className="border-b border-border bg-destructive/10 px-4 py-2 text-base text-destructive">{error}</div>}
+
+      {activeTab === "installed" ? (
+        <InstalledPluginsTab
+          plugins={visibleInstalled}
+          lookups={lookups}
+          marketplaces={marketplaces}
+          previewsByVariant={previewsByVariant}
+          loading={loading}
+          uninstallingVariants={uninstallingVariants}
+          onExplore={() => setActiveTab("explore")}
+          onPreview={previewPlugin}
+          onUninstall={uninstallPluginWithPending}
+          onOpenSource={openSourceCode}
+        />
       ) : (
-        <div className="divide-y divide-border rounded-md border border-border">
-          {plugins.map((plugin) => (
-            <div key={plugin.variantKey} className="px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[13px] font-medium text-foreground">{plugin.identityKey.normalizedName}</span>
-                    <Badge variant={plugin.state === "installed" ? "secondary" : "muted"}>{plugin.state}</Badge>
-                  </div>
-                  <p className="mt-1 truncate text-[12px] text-muted-foreground" title={plugin.installPath}>{plugin.variantKey}</p>
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" className="size-7" disabled={loading || plugin.state === "disabled"} aria-label={`Disable ${plugin.variantKey}`} onClick={() => void onDisable(plugin.variantKey)}>
-                    <Ban className="size-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="size-7" disabled={loading} aria-label={`Uninstall ${plugin.variantKey}`} onClick={() => void onUninstall(plugin.variantKey)}>
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
+        <div className="min-h-0 flex-1 overflow-y-auto" role="tabpanel" aria-label="Explore plugins">
+          <div className="mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <form
+              className="sticky top-0 z-10 col-span-full flex flex-wrap items-center justify-between gap-3 bg-background/95 py-3 backdrop-blur"
+              onSubmit={submitSearch}
+            >
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <label className="relative w-80 max-w-full">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                  <input
+                    className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
+                    value={query}
+                    placeholder="Search plugins"
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                  />
+                </label>
+                <Button type="submit" size="compact" disabled={loading}>
+                  Search
+                </Button>
               </div>
-            </div>
-          ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="h-9 min-w-40 rounded-md border border-border bg-background px-2 text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
+                  value={provider}
+                  onChange={(event) => changeProvider(event.currentTarget.value as MarketplaceProviderSelection)}
+                  aria-label="Plugin provider"
+                >
+                  <option value="all">All providers</option>
+                  <option value="anthropic">Claude</option>
+                  <option value="cursor">Cursor</option>
+                  <option value="codex">Codex</option>
+                  <option value="local">Local</option>
+                </select>
+                <CategoryFilterDropdown
+                  categories={categoryOptions}
+                  selectedCategories={selectedCategories}
+                  onChange={setSelectedCategories}
+                />
+              </div>
+            </form>
+
+            {visiblePlugins.length === 0 ? (
+              <div className="col-span-full">
+                <PanelEmpty>No plugins found for this provider.</PanelEmpty>
+              </div>
+            ) : (
+              visiblePlugins.map((plugin) => (
+                <PluginSearchRow
+                  key={pluginSearchRowKey(plugin)}
+                  plugin={plugin}
+                  marketplaces={marketplaces}
+                  installStatus={recommendedInstallStatus(plugin, installStatusByVariant)}
+                  installingVariants={installingVariants}
+                  uninstallingVariants={uninstallingVariants}
+                  previewsByVariant={previewsByVariant}
+                  onPreview={previewPlugin}
+                  onInstall={installPluginWithPending}
+                  onUninstall={uninstallPluginWithPending}
+                  onOpenSource={openSourceCode}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
     </section>
   );
+}
+
+function PluginsTabButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      className={cn(
+        "inline-flex h-9 items-center gap-2 rounded-full px-3 text-base font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+        active
+          ? "bg-muted/50 text-foreground"
+          : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function buildRecommendedInstallStatuses(
+  plugins: DedupedMarketplacePlugin[],
+  lookups: ReturnType<typeof buildMarketplacePluginLookups>,
+): Map<string, PluginInstallStatus> {
+  const statuses = new Map<string, PluginInstallStatus>();
+  for (const plugin of plugins) {
+    const variant = recommendedVariant(plugin);
+    if (variant) {
+      statuses.set(pluginVariantKey(variant), pluginInstallStatusFromLookups(plugin, variant, lookups));
+    }
+  }
+  return statuses;
+}
+
+function recommendedInstallStatus(
+  plugin: DedupedMarketplacePlugin,
+  statuses: Map<string, PluginInstallStatus>,
+): PluginInstallStatus | undefined {
+  const variant = recommendedVariant(plugin);
+  return variant ? statuses.get(pluginVariantKey(variant)) : undefined;
 }
