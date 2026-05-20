@@ -73,6 +73,8 @@ export type RoderModel = {
 };
 
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type PolicyMode = "default" | "accept_all" | "plan" | "bypass";
+
 
 export type ConversationMessage = {
   id: string;

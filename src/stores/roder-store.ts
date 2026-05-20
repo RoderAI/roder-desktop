@@ -15,6 +15,7 @@ import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceR
 import type {
   ConversationMessage,
   DesktopAttachment,
+  PolicyMode,
   RoderModel,
   RoderNotification,
   RoderItem,
@@ -39,6 +40,7 @@ type RoderStore = {
   visibleModelIds: string[];
   selectedModel: string;
   selectedReasoning: ReasoningEffort;
+  selectedPolicyMode: PolicyMode;
   selectedWorkspaceCwd: string;
   workspaceRecents: WorkspaceFolder[];
   appearance: SystemAppearance;
@@ -59,6 +61,7 @@ type RoderStore = {
   restart: () => Promise<void>;
   setSelectedModel: (model: string) => void;
   setSelectedReasoning: (reasoning: ReasoningEffort) => void;
+  setSelectedPolicyMode: (mode: PolicyMode) => Promise<void>;
   setModelVisibility: (modelId: string, visible: boolean) => void;
   resetVisibleModels: () => void;
   setSelectedWorkspaceCwd: (cwd: string) => void;
@@ -86,6 +89,16 @@ function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
   }
   return "low";
 }
+function normalizePolicyMode(value: string | undefined): PolicyMode {
+  if (value === "default" || value === "accept_all" || value === "plan" || value === "bypass") {
+    return value;
+  }
+  if (value === "accept_edits" || value === "accept-edits" || value === "accept-all") {
+    return "accept_all";
+  }
+  return "accept_all";
+}
+
 
 function realThreads(threads: RoderThread[]): RoderThread[] {
   return sortThreadsByUpdatedAt(threads.filter((thread) => !thread.id.startsWith("demo-")));
@@ -122,6 +135,7 @@ export const useRoderStore = create<RoderStore>()(
       visibleModelIds: [],
       selectedModel: "gpt-5.3-codex",
       selectedReasoning: "medium",
+      selectedPolicyMode: "accept_all",
       selectedWorkspaceCwd: "",
       workspaceRecents: [],
       appearance: "light",
@@ -154,6 +168,7 @@ export const useRoderStore = create<RoderStore>()(
             ? current.selectedModel
             : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || "gpt-5.3-codex";
 
+          const selectedPolicyMode = normalizePolicyMode(current.selectedPolicyMode);
           set({
             status,
             threads,
@@ -165,11 +180,18 @@ export const useRoderStore = create<RoderStore>()(
             selectedReasoning: normalizeReasoningEffort(
               current.selectedReasoning || models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort,
             ),
+            selectedPolicyMode,
             activeThreadId,
             hydrated: true,
             busy: false,
             error: null,
           });
+          try {
+            await roderIpc.setSessionMode(selectedPolicyMode, "desktop startup default");
+          } catch (error) {
+            set({ error: (error as Error).message });
+          }
+
 
           if (activeThreadId) {
             await get().selectThread(activeThreadId, { pushHistory: false });
@@ -404,6 +426,16 @@ export const useRoderStore = create<RoderStore>()(
       }),
       resetVisibleModels: () => set({ visibleModelIds: [] }),
       setSelectedReasoning: (selectedReasoning) => set({ selectedReasoning }),
+      setSelectedPolicyMode: async (selectedPolicyMode) => {
+        const mode = normalizePolicyMode(selectedPolicyMode);
+        set({ selectedPolicyMode: mode, error: null });
+        try {
+          const result = await roderIpc.setSessionMode(mode, "desktop permission selector");
+          set({ selectedPolicyMode: normalizePolicyMode(result.mode) });
+        } catch (error) {
+          set({ error: (error as Error).message });
+        }
+      },
       setSelectedWorkspaceCwd: (cwd) => set((state) => {
         const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
         return {
@@ -436,6 +468,7 @@ export const useRoderStore = create<RoderStore>()(
         visibleModelIds: state.visibleModelIds,
         selectedReasoning: state.selectedReasoning,
         selectedWorkspaceCwd: state.selectedWorkspaceCwd,
+        selectedPolicyMode: state.selectedPolicyMode,
         workspaceRecents: state.workspaceRecents,
       }),
     },

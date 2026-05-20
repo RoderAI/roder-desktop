@@ -34,12 +34,14 @@ export function App(): React.JSX.Element {
     openWorkspaceFolder,
     restart,
     selectedModel,
+    selectedPolicyMode,
     selectedReasoning,
     selectedWorkspaceCwd,
     selectThread: selectAgentThread,
     sendPrompt: sendAgentPrompt,
     setSelectedModel,
     setSelectedReasoning,
+    setSelectedPolicyMode,
     setSelectedWorkspaceCwd,
     status,
     stopTurn,
@@ -255,6 +257,7 @@ export function App(): React.JSX.Element {
                   busy={busy}
                   models={models}
                   selectedModel={selectedModel}
+                  selectedPolicyMode={selectedPolicyMode}
                   selectedReasoning={selectedReasoning}
                   selectedWorkspaceCwd={selectedWorkspaceCwd}
                   statusCwd={status.cwd}
@@ -262,6 +265,7 @@ export function App(): React.JSX.Element {
                   threads={threads}
                   attachments={composerAttachments}
                   onSelectedModelChange={setSelectedModel}
+                  onSelectedPolicyModeChange={(mode) => void setSelectedPolicyMode(mode)}
                   onSelectedReasoningChange={setSelectedReasoning}
                   onWorkspaceSelect={setSelectedWorkspaceCwd}
                   onOpenWorkspaceFolder={() => void openWorkspaceFolder()}
