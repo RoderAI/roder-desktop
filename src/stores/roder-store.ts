@@ -10,12 +10,16 @@ import {
   upsertConversationMessage,
   upsertThread,
 } from "@/lib/roder-thread";
+import { reducePendingWaitRequests, setWaitRequestResolving, shouldDisplayStartedItem } from "@/lib/roder-wait-requests";
 import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/roder-models";
 import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceRecent } from "@/lib/roder-workspaces";
 import type {
+  ApprovalWaitRequest,
   ConversationMessage,
   DesktopAttachment,
+  PendingWaitRequestsByThread,
   PolicyMode,
+  PlanExitWaitRequest,
   RoderModel,
   RoderNotification,
   RoderItem,
@@ -24,6 +28,7 @@ import type {
   NavigationEntry,
   ReasoningEffort,
   SystemAppearance,
+  UserInputWaitRequest,
   WorkspaceFolder,
 } from "@/types/roder";
 
@@ -43,6 +48,7 @@ type RoderStore = {
   selectedPolicyMode: PolicyMode;
   selectedWorkspaceCwd: string;
   workspaceRecents: WorkspaceFolder[];
+  pendingWaitRequestsByThread: PendingWaitRequestsByThread;
   appearance: SystemAppearance;
   busy: boolean;
   activeTurnId: string;
@@ -66,6 +72,9 @@ type RoderStore = {
   resetVisibleModels: () => void;
   setSelectedWorkspaceCwd: (cwd: string) => void;
   openWorkspaceFolder: () => Promise<void>;
+  resolveApproval: (request: ApprovalWaitRequest, approved: boolean) => Promise<void>;
+  resolveUserInput: (request: UserInputWaitRequest, answers: Record<string, string>) => Promise<void>;
+  exitPlan: (request: PlanExitWaitRequest, approved: boolean) => Promise<void>;
   applyAppearance: (appearance: SystemAppearance) => void;
   applyStatus: (status: RoderStatus) => void;
   applyStderr: (message: string) => void;
@@ -89,6 +98,7 @@ function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
   }
   return "low";
 }
+
 function normalizePolicyMode(value: string | undefined): PolicyMode {
   if (value === "default" || value === "accept_all" || value === "plan" || value === "bypass") {
     return value;
@@ -98,7 +108,6 @@ function normalizePolicyMode(value: string | undefined): PolicyMode {
   }
   return "accept_all";
 }
-
 
 function realThreads(threads: RoderThread[]): RoderThread[] {
   return sortThreadsByUpdatedAt(threads.filter((thread) => !thread.id.startsWith("demo-")));
@@ -138,6 +147,7 @@ export const useRoderStore = create<RoderStore>()(
       selectedPolicyMode: "accept_all",
       selectedWorkspaceCwd: "",
       workspaceRecents: [],
+      pendingWaitRequestsByThread: {},
       appearance: "light",
       busy: false,
       activeTurnId: "",
@@ -167,8 +177,8 @@ export const useRoderStore = create<RoderStore>()(
           const currentSelectedModel = visibleModels.some((model) => model.id === current.selectedModel)
             ? current.selectedModel
             : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || "gpt-5.3-codex";
-
           const selectedPolicyMode = normalizePolicyMode(current.selectedPolicyMode);
+
           set({
             status,
             threads,
@@ -186,12 +196,12 @@ export const useRoderStore = create<RoderStore>()(
             busy: false,
             error: null,
           });
+
           try {
             await roderIpc.setSessionMode(selectedPolicyMode, "desktop startup default");
           } catch (error) {
             set({ error: (error as Error).message });
           }
-
 
           if (activeThreadId) {
             await get().selectThread(activeThreadId, { pushHistory: false });
@@ -450,6 +460,30 @@ export const useRoderStore = create<RoderStore>()(
           get().setSelectedWorkspaceCwd(folder);
         }
       },
+      resolveApproval: async (request, approved) => {
+        markWaitRequestResolving(set, request.threadId, request.id, true);
+        try {
+          await roderIpc.resolveApproval({ approvalId: request.approvalId, approved });
+        } catch (error) {
+          markWaitRequestResolving(set, request.threadId, request.id, false, (error as Error).message);
+        }
+      },
+      resolveUserInput: async (request, answers) => {
+        markWaitRequestResolving(set, request.threadId, request.id, true);
+        try {
+          await roderIpc.resolveUserInput({ requestId: request.requestId, answers });
+        } catch (error) {
+          markWaitRequestResolving(set, request.threadId, request.id, false, (error as Error).message);
+        }
+      },
+      exitPlan: async (request, approved) => {
+        markWaitRequestResolving(set, request.threadId, request.id, true);
+        try {
+          await roderIpc.exitPlan({ requestId: request.requestId, approved });
+        } catch (error) {
+          markWaitRequestResolving(set, request.threadId, request.id, false, (error as Error).message);
+        }
+      },
       applyAppearance: (appearance) => set({ appearance }),
       applyStatus: (status) => set((state) => ({
         status,
@@ -467,8 +501,8 @@ export const useRoderStore = create<RoderStore>()(
         selectedModel: state.selectedModel,
         visibleModelIds: state.visibleModelIds,
         selectedReasoning: state.selectedReasoning,
-        selectedWorkspaceCwd: state.selectedWorkspaceCwd,
         selectedPolicyMode: state.selectedPolicyMode,
+        selectedWorkspaceCwd: state.selectedWorkspaceCwd,
         workspaceRecents: state.workspaceRecents,
       }),
     },
@@ -500,10 +534,13 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
 
 function reduceNotification(state: RoderStore, notification: RoderNotification): Partial<RoderStore> {
   const params = notificationParams(notification);
+  const pendingWaitRequestsByThread = reducePendingWaitRequests(state.pendingWaitRequestsByThread, notification, state.activeThreadId);
+  const waitPatch = pendingWaitRequestsByThread === state.pendingWaitRequestsByThread ? {} : { pendingWaitRequestsByThread };
 
   if (notification.method === "thread/started" && isRecord(params.thread)) {
     const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
     return {
+      ...waitPatch,
       threads: upsertThread(state.threads, thread),
       activeThreadId: thread.id,
       selectedWorkspaceCwd: thread.cwd,
@@ -514,17 +551,18 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
 
   if (notification.method === "item/started") {
     const item = isRecord(params.item) ? params.item : {};
-    if (item.type !== "agentMessage" && !String(item.type ?? "").startsWith("tool.")) {
-      return {};
+    if (!shouldDisplayStartedItem(item)) {
+      return waitPatch;
     }
     const threadId = String(params.threadId ?? state.activeThreadId);
     const [message] = messagesFromRoderItem(threadId, String(params.turnId ?? ""), item as RoderItem, "inProgress");
     if (!message || (message.role === "assistant" && !message.text)) {
-      return {};
+      return waitPatch;
     }
     const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
     upsertConversationMessage(nextMessages, message);
     return {
+      ...waitPatch,
       messagesByThread: {
         ...state.messagesByThread,
         [threadId]: nextMessages,
@@ -537,6 +575,7 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const turn = isRecord(params.turn) ? params.turn : {};
     const turnId = String(turn.id ?? "");
     return {
+      ...waitPatch,
       activeThreadId: threadId || state.activeThreadId,
       activeTurnId: turnId || state.activeTurnId,
       busy: true,
@@ -565,6 +604,7 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       nextMessages[index] = { ...nextMessages[index], text: nextMessages[index].text + delta, status: "streaming", phase };
     }
     return {
+      ...waitPatch,
       messagesByThread: {
         ...state.messagesByThread,
         [threadId]: nextMessages,
@@ -577,13 +617,14 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const threadId = String(params.threadId ?? state.activeThreadId);
     const messages = messagesFromRoderItem(threadId, String(params.turnId ?? ""), item as RoderItem, "completed");
     if (messages.length === 0) {
-      return {};
+      return waitPatch;
     }
     const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
     for (const message of messages) {
       upsertConversationMessage(nextMessages, message);
     }
     return {
+      ...waitPatch,
       messagesByThread: {
         ...state.messagesByThread,
         [threadId]: nextMessages,
@@ -603,6 +644,7 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       upsertConversationMessage(nextMessages, failedMessage);
     }
     return {
+      ...waitPatch,
       messagesByThread: {
         ...state.messagesByThread,
         [threadId]: nextMessages,
@@ -616,11 +658,24 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const threadId = String(params.threadId ?? "");
     const status = isRecord(params.status) ? (params.status as RoderThread["status"]) : { type: "idle" };
     return {
+      ...waitPatch,
       threads: state.threads.map((thread) => (thread.id === threadId ? { ...thread, status } : thread)),
     };
   }
 
-  return {};
+  return waitPatch;
+}
+
+function markWaitRequestResolving(
+  set: (partial: Partial<RoderStore> | ((state: RoderStore) => Partial<RoderStore>)) => void,
+  threadId: string,
+  requestId: string,
+  resolving: boolean,
+  error?: string,
+): void {
+  set((state) => ({
+    pendingWaitRequestsByThread: setWaitRequestResolving(state.pendingWaitRequestsByThread, threadId, requestId, resolving, error),
+  }));
 }
 
 function turnFailureMessage(threadId: string, turnId: string, turn: Record<string, unknown>): ConversationMessage | null {

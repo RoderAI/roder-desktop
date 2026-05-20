@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AgentWaitCards } from "@/components/agent-wait-card";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { Composer } from "@/components/composer";
@@ -40,13 +41,17 @@ export function App(): React.JSX.Element {
     selectThread: selectAgentThread,
     sendPrompt: sendAgentPrompt,
     setSelectedModel,
-    setSelectedReasoning,
     setSelectedPolicyMode,
+    setSelectedReasoning,
     setSelectedWorkspaceCwd,
     status,
     stopTurn,
     threads,
+    waitRequests,
     workspaceRecents,
+    resolveApproval,
+    resolveUserInput,
+    exitPlan,
   } = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
   const closeSettings = useThemeStore((state) => state.closeSettings);
@@ -250,6 +255,12 @@ export function App(): React.JSX.Element {
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
                 <Transcript messages={messages} followSignal={followSignal} />
+                <AgentWaitCards
+                  requests={waitRequests}
+                  onResolveApproval={resolveApproval}
+                  onResolveUserInput={resolveUserInput}
+                  onExitPlan={exitPlan}
+                />
                 {error && (
                   <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{error}</div>
                 )}
