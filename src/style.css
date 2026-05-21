@@ -270,10 +270,78 @@ code[data-streamdown="inline-code"] {
   }
 }
 
+@keyframes ai-shimmer-text {
+  from {
+    background-position: 150% 50%;
+  }
+
+  to {
+    background-position: -150% 50%;
+  }
+}
+
+.ai-shimmer-text {
+  animation: ai-shimmer-text 2s linear infinite;
+  background-image: linear-gradient(
+    110deg,
+    var(--color-muted-foreground) 0%,
+    var(--color-muted-foreground) 36%,
+    var(--color-foreground) 50%,
+    var(--color-muted-foreground) 64%,
+    var(--color-muted-foreground) 100%
+  );
+  background-clip: text;
+  background-size: 250% 100%;
+  color: transparent;
+  -webkit-background-clip: text;
+}
+
+.tool-disclosure-panel {
+  height: var(--collapsible-panel-height);
+  opacity: 1;
+  overflow: hidden;
+  transform: translateY(0);
+  transition:
+    height 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
+    opacity 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
+    transform 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.tool-disclosure-panel[data-starting-style],
+.tool-disclosure-panel[data-ending-style] {
+  height: 0;
+  opacity: 0;
+  transform: translateY(-0.125rem);
+}
+
+.tool-disclosure-panel[hidden] {
+  display: none;
+}
+
+.tool-shell-output {
+  content-visibility: auto;
+  contain-intrinsic-size: 8rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dotmatrix-spinner-dot {
     animation: none;
     opacity: 0.75;
+    transform: none;
+  }
+
+  .ai-shimmer-text {
+    animation: none;
+    background-image: none;
+    color: var(--color-muted-foreground);
+  }
+
+  .tool-disclosure-panel {
+    transition: none;
+  }
+
+  .tool-disclosure-panel[data-starting-style],
+  .tool-disclosure-panel[data-ending-style] {
     transform: none;
   }
 }

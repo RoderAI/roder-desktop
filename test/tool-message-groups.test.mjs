@@ -1,0 +1,347 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { Script } from "node:vm";
+import { test } from "node:test";
+import ts from "typescript";
+
+const toolDisplayModule = loadTypescriptModule("../src/lib/tool-display.ts");
+const toolMessageGroupsModule = loadTypescriptModule("../src/lib/tool-message-groups.ts", (id) => {
+  if (id === "@/lib/tool-display") {
+    return toolDisplayModule.exports;
+  }
+  throw new Error(`Unexpected import: ${id}`);
+});
+const { groupToolMessagesForTranscript } = toolMessageGroupsModule.exports;
+
+test("adjacent read-file tool messages collapse into one transcript group", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "read_file", "Read README.md"),
+    createToolMessage("tool-2", "read_file", "Read package.json"),
+    createAssistantMessage("Done."),
+    createToolMessage("tool-3", "read_file", "Read tsconfig.json"),
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      id: "activity-group:tool-1:tool-2",
+      kind: "activityGroup",
+      summary: {
+        commands: 0,
+        files: 2,
+        label: "Explored 2 files",
+        searches: 0,
+      },
+      entries: [
+        {
+          id: "tool-group:read_file:tool-1:tool-2",
+          kind: "readFileGroup",
+          messages: [
+            createToolMessage("tool-1", "read_file", "Read README.md"),
+            createToolMessage("tool-2", "read_file", "Read package.json"),
+          ],
+        },
+      ],
+    },
+    {
+      kind: "message",
+      message: createAssistantMessage("Done."),
+    },
+    {
+      kind: "message",
+      message: createToolMessage("tool-3", "read_file", "Read tsconfig.json"),
+    },
+  ]);
+});
+
+test("adjacent skill read tool messages collapse into one transcript group", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "read_skill", "Read ai-sdk Skill"),
+    createToolMessage("tool-2", "read_skill_file", "Read ai-sdk streaming.md"),
+    createToolMessage("tool-3", "read_file", "Read README.md"),
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      id: "activity-group:tool-1:tool-3",
+      kind: "activityGroup",
+      summary: {
+        commands: 0,
+        files: 2,
+        label: "Explored 2 files",
+        searches: 0,
+      },
+      entries: [
+        {
+          id: "tool-group:read_skill:tool-1:tool-2",
+          kind: "readSkillGroup",
+          messages: [
+            createToolMessage("tool-1", "read_skill", "Read ai-sdk Skill"),
+            createToolMessage("tool-2", "read_skill_file", "Read ai-sdk streaming.md"),
+          ],
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-3", "read_file", "Read README.md"),
+        },
+      ],
+    },
+  ]);
+});
+
+test("adjacent search tool messages collapse into one transcript group", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "glob", 'Searched "node_modules/.pnpm/7zip-bin@5.2.0/node_modules/7zip-bin/README.md"'),
+    createToolMessage("tool-2", "glob", 'Searched "examples/extensions/aurora-theme/package.json"'),
+    createToolMessage("tool-3", "search_files", 'Searched for "ToolTimelineItem" in src/components'),
+    createAssistantMessage("Done."),
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      id: "activity-group:tool-1:tool-3",
+      kind: "activityGroup",
+      summary: {
+        commands: 0,
+        files: 0,
+        label: "Explored 3 searches",
+        searches: 3,
+      },
+      entries: [
+        {
+          id: "tool-group:search:tool-1:tool-3",
+          kind: "searchGroup",
+          messages: [
+            createToolMessage("tool-1", "glob", 'Searched "node_modules/.pnpm/7zip-bin@5.2.0/node_modules/7zip-bin/README.md"'),
+            createToolMessage("tool-2", "glob", 'Searched "examples/extensions/aurora-theme/package.json"'),
+            createToolMessage("tool-3", "search_files", 'Searched for "ToolTimelineItem" in src/components'),
+          ],
+        },
+      ],
+    },
+    {
+      kind: "message",
+      message: createAssistantMessage("Done."),
+    },
+  ]);
+});
+
+test("completed tool runs collapse into one expandable activity group", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createUserMessage("Inspect this repo."),
+    createToolMessage("tool-1", "read_file", "Read README.md"),
+    createToolMessage("tool-2", "read_file", "Read package.json"),
+    createToolMessage("tool-3", "grep", 'Searched for "Transcript" in src'),
+    createToolMessage("tool-4", "shell", "Ran pnpm test"),
+    createAssistantMessage("Done."),
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      kind: "message",
+      message: createUserMessage("Inspect this repo."),
+    },
+    {
+      id: "activity-group:tool-1:tool-4",
+      kind: "activityGroup",
+      summary: {
+        commands: 1,
+        files: 2,
+        label: "Explored 2 files, 1 search, ran 1 command",
+        searches: 1,
+      },
+      entries: [
+        {
+          id: "tool-group:read_file:tool-1:tool-2",
+          kind: "readFileGroup",
+          messages: [
+            createToolMessage("tool-1", "read_file", "Read README.md"),
+            createToolMessage("tool-2", "read_file", "Read package.json"),
+          ],
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-3", "grep", 'Searched for "Transcript" in src'),
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-4", "shell", "Ran pnpm test"),
+        },
+      ],
+    },
+    {
+      kind: "message",
+      message: createAssistantMessage("Done."),
+    },
+  ]);
+});
+
+test("goal updates stay visible before collapsed exploration activity", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
+    createToolMessage("tool-2", "list_files", "Listed files in ."),
+    createToolMessage("tool-3", "read_file", "Read README.md"),
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      kind: "message",
+      message: createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
+    },
+    {
+      id: "activity-group:tool-2:tool-3",
+      kind: "activityGroup",
+      summary: {
+        commands: 0,
+        files: 2,
+        label: "Explored 2 files",
+        searches: 0,
+      },
+      entries: [
+        {
+          kind: "message",
+          message: createToolMessage("tool-2", "list_files", "Listed files in ."),
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-3", "read_file", "Read README.md"),
+        },
+      ],
+    },
+  ]);
+});
+
+test("running tool runs stay expanded while progress is active", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "read_file", "Read README.md"),
+    {
+      ...createToolMessage("tool-2", "read_file", "Reading package.json"),
+      status: "streaming",
+      toolStatus: "running",
+    },
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      id: "tool-group:read_file:tool-1:tool-2",
+      kind: "readFileGroup",
+      messages: [
+        createToolMessage("tool-1", "read_file", "Read README.md"),
+        {
+          ...createToolMessage("tool-2", "read_file", "Reading package.json"),
+          status: "streaming",
+          toolStatus: "running",
+        },
+      ],
+    },
+  ]);
+});
+
+test("completed tools stay expanded while their turn is still active", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "read_file", "Read README.md", "turn-1"),
+    createToolMessage("tool-2", "grep", 'Searched for "Transcript" in src', "turn-1"),
+  ], { activeTurnId: "turn-1" });
+
+  assert.deepEqual(plain(grouped), [
+    {
+      kind: "message",
+      message: createToolMessage("tool-1", "read_file", "Read README.md", "turn-1"),
+    },
+    {
+      kind: "message",
+      message: createToolMessage("tool-2", "grep", 'Searched for "Transcript" in src', "turn-1"),
+    },
+  ]);
+});
+
+test("failed tool activity stays inside the completed exploration group", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "read_file", "Read README.md"),
+    createFailedToolMessage("tool-2", "read_file", "Failed to read package.json"),
+    createToolMessage("tool-3", "grep", 'Searched for "Transcript" in src'),
+  ]);
+
+  assert.deepEqual(plain(grouped), [
+    {
+      id: "activity-group:tool-1:tool-3",
+      kind: "activityGroup",
+      summary: {
+        commands: 0,
+        files: 2,
+        label: "Explored 2 files, 1 search",
+        searches: 1,
+      },
+      entries: [
+        {
+          id: "tool-group:read_file:tool-1:tool-2",
+          kind: "readFileGroup",
+          messages: [
+            createToolMessage("tool-1", "read_file", "Read README.md"),
+            createFailedToolMessage("tool-2", "read_file", "Failed to read package.json"),
+          ],
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-3", "grep", 'Searched for "Transcript" in src'),
+        },
+      ],
+    },
+  ]);
+});
+
+function createToolMessage(toolCallId, toolName, text, turnId) {
+  return {
+    id: `tool:${toolCallId}`,
+    role: "tool",
+    status: "complete",
+    text,
+    ...(turnId ? { turnId } : {}),
+    toolCallId,
+    toolName,
+    toolStatus: "complete",
+    toolSummary: text,
+  };
+}
+
+function createFailedToolMessage(toolCallId, toolName, text, turnId) {
+  return {
+    ...createToolMessage(toolCallId, toolName, text, turnId),
+    status: "failed",
+    toolStatus: "failed",
+  };
+}
+
+function createUserMessage(text) {
+  return {
+    id: "user-1",
+    role: "user",
+    status: "complete",
+    text,
+  };
+}
+
+function createAssistantMessage(text) {
+  return {
+    id: "assistant-1",
+    role: "assistant",
+    status: "complete",
+    text,
+  };
+}
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function loadTypescriptModule(path, requireFn = () => ({})) {
+  const source = readFileSync(new URL(path, import.meta.url), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2023,
+    },
+  }).outputText;
+  const module = { exports: {} };
+  new Script(compiled).runInNewContext({ exports: module.exports, module, require: requireFn });
+  return module;
+}
