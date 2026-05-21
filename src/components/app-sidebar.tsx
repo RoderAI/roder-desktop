@@ -2,6 +2,7 @@ import { Archive, CirclePlus, FolderPlus, Store } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { RoderThread } from "@/types/roder";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
+import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -116,6 +117,7 @@ export function AppSidebar({
                         key={thread.id}
                         thread={thread}
                         active={activeView === "chat" && thread.id === activeThreadId}
+                        running={isThreadRunning(thread)}
                         onSelectThread={onSelectThread}
                         onArchiveThread={onArchiveThread}
                       />
@@ -141,6 +143,7 @@ export function AppSidebar({
                               key={thread.id}
                               thread={thread}
                               active={activeView === "chat" && thread.id === activeThreadId}
+                              running={isThreadRunning(thread)}
                               onSelectThread={onSelectThread}
                               onArchiveThread={onArchiveThread}
                               disabled={!expanded}
@@ -174,12 +177,14 @@ export function AppSidebar({
 function ThreadRow({
   thread,
   active,
+  running,
   onSelectThread,
   onArchiveThread,
   disabled = false,
 }: {
   thread: RoderThread;
   active: boolean;
+  running: boolean;
   onSelectThread: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
   disabled?: boolean;
@@ -199,7 +204,15 @@ function ThreadRow({
         onClick={() => onSelectThread(thread.id)}
       >
         <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
-        <span className="thread-row-age absolute right-3 text-base text-sidebar-muted">{relativeAge(thread.updatedAt)}</span>
+        <span
+          className={cn(
+            "thread-row-age absolute right-3 text-base text-sidebar-muted",
+            running && "flex h-7 w-7 -translate-x-px items-center justify-end",
+          )}
+          aria-label={running ? "Turn running" : undefined}
+        >
+          {running ? <DotMatrixSpinner /> : relativeAge(thread.updatedAt)}
+        </span>
       </button>
       <Tooltip>
         <TooltipTrigger
@@ -291,6 +304,10 @@ function normalizeFolderKey(path: string): string {
 
 function folderName(path: string): string {
   return path?.split("/").filter(Boolean).pop() || "workspace";
+}
+
+function isThreadRunning(thread: RoderThread): boolean {
+  return thread.status.type === "running";
 }
 
 function relativeAge(timestamp: number): string {
