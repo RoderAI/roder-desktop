@@ -1,4 +1,5 @@
 import type { ConversationMessage, RoderItem, RoderThread, RoderTurn } from "@/types/roder";
+import { isShellToolName } from "@/lib/tool-display";
 
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
   return [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
@@ -107,12 +108,17 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
 
   const payload = asRecord(item.payload);
   const raw = asRecord(item.raw);
-  const input = firstRecord(payload.input, payload.arguments, raw.arguments);
+  const input = inputFromToolItem(item, payload);
   const toolName = firstString(item.toolName, payload.tool, payload.name, raw.name, item.type === "toolMessage" ? "tool" : undefined) ?? "tool";
   const toolCallId = firstString(item.toolCallId, payload.tool_call_id, payload.toolCallId, payload.call_id, raw.call_id);
   const toolStatus = toolStatusFromItem(item);
   const output = toolOutputText(item, payload);
+  const detailOutput = toolDetailOutputText(item, payload);
   const summary = summarizeTool(toolName, toolStatus, input, output, payload);
+  const command = shellCommand(input, payload);
+  if (isShellToolName(toolName) && toolStatus === "running" && !command) {
+    return null;
+  }
   const status = toolStatus === "running" ? "streaming" : toolStatus;
 
   return {
@@ -125,8 +131,18 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
     toolName,
     toolCallId,
     toolStatus,
+    toolInput: isShellToolName(toolName) ? command : undefined,
+    toolOutput: toolDetailOutput(toolName, detailOutput),
+    toolSubject: toolSubject(toolName, input, payload),
     toolSummary: summary,
   };
+}
+
+function toolDetailOutput(toolName: string, detailOutput: string): string | undefined {
+  if (!detailOutput || (!isShellToolName(toolName) && toolName !== "tool")) {
+    return undefined;
+  }
+  return isShellToolName(toolName) ? stripShellHarnessMetadata(detailOutput) : detailOutput;
 }
 
 function isToolItem(item: RoderItem): boolean {
@@ -154,6 +170,13 @@ function toolOutputText(item: RoderItem, payload: Record<string, unknown>): stri
   return firstString(item.text, payload.text, payload.output, payload.error, extractItemText(item)) ?? "";
 }
 
+function toolDetailOutputText(item: RoderItem, payload: Record<string, unknown>): string {
+  if (item.type === "toolCall" || item.type === "tool.requested" || item.type === "tool.started") {
+    return rawString(payload.text, payload.output, payload.error) ?? "";
+  }
+  return rawString(item.text, payload.text, payload.output, payload.error, extractItemText(item)) ?? "";
+}
+
 function summarizeTool(
   toolName: string,
   status: "running" | "complete" | "failed",
@@ -161,36 +184,77 @@ function summarizeTool(
   output: string,
   payload: Record<string, unknown>,
 ): string {
-  if (status === "failed") {
-    return compactLine(`failed: ${firstString(payload.error, output) ?? "error"}`);
+  if (toolName === "read_file") {
+    const path = firstString(payload.path, payload.file, input.path, input.file);
+    return path ? toolActionSummary(status, "Read", "Reading", "Failed to read", basename(path)) : "";
   }
 
-  if (toolName === "read_file") {
-    const path = firstString(input.path, input.file, readFilePathFromOutput(output));
-    return path ?? "";
+  if (toolName === "read_skill") {
+    const name = toolSkillName(input, payload);
+    return toolActionSummary(status, "Read", "Reading", "Failed to read", name ? `${name} Skill` : "Skill");
+  }
+
+  if (toolName === "read_skill_file") {
+    const skill = toolSkillName(input, payload);
+    const fileName = firstString(payload.path, payload.file, input.path, input.file);
+    const subject = [skill, fileName ? basename(fileName) : "file"].filter(Boolean).join(" ");
+    return toolActionSummary(status, "Read", "Reading", "Failed to read", subject);
   }
 
   if (toolName === "list_files") {
-    return firstString(input.path, input.dir, input.directory, outputFirstLine(output)) ?? "";
+    const path = toolPath(input, payload);
+    const suffix = path ? ` in ${path}` : "";
+    if (status === "failed") {
+      return `Failed to list files${suffix}`;
+    }
+    return status === "running" ? `Listing files${suffix}` : `Listed files${suffix}`;
   }
 
   if (toolName === "grep" || toolName === "search_files") {
-    return firstString(input.query, input.pattern, input.regex, outputFirstLine(output)) ?? "";
+    const query = firstString(payload.query, payload.pattern, payload.regex, input.query, input.pattern, input.regex);
+    const path = toolPath(input, payload);
+    return query ? searchSummary(status, query, path) : "";
   }
 
   if (toolName === "glob") {
-    return firstString(input.pattern, input.glob, outputFirstLine(output)) ?? "";
+    const pattern = firstString(payload.pattern, payload.glob, input.pattern, input.glob);
+    const path = toolPath(input, payload);
+    return pattern ? searchSummary(status, pattern, path) : "";
   }
 
-  if (toolName === "apply_patch" || toolName === "edit") {
-    return firstString(input.path, input.file, outputFirstLine(output)) ?? "";
+  if (toolName === "write_file") {
+    const path = toolPath(input, payload);
+    return path ? toolActionSummary(status, "Wrote", "Writing", "Failed to write", basename(path)) : "";
+  }
+
+  if (toolName === "edit" || toolName === "multi_edit") {
+    const path = toolPath(input, payload);
+    return path ? toolActionSummary(status, "Edited", "Editing", "Failed to edit", basename(path)) : "";
+  }
+
+  if (toolName === "apply_patch") {
+    const path = toolPath(input, payload);
+    const suffix = path ? ` to ${basename(path)}` : "";
+    if (status === "failed") {
+      return `Failed to apply patch${suffix}`;
+    }
+    return status === "running" ? `Applying patch${suffix}` : `Applied patch${suffix}`;
+  }
+
+  if (isShellToolName(toolName)) {
+    const command = shellCommand(input, payload);
+    return command ? toolActionSummary(status, "Ran", "Running", "Failed to run", command) : "";
+  }
+
+  if (status === "failed") {
+    return compactLine(`failed: ${firstString(payload.error, output) ?? "error"}`);
   }
 
   if (status === "running") {
     return compactLine(summarizeInput(input));
   }
 
-  return compactLine(outputFirstLine(output) ?? summarizeInput(input));
+  return compactLine(summarizeInput(input) || output);
 }
 
 function mergeMessage(existing: ConversationMessage, incoming: ConversationMessage): ConversationMessage {
@@ -203,21 +267,50 @@ function mergeMessage(existing: ConversationMessage, incoming: ConversationMessa
     ...incoming,
     text: preferredToolSummary(existing, incoming),
     toolSummary: preferredToolSummary(existing, incoming),
-    toolName: incoming.toolName || existing.toolName,
+    toolInput: incoming.toolInput || existing.toolInput,
+    toolOutput: mergedToolOutput(existing, incoming),
+    toolName: mergedToolName(existing, incoming),
+    toolSubject: incoming.toolSubject || existing.toolSubject,
     toolCallId: incoming.toolCallId || existing.toolCallId,
   };
+}
+
+function mergedToolName(existing: ConversationMessage, incoming: ConversationMessage): string | undefined {
+  return incoming.toolName === "tool" ? existing.toolName : incoming.toolName || existing.toolName;
+}
+
+function mergedToolOutput(existing: ConversationMessage, incoming: ConversationMessage): string | undefined {
+  const output = incoming.toolOutput || existing.toolOutput;
+  if (!output || !isShellToolName(mergedToolName(existing, incoming))) {
+    return output;
+  }
+  return stripShellHarnessMetadata(output);
 }
 
 function preferredToolSummary(existing: ConversationMessage, incoming: ConversationMessage): string {
   const incomingSummary = incoming.toolSummary || incoming.text;
   const existingSummary = existing.toolSummary || existing.text;
+  if (incoming.status === "complete" && incoming.toolName === "tool" && existingSummary) {
+    return completedToolSummary(existingSummary, incoming.status);
+  }
   if (!incomingSummary) {
-    return existingSummary;
+    return completedToolSummary(existingSummary, incoming.status);
   }
   if (incoming.status === "complete" && existingSummary && looksLikeResultSummary(incomingSummary)) {
-    return existingSummary;
+    return completedToolSummary(existingSummary, incoming.status);
   }
-  return incomingSummary;
+  return completedToolSummary(incomingSummary, incoming.status);
+}
+
+function completedToolSummary(summary: string, status: ConversationMessage["status"]): string {
+  if (status !== "complete") {
+    return summary;
+  }
+
+  return summary
+    .replace(/^Reading\s+/, "Read ")
+    .replace(/^Searching for\s+/, "Searched for ")
+    .replace(/^Running\s+/, "Ran ");
 }
 
 function messageKey(message: ConversationMessage): string {
@@ -227,25 +320,23 @@ function messageKey(message: ConversationMessage): string {
   return message.id;
 }
 
-function firstRecord(...values: unknown[]): Record<string, unknown> {
-  for (const value of values) {
-    if (isRecord(value)) {
-      return value;
-    }
-    if (typeof value === "string") {
-      const parsed = parseJSONRecord(value);
-      if (parsed) {
-        return parsed;
-      }
-    }
-  }
-  return {};
+function inputFromToolItem(item: RoderItem, payload: Record<string, unknown>): Record<string, unknown> {
+  return item.type === "toolCall" ? payload : {};
 }
 
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) {
       return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function rawString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value;
     }
   }
   return undefined;
@@ -263,28 +354,83 @@ function summarizeInput(input: Record<string, unknown>): string {
   return "";
 }
 
-function outputFirstLine(output: string): string | undefined {
-  const line = output.split(/\r?\n/).find((part) => part.trim());
-  if (!line) {
-    return undefined;
-  }
-  const normalized = line.replace(/^success:\s*/i, "").replace(/^requested$/i, "").trim();
-  if (isLegacyToolLabel(normalized)) {
-    return undefined;
-  }
-  return normalized || undefined;
+function shellCommand(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  return firstString(
+    payload.command,
+    payload.cmd,
+    payload.shell_command,
+    input.command,
+    input.cmd,
+    input.shell_command,
+  );
 }
 
-function readFilePathFromOutput(output: string): string | undefined {
-  const line = outputFirstLine(output);
-  if (!line) {
-    return undefined;
+function toolSubject(toolName: string, input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  if (toolName === "read_file") {
+    const path = firstString(payload.path, payload.file, input.path, input.file);
+    return path ? basename(path) : undefined;
   }
-  if (/^read file$/i.test(line)) {
-    return undefined;
+  if (toolName === "read_skill") {
+    const name = toolSkillName(input, payload);
+    return name ? `${name} Skill` : "Skill";
   }
-  const match = /^read\s+(.+)$/i.exec(line);
-  return match?.[1]?.trim();
+  if (toolName === "read_skill_file") {
+    const skill = toolSkillName(input, payload);
+    const fileName = firstString(payload.path, payload.file, input.path, input.file);
+    return [skill, fileName ? basename(fileName) : "file"].filter(Boolean).join(" ") || undefined;
+  }
+  if (toolName === "list_files") {
+    return toolPath(input, payload);
+  }
+  if (toolName === "grep" || toolName === "search_files" || toolName === "glob") {
+    const query = firstString(payload.query, payload.pattern, payload.regex, payload.glob, input.query, input.pattern, input.regex, input.glob);
+    const path = toolPath(input, payload);
+    if (!query) {
+      return undefined;
+    }
+    return path ? `${query} in ${path}` : query;
+  }
+  if (toolName === "write_file" || toolName === "edit" || toolName === "multi_edit" || toolName === "apply_patch") {
+    const path = toolPath(input, payload);
+    return path ? basename(path) : undefined;
+  }
+  if (isShellToolName(toolName)) {
+    return shellCommand(input, payload);
+  }
+  return undefined;
+}
+
+function stripShellHarnessMetadata(output: string): string {
+  const runnerMatch = /^(?:Exit code:\s*[^\r\n]*\r?\n)?Wall time:\s*[^\r\n]*\r?\nOutput:\r?\n([\s\S]*)$/i.exec(output);
+  if (runnerMatch) {
+    return runnerMatch[1];
+  }
+
+  return output.replace(/(?:\r?\n)?Status:\s*\w+\s*\r?\nWall time:\s*[^\r\n]+\s*$/i, (match) => {
+    return match.startsWith("\n") || match.startsWith("\r\n") ? "\n" : "";
+  });
+}
+
+function basename(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+}
+
+function toolSkillName(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  return firstString(payload.displayName, payload.name, payload.skill, input.displayName, input.name, input.skill);
+}
+
+function toolPath(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  return firstString(payload.path, payload.dir, payload.directory, input.path, input.dir, input.directory);
+}
+
+function searchSummary(status: "running" | "complete" | "failed", query: string, path: string | undefined): string {
+  const verb = status === "failed" ? "Failed to search for" : status === "running" ? "Searching for" : "Searched for";
+  return path ? `${verb} "${query}" in ${path}` : `${verb} "${query}"`;
+}
+
+function toolActionSummary(status: "running" | "complete" | "failed", completed: string, running: string, failed: string, subject: string): string {
+  const verb = status === "failed" ? failed : status === "running" ? running : completed;
+  return `${verb} ${subject}`;
 }
 
 function compactLine(value: string | undefined): string {
@@ -293,15 +439,6 @@ function compactLine(value: string | undefined): string {
 
 function looksLikeResultSummary(value: string): boolean {
   return isLegacyToolLabel(value) || value.includes("\n") || value.length > 160;
-}
-
-function parseJSONRecord(value: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(value);
-    return isRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
