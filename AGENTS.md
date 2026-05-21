@@ -3,6 +3,7 @@
 ## Project References
 
 - The Roder app-server API contract is documented in `docs/api.md`.
+- To access the backend code, run `cd ../gode` from this directory.
 - Product UI principles and current desktop design decisions are documented in
   `docs/design.md`.
 

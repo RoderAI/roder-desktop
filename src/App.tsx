@@ -24,6 +24,7 @@ type MainView = "chat" | "plugins";
 export function App(): React.JSX.Element {
   const {
     activeThreadId,
+    activeTurnId,
     appearance,
     archiveThread: archiveAgentThread,
     busy,
@@ -254,7 +255,7 @@ export function App(): React.JSX.Element {
             />
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
-                <Transcript messages={messages} followSignal={followSignal} />
+                <Transcript activeTurnId={activeTurnId} messages={messages} followSignal={followSignal} />
                 <AgentWaitCards
                   requests={waitRequests}
                   onResolveApproval={resolveApproval}
