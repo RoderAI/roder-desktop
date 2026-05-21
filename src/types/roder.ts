@@ -189,6 +189,9 @@ export type ConversationMessage = {
   toolName?: string;
   toolCallId?: string;
   toolStatus?: "running" | "complete" | "failed";
+  toolInput?: string;
+  toolOutput?: string;
+  toolSubject?: string;
   toolSummary?: string;
 };
 
