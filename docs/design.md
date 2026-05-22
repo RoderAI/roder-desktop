@@ -139,6 +139,11 @@ Text should be optimized for long working sessions.
 Prefer Tailwind's standard spacing scale. Density is part of the product: Roder
 should fit meaningful work on screen without feeling cramped.
 
+When an element is square, prefer Tailwind's `size-*` shorthand over separate
+`h-*` and `w-*` classes. Use individual height and width classes only when the
+dimensions are intentionally different or one axis needs to respond
+independently.
+
 Use spacing to show relationships:
 
 - Tight spacing for controls within the same action group.

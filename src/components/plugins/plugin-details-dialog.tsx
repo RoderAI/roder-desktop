@@ -1,7 +1,6 @@
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
 import {
-  DotMatrixSpinner,
   PluginActionContent,
   type PluginActionState,
   pluginActionButtonClassName,
@@ -10,6 +9,7 @@ import {
 import { PluginIcon } from "@/components/plugins/plugin-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import {
   Dialog,
   DialogContent,
