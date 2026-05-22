@@ -1,6 +1,7 @@
 import * as React from "react";
 import { CircleMinus, CirclePlus } from "lucide-react";
 import type { ButtonProps } from "@/components/ui/button";
+import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { cn } from "@/lib/utils";
 
 const pluginActionButtonBaseClassName = "transition-none";
@@ -23,16 +24,6 @@ export function PluginActionContent({ state }: { state: PluginActionState }): Re
         </span>
       </span>
     </>
-  );
-}
-
-export function DotMatrixSpinner(): React.JSX.Element {
-  return (
-    <span className="dotmatrix-spinner" aria-hidden="true">
-      {Array.from({ length: 9 }, (_, index) => (
-        <span key={index} className="dotmatrix-spinner-dot" />
-      ))}
-    </span>
   );
 }
 
