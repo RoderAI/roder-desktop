@@ -1,4 +1,4 @@
-import type { DesktopAttachment, PolicyMode, RoderModel, RoderStatus, RoderThread, SystemAppearance, TurnInputItem } from "@/types/roder";
+import type { DesktopAttachment, PolicyMode, RoderModel, RoderStatus, RoderThread, SystemAppearance, TurnInputItem, SpeechProviderDescriptor, SpeechTranscribeResult } from "@/types/roder";
 
 export type ThreadListResult = {
   data?: RoderThread[];
@@ -66,6 +66,21 @@ export const roderIpc = {
   setSessionMode: (mode: PolicyMode, reason: string) =>
     window.roderDesktop.request("session/set_mode", { mode, reason }) as Promise<SessionSetModeResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
+  listSpeechProviders: () =>
+    window.roderDesktop.request("speech/providers/list", {}) as Promise<{ providers: SpeechProviderDescriptor[] }>,
+  transcribeSpeech: (params: {
+    provider?: string;
+    model?: string;
+    audio: {
+      bytesBase64: string;
+      mimeType: string;
+      filename?: string;
+    };
+    language?: string;
+    prompt?: string;
+    diarization?: boolean;
+  }) =>
+    window.roderDesktop.request("speech/transcribe", params) as Promise<SpeechTranscribeResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),
   onNotification: window.roderDesktop.onNotification,
   onStderr: window.roderDesktop.onStderr,

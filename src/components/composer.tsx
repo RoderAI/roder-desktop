@@ -8,8 +8,10 @@ import {
   ShieldCheck,
   Square,
   X,
+  Mic,
+  Loader2,
 } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import type {
   DesktopAttachment,
@@ -82,6 +84,120 @@ export function Composer({
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        const base64data = (reader.result as string).split(",")[1];
+        resolve(base64data);
+      };
+      reader.onerror = reject;
+    });
+  }
+
+  async function startRecording(): Promise<void> {
+    setRecordingError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+
+      let mimeType = "audio/webm";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported("audio/webm")) {
+          mimeType = "audio/webm";
+        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+          mimeType = "audio/mp4";
+        } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
+          mimeType = "audio/ogg";
+        } else if (MediaRecorder.isTypeSupported("audio/wav")) {
+          mimeType = "audio/wav";
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        stream.getTracks().forEach((track) => track.stop());
+
+        setIsTranscribing(true);
+        try {
+          const base64 = await blobToBase64(audioBlob);
+          const filename = mimeType.includes("webm")
+            ? "recording.webm"
+            : mimeType.includes("mp4")
+            ? "recording.mp4"
+            : mimeType.includes("ogg")
+            ? "recording.ogg"
+            : "recording.wav";
+
+          const result = (await window.roderDesktop.request("speech/transcribe", {
+            audio: {
+              bytesBase64: base64,
+              mimeType,
+              filename,
+            },
+          })) as { text: string };
+
+          if (result && result.text) {
+            setPrompt((prev) => {
+              const trimmed = prev.trim();
+              return trimmed ? `${trimmed} ${result.text.trim()}` : result.text.trim();
+            });
+          }
+        } catch (err) {
+          console.error("Transcription failed:", err);
+          setRecordingError("Transcription failed: " + (err as Error).message);
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Microphone access failed:", err);
+      setRecordingError("Microphone access failed: " + (err as Error).message);
+    }
+  }
+
+  function stopRecording(): void {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  }
+
+  function toggleRecording(): void {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      void startRecording();
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   function resizeTextarea(): void {
     const textarea = textareaRef.current;
@@ -236,7 +352,12 @@ export function Composer({
                 : "Send follow-up"
             }
             className="min-h-16 overflow-hidden border-0 bg-transparent px-1 py-2 text-[var(--font-size-composer)] leading-6 shadow-none focus-visible:border-transparent focus-visible:ring-0"
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              if (recordingError) {
+                setRecordingError(null);
+              }
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -244,6 +365,11 @@ export function Composer({
               }
             }}
           />
+          {recordingError && (
+            <div className="text-sm text-destructive px-1 pb-2">
+              {recordingError}
+            </div>
+          )}
           <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <Button
@@ -272,6 +398,25 @@ export function Composer({
                   <Square className="size-4 fill-current" />
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "size-9 shrink-0 rounded-full",
+                  isRecording
+                    ? "bg-destructive/10 text-destructive animate-pulse hover:bg-destructive/20 hover:text-destructive"
+                    : "text-muted-foreground"
+                )}
+                aria-label={isRecording ? "Stop recording" : "Record voice prompt"}
+                onClick={toggleRecording}
+                disabled={isTranscribing}
+              >
+                {isTranscribing ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <Mic className="size-5" />
+                )}
+              </Button>
               <ModelPicker
                 models={models}
                 selectedModel={selectedModel}

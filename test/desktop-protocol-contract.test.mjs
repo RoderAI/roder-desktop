@@ -6,7 +6,7 @@ const clientSource = readFileSync(new URL("../electron/roder/app-server-client.t
 const storeSource = readFileSync(new URL("../src/stores/roder-store.ts", import.meta.url), "utf8");
 const apiDocs = readFileSync(new URL("../docs/api.md", import.meta.url), "utf8");
 
-const documentedDesktopMethods = ["initialize", "thread/list", "thread/read", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "model/list"];
+const documentedDesktopMethods = ["initialize", "thread/list", "thread/read", "thread/start", "turn/start", "turn/steer", "turn/interrupt", "model/list", "speech/providers/list", "speech/transcribe"];
 
 test("api docs describe the desktop methods the Electron bridge uses", () => {
   for (const method of documentedDesktopMethods) {
