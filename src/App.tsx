@@ -65,6 +65,7 @@ export function App(): React.JSX.Element {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
+  const [composerFocusSignal, setComposerFocusSignal] = useState(0);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const extensions = useExtensionsStore((state) => state.extensions);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
@@ -115,11 +116,13 @@ export function App(): React.JSX.Element {
   const newThread = useCallback(() => {
     showChat();
     followBottom();
+    setComposerFocusSignal((value) => value + 1);
     void createAgentThread();
   }, [createAgentThread, followBottom, showChat]);
   const newThreadInFolder = useCallback((path: string) => {
     showChat();
     followBottom();
+    setComposerFocusSignal((value) => value + 1);
     setSelectedWorkspaceCwd(path);
     void createAgentThread();
   }, [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat]);
@@ -283,6 +286,7 @@ export function App(): React.JSX.Element {
                   workspaceRecents={workspaceRecents}
                   threads={threads}
                   attachments={composerAttachments}
+                  focusSignal={composerFocusSignal}
                   onSelectedModelChange={setSelectedModel}
                   onSelectedPolicyModeChange={(mode) => void setSelectedPolicyMode(mode)}
                   onSelectedReasoningChange={setSelectedReasoning}
