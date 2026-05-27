@@ -7,6 +7,17 @@
 - Product UI principles and current desktop design decisions are documented in
   `docs/design.md`.
 
+## Project Terminology
+
+When the user says "thread", "last thread", "session", "conversation", or asks
+about something getting stuck, assume they are talking about the Roder/Gode app
+model and UI in this repository unless they explicitly say "Codex", "Codex
+thread", "Codex session", or refer to files under `~/.codex`.
+
+Do not inspect Codex's own local state, logs, sessions, or skill cache for those
+requests by default. Start from this app's code, data flow, and documented
+backend contract instead.
+
 ## UI Styling
 
 Use Base UI for headless primitives and local shadcn-style wrappers. Do not add
