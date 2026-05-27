@@ -101,7 +101,7 @@ export function setWaitRequestResolving(
 
 export function shouldDisplayStartedItem(item: Pick<RoderItem, "type"> | Record<string, unknown>): boolean {
   const type = String(item.type ?? "");
-  return type === "agentMessage" || type === "toolCall" || type.startsWith("tool.");
+  return type === "agentMessage" || type === "toolExecution";
 }
 
 function upsertWaitRequest(
