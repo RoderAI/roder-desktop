@@ -1,11 +1,13 @@
 import { Archive, CirclePlus, FolderPlus, Store } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RoderThread } from "@/types/roder";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { isThreadRunning } from "@/lib/roder-thread";
 import { cn } from "@/lib/utils";
+import { groupThreadsByFolder, sidebarProjectOrder } from "@/lib/sidebar-thread-groups";
 import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 
 type AppSidebarProps = {
@@ -21,14 +23,6 @@ type AppSidebarProps = {
   onOpenPlugins: () => void;
 };
 
-type ThreadGroup = {
-  key: string;
-  title: string;
-  path: string;
-  updatedAt: number;
-  threads: RoderThread[];
-};
-
 export function AppSidebar({
   threads,
   activeThreadId,
@@ -42,7 +36,15 @@ export function AppSidebar({
   onOpenPlugins,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
-  const threadGroups = useMemo(() => groupThreadsByFolder(threads, activeThreadId), [activeThreadId, threads]);
+  const [projectOrder, setProjectOrder] = useState<string[]>(() => []);
+  const nextProjectOrder = useMemo(() => sidebarProjectOrder(threads, projectOrder), [projectOrder, threads]);
+  const threadGroups = useMemo(() => groupThreadsByFolder(threads, nextProjectOrder), [nextProjectOrder, threads]);
+
+  useEffect(() => {
+    if (!sameStringList(projectOrder, nextProjectOrder)) {
+      setProjectOrder(nextProjectOrder);
+    }
+  }, [nextProjectOrder, projectOrder]);
 
   function showMoreForGroup(groupKey: string): void {
     setExpandedGroupKeys((current) => {
@@ -256,58 +258,8 @@ function SidebarRowButton({
   );
 }
 
-function groupThreadsByFolder(threads: RoderThread[], activeThreadId: string): ThreadGroup[] {
-  const groups = new Map<string, ThreadGroup>();
-  let activeFolderKey = "";
-
-  for (const thread of threads) {
-    if (thread.id.startsWith("demo-")) {
-      continue;
-    }
-    const key = normalizeFolderKey(thread.cwd);
-    const existing = groups.get(key);
-    const group = existing ?? {
-      key,
-      title: folderName(thread.cwd),
-      path: thread.cwd || "",
-      updatedAt: 0,
-      threads: [],
-    };
-    group.updatedAt = Math.max(group.updatedAt, normalizedTimestamp(thread.updatedAt));
-    group.threads.push(thread);
-    groups.set(key, group);
-
-    if (thread.id === activeThreadId) {
-      activeFolderKey = key;
-    }
-  }
-
-  return [...groups.values()]
-    .map((group) => ({
-      ...group,
-      threads: [...group.threads].sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt)),
-    }))
-    .sort((left, right) => {
-      if (left.key === activeFolderKey) {
-        return -1;
-      }
-      if (right.key === activeFolderKey) {
-        return 1;
-      }
-      return right.updatedAt - left.updatedAt || left.title.localeCompare(right.title);
-    });
-}
-
-function normalizeFolderKey(path: string): string {
-  return path || "workspace";
-}
-
-function folderName(path: string): string {
-  return path?.split("/").filter(Boolean).pop() || "workspace";
-}
-
-function isThreadRunning(thread: RoderThread): boolean {
-  return thread.status.type === "running";
+function sameStringList(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function relativeAge(timestamp: number): string {
