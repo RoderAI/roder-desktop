@@ -1,37 +1,10 @@
-import {
-  ArrowDown,
-  Check,
-  FileText,
-  ImageIcon,
-  Plus,
-  Search,
-  ShieldCheck,
-  Square,
-  X,
-  Mic,
-  Loader2,
-} from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { Combobox } from "@base-ui/react/combobox";
-import type {
-  DesktopAttachment,
-  PolicyMode,
-  RoderModel,
-  ReasoningEffort,
-} from "@/types/roder";
+import { ArrowDown, Loader2, Mic, Plus, Square } from "lucide-react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
+import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort } from "@/types/roder";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownTriggerChevron,
-  dropdownMenuContentClassName,
-  dropdownMenuItemClassName,
-  dropdownMenuTriggerVariants,
-} from "@/components/ui/dropdown-menu";
+import { AttachmentChip, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
 import { Textarea } from "@/components/ui/textarea";
+import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import { cn } from "@/lib/utils";
 
 /*
@@ -41,21 +14,17 @@ import { cn } from "@/lib/utils";
  *
  *   0ms   button mounts or begins exit with opacity 0 <-> 1
  * 120ms   button fade reaches its target opacity
- * 180ms   exiting button unmounts after the fade completes
  */
 const SCROLL_BUTTON_TIMING = {
   fade:   120,  // button opacity transition
-  settle: 180,  // exit unmount delay
 };
 
 type ComposerScrollButtonStyle = CSSProperties & {
-  "--composer-scroll-button-duration": string;
   "--composer-scroll-button-fade-duration": string;
 };
 
 const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
   "--composer-scroll-button-fade-duration": `${SCROLL_BUTTON_TIMING.fade}ms`,
-  "--composer-scroll-button-duration": `${SCROLL_BUTTON_TIMING.settle}ms`,
 };
 
 type ComposerProps = {
@@ -95,155 +64,50 @@ export function Composer({
 }: ComposerProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [dragActive, setDragActive] = useState(false);
-  const [renderScrollButton, setRenderScrollButton] = useState(showScrollToBottom);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const focusedSignalRef = useRef(0);
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-
-  function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => {
-        const base64data = (reader.result as string).split(",")[1];
-        resolve(base64data);
-      };
-      reader.onerror = reject;
-    });
-  }
-
-  async function startRecording(): Promise<void> {
-    setRecordingError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunksRef.current = [];
-
-      let mimeType = "audio/webm";
-      if (typeof MediaRecorder !== "undefined") {
-        if (MediaRecorder.isTypeSupported("audio/webm")) {
-          mimeType = "audio/webm";
-        } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
-          mimeType = "audio/mp4";
-        } else if (MediaRecorder.isTypeSupported("audio/ogg")) {
-          mimeType = "audio/ogg";
-        } else if (MediaRecorder.isTypeSupported("audio/wav")) {
-          mimeType = "audio/wav";
-        }
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        stream.getTracks().forEach((track) => track.stop());
-
-        setIsTranscribing(true);
-        try {
-          const base64 = await blobToBase64(audioBlob);
-          const filename = mimeType.includes("webm")
-            ? "recording.webm"
-            : mimeType.includes("mp4")
-            ? "recording.mp4"
-            : mimeType.includes("ogg")
-            ? "recording.ogg"
-            : "recording.wav";
-
-          const result = (await window.roderDesktop.request("speech/transcribe", {
-            audio: {
-              bytesBase64: base64,
-              mimeType,
-              filename,
-            },
-          })) as { text: string };
-
-          if (result && result.text) {
-            setPrompt((prev) => {
-              const trimmed = prev.trim();
-              return trimmed ? `${trimmed} ${result.text.trim()}` : result.text.trim();
-            });
-          }
-        } catch (err) {
-          console.error("Transcription failed:", err);
-          setRecordingError("Transcription failed: " + (err as Error).message);
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Microphone access failed:", err);
-      setRecordingError("Microphone access failed: " + (err as Error).message);
-    }
-  }
-
-  function stopRecording(): void {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-  }
-
-  function toggleRecording(): void {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      void startRecording();
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (focusSignal === 0) {
-      return;
-    }
-    textareaRef.current?.focus();
-  }, [focusSignal]);
-
-  useEffect(() => {
-    if (showScrollToBottom) {
-      setRenderScrollButton(true);
-      return;
-    }
-    if (!renderScrollButton) {
-      return;
-    }
-    const timeout = window.setTimeout(() => setRenderScrollButton(false), SCROLL_BUTTON_TIMING.settle);
-    return () => window.clearTimeout(timeout);
-  }, [renderScrollButton, showScrollToBottom]);
-
-  function resizeTextarea(): void {
+  const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) {
       return;
     }
     textarea.style.height = "auto";
     textarea.style.height = `${textarea.scrollHeight}px`;
-  }
+  }, []);
 
-  useLayoutEffect(() => {
+  const scheduleTextareaResize = useCallback(() => {
+    requestAnimationFrame(resizeTextarea);
+  }, [resizeTextarea]);
+
+  const setTextareaNode = useCallback((node: HTMLTextAreaElement | null) => {
+    textareaRef.current = node;
+    if (!node) {
+      return;
+    }
     resizeTextarea();
-  }, [prompt]);
+    if (focusSignal > 0 && focusedSignalRef.current !== focusSignal) {
+      focusedSignalRef.current = focusSignal;
+      node.focus();
+    }
+  }, [focusSignal, resizeTextarea]);
+
+  const appendTranscribedText = useCallback((text: string) => {
+    setPrompt((previous) => {
+      const trimmed = previous.trim();
+      return trimmed ? `${trimmed} ${text}` : text;
+    });
+    scheduleTextareaResize();
+  }, [scheduleTextareaResize]);
+  const {
+    isRecording,
+    isTranscribing,
+    recordingError,
+    clearRecordingError,
+    lifecycleRef: speechLifecycleRef,
+    toggleRecording,
+  } = useSpeechTranscription({ onTranscriptionText: appendTranscribedText });
 
   async function submit(): Promise<void> {
     const value = prompt.trim();
@@ -252,6 +116,7 @@ export function Composer({
     }
     const submittedAttachments = attachments;
     setPrompt("");
+    scheduleTextareaResize();
     onAttachmentsChange([]);
     await onSend(value, submittedAttachments);
   }
@@ -292,6 +157,7 @@ export function Composer({
 
   return (
     <div
+      ref={speechLifecycleRef}
       className="mx-auto w-full max-w-[980px] px-8 pb-5 pt-2"
       onDragEnter={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
@@ -320,23 +186,7 @@ export function Composer({
           dragActive && "border-ring bg-card shadow-md ring-2 ring-ring/25",
         )}
       >
-        {renderScrollButton && (
-          <div
-            className="composer-scroll-button-region absolute -top-11 left-0 flex items-center"
-            data-visible={showScrollToBottom ? "true" : undefined}
-            style={scrollButtonAnimationStyle}
-          >
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-8 rounded-full text-muted-foreground shadow-sm"
-              aria-label="Scroll to bottom"
-              onClick={onScrollToBottom}
-            >
-              <ArrowDown className="size-4" />
-            </Button>
-          </div>
-        )}
+        <ScrollToBottomButton visible={showScrollToBottom} onClick={onScrollToBottom} />
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
             {attachments.map((attachment) => (
@@ -362,7 +212,7 @@ export function Composer({
             }}
           />
           <Textarea
-            ref={textareaRef}
+            ref={setTextareaNode}
             value={prompt}
             placeholder={
               busy
@@ -372,8 +222,9 @@ export function Composer({
             className="min-h-16 overflow-hidden border-0 bg-transparent px-1 py-2 text-[var(--font-size-composer)] leading-6 shadow-none focus-visible:border-transparent focus-visible:ring-0"
             onChange={(event) => {
               setPrompt(event.target.value);
+              resizeTextarea();
               if (recordingError) {
-                setRecordingError(null);
+                clearRecordingError();
               }
             }}
             onKeyDown={(event) => {
@@ -450,439 +301,30 @@ export function Composer({
   );
 }
 
-function PolicyModePicker({
-  selectedMode,
-  onChange,
+function ScrollToBottomButton({
+  visible,
+  onClick,
 }: {
-  selectedMode: PolicyMode;
-  onChange: (mode: PolicyMode) => void;
+  visible: boolean;
+  onClick: () => void;
 }): React.JSX.Element {
-  const selected = policyModeOptions.find((option) => option.mode === selectedMode) ?? policyModeOptions[0];
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        variant="pill"
-        className="max-w-40 px-2.5 text-base text-muted-foreground sm:max-w-none sm:px-3"
-        aria-label={`Choose permission mode: ${selected.label}`}
+    <div
+      className="composer-scroll-button-region absolute -top-11 left-0 flex items-center"
+      aria-hidden={!visible}
+      data-visible={visible ? "true" : undefined}
+      style={scrollButtonAnimationStyle}
+    >
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-8 rounded-full text-muted-foreground shadow-sm"
+        aria-label="Scroll to bottom"
+        tabIndex={visible ? 0 : -1}
+        onClick={onClick}
       >
-        <ShieldCheck className="size-4 shrink-0" />
-        <span className="truncate">{selected.label}</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-64">
-        <DropdownMenuGroup>
-          {policyModeOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.mode}
-              selected={option.mode === selected.mode}
-              className="items-start gap-2 py-2"
-              onSelect={() => onChange(option.mode)}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-foreground">{option.label}</div>
-                <div className="mt-0.5 text-sm leading-5 text-muted-foreground">
-                  {option.description}
-                </div>
-              </div>
-              {option.mode === selected.mode && (
-                <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-const policyModeOptions: Array<{
-  mode: PolicyMode;
-  label: string;
-  description: string;
-}> = [
-  {
-    mode: "accept_all",
-    label: "Accept all",
-    description: "Run edits and commands without stopping for approval.",
-  },
-  {
-    mode: "default",
-    label: "Ask before changes",
-    description: "Pause before writes, commands, and other side effects.",
-  },
-  {
-    mode: "plan",
-    label: "Plan only",
-    description: "Read and reason while blocking edits and commands.",
-  },
-  {
-    mode: "bypass",
-    label: "Full access",
-    description: "Auto-approve every tool the harness allows.",
-  },
-];
-
-function AttachmentChip({
-  attachment,
-  onRemove,
-}: {
-  attachment: DesktopAttachment;
-  onRemove: () => void;
-}): React.JSX.Element {
-  const isImage = attachment.type.startsWith("image/");
-  return (
-    <span className="flex max-w-[220px] items-center gap-2 rounded-full bg-muted px-3 py-1 text-base text-muted-foreground">
-      {isImage ? (
-        <ImageIcon className="size-4 shrink-0" />
-      ) : (
-        <FileText className="size-4 shrink-0" />
-      )}
-      <span className="truncate">{attachment.name}</span>
-      <button
-        type="button"
-        className="rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-        aria-label={`Remove ${attachment.name}`}
-        onClick={onRemove}
-      >
-        <X className="size-3.5" />
-      </button>
-    </span>
-  );
-}
-
-function ModelPicker({
-  models,
-  selectedModel,
-  selectedReasoning,
-  onChange,
-  onReasoningChange,
-}: {
-  models: RoderModel[];
-  selectedModel: string;
-  selectedReasoning: ReasoningEffort;
-  onChange: (model: string) => void;
-  onReasoningChange: (reasoning: ReasoningEffort) => void;
-}): React.JSX.Element {
-  const visibleModels =
-    models.length > 0
-      ? models
-      : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
-  const selected =
-    visibleModels.find((model) => model.id === selectedModel) ??
-    visibleModels[0];
-
-  return (
-    <div className="flex shrink-0 items-center gap-2 text-foreground">
-      <Combobox.Root<RoderModel>
-        value={selected}
-        items={visibleModels}
-        limit={10}
-        itemToStringLabel={modelName}
-        itemToStringValue={(model) => `${model.modelProvider}:${model.id}`}
-        isItemEqualToValue={(item, value) =>
-          item.id === value.id && item.modelProvider === value.modelProvider
-        }
-        filter={(model, inputValue) => {
-          const haystack =
-            `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase();
-          return haystack.includes(inputValue.trim().toLowerCase());
-        }}
-        onValueChange={(model) => {
-          if (model) {
-            onChange(model.id);
-          }
-        }}
-      >
-        <Combobox.Trigger
-          className={cn(dropdownMenuTriggerVariants({ variant: "pill" }))}
-          aria-label="Choose model"
-        >
-          <Combobox.Value>
-            {(model: RoderModel | null) => (
-              <span>{modelName(model ?? selected)}</span>
-            )}
-          </Combobox.Value>
-          <DropdownTriggerChevron />
-        </Combobox.Trigger>
-        <Combobox.Portal>
-          <Combobox.Positioner
-            align="end"
-            side="top"
-            sideOffset={8}
-            className="z-50"
-          >
-            <Combobox.Popup
-              className={cn(dropdownMenuContentClassName, "w-[320px] p-0")}
-              aria-label="Choose model"
-            >
-              <div className="flex h-11 items-center gap-2.5 border-b border-border px-3.5">
-                <Search className="size-4 shrink-0 text-muted-foreground" />
-                <Combobox.Input
-                  className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
-                  placeholder="Search models"
-                />
-              </div>
-              <Combobox.Empty>
-                <div className="px-3.5 py-4 text-base text-muted-foreground">
-                  No matching models
-                </div>
-              </Combobox.Empty>
-              <Combobox.List className="max-h-[286px] overflow-y-auto p-1.5">
-                {(model: RoderModel) => (
-                  <Combobox.Item
-                    key={`${model.modelProvider}:${model.id}`}
-                    value={model}
-                    className={cn(
-                      dropdownMenuItemClassName,
-                      "h-9 data-[selected]:font-medium",
-                    )}
-                  >
-                    <ProviderLogo provider={model.modelProvider} />
-                    <span className="min-w-0 flex-1 truncate text-foreground">
-                      {modelName(model)}
-                    </span>
-                    <Combobox.ItemIndicator
-                      keepMounted
-                      className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
-                    >
-                      <Check className="size-3.5" />
-                    </Combobox.ItemIndicator>
-                  </Combobox.Item>
-                )}
-              </Combobox.List>
-            </Combobox.Popup>
-          </Combobox.Positioner>
-        </Combobox.Portal>
-      </Combobox.Root>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          variant="pill"
-          aria-label={`Choose thinking effort: ${reasoningLabel(selectedReasoning)}`}
-        >
-          <span>{reasoningLabel(selectedReasoning)}</span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" sideOffset={8}>
-          <DropdownMenuGroup>
-            {reasoningOptions.map((reasoning) => (
-              <DropdownMenuItem
-                key={reasoning}
-                selected={reasoning === selectedReasoning}
-                className="h-9 text-base"
-                onSelect={() => onReasoningChange(reasoning)}
-              >
-                <span className="min-w-0 flex-1">
-                  {reasoningName(reasoning)}
-                </span>
-                {reasoning === selectedReasoning && (
-                  <Check className="size-3.5 text-primary" />
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        <ArrowDown className="size-4" />
+      </Button>
     </div>
   );
-}
-
-const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
-
-type ProviderLogoDefinition = {
-  title: string;
-  viewBox?: string;
-  paths: Array<{
-    d: string;
-    clipRule?: "evenodd";
-    fill?: string;
-  }>;
-};
-
-const providerLogos: Record<string, ProviderLogoDefinition> = {
-  anthropic: {
-    title: "Anthropic",
-    paths: [
-      {
-        d: "M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z",
-      },
-    ],
-  },
-  cohere: {
-    title: "Cohere",
-    paths: [
-      {
-        d: "M8.128 14.099c.592 0 1.77-.033 3.398-.703 1.897-.781 5.672-2.2 8.395-3.656 1.905-1.018 2.74-2.366 2.74-4.18A4.56 4.56 0 0018.1 1H7.549A6.55 6.55 0 001 7.55c0 3.617 2.745 6.549 7.128 6.549z",
-        clipRule: "evenodd",
-      },
-      {
-        d: "M9.912 18.61a4.387 4.387 0 012.705-4.052l3.323-1.38c3.361-1.394 7.06 1.076 7.06 4.715a5.104 5.104 0 01-5.105 5.104l-3.597-.001a4.386 4.386 0 01-4.386-4.387z",
-        clipRule: "evenodd",
-      },
-      {
-        d: "M4.776 14.962A3.775 3.775 0 001 18.738v.489a3.776 3.776 0 007.551 0v-.49a3.775 3.775 0 00-3.775-3.775z",
-      },
-    ],
-  },
-  gemini: {
-    title: "Gemini",
-    paths: [
-      {
-        d: "M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z",
-      },
-    ],
-  },
-  groq: {
-    title: "Groq",
-    paths: [
-      {
-        d: "M12.036 2c-3.853-.035-7 3-7.036 6.781-.035 3.782 3.055 6.872 6.908 6.907h2.42v-2.566h-2.292c-2.407.028-4.38-1.866-4.408-4.23-.029-2.362 1.901-4.298 4.308-4.326h.1c2.407 0 4.358 1.915 4.365 4.278v6.305c0 2.342-1.944 4.25-4.323 4.279a4.375 4.375 0 01-3.033-1.252l-1.851 1.818A7 7 0 0012.029 22h.092c3.803-.056 6.858-3.083 6.879-6.816v-6.5C18.907 4.963 15.817 2 12.036 2z",
-      },
-    ],
-  },
-  meta: {
-    title: "Meta",
-    paths: [
-      {
-        d: "M6.897 4c1.915 0 3.516.932 5.43 3.376l.282-.373c.19-.246.383-.484.58-.71l.313-.35C14.588 4.788 15.792 4 17.225 4c1.273 0 2.469.557 3.491 1.516l.218.213c1.73 1.765 2.917 4.71 3.053 8.026l.011.392.002.25c0 1.501-.28 2.759-.818 3.7l-.14.23-.108.153c-.301.42-.664.758-1.086 1.009l-.265.142-.087.04a3.493 3.493 0 01-.302.118 4.117 4.117 0 01-1.33.208c-.524 0-.996-.067-1.438-.215-.614-.204-1.163-.56-1.726-1.116l-.227-.235c-.753-.812-1.534-1.976-2.493-3.586l-1.43-2.41-.544-.895-1.766 3.13-.343.592C7.597 19.156 6.227 20 4.356 20c-1.21 0-2.205-.42-2.936-1.182l-.168-.184c-.484-.573-.837-1.311-1.043-2.189l-.067-.32a8.69 8.69 0 01-.136-1.288L0 14.468c.002-.745.06-1.49.174-2.23l.1-.573c.298-1.53.828-2.958 1.536-4.157l.209-.34c1.177-1.83 2.789-3.053 4.615-3.16L6.897 4zm-.033 2.615l-.201.01c-.83.083-1.606.673-2.252 1.577l-.138.199-.01.018c-.67 1.017-1.185 2.378-1.456 3.845l-.004.022a12.591 12.591 0 00-.207 2.254l.002.188c.004.18.017.36.04.54l.043.291c.092.503.257.908.486 1.208l.117.137c.303.323.698.492 1.17.492 1.1 0 1.796-.676 3.696-3.641l2.175-3.4.454-.701-.139-.198C9.11 7.3 8.084 6.616 6.864 6.616zm10.196-.552l-.176.007c-.635.048-1.223.359-1.82.933l-.196.198c-.439.462-.887 1.064-1.367 1.807l.266.398c.18.274.362.56.55.858l.293.475 1.396 2.335.695 1.114c.583.926 1.03 1.6 1.408 2.082l.213.262c.282.326.529.54.777.673l.102.05c.227.1.457.138.718.138.176.002.35-.023.518-.073.338-.104.61-.32.813-.637l.095-.163.077-.162c.194-.459.29-1.06.29-1.785l-.006-.449c-.08-2.871-.938-5.372-2.2-6.798l-.176-.189c-.67-.683-1.444-1.074-2.27-1.074z",
-      },
-    ],
-  },
-  mistral: {
-    title: "Mistral",
-    paths: [
-      {
-        d: "M3.428 3.4h3.429v3.428h3.429v3.429h-.002 3.431V6.828h3.427V3.4h3.43v13.714H24v3.429H13.714v-3.428h-3.428v-3.429h-3.43v3.428h3.43v3.429H0v-3.429h3.428V3.4zm10.286 13.715h3.428v-3.429h-3.427v3.429z",
-        clipRule: "evenodd",
-      },
-    ],
-  },
-  openai: {
-    title: "OpenAI",
-    paths: [
-      {
-        d: "M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z",
-      },
-    ],
-  },
-  opencode: {
-    title: "OpenCode",
-    viewBox: "0 0 240 300",
-    paths: [
-      { d: "M180 240H60V120H180V240Z", fill: "#CFCECD" },
-      { d: "M180 60H60V240H180V60ZM240 300H0V0H240V300Z", fill: "#211E1E" },
-    ],
-  },
-  perplexity: {
-    title: "Perplexity",
-    paths: [
-      {
-        d: "M19.785 0v7.272H22.5V17.62h-2.935V24l-7.037-6.194v6.145h-1.091v-6.152L4.392 24v-6.465H1.5V7.188h2.884V0l7.053 6.494V.19h1.09v6.49L19.786 0zm-7.257 9.044v7.319l5.946 5.234V14.44l-5.946-5.397zm-1.099-.08l-5.946 5.398v7.235l5.946-5.234V8.965zm8.136 7.58h1.844V8.349H13.46l6.105 5.54v2.655zm-8.982-8.28H2.59v8.195h1.8v-2.576l6.192-5.62zM5.475 2.476v4.71h5.115l-5.115-4.71zm13.219 0l-5.115 4.71h5.115v-4.71z",
-      },
-    ],
-  },
-  xai: {
-    title: "xAI",
-    paths: [
-      {
-        d: "M6.469 8.776L16.512 23h-4.464L2.005 8.776H6.47zm-.004 7.9l2.233 3.164L6.467 23H2l4.465-6.324zM22 2.582V23h-3.659V7.764L22 2.582zM22 1l-9.952 14.095-2.233-3.163L17.533 1H22z",
-      },
-    ],
-  },
-};
-
-const providerLogoAliases: Record<string, string> = {
-  claude: "anthropic",
-  codex: "openai",
-  google: "gemini",
-  googlegemini: "gemini",
-  grok: "xai",
-  mistralai: "mistral",
-  opencodego: "opencode",
-};
-
-function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
-  const logo = providerLogoFor(provider);
-
-  return (
-    <span
-      className="grid size-5 shrink-0 place-items-center text-foreground"
-      title={logo?.title ?? providerName(provider)}
-      aria-hidden="true"
-    >
-      {logo ? (
-        <svg
-          viewBox={logo.viewBox ?? "0 0 24 24"}
-          className="size-4"
-          fill="currentColor"
-          fillRule="evenodd"
-        >
-          {logo.paths.map((path) => (
-            <path
-              key={path.d}
-              d={path.d}
-              clipRule={path.clipRule}
-              fill={path.fill}
-            />
-          ))}
-        </svg>
-      ) : (
-        <svg
-          viewBox="0 0 24 24"
-          className="size-4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 3.5 14.2 9l5.8 1-4.4 3.9 1.3 5.7L12 16.6l-4.9 3 1.3-5.7L4 10l5.8-1L12 3.5Z" />
-        </svg>
-      )}
-    </span>
-  );
-}
-
-function providerLogoFor(provider: string): ProviderLogoDefinition | undefined {
-  const normalizedProvider = provider.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const [token, logoKey] of Object.entries(providerLogoAliases)) {
-    if (normalizedProvider.includes(token)) {
-      return providerLogos[logoKey];
-    }
-  }
-  for (const [logoKey, logo] of Object.entries(providerLogos)) {
-    if (normalizedProvider.includes(logoKey)) {
-      return logo;
-    }
-  }
-  return undefined;
-}
-
-function modelName(model: RoderModel | undefined): string {
-  return model?.name || model?.id || "Model";
-}
-
-function providerName(provider: string): string {
-  if (!provider) {
-    return "Roder";
-  }
-  if (provider.toLowerCase() === "openai") {
-    return "OpenAI";
-  }
-  return provider.slice(0, 1).toUpperCase() + provider.slice(1);
-}
-
-function reasoningLabel(reasoning: ReasoningEffort): string {
-  if (reasoning === "medium") {
-    return "Med";
-  }
-  if (reasoning === "xhigh") {
-    return "xHigh";
-  }
-  return reasoning.slice(0, 1).toUpperCase() + reasoning.slice(1);
-}
-
-function reasoningName(reasoning: ReasoningEffort): string {
-  if (reasoning === "xhigh") {
-    return "Extra high";
-  }
-  return reasoning.slice(0, 1).toUpperCase() + reasoning.slice(1);
 }
