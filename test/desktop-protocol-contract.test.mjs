@@ -56,6 +56,7 @@ test("desktop selected controls are sent with turns instead of persisted as defa
   const persistedNavigation = storeSource.match(/partialize:\s*\(state\)\s*=>\s*\(\{(?<body>[\s\S]*?)\}\)/);
   assert.ok(persistedNavigation?.groups?.body);
   assert.doesNotMatch(persistedNavigation.groups.body, /selectedModel|selectedReasoning|selectedPolicyMode/);
+  assert.doesNotMatch(storeSource, /gpt-5\.3-codex/);
   assert.match(storeSource, /model:\s*selectedTurnModel/);
   assert.match(storeSource, /reasoning:\s*turnState\.selectedReasoning/);
   assert.match(storeSource, /policyMode:\s*turnState\.selectedPolicyMode/);

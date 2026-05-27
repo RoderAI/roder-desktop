@@ -143,7 +143,7 @@ export const useRoderStore = create<RoderStore>()(
       forwardStack: [],
       models: [],
       visibleModelIds: [],
-      selectedModel: "gpt-5.3-codex",
+      selectedModel: "",
       selectedReasoning: "medium",
       selectedPolicyMode: "accept_all",
       selectedWorkspaceCwd: "",
@@ -177,7 +177,7 @@ export const useRoderStore = create<RoderStore>()(
           const selectedWorkspaceCwd = normalizeCwd(current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "", status.cwd);
           const currentSelectedModel = visibleModels.some((model) => model.id === settings.default_model)
             ? settings.default_model
-            : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || settings.default_model || "gpt-5.3-codex";
+            : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || settings.default_model;
           const selectedPolicyMode = normalizePolicyMode(settings.default_mode);
 
           set({
