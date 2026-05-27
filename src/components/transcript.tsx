@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ConversationMessage } from "@/types/roder";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { cn } from "@/lib/utils";
 import { groupToolMessagesForTranscript } from "@/lib/tool-message-groups";
 import { CompactToolGroup } from "./compact-tool-group";
@@ -8,19 +9,29 @@ import { MessageContent } from "./message-content";
 import { PhaseMessage } from "./phase-message";
 import { ToolActivityGroup } from "./tool-activity-group";
 import { ToolTimelineItem } from "./tool-timeline-item";
+import { ShimmerText } from "./tool-timeline-shared";
 
 type TranscriptProps = {
   messages: ConversationMessage[];
   followSignal: number;
   activeTurnId?: string;
+  showWorkingIndicator?: boolean;
+  onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
 };
 
 const bottomThresholdPx = 48;
 
-export function Transcript({ activeTurnId, messages, followSignal }: TranscriptProps): React.JSX.Element {
+export function Transcript({
+  activeTurnId,
+  messages,
+  followSignal,
+  showWorkingIndicator = false,
+  onCanScrollToBottomChange,
+}: TranscriptProps): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
-  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const lastFollowSignalRef = useRef(followSignal);
+  const lastMessageVersionRef = useRef("");
 
   const messageVersion = useMemo(() => {
     const lastMessage = messages.at(-1);
@@ -31,8 +42,9 @@ export function Transcript({ activeTurnId, messages, followSignal }: TranscriptP
       lastMessage?.toolOutput?.length ?? 0,
       lastMessage?.toolSummary?.length ?? 0,
       lastMessage?.status ?? "",
+      showWorkingIndicator ? "working" : "idle",
     ].join(":");
-  }, [messages]);
+  }, [messages, showWorkingIndicator]);
   const transcriptEntries = useMemo(() => groupToolMessagesForTranscript(messages, { activeTurnId }), [activeTurnId, messages]);
 
   const syncPinnedState = useCallback((viewport: HTMLDivElement) => {
@@ -41,37 +53,51 @@ export function Transcript({ activeTurnId, messages, followSignal }: TranscriptP
     const wasPinned = pinnedToBottomRef.current;
     pinnedToBottomRef.current = nextPinned;
     if (wasPinned !== nextPinned) {
-      setIsPinnedToBottom(nextPinned);
+      onCanScrollToBottomChange?.(!nextPinned);
     }
-  }, []);
+  }, [onCanScrollToBottomChange]);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
-    const viewport = viewportRef.current;
+  const setViewportNode = useCallback((viewport: HTMLDivElement | null) => {
+    viewportRef.current = viewport;
     if (!viewport) {
       return;
     }
-    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-  }, []);
 
-  useEffect(() => {
-    if (!pinnedToBottomRef.current) {
+    const followChanged = lastFollowSignalRef.current !== followSignal;
+    const messageChanged = lastMessageVersionRef.current !== messageVersion;
+    lastFollowSignalRef.current = followSignal;
+    lastMessageVersionRef.current = messageVersion;
+
+    if (followChanged) {
+      pinnedToBottomRef.current = true;
+      onCanScrollToBottomChange?.(false);
+      requestAnimationFrame(() => {
+        if (viewportRef.current === viewport) {
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+        }
+      });
       return;
     }
-    requestAnimationFrame(() => scrollToBottom("auto"));
-  }, [messageVersion, scrollToBottom]);
 
-  useEffect(() => {
-    pinnedToBottomRef.current = true;
-    setIsPinnedToBottom(true);
-    requestAnimationFrame(() => scrollToBottom("smooth"));
-  }, [followSignal, scrollToBottom]);
+    if (messageChanged) {
+      requestAnimationFrame(() => {
+        if (viewportRef.current !== viewport) {
+          return;
+        }
+        if (pinnedToBottomRef.current) {
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
+        }
+        syncPinnedState(viewport);
+      });
+    }
+  }, [followSignal, messageVersion, onCanScrollToBottomChange, syncPinnedState]);
 
   return (
     <div className="relative min-h-0 flex-1">
       <ScrollArea
         className="h-full"
         viewportClassName="transcript-viewport"
-        viewportRef={viewportRef}
+        viewportRef={setViewportNode}
         onViewportScroll={(event) => syncPinnedState(event.currentTarget)}
       >
         <main className="mx-auto flex w-full max-w-[980px] flex-col px-8 pb-40 pt-2">
@@ -115,10 +141,24 @@ export function Transcript({ activeTurnId, messages, followSignal }: TranscriptP
               </article>
             );
           })}
+          {showWorkingIndicator && <ThreadWorkingIndicator />}
         </main>
       </ScrollArea>
       <div className="transcript-fade pointer-events-none absolute inset-x-0 bottom-0 h-28" />
-      <div data-transcript-pinned={isPinnedToBottom ? "true" : "false"} className="sr-only" />
+    </div>
+  );
+}
+
+function ThreadWorkingIndicator(): React.JSX.Element {
+  return (
+    <div
+      aria-label="Agent is working"
+      aria-live="polite"
+      className="my-3 flex h-8 items-center gap-2 text-base font-medium text-muted-foreground"
+      role="status"
+    >
+      <DotMatrixSpinner />
+      <ShimmerText>Working</ShimmerText>
     </div>
   );
 }
