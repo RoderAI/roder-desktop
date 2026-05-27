@@ -1,4 +1,4 @@
-import { ArrowDown, Loader2, Mic, Plus, Square } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Mic, Plus, Square } from "lucide-react";
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort } from "@/types/roder";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,7 @@ export function Composer({
     lifecycleRef: speechLifecycleRef,
     toggleRecording,
   } = useSpeechTranscription({ onTranscriptionText: appendTranscribedText });
+  const canSubmit = prompt.trim().length > 0 || attachments.length > 0;
 
   async function submit(): Promise<void> {
     const value = prompt.trim();
@@ -256,17 +257,6 @@ export function Composer({
               />
             </div>
             <div className="flex items-center gap-2">
-              {busy && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  aria-label="Stop inference"
-                  onClick={() => void onStop()}
-                >
-                  <Square className="size-4 fill-current" />
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -293,11 +283,59 @@ export function Composer({
                 onChange={onSelectedModelChange}
                 onReasoningChange={onSelectedReasoningChange}
               />
+              <SubmitOrStopButton
+                busy={busy}
+                canSubmit={canSubmit}
+                onSubmit={() => void submit()}
+                onStop={() => void onStop()}
+              />
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/*
+ * SUBMIT BUTTON STATE STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to the thread running state changing.
+ *
+ *   0ms   same button slot keeps position while color/icon state changes
+ * 120ms   background and foreground colors settle
+ */
+function SubmitOrStopButton({
+  busy,
+  canSubmit,
+  onSubmit,
+  onStop,
+}: {
+  busy: boolean;
+  canSubmit: boolean;
+  onSubmit: () => void;
+  onStop: () => void;
+}): React.JSX.Element {
+  const disabled = !busy && !canSubmit;
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn(
+        "composer-submit-button size-9 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+      )}
+      aria-label={busy ? "Stop inference" : "Send message"}
+      disabled={disabled}
+      data-state={busy ? "stop" : "send"}
+      onClick={busy ? onStop : onSubmit}
+    >
+      {busy ? (
+        <Square className="size-4 fill-current" />
+      ) : (
+        <ArrowUp className="size-5" />
+      )}
+    </Button>
   );
 }
 

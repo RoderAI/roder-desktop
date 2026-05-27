@@ -610,6 +610,13 @@ code[data-streamdown="inline-code"] {
   pointer-events: auto;
 }
 
+.composer-submit-button {
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out,
+    opacity 120ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dropdown-menu-popup {
     transition: none;
@@ -656,6 +663,10 @@ code[data-streamdown="inline-code"] {
   }
 
   .composer-scroll-button-region {
+    transition: none;
+  }
+
+  .composer-submit-button {
     transition: none;
   }
 }
