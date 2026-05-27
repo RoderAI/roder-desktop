@@ -69,6 +69,7 @@ type RoderStore = {
   setSelectedModel: (model: string) => void;
   setSelectedReasoning: (reasoning: ReasoningEffort) => void;
   setSelectedPolicyMode: (mode: PolicyMode) => void;
+  saveDefaults: () => Promise<void>;
   setModelVisibility: (modelId: string, visible: boolean) => void;
   resetVisibleModels: () => void;
   setSelectedWorkspaceCwd: (cwd: string) => void;
@@ -467,6 +468,29 @@ export const useRoderStore = create<RoderStore>()(
       setSelectedPolicyMode: (selectedPolicyMode) => {
         const mode = normalizePolicyMode(selectedPolicyMode);
         set({ selectedPolicyMode: mode, error: null });
+      },
+      saveDefaults: async () => {
+        const state = get();
+        const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
+        const selectedModel = model?.id ?? state.selectedModel;
+        const selectedProvider = model?.modelProvider ?? selectedModelProvider(state.models, selectedModel);
+        if (!selectedModel || !selectedProvider) {
+          const message = "Select a model before saving defaults";
+          set({ error: message });
+          throw new Error(message);
+        }
+
+        set({ error: null });
+        const [selection, mode] = await Promise.all([
+          roderIpc.selectProviderDefaults(selectedProvider, selectedModel, state.selectedReasoning),
+          roderIpc.setDefaultMode(state.selectedPolicyMode),
+        ]);
+
+        set({
+          selectedModel: selection.model || selectedModel,
+          selectedReasoning: normalizeReasoningEffort(selection.reasoning || state.selectedReasoning),
+          selectedPolicyMode: normalizePolicyMode(mode.default_mode || state.selectedPolicyMode),
+        });
       },
       setSelectedWorkspaceCwd: (cwd) => set((state) => {
         const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);

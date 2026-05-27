@@ -65,6 +65,37 @@ test("setThreadMode sends the policy mode wire value to the app-server", async (
   ]);
 });
 
+test("default settings use provider and settings protocol methods", async () => {
+  const calls = [];
+  const roderIpc = loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    if (method === "providers/select") {
+      return { provider: params.provider, model: params.model, reasoning: params.reasoning };
+    }
+    return { default_mode: params.mode };
+  });
+
+  await roderIpc.selectProviderDefaults("openai", "gpt-5.5", "high");
+  await roderIpc.setDefaultMode("plan");
+
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      method: "providers/select",
+      params: {
+        provider: "openai",
+        model: "gpt-5.5",
+        reasoning: "high",
+      },
+    },
+    {
+      method: "settings/set_default_mode",
+      params: {
+        mode: "plan",
+      },
+    },
+  ]);
+});
+
 test("startTurn sends selected controls with the next turn", async () => {
   const calls = [];
   const roderIpc = loadRoderIpc(async (method, params) => {

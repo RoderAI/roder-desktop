@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 const clientSource = readFileSync(new URL("../electron/roder/app-server-client.ts", import.meta.url), "utf8");
 const storeSource = readFileSync(new URL("../src/stores/roder-store.ts", import.meta.url), "utf8");
+const generalSettingsSource = readFileSync(new URL("../src/components/settings-general-panel.tsx", import.meta.url), "utf8");
 const apiDocs = readFileSync(new URL("../docs/api.md", import.meta.url), "utf8");
 
 const documentedDesktopMethods = [
@@ -60,4 +61,12 @@ test("desktop selected controls are sent with turns instead of persisted as defa
   assert.match(storeSource, /model:\s*selectedTurnModel/);
   assert.match(storeSource, /reasoning:\s*turnState\.selectedReasoning/);
   assert.match(storeSource, /policyMode:\s*turnState\.selectedPolicyMode/);
+});
+
+test("general settings exposes default controls save action", () => {
+  assert.match(storeSource, /saveDefaults/);
+  assert.match(storeSource, /selectProviderDefaults/);
+  assert.match(storeSource, /setDefaultMode/);
+  assert.match(generalSettingsSource, /Defaults/);
+  assert.match(generalSettingsSource, /saveDefaults/);
 });
