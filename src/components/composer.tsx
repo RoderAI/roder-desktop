@@ -48,6 +48,7 @@ type ComposerProps = {
   workspaceRecents: WorkspaceFolder[];
   threads: RoderThread[];
   attachments: DesktopAttachment[];
+  focusSignal: number;
   onSelectedModelChange: (model: string) => void;
   onSelectedPolicyModeChange: (mode: PolicyMode) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
@@ -70,6 +71,7 @@ export function Composer({
   workspaceRecents,
   threads,
   attachments,
+  focusSignal,
   onSelectedModelChange,
   onSelectedPolicyModeChange,
   onSelectedReasoningChange,
@@ -198,6 +200,13 @@ export function Composer({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (focusSignal === 0) {
+      return;
+    }
+    textareaRef.current?.focus();
+  }, [focusSignal]);
 
   function resizeTextarea(): void {
     const textarea = textareaRef.current;
