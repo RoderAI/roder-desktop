@@ -18,6 +18,12 @@ export type ThreadStartResult = {
   cwd: string;
 };
 
+export type ProviderSelectResult = {
+  provider: string;
+  model: string;
+  reasoning: string;
+};
+
 export type ThreadArchiveResult = {
   threadId: string;
   archived: boolean;
@@ -49,6 +55,10 @@ export type ThreadStateResult = {
 
 export type ThreadSetModeResult = {
   mode: PolicyMode;
+};
+
+export type SettingsSetDefaultModeResult = {
+  default_mode: PolicyMode;
 };
 
 export type TurnStartResult = {
@@ -83,6 +93,8 @@ export const roderIpc = {
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
   startThread: (model: string, cwd: string, modelProvider?: string, reasoning?: string) =>
     window.roderDesktop.request("thread/start", { model, cwd, modelProvider, reasoning, ephemeral: false }) as Promise<ThreadStartResult>,
+  selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
+    window.roderDesktop.request("providers/select", { provider, model, reasoning }) as Promise<ProviderSelectResult>,
   startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = [], options: TurnStartOptions = {}) => {
     const input = turnInput(prompt, attachments);
     if (input.length > 0) {
@@ -106,6 +118,8 @@ export const roderIpc = {
     window.roderDesktop.request("thread/exit_plan", { requestId: params.requestId, approved: params.approved }),
   setThreadMode: (mode: PolicyMode, reason: string) =>
     window.roderDesktop.request("thread/set_mode", { mode, reason }) as Promise<ThreadSetModeResult>,
+  setDefaultMode: (mode: PolicyMode) =>
+    window.roderDesktop.request("settings/set_default_mode", { mode }) as Promise<SettingsSetDefaultModeResult>,
   settings: () => window.roderDesktop.request("settings/get", {}) as Promise<SettingsGetResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),

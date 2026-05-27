@@ -19,6 +19,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
+import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import {
   presetsForScheme,
@@ -64,7 +65,9 @@ export function SettingsView(): React.JSX.Element {
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto px-10 py-12">
         <div className="mx-auto w-full max-w-[860px]">
-          {settingsSection === "appearance" ? (
+          {settingsSection === "general" ? (
+            <GeneralSettingsPanel />
+          ) : settingsSection === "appearance" ? (
             <AppearancePanel onReset={resetTheme} />
           ) : settingsSection === "components" ? (
             <ComponentsSettingsPanel />
