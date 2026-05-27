@@ -14,6 +14,7 @@ export type ThreadStartResult = {
   thread: RoderThread;
   model: string;
   modelProvider: string;
+  reasoning: string;
   cwd: string;
 };
 
@@ -66,8 +67,8 @@ export const roderIpc = {
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
   archiveThread: (threadId: string) =>
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
-  startThread: (model: string, cwd: string, modelProvider?: string) =>
-    window.roderDesktop.request("thread/start", { model, cwd, modelProvider, ephemeral: false }) as Promise<ThreadStartResult>,
+  startThread: (model: string, cwd: string, modelProvider?: string, reasoning?: string) =>
+    window.roderDesktop.request("thread/start", { model, cwd, modelProvider, reasoning, ephemeral: false }) as Promise<ThreadStartResult>,
   startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
     const input = turnInput(prompt, attachments);
     if (input.length > 0) {

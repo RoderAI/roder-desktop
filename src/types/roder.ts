@@ -126,6 +126,7 @@ export type RoderThread = {
   id: string;
   preview: string;
   modelProvider: string;
+  model: string;
   createdAt: number;
   updatedAt: number;
   status: {

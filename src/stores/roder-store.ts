@@ -246,6 +246,7 @@ export const useRoderStore = create<RoderStore>()(
             messagesByThread: { ...state.messagesByThread, [threadId]: messagesFromThread(thread) },
             threads: upsertThread(state.threads, thread),
             selectedWorkspaceCwd: thread.cwd,
+            selectedModel: thread.model || state.selectedModel,
             workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
           }));
         } catch (error) {
@@ -355,7 +356,12 @@ export const useRoderStore = create<RoderStore>()(
             const cwd = requireAbsoluteCwd(state.selectedWorkspaceCwd || state.status.cwd, state.status.cwd);
             const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
             const selectedModel = model?.id ?? state.selectedModel;
-            const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
+            const result = await roderIpc.startThread(
+              selectedModel,
+              cwd,
+              model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
+              state.selectedReasoning,
+            );
             if (!result.thread) {
               throw new Error("roder app-server did not return a thread");
             }
@@ -365,6 +371,8 @@ export const useRoderStore = create<RoderStore>()(
               threads: upsertThread(state.threads, thread),
               activeThreadId: threadId,
               selectedWorkspaceCwd: thread.cwd,
+              selectedModel: thread.model || result.model || selectedModel,
+              selectedReasoning: normalizeReasoningEffort(result.reasoning || state.selectedReasoning),
               workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
             }));
           }
@@ -530,7 +538,12 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
   const threadCwd = requireAbsoluteCwd(cwd, state.status.cwd);
   const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
   const selectedModel = model?.id ?? state.selectedModel;
-  const result = await roderIpc.startThread(selectedModel, threadCwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
+  const result = await roderIpc.startThread(
+    selectedModel,
+    threadCwd,
+    model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
+    state.selectedReasoning,
+  );
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
   }
@@ -539,6 +552,8 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
     threads: upsertThread(state.threads, thread),
     activeThreadId: thread.id,
     selectedWorkspaceCwd: thread.cwd,
+    selectedModel: thread.model || result.model || selectedModel,
+    selectedReasoning: normalizeReasoningEffort(result.reasoning || state.selectedReasoning),
     workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
     messagesByThread: { ...state.messagesByThread, [thread.id]: [] },
     backStack: state.activeThreadId ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80) : state.backStack,
