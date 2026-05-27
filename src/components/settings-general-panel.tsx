@@ -42,12 +42,12 @@ const policyOptions: Array<{ mode: PolicyMode; label: string; description: strin
 export function GeneralSettingsPanel(): React.JSX.Element {
   const allModels = useRoderStore((state) => state.models);
   const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
-  const selectedModel = useRoderStore((state) => state.selectedModel);
-  const selectedReasoning = useRoderStore((state) => state.selectedReasoning);
-  const selectedPolicyMode = useRoderStore((state) => state.selectedPolicyMode);
-  const setSelectedModel = useRoderStore((state) => state.setSelectedModel);
-  const setSelectedReasoning = useRoderStore((state) => state.setSelectedReasoning);
-  const setSelectedPolicyMode = useRoderStore((state) => state.setSelectedPolicyMode);
+  const defaultModel = useRoderStore((state) => state.defaultModel);
+  const defaultReasoning = useRoderStore((state) => state.defaultReasoning);
+  const defaultPolicyMode = useRoderStore((state) => state.defaultPolicyMode);
+  const setDefaultModel = useRoderStore((state) => state.setDefaultModel);
+  const setDefaultReasoning = useRoderStore((state) => state.setDefaultReasoning);
+  const setDefaultPolicyMode = useRoderStore((state) => state.setDefaultPolicyMode);
   const saveDefaults = useRoderStore((state) => state.saveDefaults);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -55,8 +55,8 @@ export function GeneralSettingsPanel(): React.JSX.Element {
 
   const models = useMemo(() => visibleModelsFor(allModels, visibleModelIds), [allModels, visibleModelIds]);
   const selectedModelRecord = useMemo(
-    () => models.find((model) => model.id === selectedModel) ?? models[0],
-    [models, selectedModel],
+    () => models.find((model) => model.id === defaultModel) ?? models[0],
+    [models, defaultModel],
   );
   const modelItems = useMemo(
     () => Object.fromEntries(models.map((model) => [model.id, modelName(model)])),
@@ -97,7 +97,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
             items={modelItems}
             value={selectedModelRecord?.id ?? ""}
             disabled={models.length === 0}
-            onValueChange={(value) => setSelectedModel(value ?? "")}
+            onValueChange={(value) => setDefaultModel(value ?? "")}
           >
             <SelectTrigger className="w-[300px] border border-border bg-card">
               <SelectValue />
@@ -117,8 +117,8 @@ export function GeneralSettingsPanel(): React.JSX.Element {
         <SettingsRow label="Reasoning" description="Thinking effort used when starting new turns">
           <Select
             items={Object.fromEntries(reasoningOptions.map((reasoning) => [reasoning, reasoningLabel(reasoning)]))}
-            value={selectedReasoning}
-            onValueChange={(value) => setSelectedReasoning((value ?? "medium") as ReasoningEffort)}
+            value={defaultReasoning}
+            onValueChange={(value) => setDefaultReasoning((value ?? "medium") as ReasoningEffort)}
           >
             <SelectTrigger className="w-[220px] border border-border bg-card">
               <SelectValue />
@@ -135,11 +135,11 @@ export function GeneralSettingsPanel(): React.JSX.Element {
           </Select>
         </SettingsRow>
 
-        <SettingsRow label="Policy mode" description={policyOptions.find((option) => option.mode === selectedPolicyMode)?.description ?? ""}>
+        <SettingsRow label="Policy mode" description={policyOptions.find((option) => option.mode === defaultPolicyMode)?.description ?? ""}>
           <Select
             items={Object.fromEntries(policyOptions.map((option) => [option.mode, option.label]))}
-            value={selectedPolicyMode}
-            onValueChange={(value) => setSelectedPolicyMode((value ?? "default") as PolicyMode)}
+            value={defaultPolicyMode}
+            onValueChange={(value) => setDefaultPolicyMode((value ?? "default") as PolicyMode)}
           >
             <SelectTrigger className="w-[220px] border border-border bg-card">
               <SelectValue />

@@ -70,3 +70,14 @@ test("general settings exposes default controls save action", () => {
   assert.match(generalSettingsSource, /Defaults/);
   assert.match(generalSettingsSource, /saveDefaults/);
 });
+
+test("default settings are separate from active composer selections", () => {
+  assert.match(storeSource, /defaultModel/);
+  assert.match(storeSource, /defaultReasoning/);
+  assert.match(storeSource, /defaultPolicyMode/);
+  assert.match(storeSource, /reasoning:\s*turnState\.selectedReasoning/);
+  assert.match(storeSource, /state\.defaultReasoning/);
+  assert.match(generalSettingsSource, /defaultReasoning/);
+  assert.doesNotMatch(generalSettingsSource, /setSelectedReasoning/);
+  assert.doesNotMatch(generalSettingsSource, /setSelectedPolicyMode/);
+});

@@ -40,11 +40,15 @@ type RoderStore = {
   threads: RoderThread[];
   threadDetails: Record<string, RoderThread>;
   messagesByThread: Record<string, ConversationMessage[]>;
+  threadControlsByThread: Record<string, ThreadControlState>;
   activeThreadId: string;
   backStack: NavigationEntry[];
   forwardStack: NavigationEntry[];
   models: RoderModel[];
   visibleModelIds: string[];
+  defaultModel: string;
+  defaultReasoning: ReasoningEffort;
+  defaultPolicyMode: PolicyMode;
   selectedModel: string;
   selectedReasoning: ReasoningEffort;
   selectedPolicyMode: PolicyMode;
@@ -66,6 +70,9 @@ type RoderStore = {
   sendPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
   stopTurn: () => Promise<void>;
   restart: () => Promise<void>;
+  setDefaultModel: (model: string) => void;
+  setDefaultReasoning: (reasoning: ReasoningEffort) => void;
+  setDefaultPolicyMode: (mode: PolicyMode) => void;
   setSelectedModel: (model: string) => void;
   setSelectedReasoning: (reasoning: ReasoningEffort) => void;
   setSelectedPolicyMode: (mode: PolicyMode) => void;
@@ -81,6 +88,12 @@ type RoderStore = {
   applyStatus: (status: RoderStatus) => void;
   applyStderr: (message: string) => void;
   applyNotification: (notification: RoderNotification) => void;
+};
+
+type ThreadControlState = {
+  model: string;
+  reasoning: ReasoningEffort;
+  policyMode: PolicyMode;
 };
 
 const initialStatus: RoderStatus = {
@@ -139,11 +152,15 @@ export const useRoderStore = create<RoderStore>()(
       threads: [],
       threadDetails: {},
       messagesByThread: {},
+      threadControlsByThread: {},
       activeThreadId: "",
       backStack: [],
       forwardStack: [],
       models: [],
       visibleModelIds: [],
+      defaultModel: "",
+      defaultReasoning: "medium",
+      defaultPolicyMode: "accept_all",
       selectedModel: "",
       selectedReasoning: "medium",
       selectedPolicyMode: "accept_all",
@@ -179,18 +196,22 @@ export const useRoderStore = create<RoderStore>()(
           const currentSelectedModel = visibleModels.some((model) => model.id === settings.default_model)
             ? settings.default_model
             : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || settings.default_model;
-          const selectedPolicyMode = normalizePolicyMode(settings.default_mode);
+          const defaultPolicyMode = normalizePolicyMode(settings.default_mode);
+          const defaultReasoning = normalizeReasoningEffort(settings.default_reasoning || models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort);
 
           set({
             status,
             threads,
             models,
             visibleModelIds,
+            defaultModel: currentSelectedModel,
+            defaultReasoning,
+            defaultPolicyMode,
             selectedWorkspaceCwd,
             workspaceRecents: upsertWorkspaceRecent(current.workspaceRecents, selectedWorkspaceCwd),
-            selectedModel: currentSelectedModel,
-            selectedReasoning: normalizeReasoningEffort(settings.default_reasoning || models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort),
-            selectedPolicyMode,
+            selectedModel: activeThread?.model || currentSelectedModel,
+            selectedReasoning: defaultReasoning,
+            selectedPolicyMode: defaultPolicyMode,
             activeThreadId,
             hydrated: true,
             busy: false,
@@ -245,7 +266,9 @@ export const useRoderStore = create<RoderStore>()(
             messagesByThread: { ...state.messagesByThread, [threadId]: messagesFromThread(thread) },
             threads: upsertThread(state.threads, thread),
             selectedWorkspaceCwd: thread.cwd,
-            selectedModel: thread.model || state.selectedModel,
+            selectedModel: state.threadControlsByThread[threadId]?.model || thread.model || state.defaultModel,
+            selectedReasoning: state.threadControlsByThread[threadId]?.reasoning || state.defaultReasoning,
+            selectedPolicyMode: state.threadControlsByThread[threadId]?.policyMode || state.defaultPolicyMode,
             workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
           }));
         } catch (error) {
@@ -269,10 +292,11 @@ export const useRoderStore = create<RoderStore>()(
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
             const { [threadId]: _archivedMessages, ...messagesByThread } = state.messagesByThread;
             return {
-              threads: state.threads.filter((thread) => thread.id !== threadId),
-              threadDetails,
-              messagesByThread,
-              activeThreadId: nextActiveThreadId,
+            threads: state.threads.filter((thread) => thread.id !== threadId),
+            threadDetails,
+            messagesByThread,
+            threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
+            activeThreadId: nextActiveThreadId,
               backStack: state.backStack.filter((entry) => entry.threadId !== threadId),
               forwardStack: state.forwardStack.filter((entry) => entry.threadId !== threadId),
             };
@@ -353,27 +377,33 @@ export const useRoderStore = create<RoderStore>()(
           if (!threadId) {
             const state = get();
             const cwd = requireAbsoluteCwd(state.selectedWorkspaceCwd || state.status.cwd, state.status.cwd);
-            const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
-            const selectedModel = model?.id ?? state.selectedModel;
+            const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.defaultModel);
+            const selectedModel = model?.id ?? state.defaultModel;
             const result = await roderIpc.startThread(
               selectedModel,
               cwd,
               model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
-              state.selectedReasoning,
+              state.defaultReasoning,
             );
             if (!result.thread) {
               throw new Error("roder app-server did not return a thread");
             }
-            const thread = normalizeThreadCwd(result.thread, get().status.cwd);
-            threadId = thread.id;
-            set((state) => ({
-              threads: upsertThread(state.threads, thread),
-              activeThreadId: threadId,
-              selectedWorkspaceCwd: thread.cwd,
-              selectedModel: thread.model || result.model || selectedModel,
-              selectedReasoning: normalizeReasoningEffort(result.reasoning || state.selectedReasoning),
-              workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-            }));
+          const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+          threadId = thread.id;
+          set((state) => ({
+            threads: upsertThread(state.threads, thread),
+            activeThreadId: threadId,
+            selectedWorkspaceCwd: thread.cwd,
+            selectedModel: thread.model || result.model || selectedModel,
+            selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+            selectedPolicyMode: state.defaultPolicyMode,
+            threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
+              model: thread.model || result.model || selectedModel,
+              reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+              policyMode: state.defaultPolicyMode,
+            }),
+            workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+          }));
           }
 
           set((state) => ({
@@ -444,7 +474,16 @@ export const useRoderStore = create<RoderStore>()(
         }
       },
 
-      setSelectedModel: (selectedModel) => set({ selectedModel }),
+      setDefaultModel: (defaultModel) => set({ defaultModel }),
+      setDefaultReasoning: (defaultReasoning) => set({ defaultReasoning }),
+      setDefaultPolicyMode: (defaultPolicyMode) => {
+        const mode = normalizePolicyMode(defaultPolicyMode);
+        set({ defaultPolicyMode: mode, error: null });
+      },
+      setSelectedModel: (selectedModel) => set((state) => ({
+        selectedModel,
+        threadControlsByThread: updateActiveThreadControls(state, { model: selectedModel }),
+      })),
       setModelVisibility: (modelId, visible) => set((state) => {
         const currentVisibleIds = visibleModelIdsFor(state.models, state.visibleModelIds);
         const currentVisible = new Set(currentVisibleIds);
@@ -464,15 +503,22 @@ export const useRoderStore = create<RoderStore>()(
         };
       }),
       resetVisibleModels: () => set({ visibleModelIds: [] }),
-      setSelectedReasoning: (selectedReasoning) => set({ selectedReasoning }),
+      setSelectedReasoning: (selectedReasoning) => set((state) => ({
+        selectedReasoning,
+        threadControlsByThread: updateActiveThreadControls(state, { reasoning: selectedReasoning }),
+      })),
       setSelectedPolicyMode: (selectedPolicyMode) => {
         const mode = normalizePolicyMode(selectedPolicyMode);
-        set({ selectedPolicyMode: mode, error: null });
+        set((state) => ({
+          selectedPolicyMode: mode,
+          threadControlsByThread: updateActiveThreadControls(state, { policyMode: mode }),
+          error: null,
+        }));
       },
       saveDefaults: async () => {
         const state = get();
-        const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
-        const selectedModel = model?.id ?? state.selectedModel;
+        const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.defaultModel);
+        const selectedModel = model?.id ?? state.defaultModel;
         const selectedProvider = model?.modelProvider ?? selectedModelProvider(state.models, selectedModel);
         if (!selectedModel || !selectedProvider) {
           const message = "Select a model before saving defaults";
@@ -482,14 +528,14 @@ export const useRoderStore = create<RoderStore>()(
 
         set({ error: null });
         const [selection, mode] = await Promise.all([
-          roderIpc.selectProviderDefaults(selectedProvider, selectedModel, state.selectedReasoning),
-          roderIpc.setDefaultMode(state.selectedPolicyMode),
+          roderIpc.selectProviderDefaults(selectedProvider, selectedModel, state.defaultReasoning),
+          roderIpc.setDefaultMode(state.defaultPolicyMode),
         ]);
 
         set({
-          selectedModel: selection.model || selectedModel,
-          selectedReasoning: normalizeReasoningEffort(selection.reasoning || state.selectedReasoning),
-          selectedPolicyMode: normalizePolicyMode(mode.default_mode || state.selectedPolicyMode),
+          defaultModel: selection.model || selectedModel,
+          defaultReasoning: normalizeReasoningEffort(selection.reasoning || state.defaultReasoning),
+          defaultPolicyMode: normalizePolicyMode(mode.default_mode || state.defaultPolicyMode),
         });
       },
       setSelectedWorkspaceCwd: (cwd) => set((state) => {
@@ -554,16 +600,53 @@ export const useRoderStore = create<RoderStore>()(
 
 type RoderStoreSet = (partial: Partial<RoderStore> | ((state: RoderStore) => Partial<RoderStore>)) => void;
 
+function setThreadControls(
+  controlsByThread: Record<string, ThreadControlState>,
+  threadId: string,
+  controls: ThreadControlState,
+): Record<string, ThreadControlState> {
+  return {
+    ...controlsByThread,
+    [threadId]: controls,
+  };
+}
+
+function updateActiveThreadControls(
+  state: RoderStore,
+  patch: Partial<ThreadControlState>,
+): Record<string, ThreadControlState> {
+  if (!state.activeThreadId) {
+    return state.threadControlsByThread;
+  }
+  const currentControls = state.threadControlsByThread[state.activeThreadId] ?? {
+    model: state.selectedModel,
+    reasoning: state.selectedReasoning,
+    policyMode: state.selectedPolicyMode,
+  };
+  return setThreadControls(state.threadControlsByThread, state.activeThreadId, {
+    ...currentControls,
+    ...patch,
+  });
+}
+
+function removeThreadControls(
+  controlsByThread: Record<string, ThreadControlState>,
+  threadId: string,
+): Record<string, ThreadControlState> {
+  const { [threadId]: _removed, ...remaining } = controlsByThread;
+  return remaining;
+}
+
 async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () => RoderStore): Promise<void> {
   const state = get();
   const threadCwd = requireAbsoluteCwd(cwd, state.status.cwd);
-  const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
-  const selectedModel = model?.id ?? state.selectedModel;
+  const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.defaultModel);
+  const selectedModel = model?.id ?? state.defaultModel;
   const result = await roderIpc.startThread(
     selectedModel,
     threadCwd,
     model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
-    state.selectedReasoning,
+    state.defaultReasoning,
   );
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
@@ -574,7 +657,13 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
     activeThreadId: thread.id,
     selectedWorkspaceCwd: thread.cwd,
     selectedModel: thread.model || result.model || selectedModel,
-    selectedReasoning: normalizeReasoningEffort(result.reasoning || state.selectedReasoning),
+    selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+    selectedPolicyMode: state.defaultPolicyMode,
+    threadControlsByThread: setThreadControls(state.threadControlsByThread, thread.id, {
+      model: thread.model || result.model || selectedModel,
+      reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+      policyMode: state.defaultPolicyMode,
+    }),
     workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
     messagesByThread: { ...state.messagesByThread, [thread.id]: [] },
     backStack: state.activeThreadId ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80) : state.backStack,
