@@ -143,7 +143,7 @@ export type RoderTurn = {
   id: string;
   items: RoderItem[];
   itemsView: string;
-  status: string;
+  status: "inProgress" | "completed" | "failed";
   error?: {
     message: string;
   } | null;
@@ -152,17 +152,91 @@ export type RoderTurn = {
   durationMs?: number | null;
 };
 
-export type RoderItem = {
+export type RoderItemStatus = "inProgress" | "completed" | "failed";
+
+export type RoderUserMessageItem = {
   id: string;
-  type: "userMessage" | "agentMessage" | "toolMessage" | "toolCall" | "reasoning" | "compaction" | "error" | string;
-  text?: string;
-  status?: string;
+  type: "userMessage";
+  text: string;
+  images?: { imageUrl?: string; image_url?: string }[];
+  status?: RoderItemStatus;
+};
+
+export type RoderAgentMessageItem = {
+  id: string;
+  type: "agentMessage";
+  text: string;
   phase?: string;
-  payload?: unknown;
-  raw?: unknown;
-  toolName?: string;
-  toolCallId?: string;
-  sourceKind?: string;
+  status?: RoderItemStatus;
+};
+
+export type RoderReasoningItem = {
+  id: string;
+  type: "reasoning";
+  summary?: string[];
+  content?: string[];
+  status?: RoderItemStatus;
+};
+
+export type RoderToolExecutionItem = {
+  id: string;
+  type: "toolExecution";
+  toolCallId: string;
+  toolName: string;
+  status: RoderItemStatus;
+  input?: unknown;
+  output?: string;
+  error?: string;
+};
+
+export type RoderCompactionItem = {
+  id: string;
+  type: "compaction";
+  summary: string;
+  status?: RoderItemStatus;
+};
+
+export type RoderErrorItem = {
+  id: string;
+  type: "error";
+  message: string;
+  status?: RoderItemStatus;
+};
+
+export type RoderRawItem = {
+  id: string;
+  type: "raw";
+  payload: unknown;
+  status?: RoderItemStatus;
+};
+
+export type RoderItem =
+  | RoderUserMessageItem
+  | RoderAgentMessageItem
+  | RoderReasoningItem
+  | RoderToolExecutionItem
+  | RoderCompactionItem
+  | RoderErrorItem
+  | RoderRawItem;
+
+export type RoderThreadItemDelta =
+  | { type: "agentMessageText"; delta: string; phase?: string }
+  | { type: "reasoningText"; delta: string; contentIndex: number }
+  | { type: "reasoningSummaryPartAdded"; summaryIndex: number }
+  | { type: "reasoningSummaryText"; delta: string; summaryIndex: number };
+
+export type RoderThreadItemEventKind =
+  | { type: "itemStarted"; item: RoderItem }
+  | { type: "itemDelta"; itemId: string; delta: RoderThreadItemDelta }
+  | { type: "itemCompleted"; item: RoderItem };
+
+export type RoderThreadItemEvent = {
+  seq: number;
+  eventId: string;
+  threadId: string;
+  turnId: string;
+  timestamp: string;
+  event: RoderThreadItemEventKind;
 };
 
 export type RoderModel = {
