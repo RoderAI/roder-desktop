@@ -28,6 +28,22 @@ export function isThreadRunning(thread: RoderThread | undefined): boolean {
   return thread?.status.type === "running";
 }
 
+export function shouldShowThreadWorkingIndicator(
+  thread: RoderThread | undefined,
+  waitRequestCount: number,
+  messages: ConversationMessage[],
+): boolean {
+  if (!isThreadRunning(thread) || waitRequestCount > 0) {
+    return false;
+  }
+  if (messages.some((message) => message.role === "assistant" && message.status === "streaming")) {
+    return false;
+  }
+  return !thread?.status.activeFlags.some((flag) =>
+    flag === "approvalRequired" || flag === "userInputRequired" || flag === "planExitRequired"
+  );
+}
+
 export function activeTurnIdForThread(thread: RoderThread | undefined): string {
   return thread?.status.activeTurnId ?? "";
 }

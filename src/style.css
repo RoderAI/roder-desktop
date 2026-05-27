@@ -590,6 +590,33 @@ code[data-streamdown="inline-code"] {
   transform: scale(1);
 }
 
+/*
+ * COMPOSER SCROLL BUTTON ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to scroll availability changing.
+ *
+ *   0ms   button starts at the same position with opacity 0
+ * 120ms   opacity reaches 0 ↔ 1
+ * 180ms   exiting element can unmount
+ */
+.composer-scroll-button-region {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--composer-scroll-button-fade-duration, 120ms) ease-out;
+}
+
+.composer-scroll-button-region[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.composer-submit-button {
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out,
+    opacity 120ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dropdown-menu-popup {
     transition: none;
@@ -632,6 +659,14 @@ code[data-streamdown="inline-code"] {
 
   .thread-row-age,
   .thread-row-archive {
+    transition: none;
+  }
+
+  .composer-scroll-button-region {
+    transition: none;
+  }
+
+  .composer-submit-button {
     transition: none;
   }
 }

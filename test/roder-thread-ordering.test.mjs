@@ -23,7 +23,7 @@ new Script(compiled).runInNewContext({
     throw new Error(`Unexpected require: ${specifier}`);
   },
 });
-const { isThreadRunning, markThreadStatus, upsertThread } = module.exports;
+const { isThreadRunning, markThreadStatus, shouldShowThreadWorkingIndicator, upsertThread } = module.exports;
 
 function thread(id, updatedAt) {
   return {
@@ -72,4 +72,18 @@ test("explicit status changes update thread activity", () => {
   const idle = markThreadStatus(running, "thread-b", { type: "idle", activeTurnId: null, activeFlags: [] });
   assert.equal(isThreadRunning(idle[1]), false);
   assert.equal(idle[1].status.activeTurnId, null);
+});
+
+test("working indicator follows active thread work without covering waits", () => {
+  const running = { ...thread("thread-a", 100), status: { type: "running", activeTurnId: "turn-a", activeFlags: [] } };
+  const waiting = { ...running, status: { type: "running", activeTurnId: "turn-a", activeFlags: ["approvalRequired"] } };
+  const streamingAssistantMessages = [{ id: "message-1", role: "assistant", text: "Hello", status: "streaming" }];
+  const streamingToolMessages = [{ id: "tool-1", role: "tool", text: "Reading", status: "streaming" }];
+
+  assert.equal(shouldShowThreadWorkingIndicator(running, 0, []), true);
+  assert.equal(shouldShowThreadWorkingIndicator(running, 0, streamingToolMessages), true);
+  assert.equal(shouldShowThreadWorkingIndicator(running, 0, streamingAssistantMessages), false);
+  assert.equal(shouldShowThreadWorkingIndicator(running, 1, []), false);
+  assert.equal(shouldShowThreadWorkingIndicator(waiting, 0, []), false);
+  assert.equal(shouldShowThreadWorkingIndicator(thread("thread-b", 90), 0, []), false);
 });

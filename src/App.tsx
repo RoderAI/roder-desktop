@@ -15,7 +15,7 @@ import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
-import { isThreadRunning } from "@/lib/roder-thread";
+import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
@@ -33,7 +33,6 @@ export function App(): React.JSX.Element {
     models,
     newProject: createProjectThread,
     newThread: createAgentThread,
-    openWorkspaceFolder,
     restart,
     selectedModel,
     selectedPolicyMode,
@@ -49,7 +48,6 @@ export function App(): React.JSX.Element {
     stopTurn,
     threads,
     waitRequests,
-    workspaceRecents,
     resolveApproval,
     resolveUserInput,
     exitPlan,
@@ -59,18 +57,21 @@ export function App(): React.JSX.Element {
   useExtensionThemes();
   useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
+  const [canScrollTranscriptToBottom, setCanScrollTranscriptToBottom] = useState(false);
   const [mainView, setMainView] = useState<MainView>("chat");
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toolPanelWidth, setToolPanelWidth] = useState(560);
+  const [composerFocusSignal, setComposerFocusSignal] = useState(0);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const extensions = useExtensionsStore((state) => state.extensions);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
   const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
+  const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
   const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => {
@@ -114,11 +115,13 @@ export function App(): React.JSX.Element {
   const newThread = useCallback(() => {
     showChat();
     followBottom();
+    setComposerFocusSignal((value) => value + 1);
     void createAgentThread();
   }, [createAgentThread, followBottom, showChat]);
   const newThreadInFolder = useCallback((path: string) => {
     showChat();
     followBottom();
+    setComposerFocusSignal((value) => value + 1);
     setSelectedWorkspaceCwd(path);
     void createAgentThread();
   }, [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat]);
@@ -256,7 +259,13 @@ export function App(): React.JSX.Element {
             />
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
-                <Transcript activeTurnId={activeTurnId} messages={messages} followSignal={followSignal} />
+                <Transcript
+                  activeTurnId={activeTurnId}
+                  messages={messages}
+                  followSignal={followSignal}
+                  showWorkingIndicator={showWorkingIndicator}
+                  onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
+                />
                 <AgentWaitCards
                   requests={waitRequests}
                   onResolveApproval={resolveApproval}
@@ -272,16 +281,12 @@ export function App(): React.JSX.Element {
                   selectedModel={selectedModel}
                   selectedPolicyMode={selectedPolicyMode}
                   selectedReasoning={selectedReasoning}
-                  selectedWorkspaceCwd={selectedWorkspaceCwd}
-                  statusCwd={status.cwd}
-                  workspaceRecents={workspaceRecents}
-                  threads={threads}
                   attachments={composerAttachments}
+                  focusSignal={composerFocusSignal}
+                  showScrollToBottom={canScrollTranscriptToBottom}
                   onSelectedModelChange={setSelectedModel}
                   onSelectedPolicyModeChange={(mode) => void setSelectedPolicyMode(mode)}
                   onSelectedReasoningChange={setSelectedReasoning}
-                  onWorkspaceSelect={setSelectedWorkspaceCwd}
-                  onOpenWorkspaceFolder={() => void openWorkspaceFolder()}
                   onScrollToBottom={followBottom}
                   onAttachmentsChange={setComposerAttachments}
                   onSend={sendPrompt}
