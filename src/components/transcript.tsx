@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConversationMessage } from "@/types/roder";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { cn } from "@/lib/utils";
 import { groupToolMessagesForTranscript } from "@/lib/tool-message-groups";
 import { CompactToolGroup } from "./compact-tool-group";
@@ -8,16 +9,18 @@ import { MessageContent } from "./message-content";
 import { PhaseMessage } from "./phase-message";
 import { ToolActivityGroup } from "./tool-activity-group";
 import { ToolTimelineItem } from "./tool-timeline-item";
+import { ShimmerText } from "./tool-timeline-shared";
 
 type TranscriptProps = {
   messages: ConversationMessage[];
   followSignal: number;
   activeTurnId?: string;
+  showWorkingIndicator?: boolean;
 };
 
 const bottomThresholdPx = 48;
 
-export function Transcript({ activeTurnId, messages, followSignal }: TranscriptProps): React.JSX.Element {
+export function Transcript({ activeTurnId, messages, followSignal, showWorkingIndicator = false }: TranscriptProps): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
@@ -31,8 +34,9 @@ export function Transcript({ activeTurnId, messages, followSignal }: TranscriptP
       lastMessage?.toolOutput?.length ?? 0,
       lastMessage?.toolSummary?.length ?? 0,
       lastMessage?.status ?? "",
+      showWorkingIndicator ? "working" : "idle",
     ].join(":");
-  }, [messages]);
+  }, [messages, showWorkingIndicator]);
   const transcriptEntries = useMemo(() => groupToolMessagesForTranscript(messages, { activeTurnId }), [activeTurnId, messages]);
 
   const syncPinnedState = useCallback((viewport: HTMLDivElement) => {
@@ -115,10 +119,25 @@ export function Transcript({ activeTurnId, messages, followSignal }: TranscriptP
               </article>
             );
           })}
+          {showWorkingIndicator && <ThreadWorkingIndicator />}
         </main>
       </ScrollArea>
       <div className="transcript-fade pointer-events-none absolute inset-x-0 bottom-0 h-28" />
       <div data-transcript-pinned={isPinnedToBottom ? "true" : "false"} className="sr-only" />
+    </div>
+  );
+}
+
+function ThreadWorkingIndicator(): React.JSX.Element {
+  return (
+    <div
+      aria-label="Agent is working"
+      aria-live="polite"
+      className="my-3 flex h-8 items-center gap-2 text-base font-medium text-muted-foreground"
+      role="status"
+    >
+      <DotMatrixSpinner />
+      <ShimmerText>Working</ShimmerText>
     </div>
   );
 }
