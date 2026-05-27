@@ -21,6 +21,8 @@ const documentedDesktopMethods = [
   "turn/steer",
   "turn/interrupt",
   "model/list",
+  "speech/providers/list",
+  "speech/transcribe",
 ];
 
 test("api docs describe the desktop methods the Electron bridge uses", () => {

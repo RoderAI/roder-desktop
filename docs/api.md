@@ -214,7 +214,7 @@ Teams and panes:
 | `team/pane/focus` | Unsupported in headless app-server clients. |
 | `team/pane/cleanup` | Unsupported in headless app-server clients. |
 
-Review, hunks, workflow imports, media, and memory:
+Review, hunks, workflow imports, media, memory, and speech:
 
 | Method | Purpose |
 | --- | --- |
@@ -248,6 +248,8 @@ Review, hunks, workflow imports, media, and memory:
 | `memory/provider/list` | List embedding providers and selected provider. |
 | `memory/provider/set` | Persist the embedding provider/model. |
 | `memory/recall/preview` | Preview recall citations/results for a turn. |
+| `speech/providers/list` | Discover available speech transcription providers. |
+| `speech/transcribe` | Transcribe an audio recording to text. |
 
 ## Detailed Method Reference
 
