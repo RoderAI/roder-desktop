@@ -507,6 +507,7 @@ Request:
 {
   "model": "gpt-5.5",
   "modelProvider": "openai",
+  "reasoning": "high",
   "cwd": "/Users/pz/w/gode",
   "ephemeral": false
 }
@@ -520,6 +521,7 @@ Response:
     "id": "thread-123",
     "preview": "Untitled thread",
     "modelProvider": "openai",
+    "model": "gpt-5.5",
     "createdAt": 1770000000,
     "updatedAt": 1770000000,
     "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
@@ -527,6 +529,7 @@ Response:
   },
   "model": "gpt-5.5",
   "modelProvider": "openai",
+  "reasoning": "high",
   "cwd": "/Users/pz/w/gode"
 }
 ```
@@ -535,7 +538,8 @@ Behavior:
 
 - Creates a persisted runtime thread with optional provider/model and required absolute workspace `cwd`.
 - Rejects missing, empty, or relative `cwd`; thread snapshots do not fall back to the app-server process cwd.
-- Stores the selected provider/model for later `turn/start` overrides.
+- Stores the selected provider/model/reasoning for later `turn/start` overrides.
+- If `reasoning` is omitted, returns and stores the effective reasoning effort for the selected model.
 - Emits `thread/started`.
 - `ephemeral` is accepted by the DTO but is not currently used by the handler.
 
@@ -560,6 +564,7 @@ Response:
       "id": "thread-123",
       "preview": "Fix tests",
       "modelProvider": "openai",
+      "model": "gpt-5.5",
       "createdAt": 1770000000,
       "updatedAt": 1770000100,
       "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
@@ -1626,6 +1631,7 @@ or the remote WebSocket notification stream for remote clients.
     "id": "thread-123",
     "preview": "Untitled thread",
     "modelProvider": "openai",
+    "model": "gpt-5.5",
     "createdAt": 1770000000,
     "updatedAt": 1770000000,
     "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
