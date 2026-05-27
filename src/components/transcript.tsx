@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ConversationMessage } from "@/types/roder";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
@@ -30,7 +30,8 @@ export function Transcript({
 }: TranscriptProps): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
-  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const lastFollowSignalRef = useRef(followSignal);
+  const lastMessageVersionRef = useRef("");
 
   const messageVersion = useMemo(() => {
     const lastMessage = messages.at(-1);
@@ -52,44 +53,51 @@ export function Transcript({
     const wasPinned = pinnedToBottomRef.current;
     pinnedToBottomRef.current = nextPinned;
     if (wasPinned !== nextPinned) {
-      setIsPinnedToBottom(nextPinned);
       onCanScrollToBottomChange?.(!nextPinned);
     }
   }, [onCanScrollToBottomChange]);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
-    const viewport = viewportRef.current;
+  const setViewportNode = useCallback((viewport: HTMLDivElement | null) => {
+    viewportRef.current = viewport;
     if (!viewport) {
       return;
     }
-    viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-  }, []);
 
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      if (pinnedToBottomRef.current) {
-        scrollToBottom("auto");
-      }
-      const viewport = viewportRef.current;
-      if (viewport) {
+    const followChanged = lastFollowSignalRef.current !== followSignal;
+    const messageChanged = lastMessageVersionRef.current !== messageVersion;
+    lastFollowSignalRef.current = followSignal;
+    lastMessageVersionRef.current = messageVersion;
+
+    if (followChanged) {
+      pinnedToBottomRef.current = true;
+      onCanScrollToBottomChange?.(false);
+      requestAnimationFrame(() => {
+        if (viewportRef.current === viewport) {
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+        }
+      });
+      return;
+    }
+
+    if (messageChanged) {
+      requestAnimationFrame(() => {
+        if (viewportRef.current !== viewport) {
+          return;
+        }
+        if (pinnedToBottomRef.current) {
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
+        }
         syncPinnedState(viewport);
-      }
-    });
-  }, [messageVersion, scrollToBottom, syncPinnedState]);
-
-  useEffect(() => {
-    pinnedToBottomRef.current = true;
-    setIsPinnedToBottom(true);
-    onCanScrollToBottomChange?.(false);
-    requestAnimationFrame(() => scrollToBottom("smooth"));
-  }, [followSignal, onCanScrollToBottomChange, scrollToBottom]);
+      });
+    }
+  }, [followSignal, messageVersion, onCanScrollToBottomChange, syncPinnedState]);
 
   return (
     <div className="relative min-h-0 flex-1">
       <ScrollArea
         className="h-full"
         viewportClassName="transcript-viewport"
-        viewportRef={viewportRef}
+        viewportRef={setViewportNode}
         onViewportScroll={(event) => syncPinnedState(event.currentTarget)}
       >
         <main className="mx-auto flex w-full max-w-[980px] flex-col px-8 pb-40 pt-2">
@@ -137,7 +145,6 @@ export function Transcript({
         </main>
       </ScrollArea>
       <div className="transcript-fade pointer-events-none absolute inset-x-0 bottom-0 h-28" />
-      <div data-transcript-pinned={isPinnedToBottom ? "true" : "false"} className="sr-only" />
     </div>
   );
 }
