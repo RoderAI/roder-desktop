@@ -15,7 +15,7 @@ import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
-import { isThreadRunning } from "@/lib/roder-thread";
+import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
@@ -71,6 +71,7 @@ export function App(): React.JSX.Element {
   const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
+  const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
   const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => {
@@ -256,7 +257,12 @@ export function App(): React.JSX.Element {
             />
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
-                <Transcript activeTurnId={activeTurnId} messages={messages} followSignal={followSignal} />
+                <Transcript
+                  activeTurnId={activeTurnId}
+                  messages={messages}
+                  followSignal={followSignal}
+                  showWorkingIndicator={showWorkingIndicator}
+                />
                 <AgentWaitCards
                   requests={waitRequests}
                   onResolveApproval={resolveApproval}
