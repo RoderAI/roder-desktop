@@ -18,7 +18,7 @@ const { reducePendingWaitRequests, shouldDisplayStartedItem, waitRequestsForThre
 
 test("approval requests are stored by thread and removed by resolution", () => {
   const requested = reducePendingWaitRequests({}, {
-    method: "session/approvalRequested",
+    method: "thread/approvalRequested",
     params: {
       threadId: "thread-1",
       turnId: "turn-1",
@@ -41,7 +41,7 @@ test("approval requests are stored by thread and removed by resolution", () => {
   }]);
 
   const resolved = reducePendingWaitRequests(requested, {
-    method: "session/approvalResolved",
+    method: "thread/approvalResolved",
     params: {
       threadId: "thread-1",
       approvalId: "approval-1",
@@ -54,7 +54,7 @@ test("approval requests are stored by thread and removed by resolution", () => {
 
 test("user input requests keep questions and turn completion clears stale waits", () => {
   const requested = reducePendingWaitRequests({}, {
-    method: "session/userInputRequested",
+    method: "thread/userInputRequested",
     params: {
       threadId: "thread-2",
       turnId: "turn-2",
@@ -103,7 +103,7 @@ test("user input requests keep questions and turn completion clears stale waits"
 
 test("plan exit requests are stored and removed by resolution", () => {
   const requested = reducePendingWaitRequests({}, {
-    method: "session/planExitRequested",
+    method: "thread/planExitRequested",
     params: {
       threadId: "thread-3",
       turnId: "turn-3",
@@ -124,7 +124,7 @@ test("plan exit requests are stored and removed by resolution", () => {
   }]);
 
   const resolved = reducePendingWaitRequests(requested, {
-    method: "session/planExitResolved",
+    method: "thread/planExitResolved",
     params: {
       threadId: "thread-3",
       requestId: "plan-exit-1",

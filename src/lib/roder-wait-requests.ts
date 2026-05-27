@@ -13,7 +13,7 @@ export function reducePendingWaitRequests(
 ): PendingWaitRequestsByThread {
   const params = notificationParams(notification);
 
-  if (notification.method === "session/approvalRequested") {
+  if (notification.method === "thread/approvalRequested") {
     const threadId = stringParam(params.threadId) || fallbackThreadId;
     const approvalId = stringParam(params.approvalId);
     if (!threadId || !approvalId) {
@@ -31,7 +31,7 @@ export function reducePendingWaitRequests(
     });
   }
 
-  if (notification.method === "session/userInputRequested") {
+  if (notification.method === "thread/userInputRequested") {
     const threadId = stringParam(params.threadId) || fallbackThreadId;
     const requestId = stringParam(params.requestId);
     if (!threadId || !requestId) {
@@ -47,7 +47,7 @@ export function reducePendingWaitRequests(
     });
   }
 
-  if (notification.method === "session/planExitRequested") {
+  if (notification.method === "thread/planExitRequested") {
     const threadId = stringParam(params.threadId) || fallbackThreadId;
     const requestId = stringParam(params.requestId);
     if (!threadId || !requestId) {
@@ -64,12 +64,12 @@ export function reducePendingWaitRequests(
     });
   }
 
-  if (notification.method === "session/approvalResolved") {
+  if (notification.method === "thread/approvalResolved") {
     const threadId = stringParam(params.threadId) || fallbackThreadId;
     return removeWaitRequest(pending, threadId, stringParam(params.approvalId));
   }
 
-  if (notification.method === "session/userInputResolved" || notification.method === "session/planExitResolved") {
+  if (notification.method === "thread/userInputResolved" || notification.method === "thread/planExitResolved") {
     const threadId = stringParam(params.threadId) || fallbackThreadId;
     return removeWaitRequest(pending, threadId, stringParam(params.requestId));
   }

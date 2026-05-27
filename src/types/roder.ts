@@ -124,14 +124,14 @@ export type AppServerEvent = {
 
 export type RoderThread = {
   id: string;
-  sessionId: string;
   preview: string;
   modelProvider: string;
   createdAt: number;
   updatedAt: number;
   status: {
     type: string;
-    activeFlags?: RoderActiveFlag[];
+    activeTurnId: string | null;
+    activeFlags: RoderActiveFlag[];
   };
   cwd: string;
   name?: string | null;

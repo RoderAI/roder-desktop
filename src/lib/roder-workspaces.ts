@@ -11,12 +11,20 @@ export function normalizeThreadsCwd(threads: RoderThread[], baseCwd?: string): R
 
 export function normalizeCwd(cwd: string, baseCwd?: string): string {
   if (!cwd || cwd === ".") {
-    return baseCwd || cwd || "workspace";
+    return baseCwd || cwd || "";
   }
   if (cwd.startsWith("/") || !baseCwd) {
     return cwd;
   }
   return `${baseCwd.replace(/\/+$/, "")}/${cwd.replace(/^\/+/, "")}`;
+}
+
+export function requireAbsoluteCwd(cwd: string | undefined, baseCwd?: string): string {
+  const normalized = normalizeCwd(cwd?.trim() ?? "", baseCwd).trim();
+  if (!normalized || normalized === "." || !normalized.startsWith("/")) {
+    throw new Error("Select a workspace before starting a thread");
+  }
+  return normalized;
 }
 
 export function upsertWorkspaceRecent(recents: WorkspaceFolder[], path: string): WorkspaceFolder[] {

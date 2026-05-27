@@ -2,9 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { roderIpc } from "@/lib/roder-ipc";
 import {
+  activeTurnIdForThread,
   assistantMessageId,
   messagesFromRoderItem,
   messagesFromThread,
+  markThreadStatus,
   normalizeAssistantPhase,
   sortThreadsByUpdatedAt,
   upsertConversationMessage,
@@ -12,7 +14,7 @@ import {
 } from "@/lib/roder-thread";
 import { reducePendingWaitRequests, setWaitRequestResolving, shouldDisplayStartedItem } from "@/lib/roder-wait-requests";
 import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/roder-models";
-import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, upsertWorkspaceRecent } from "@/lib/roder-workspaces";
+import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, requireAbsoluteCwd, upsertWorkspaceRecent } from "@/lib/roder-workspaces";
 import type {
   ApprovalWaitRequest,
   ConversationMessage,
@@ -51,7 +53,6 @@ type RoderStore = {
   pendingWaitRequestsByThread: PendingWaitRequestsByThread;
   appearance: SystemAppearance;
   busy: boolean;
-  activeTurnId: string;
   hydrated: boolean;
   error: string | null;
   bootstrap: () => Promise<void>;
@@ -150,7 +151,6 @@ export const useRoderStore = create<RoderStore>()(
       pendingWaitRequestsByThread: {},
       appearance: "light",
       busy: false,
-      activeTurnId: "",
       hydrated: false,
       error: null,
 
@@ -158,15 +158,16 @@ export const useRoderStore = create<RoderStore>()(
         set({ busy: true, error: null });
         try {
           const readyStatus = await roderIpc.start();
-          const [status, threadResult, modelResult] = await Promise.all([
+          const [status, threadResult, modelResult, threadState] = await Promise.all([
             roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
             roderIpc.listThreads(100),
             roderIpc.listModels(),
+            roderIpc.threadState(),
           ]);
 
-          const threads = realThreads(normalizeThreadsCwd(threadResult.data ?? [], status.cwd));
+          const threads = realThreads(normalizeThreadsCwd(threadResult.data, status.cwd));
           const current = get();
-          const models = modelResult.models ?? [];
+          const models = modelResult.models;
           const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, current.visibleModelIds));
           const visibleModels = visibleModelsFor(models, visibleModelIds);
           const activeThreadId = threads.some((thread) => thread.id === current.activeThreadId)
@@ -177,7 +178,7 @@ export const useRoderStore = create<RoderStore>()(
           const currentSelectedModel = visibleModels.some((model) => model.id === current.selectedModel)
             ? current.selectedModel
             : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || "gpt-5.3-codex";
-          const selectedPolicyMode = normalizePolicyMode(current.selectedPolicyMode);
+          const selectedPolicyMode = normalizePolicyMode(threadState.mode);
 
           set({
             status,
@@ -196,12 +197,6 @@ export const useRoderStore = create<RoderStore>()(
             busy: false,
             error: null,
           });
-
-          try {
-            await roderIpc.setSessionMode(selectedPolicyMode, "desktop startup default");
-          } catch (error) {
-            set({ error: (error as Error).message });
-          }
 
           if (activeThreadId) {
             await get().selectThread(activeThreadId, { pushHistory: false });
@@ -334,7 +329,7 @@ export const useRoderStore = create<RoderStore>()(
       newThread: async () => {
         set({ busy: true, error: null });
         try {
-          const cwd = get().selectedWorkspaceCwd || get().status.cwd || "";
+          const cwd = requireAbsoluteCwd(get().selectedWorkspaceCwd || get().status.cwd, get().status.cwd);
           await startThreadForWorkspace(cwd, set, get);
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
@@ -348,13 +343,16 @@ export const useRoderStore = create<RoderStore>()(
         }
 
         let threadId = get().activeThreadId;
-        const steering = get().busy && threadId !== "" && get().activeTurnId !== "";
+        const activeThread = get().threads.find((thread) => thread.id === threadId);
+        const activeTurnId = activeTurnIdForThread(activeThread);
+        const steering = threadId !== "" && activeTurnId !== "";
+        let markedTurnStarting = false;
         set({ busy: true, error: null });
 
         try {
           if (!threadId) {
-            const cwd = get().selectedWorkspaceCwd || get().status.cwd;
             const state = get();
+            const cwd = requireAbsoluteCwd(state.selectedWorkspaceCwd || state.status.cwd, state.status.cwd);
             const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
             const selectedModel = model?.id ?? state.selectedModel;
             const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
@@ -382,23 +380,39 @@ export const useRoderStore = create<RoderStore>()(
           }));
 
           if (steering) {
-            await roderIpc.steerTurn(threadId, get().activeTurnId, text, attachments);
+            await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
             return;
           }
 
-          await roderIpc.startTurn(threadId, text, attachments);
+          markedTurnStarting = true;
+          set((state) => ({
+            threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: null, activeFlags: [] }),
+          }));
+          const started = await roderIpc.startTurn(threadId, text, attachments);
+          if (started.turnId) {
+            set((state) => ({
+              threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: started.turnId, activeFlags: [] }),
+            }));
+          }
         } catch (error) {
-          set({ busy: steering ? get().busy : false, error: (error as Error).message });
+          set((state) => ({
+            busy: steering ? state.busy : false,
+            error: (error as Error).message,
+            threads: markedTurnStarting
+              ? markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
+              : state.threads,
+          }));
         }
       },
 
       stopTurn: async () => {
         const state = get();
-        if (!state.activeThreadId || !state.activeTurnId) {
+        if (!state.activeThreadId) {
           return;
         }
+        const activeThread = state.threads.find((thread) => thread.id === state.activeThreadId);
         try {
-          await roderIpc.interruptTurn(state.activeThreadId, state.activeTurnId);
+          await roderIpc.interruptTurn(state.activeThreadId, activeTurnIdForThread(activeThread) || undefined);
         } catch (error) {
           set({ error: (error as Error).message });
         }
@@ -440,7 +454,7 @@ export const useRoderStore = create<RoderStore>()(
         const mode = normalizePolicyMode(selectedPolicyMode);
         set({ selectedPolicyMode: mode, error: null });
         try {
-          const result = await roderIpc.setSessionMode(mode, "desktop permission selector");
+          const result = await roderIpc.setThreadMode(mode, "desktop permission selector");
           set({ selectedPolicyMode: normalizePolicyMode(result.mode) });
         } catch (error) {
           set({ error: (error as Error).message });
@@ -513,9 +527,10 @@ type RoderStoreSet = (partial: Partial<RoderStore> | ((state: RoderStore) => Par
 
 async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () => RoderStore): Promise<void> {
   const state = get();
+  const threadCwd = requireAbsoluteCwd(cwd, state.status.cwd);
   const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.selectedModel);
   const selectedModel = model?.id ?? state.selectedModel;
-  const result = await roderIpc.startThread(selectedModel, cwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
+  const result = await roderIpc.startThread(selectedModel, threadCwd, model?.modelProvider ?? selectedModelProvider(state.models, selectedModel));
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
   }
@@ -542,7 +557,7 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     return {
       ...waitPatch,
       threads: upsertThread(state.threads, thread),
-      activeThreadId: thread.id,
+      activeThreadId: state.activeThreadId || thread.id,
       selectedWorkspaceCwd: thread.cwd,
       workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
       messagesByThread: { ...state.messagesByThread, [thread.id]: state.messagesByThread[thread.id] ?? [] },
@@ -576,9 +591,9 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const turnId = String(turn.id ?? "");
     return {
       ...waitPatch,
-      activeThreadId: threadId || state.activeThreadId,
-      activeTurnId: turnId || state.activeTurnId,
-      busy: true,
+      activeThreadId: state.activeThreadId || threadId,
+      threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: turnId || null, activeFlags: [] }),
+      busy: threadId === state.activeThreadId ? true : state.busy,
     };
   }
 
@@ -649,17 +664,17 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
         ...state.messagesByThread,
         [threadId]: nextMessages,
       },
-      busy: false,
-      activeTurnId: turnId === state.activeTurnId || !turnId ? "" : state.activeTurnId,
+      threads: markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] }),
+      busy: threadId === state.activeThreadId ? false : state.busy,
     };
   }
 
   if (notification.method === "thread/status/changed") {
     const threadId = String(params.threadId ?? "");
-    const status = isRecord(params.status) ? (params.status as RoderThread["status"]) : { type: "idle" };
+    const status = isRecord(params.status) ? (params.status as RoderThread["status"]) : { type: "idle", activeTurnId: null, activeFlags: [] };
     return {
       ...waitPatch,
-      threads: state.threads.map((thread) => (thread.id === threadId ? { ...thread, status } : thread)),
+      threads: markThreadStatus(state.threads, threadId, status),
     };
   }
 

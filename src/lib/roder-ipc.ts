@@ -1,20 +1,20 @@
 import type { DesktopAttachment, PolicyMode, RoderModel, RoderStatus, RoderThread, SystemAppearance, TurnInputItem } from "@/types/roder";
 
 export type ThreadListResult = {
-  data?: RoderThread[];
-  nextCursor?: string | null;
-  backwardsCursor?: string | null;
+  data: RoderThread[];
+  nextCursor: string | null;
+  backwardsCursor: string | null;
 };
 
 export type ThreadReadResult = {
-  thread?: RoderThread;
+  thread: RoderThread | null;
 };
 
 export type ThreadStartResult = {
-  thread?: RoderThread;
-  model?: string;
-  modelProvider?: string;
-  cwd?: string;
+  thread: RoderThread;
+  model: string;
+  modelProvider: string;
+  cwd: string;
 };
 
 export type ThreadArchiveResult = {
@@ -23,11 +23,36 @@ export type ThreadArchiveResult = {
 };
 
 export type ModelListResult = {
-  models?: RoderModel[];
+  models: RoderModel[];
 };
 
-export type SessionSetModeResult = {
+export type ThreadStateResult = {
   mode: PolicyMode;
+  pendingPlanExit: {
+    threadId: string;
+    turnId: string;
+    requestId: string;
+    targetMode: PolicyMode;
+    planSummary: string | null;
+    requestedAt: string;
+    expiresAt: string | null;
+  } | null;
+};
+
+export type ThreadSetModeResult = {
+  mode: PolicyMode;
+};
+
+export type TurnStartResult = {
+  turnId: string;
+};
+
+export type TurnSteerResult = {
+  turnId: string;
+};
+
+export type TurnInterruptResult = {
+  turnId: string | null;
 };
 
 export const roderIpc = {
@@ -41,30 +66,31 @@ export const roderIpc = {
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
   archiveThread: (threadId: string) =>
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
-  startThread: (model: string, cwd?: string, modelProvider?: string) =>
+  startThread: (model: string, cwd: string, modelProvider?: string) =>
     window.roderDesktop.request("thread/start", { model, cwd, modelProvider, ephemeral: false }) as Promise<ThreadStartResult>,
   startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
     const input = turnInput(prompt, attachments);
     if (input.length > 0) {
-      return window.roderDesktop.request("turn/start", { threadId, input });
+      return window.roderDesktop.request("turn/start", { threadId, input }) as Promise<TurnStartResult>;
     }
-    return window.roderDesktop.request("turn/start", { threadId, prompt });
+    return window.roderDesktop.request("turn/start", { threadId, prompt }) as Promise<TurnStartResult>;
   },
   steerTurn: (threadId: string, expectedTurnId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
     const input = turnInput(prompt, attachments);
     const params = input.length > 0 ? { threadId, expectedTurnId, input } : { threadId, expectedTurnId, prompt };
-    return window.roderDesktop.request("turn/steer", params);
+    return window.roderDesktop.request("turn/steer", params) as Promise<TurnSteerResult>;
   },
   interruptTurn: (threadId: string, turnId?: string) =>
-    window.roderDesktop.request("turn/interrupt", { threadId, turnId: turnId || undefined }),
+    window.roderDesktop.request("turn/interrupt", { threadId, turnId: turnId || undefined }) as Promise<TurnInterruptResult>,
+  threadState: () => window.roderDesktop.request("thread/state", {}) as Promise<ThreadStateResult>,
   resolveApproval: (params: { approvalId: string; approved: boolean }) =>
-    window.roderDesktop.request("session/resolve_approval", { approval_id: params.approvalId, approved: params.approved }),
+    window.roderDesktop.request("thread/resolve_approval", { approvalId: params.approvalId, approved: params.approved }),
   resolveUserInput: (params: { requestId: string; answers: Record<string, string> }) =>
-    window.roderDesktop.request("session/resolve_user_input", { request_id: params.requestId, answers: params.answers }),
+    window.roderDesktop.request("thread/resolve_user_input", { requestId: params.requestId, answers: params.answers }),
   exitPlan: (params: { requestId: string; approved: boolean }) =>
-    window.roderDesktop.request("session/exit_plan", { request_id: params.requestId, approved: params.approved }),
-  setSessionMode: (mode: PolicyMode, reason: string) =>
-    window.roderDesktop.request("session/set_mode", { mode, reason }) as Promise<SessionSetModeResult>,
+    window.roderDesktop.request("thread/exit_plan", { requestId: params.requestId, approved: params.approved }),
+  setThreadMode: (mode: PolicyMode, reason: string) =>
+    window.roderDesktop.request("thread/set_mode", { mode, reason }) as Promise<ThreadSetModeResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),
   onNotification: window.roderDesktop.onNotification,
