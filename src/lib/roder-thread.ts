@@ -6,7 +6,30 @@ export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
 }
 
 export function upsertThread(threads: RoderThread[], incoming: RoderThread): RoderThread[] {
-  return sortThreadsByUpdatedAt([incoming, ...threads.filter((thread) => thread.id !== incoming.id && !thread.id.startsWith("demo-"))]);
+  const realThreads = threads.filter((thread) => !thread.id.startsWith("demo-"));
+  const existingIndex = realThreads.findIndex((thread) => thread.id === incoming.id);
+  if (existingIndex === -1) {
+    return [incoming, ...realThreads];
+  }
+
+  const nextThreads = [...realThreads];
+  nextThreads[existingIndex] = incoming;
+  return nextThreads;
+}
+
+export function markThreadStatus(threads: RoderThread[], threadId: string, status: RoderThread["status"]): RoderThread[] {
+  if (!threadId) {
+    return threads;
+  }
+  return threads.map((thread) => (thread.id === threadId ? { ...thread, status } : thread));
+}
+
+export function isThreadRunning(thread: RoderThread | undefined): boolean {
+  return thread?.status.type === "running";
+}
+
+export function activeTurnIdForThread(thread: RoderThread | undefined): string {
+  return thread?.status.activeTurnId ?? "";
 }
 
 export function messagesFromThread(thread: RoderThread | undefined): ConversationMessage[] {

@@ -15,6 +15,7 @@ import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
+import { isThreadRunning } from "@/lib/roder-thread";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
@@ -27,7 +28,6 @@ export function App(): React.JSX.Element {
     activeTurnId,
     appearance,
     archiveThread: archiveAgentThread,
-    busy,
     error,
     messages,
     models,
@@ -70,6 +70,7 @@ export function App(): React.JSX.Element {
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
   const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
+  const activeThreadBusy = isThreadRunning(activeThread);
   const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => {
@@ -266,7 +267,7 @@ export function App(): React.JSX.Element {
                   <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{error}</div>
                 )}
                 <Composer
-                  busy={busy}
+                  busy={activeThreadBusy}
                   models={models}
                   selectedModel={selectedModel}
                   selectedPolicyMode={selectedPolicyMode}

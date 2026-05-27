@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { roderIpc } from "@/lib/roder-ipc";
+import { activeTurnIdForThread } from "@/lib/roder-thread";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
@@ -47,6 +48,7 @@ function useRoderStoreBootstrap(): void {
 function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
   const messages = state.messagesByThread[state.activeThreadId] ?? emptyMessages;
   const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
+  const activeThread = state.threads.find((thread) => thread.id === state.activeThreadId);
   return {
     status: state.status,
     stderr: state.stderr,
@@ -63,7 +65,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     waitRequests,
     appearance: state.appearance,
     busy: state.busy,
-    activeTurnId: state.activeTurnId,
+    activeTurnId: activeTurnIdForThread(activeThread),
     hydrated: state.hydrated,
     error: state.error,
     canGoBack: state.backStack.length > 0,
