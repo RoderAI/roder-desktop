@@ -65,6 +65,36 @@ test("setThreadMode sends the policy mode wire value to the app-server", async (
   ]);
 });
 
+test("startTurn sends selected controls with the next turn", async () => {
+  const calls = [];
+  const roderIpc = loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { turnId: "turn-1" };
+  });
+
+  const result = await roderIpc.startTurn("thread-1", "hello", [], {
+    modelProvider: "mock",
+    model: "gpt-5.5",
+    reasoning: "high",
+    policyMode: "plan",
+  });
+
+  assert.deepEqual(result, { turnId: "turn-1" });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        input: [{ type: "text", text: "hello" }],
+        modelProvider: "mock",
+        model: "gpt-5.5",
+        reasoning: "high",
+        policyMode: "plan",
+      },
+    },
+  ]);
+});
+
 test("wait request resolvers use thread protocol methods and camelCase params", async () => {
   const calls = [];
   const roderIpc = loadRoderIpc(async (method, params) => {

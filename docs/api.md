@@ -408,6 +408,9 @@ Response:
 ```json
 {
   "web_search": { "mode": "cached" },
+  "default_provider": "openai",
+  "default_model": "gpt-5.5",
+  "default_reasoning": "medium",
   "default_mode": "default"
 }
 ```
@@ -415,6 +418,8 @@ Response:
 Notes:
 
 - `web_search.mode` is one of `disabled`, `cached`, or `live`.
+- `default_provider`, `default_model`, `default_reasoning`, and `default_mode`
+  initialize desktop controls.
 - `default_mode` is a `PolicyMode` value from `roder-api`.
 
 ### `settings/set_web_search`
@@ -667,7 +672,11 @@ Request:
   "threadId": "thread-123",
   "input": [
     { "type": "text", "text": "inspect this repo" }
-  ]
+  ],
+  "modelProvider": "openai",
+  "model": "gpt-5.5",
+  "reasoning": "high",
+  "policyMode": "default"
 }
 ```
 
@@ -683,7 +692,9 @@ Behavior:
 
 - Concatenates text input blocks with newlines.
 - Uses `prompt` as a transition fallback only when text input is empty.
-- Uses the thread's selected provider/model when known.
+- Uses explicit model/provider/reasoning overrides first, then the thread's
+  selected provider/model/reasoning when known.
+- Applies `policyMode` as the live policy mode before starting the turn.
 - Starts a runtime turn and records the active turn id for optional
   `turn/interrupt`.
 
