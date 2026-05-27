@@ -33,6 +33,11 @@ scale token and adjust the surrounding layout to fit the system. If an arbitrary
 value is still necessary, keep it local, document the reason when it is not
 obvious, and avoid spreading similar one-off values across multiple components.
 
+When working on UI that changes state visually, such as showing, hiding,
+expanding, collapsing, or otherwise changing visibility, use the web animation
+/ Interface Craft skills to design and implement the motion. Keep animations
+short, purposeful, and consistent with `docs/design.md`.
+
 ## TDD
 
 Use TDD when the change affects behavior that can be proven with a meaningful
