@@ -33,7 +33,6 @@ export function App(): React.JSX.Element {
     models,
     newProject: createProjectThread,
     newThread: createAgentThread,
-    openWorkspaceFolder,
     restart,
     selectedModel,
     selectedPolicyMode,
@@ -49,7 +48,6 @@ export function App(): React.JSX.Element {
     stopTurn,
     threads,
     waitRequests,
-    workspaceRecents,
     resolveApproval,
     resolveUserInput,
     exitPlan,
@@ -59,6 +57,7 @@ export function App(): React.JSX.Element {
   useExtensionThemes();
   useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
+  const [canScrollTranscriptToBottom, setCanScrollTranscriptToBottom] = useState(false);
   const [mainView, setMainView] = useState<MainView>("chat");
   const [activeTool, setActiveTool] = useState<ToolPanel>(null);
   const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
@@ -265,6 +264,7 @@ export function App(): React.JSX.Element {
                   messages={messages}
                   followSignal={followSignal}
                   showWorkingIndicator={showWorkingIndicator}
+                  onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
                 />
                 <AgentWaitCards
                   requests={waitRequests}
@@ -281,17 +281,12 @@ export function App(): React.JSX.Element {
                   selectedModel={selectedModel}
                   selectedPolicyMode={selectedPolicyMode}
                   selectedReasoning={selectedReasoning}
-                  selectedWorkspaceCwd={selectedWorkspaceCwd}
-                  statusCwd={status.cwd}
-                  workspaceRecents={workspaceRecents}
-                  threads={threads}
                   attachments={composerAttachments}
                   focusSignal={composerFocusSignal}
+                  showScrollToBottom={canScrollTranscriptToBottom}
                   onSelectedModelChange={setSelectedModel}
                   onSelectedPolicyModeChange={(mode) => void setSelectedPolicyMode(mode)}
                   onSelectedReasoningChange={setSelectedReasoning}
-                  onWorkspaceSelect={setSelectedWorkspaceCwd}
-                  onOpenWorkspaceFolder={() => void openWorkspaceFolder()}
                   onScrollToBottom={followBottom}
                   onAttachmentsChange={setComposerAttachments}
                   onSend={sendPrompt}

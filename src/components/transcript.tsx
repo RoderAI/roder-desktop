@@ -16,11 +16,18 @@ type TranscriptProps = {
   followSignal: number;
   activeTurnId?: string;
   showWorkingIndicator?: boolean;
+  onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
 };
 
 const bottomThresholdPx = 48;
 
-export function Transcript({ activeTurnId, messages, followSignal, showWorkingIndicator = false }: TranscriptProps): React.JSX.Element {
+export function Transcript({
+  activeTurnId,
+  messages,
+  followSignal,
+  showWorkingIndicator = false,
+  onCanScrollToBottomChange,
+}: TranscriptProps): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
@@ -46,8 +53,9 @@ export function Transcript({ activeTurnId, messages, followSignal, showWorkingIn
     pinnedToBottomRef.current = nextPinned;
     if (wasPinned !== nextPinned) {
       setIsPinnedToBottom(nextPinned);
+      onCanScrollToBottomChange?.(!nextPinned);
     }
-  }, []);
+  }, [onCanScrollToBottomChange]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const viewport = viewportRef.current;
@@ -58,17 +66,23 @@ export function Transcript({ activeTurnId, messages, followSignal, showWorkingIn
   }, []);
 
   useEffect(() => {
-    if (!pinnedToBottomRef.current) {
-      return;
-    }
-    requestAnimationFrame(() => scrollToBottom("auto"));
-  }, [messageVersion, scrollToBottom]);
+    requestAnimationFrame(() => {
+      if (pinnedToBottomRef.current) {
+        scrollToBottom("auto");
+      }
+      const viewport = viewportRef.current;
+      if (viewport) {
+        syncPinnedState(viewport);
+      }
+    });
+  }, [messageVersion, scrollToBottom, syncPinnedState]);
 
   useEffect(() => {
     pinnedToBottomRef.current = true;
     setIsPinnedToBottom(true);
+    onCanScrollToBottomChange?.(false);
     requestAnimationFrame(() => scrollToBottom("smooth"));
-  }, [followSignal, scrollToBottom]);
+  }, [followSignal, onCanScrollToBottomChange, scrollToBottom]);
 
   return (
     <div className="relative min-h-0 flex-1">

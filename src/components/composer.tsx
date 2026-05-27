@@ -11,18 +11,15 @@ import {
   Mic,
   Loader2,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import type {
   DesktopAttachment,
   PolicyMode,
   RoderModel,
-  RoderThread,
   ReasoningEffort,
-  WorkspaceFolder,
 } from "@/types/roder";
 import { Button } from "@/components/ui/button";
-import { WorkspacePicker } from "@/components/workspace-picker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,23 +34,42 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
+/*
+ * SCROLL BUTTON ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to scroll availability changing.
+ *
+ *   0ms   button mounts or begins exit with opacity 0 <-> 1
+ * 120ms   button fade reaches its target opacity
+ * 180ms   exiting button unmounts after the fade completes
+ */
+const SCROLL_BUTTON_TIMING = {
+  fade:   120,  // button opacity transition
+  settle: 180,  // exit unmount delay
+};
+
+type ComposerScrollButtonStyle = CSSProperties & {
+  "--composer-scroll-button-duration": string;
+  "--composer-scroll-button-fade-duration": string;
+};
+
+const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
+  "--composer-scroll-button-fade-duration": `${SCROLL_BUTTON_TIMING.fade}ms`,
+  "--composer-scroll-button-duration": `${SCROLL_BUTTON_TIMING.settle}ms`,
+};
+
 type ComposerProps = {
   busy: boolean;
   models: RoderModel[];
   selectedModel: string;
   selectedPolicyMode: PolicyMode;
   selectedReasoning: ReasoningEffort;
-  selectedWorkspaceCwd: string;
-  statusCwd?: string;
-  workspaceRecents: WorkspaceFolder[];
-  threads: RoderThread[];
   attachments: DesktopAttachment[];
   focusSignal: number;
+  showScrollToBottom: boolean;
   onSelectedModelChange: (model: string) => void;
   onSelectedPolicyModeChange: (mode: PolicyMode) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
-  onWorkspaceSelect: (cwd: string) => void;
-  onOpenWorkspaceFolder: () => void;
   onScrollToBottom: () => void;
   onAttachmentsChange: (attachments: DesktopAttachment[]) => void;
   onSend: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
@@ -66,17 +82,12 @@ export function Composer({
   selectedModel,
   selectedPolicyMode,
   selectedReasoning,
-  selectedWorkspaceCwd,
-  statusCwd,
-  workspaceRecents,
-  threads,
   attachments,
   focusSignal,
+  showScrollToBottom,
   onSelectedModelChange,
   onSelectedPolicyModeChange,
   onSelectedReasoningChange,
-  onWorkspaceSelect,
-  onOpenWorkspaceFolder,
   onScrollToBottom,
   onAttachmentsChange,
   onSend,
@@ -84,6 +95,7 @@ export function Composer({
 }: ComposerProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [renderScrollButton, setRenderScrollButton] = useState(showScrollToBottom);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -208,6 +220,18 @@ export function Composer({
     textareaRef.current?.focus();
   }, [focusSignal]);
 
+  useEffect(() => {
+    if (showScrollToBottom) {
+      setRenderScrollButton(true);
+      return;
+    }
+    if (!renderScrollButton) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setRenderScrollButton(false), SCROLL_BUTTON_TIMING.settle);
+    return () => window.clearTimeout(timeout);
+  }, [renderScrollButton, showScrollToBottom]);
+
   function resizeTextarea(): void {
     const textarea = textareaRef.current;
     if (!textarea) {
@@ -290,44 +314,29 @@ export function Composer({
       }}
       onDrop={handleDrop}
     >
-      <div className="mb-3 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger variant="pill">Commit</DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuGroup>
-                <DropdownMenuItem>Commit current patch</DropdownMenuItem>
-                <DropdownMenuItem>Create branch</DropdownMenuItem>
-                <DropdownMenuItem>Open diff</DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-8 rounded-full text-muted-foreground"
-            aria-label="Scroll to bottom"
-            onClick={onScrollToBottom}
-          >
-            <ArrowDown className="size-4" />
-          </Button>
-        </div>
-        <WorkspacePicker
-          selectedCwd={selectedWorkspaceCwd}
-          statusCwd={statusCwd}
-          recents={workspaceRecents}
-          threads={threads}
-          onSelect={onWorkspaceSelect}
-          onOpenFolder={onOpenWorkspaceFolder}
-        />
-        <div />
-      </div>
       <div
         className={cn(
-          "mt-3 rounded-3xl border border-border bg-card/95 shadow-sm backdrop-blur-md transition-[background-color,border-color,box-shadow]",
+          "relative mt-3 rounded-3xl border border-border bg-card/95 shadow-sm backdrop-blur-md transition-[background-color,border-color,box-shadow]",
           dragActive && "border-ring bg-card shadow-md ring-2 ring-ring/25",
         )}
       >
+        {renderScrollButton && (
+          <div
+            className="composer-scroll-button-region absolute -top-11 left-0 flex items-center"
+            data-visible={showScrollToBottom ? "true" : undefined}
+            style={scrollButtonAnimationStyle}
+          >
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8 rounded-full text-muted-foreground shadow-sm"
+              aria-label="Scroll to bottom"
+              onClick={onScrollToBottom}
+            >
+              <ArrowDown className="size-4" />
+            </Button>
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
             {attachments.map((attachment) => (
