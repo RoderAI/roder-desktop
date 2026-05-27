@@ -68,7 +68,7 @@ type RoderStore = {
   restart: () => Promise<void>;
   setSelectedModel: (model: string) => void;
   setSelectedReasoning: (reasoning: ReasoningEffort) => void;
-  setSelectedPolicyMode: (mode: PolicyMode) => Promise<void>;
+  setSelectedPolicyMode: (mode: PolicyMode) => void;
   setModelVisibility: (modelId: string, visible: boolean) => void;
   resetVisibleModels: () => void;
   setSelectedWorkspaceCwd: (cwd: string) => void;
@@ -158,11 +158,11 @@ export const useRoderStore = create<RoderStore>()(
         set({ busy: true, error: null });
         try {
           const readyStatus = await roderIpc.start();
-          const [status, threadResult, modelResult, threadState] = await Promise.all([
+          const [status, threadResult, modelResult, settings] = await Promise.all([
             roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
             roderIpc.listThreads(100),
             roderIpc.listModels(),
-            roderIpc.threadState(),
+            roderIpc.settings(),
           ]);
 
           const threads = realThreads(normalizeThreadsCwd(threadResult.data, status.cwd));
@@ -175,10 +175,10 @@ export const useRoderStore = create<RoderStore>()(
             : firstThreadId(threads, "");
           const activeThread = threads.find((thread) => thread.id === activeThreadId);
           const selectedWorkspaceCwd = normalizeCwd(current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "", status.cwd);
-          const currentSelectedModel = visibleModels.some((model) => model.id === current.selectedModel)
-            ? current.selectedModel
-            : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || "gpt-5.3-codex";
-          const selectedPolicyMode = normalizePolicyMode(threadState.mode);
+          const currentSelectedModel = visibleModels.some((model) => model.id === settings.default_model)
+            ? settings.default_model
+            : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || settings.default_model || "gpt-5.3-codex";
+          const selectedPolicyMode = normalizePolicyMode(settings.default_mode);
 
           set({
             status,
@@ -188,9 +188,7 @@ export const useRoderStore = create<RoderStore>()(
             selectedWorkspaceCwd,
             workspaceRecents: upsertWorkspaceRecent(current.workspaceRecents, selectedWorkspaceCwd),
             selectedModel: currentSelectedModel,
-            selectedReasoning: normalizeReasoningEffort(
-              current.selectedReasoning || models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort,
-            ),
+            selectedReasoning: normalizeReasoningEffort(settings.default_reasoning || models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort),
             selectedPolicyMode,
             activeThreadId,
             hydrated: true,
@@ -396,7 +394,15 @@ export const useRoderStore = create<RoderStore>()(
           set((state) => ({
             threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: null, activeFlags: [] }),
           }));
-          const started = await roderIpc.startTurn(threadId, text, attachments);
+          const turnState = get();
+          const turnModel = effectiveSelectedModel(turnState.models, turnState.visibleModelIds, turnState.selectedModel);
+          const selectedTurnModel = turnModel?.id ?? turnState.selectedModel;
+          const started = await roderIpc.startTurn(threadId, text, attachments, {
+            modelProvider: turnModel?.modelProvider ?? selectedModelProvider(turnState.models, selectedTurnModel),
+            model: selectedTurnModel,
+            reasoning: turnState.selectedReasoning,
+            policyMode: turnState.selectedPolicyMode,
+          });
           if (started.turnId) {
             set((state) => ({
               threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: started.turnId, activeFlags: [] }),
@@ -458,15 +464,9 @@ export const useRoderStore = create<RoderStore>()(
       }),
       resetVisibleModels: () => set({ visibleModelIds: [] }),
       setSelectedReasoning: (selectedReasoning) => set({ selectedReasoning }),
-      setSelectedPolicyMode: async (selectedPolicyMode) => {
+      setSelectedPolicyMode: (selectedPolicyMode) => {
         const mode = normalizePolicyMode(selectedPolicyMode);
         set({ selectedPolicyMode: mode, error: null });
-        try {
-          const result = await roderIpc.setThreadMode(mode, "desktop permission selector");
-          set({ selectedPolicyMode: normalizePolicyMode(result.mode) });
-        } catch (error) {
-          set({ error: (error as Error).message });
-        }
       },
       setSelectedWorkspaceCwd: (cwd) => set((state) => {
         const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
@@ -520,10 +520,7 @@ export const useRoderStore = create<RoderStore>()(
         activeThreadId: state.activeThreadId,
         backStack: state.backStack,
         forwardStack: state.forwardStack,
-        selectedModel: state.selectedModel,
         visibleModelIds: state.visibleModelIds,
-        selectedReasoning: state.selectedReasoning,
-        selectedPolicyMode: state.selectedPolicyMode,
         selectedWorkspaceCwd: state.selectedWorkspaceCwd,
         workspaceRecents: state.workspaceRecents,
       }),

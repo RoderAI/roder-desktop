@@ -27,6 +27,13 @@ export type ModelListResult = {
   models: RoderModel[];
 };
 
+export type SettingsGetResult = {
+  default_provider: string;
+  default_model: string;
+  default_reasoning: string;
+  default_mode: PolicyMode;
+};
+
 export type ThreadStateResult = {
   mode: PolicyMode;
   pendingPlanExit: {
@@ -46,6 +53,13 @@ export type ThreadSetModeResult = {
 
 export type TurnStartResult = {
   turnId: string;
+};
+
+export type TurnStartOptions = {
+  modelProvider?: string;
+  model?: string;
+  reasoning?: string;
+  policyMode?: PolicyMode;
 };
 
 export type TurnSteerResult = {
@@ -69,12 +83,12 @@ export const roderIpc = {
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
   startThread: (model: string, cwd: string, modelProvider?: string, reasoning?: string) =>
     window.roderDesktop.request("thread/start", { model, cwd, modelProvider, reasoning, ephemeral: false }) as Promise<ThreadStartResult>,
-  startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
+  startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = [], options: TurnStartOptions = {}) => {
     const input = turnInput(prompt, attachments);
     if (input.length > 0) {
-      return window.roderDesktop.request("turn/start", { threadId, input }) as Promise<TurnStartResult>;
+      return window.roderDesktop.request("turn/start", { threadId, input, ...options }) as Promise<TurnStartResult>;
     }
-    return window.roderDesktop.request("turn/start", { threadId, prompt }) as Promise<TurnStartResult>;
+    return window.roderDesktop.request("turn/start", { threadId, prompt, ...options }) as Promise<TurnStartResult>;
   },
   steerTurn: (threadId: string, expectedTurnId: string, prompt: string, attachments: DesktopAttachment[] = []) => {
     const input = turnInput(prompt, attachments);
@@ -92,6 +106,7 @@ export const roderIpc = {
     window.roderDesktop.request("thread/exit_plan", { requestId: params.requestId, approved: params.approved }),
   setThreadMode: (mode: PolicyMode, reason: string) =>
     window.roderDesktop.request("thread/set_mode", { mode, reason }) as Promise<ThreadSetModeResult>,
+  settings: () => window.roderDesktop.request("settings/get", {}) as Promise<SettingsGetResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),
   onNotification: window.roderDesktop.onNotification,

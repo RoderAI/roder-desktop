@@ -51,3 +51,12 @@ test("desktop store turns failed turn completions into visible failed system mes
   assert.match(storeSource, /role:\s*"system"/);
   assert.match(storeSource, /status:\s*"failed"/);
 });
+
+test("desktop selected controls are sent with turns instead of persisted as defaults", () => {
+  const persistedNavigation = storeSource.match(/partialize:\s*\(state\)\s*=>\s*\(\{(?<body>[\s\S]*?)\}\)/);
+  assert.ok(persistedNavigation?.groups?.body);
+  assert.doesNotMatch(persistedNavigation.groups.body, /selectedModel|selectedReasoning|selectedPolicyMode/);
+  assert.match(storeSource, /model:\s*selectedTurnModel/);
+  assert.match(storeSource, /reasoning:\s*turnState\.selectedReasoning/);
+  assert.match(storeSource, /policyMode:\s*turnState\.selectedPolicyMode/);
+});
