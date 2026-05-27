@@ -271,6 +271,48 @@ export type TurnInputItem = {
   path?: string;
 };
 
+export type SpeechProviderDescriptor = {
+  id: string;
+  name: string;
+  description?: string;
+  authType: string;
+  authLabel?: string;
+  authenticated: boolean;
+  authDetail?: string;
+  recommended: boolean;
+  sortOrder: number;
+  capabilities: {
+    batch?: boolean;
+    streaming?: boolean;
+    diarization?: boolean;
+    timestamps?: boolean;
+    languageHints?: boolean;
+    prompt?: boolean;
+  };
+  models: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+};
+
+export type SpeechTranscribeResult = {
+  provider: string;
+  model: string;
+  text: string;
+  language?: string;
+  durationMillis?: number;
+  segments: Array<{
+    text: string;
+    startMillis?: number;
+    endMillis?: number;
+    speaker?: string;
+    confidence?: number;
+  }>;
+  providerResponseId?: string;
+  metadata?: unknown;
+};
+
 export type AppCommand = {
   command: "newProject" | "newThread";
 };
