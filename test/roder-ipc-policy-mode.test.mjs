@@ -26,22 +26,137 @@ function loadRoderIpc(request) {
   return module.exports.roderIpc;
 }
 
-test("setSessionMode sends the policy mode wire value to the app-server", async () => {
+test("threadState reads the live policy mode from the app-server", async () => {
+  const calls = [];
+  const roderIpc = loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { mode: "plan", pendingPlanExit: null };
+  });
+
+  const result = await roderIpc.threadState();
+
+  assert.deepEqual(result, { mode: "plan", pendingPlanExit: null });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      method: "thread/state",
+      params: {},
+    },
+  ]);
+});
+
+test("setThreadMode sends the policy mode wire value to the app-server", async () => {
   const calls = [];
   const roderIpc = loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { mode: params.mode };
   });
 
-  const result = await roderIpc.setSessionMode("accept_all", "desktop permission selector");
+  const result = await roderIpc.setThreadMode("accept_all", "desktop permission selector");
 
   assert.deepEqual(result, { mode: "accept_all" });
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
     {
-      method: "session/set_mode",
+      method: "thread/set_mode",
       params: {
         mode: "accept_all",
         reason: "desktop permission selector",
+      },
+    },
+  ]);
+});
+
+test("default settings use provider and settings protocol methods", async () => {
+  const calls = [];
+  const roderIpc = loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    if (method === "providers/select") {
+      return { provider: params.provider, model: params.model, reasoning: params.reasoning };
+    }
+    return { default_mode: params.mode };
+  });
+
+  await roderIpc.selectProviderDefaults("openai", "gpt-5.5", "high");
+  await roderIpc.setDefaultMode("plan");
+
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      method: "providers/select",
+      params: {
+        provider: "openai",
+        model: "gpt-5.5",
+        reasoning: "high",
+      },
+    },
+    {
+      method: "settings/set_default_mode",
+      params: {
+        mode: "plan",
+      },
+    },
+  ]);
+});
+
+test("startTurn sends selected controls with the next turn", async () => {
+  const calls = [];
+  const roderIpc = loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { turnId: "turn-1" };
+  });
+
+  const result = await roderIpc.startTurn("thread-1", "hello", [], {
+    modelProvider: "mock",
+    model: "gpt-5.5",
+    reasoning: "high",
+    policyMode: "plan",
+  });
+
+  assert.deepEqual(result, { turnId: "turn-1" });
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        input: [{ type: "text", text: "hello" }],
+        modelProvider: "mock",
+        model: "gpt-5.5",
+        reasoning: "high",
+        policyMode: "plan",
+      },
+    },
+  ]);
+});
+
+test("wait request resolvers use thread protocol methods and camelCase params", async () => {
+  const calls = [];
+  const roderIpc = loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { resolved: true };
+  });
+
+  await roderIpc.resolveApproval({ approvalId: "approval-1", approved: false });
+  await roderIpc.resolveUserInput({ requestId: "input-1", answers: { mode: "Default" } });
+  await roderIpc.exitPlan({ requestId: "plan-1", approved: true });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    {
+      method: "thread/resolve_approval",
+      params: {
+        approvalId: "approval-1",
+        approved: false,
+      },
+    },
+    {
+      method: "thread/resolve_user_input",
+      params: {
+        requestId: "input-1",
+        answers: { mode: "Default" },
+      },
+    },
+    {
+      method: "thread/exit_plan",
+      params: {
+        requestId: "plan-1",
+        approved: true,
       },
     },
   ]);

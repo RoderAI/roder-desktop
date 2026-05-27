@@ -101,21 +101,17 @@ write the selected defaults to `~/.roder/config.toml`.
 
 ## Core Concepts
 
-`session` is the persisted runtime conversation unit used by the Roder runtime.
-App-server clients interact with sessions through the desktop-facing `thread/*`
-methods.
-
-`thread` is the desktop-facing view of a Roder session. It is shaped as:
+`thread` is the persisted runtime conversation unit used by desktop-facing
+clients. It is shaped as:
 
 ```json
 {
   "id": "thread-123",
-  "sessionId": "thread-123",
   "preview": "Untitled thread",
   "modelProvider": "openai",
   "createdAt": 1770000000,
   "updatedAt": 1770000100,
-  "status": { "type": "idle", "activeFlags": [] },
+  "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
   "cwd": "/Users/pz/w/gode",
   "name": "optional title",
   "turns": []
@@ -142,8 +138,8 @@ methods.
 provider id plus model id, for example `openai` and `gpt-5.5`, or provider
 catalog entries that intentionally use Codex provider IDs.
 
-`mode` is Roder's policy mode. App-server clients see it in `session/get` and
-can change it with `session/set_mode` or `settings/set_default_mode`.
+`mode` is Roder's policy mode. App-server clients see it in `thread/state` and
+can change it with `thread/set_mode` or `settings/set_default_mode`.
 
 ## Method Index
 
@@ -167,22 +163,22 @@ Core:
 | `auth/supergrok/status` | Read SuperGrok OAuth status. |
 | `auth/supergrok/logout` | Clear SuperGrok OAuth credentials. |
 
-Sessions, threads, and turns:
+Threads and turns:
 
 | Method | Purpose |
 | --- | --- |
-| `thread/start` | Create a desktop thread/session. |
+| `thread/start` | Create a desktop thread. |
 | `thread/list` | List desktop threads. |
 | `thread/read` | Read a desktop thread with optional turns. |
 | `thread/archive` | Archive a desktop thread so it no longer appears in active lists. |
 | `turn/start` | Start a desktop turn from rich text input. |
 | `turn/steer` | Add user input to an active desktop turn. |
 | `turn/interrupt` | Interrupt an active desktop turn. |
-| `session/get` | Read policy mode and pending plan-exit state. |
-| `session/set_mode` | Set the live policy mode. |
-| `session/exit_plan` | Resolve a pending plan-exit request. |
-| `session/resolve_approval` | Resolve a pending tool approval request. |
-| `session/resolve_user_input` | Resolve a pending model-requested user input request. |
+| `thread/state` | Read policy mode and pending plan-exit state. |
+| `thread/set_mode` | Set the live policy mode. |
+| `thread/exit_plan` | Resolve a pending plan-exit request. |
+| `thread/resolve_approval` | Resolve a pending tool approval request. |
+| `thread/resolve_user_input` | Resolve a pending model-requested user input request. |
 
 Tools, commands, files, agents, and tasks:
 
@@ -414,6 +410,9 @@ Response:
 ```json
 {
   "web_search": { "mode": "cached" },
+  "default_provider": "openai",
+  "default_model": "gpt-5.5",
+  "default_reasoning": "medium",
   "default_mode": "default"
 }
 ```
@@ -421,6 +420,8 @@ Response:
 Notes:
 
 - `web_search.mode` is one of `disabled`, `cached`, or `live`.
+- `default_provider`, `default_model`, `default_reasoning`, and `default_mode`
+  initialize desktop controls.
 - `default_mode` is a `PolicyMode` value from `roder-api`.
 
 ### `settings/set_web_search`
@@ -505,7 +506,7 @@ Errors:
 
 ### `thread/start`
 
-Purpose: Create a desktop thread backed by a Roder session.
+Purpose: Create a desktop thread.
 
 Request:
 
@@ -513,6 +514,7 @@ Request:
 {
   "model": "gpt-5.5",
   "modelProvider": "openai",
+  "reasoning": "high",
   "cwd": "/Users/pz/w/gode",
   "ephemeral": false
 }
@@ -524,24 +526,27 @@ Response:
 {
   "thread": {
     "id": "thread-123",
-    "sessionId": "thread-123",
     "preview": "Untitled thread",
     "modelProvider": "openai",
+    "model": "gpt-5.5",
     "createdAt": 1770000000,
     "updatedAt": 1770000000,
-    "status": { "type": "idle" },
+    "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
     "cwd": "/Users/pz/w/gode"
   },
   "model": "gpt-5.5",
   "modelProvider": "openai",
+  "reasoning": "high",
   "cwd": "/Users/pz/w/gode"
 }
 ```
 
 Behavior:
 
-- Creates a persisted runtime session with optional provider/model/workspace.
-- Stores the selected provider/model for later `turn/start` overrides.
+- Creates a persisted runtime thread with optional provider/model and required absolute workspace `cwd`.
+- Rejects missing, empty, or relative `cwd`; thread snapshots do not fall back to the app-server process cwd.
+- Stores the selected provider/model/reasoning for later `turn/start` overrides.
+- If `reasoning` is omitted, returns and stores the effective reasoning effort for the selected model.
 - Emits `thread/started`.
 - `ephemeral` is accepted by the DTO but is not currently used by the handler.
 
@@ -564,12 +569,12 @@ Response:
   "data": [
     {
       "id": "thread-123",
-      "sessionId": "thread-123",
       "preview": "Fix tests",
       "modelProvider": "openai",
+      "model": "gpt-5.5",
       "createdAt": 1770000000,
       "updatedAt": 1770000100,
-      "status": { "type": "idle" },
+      "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
       "cwd": "/Users/pz/w/gode",
       "name": "Fix tests"
     }
@@ -581,9 +586,9 @@ Response:
 
 Behavior:
 
-- Lists persisted runtime sessions sorted by newest `updatedAt` first.
+- Lists persisted runtime threads sorted by newest `updatedAt` first.
 - Applies `limit` when supplied.
-- Merges in desktop threads that are in memory but not in persisted sessions.
+- Merges in protocol threads that are in memory but not yet persisted.
 - Cursor fields are currently always null.
 
 ### `thread/read`
@@ -605,12 +610,11 @@ Response:
 {
   "thread": {
     "id": "thread-123",
-    "sessionId": "thread-123",
     "preview": "Fix tests",
     "modelProvider": "openai",
     "createdAt": 1770000000,
     "updatedAt": 1770000100,
-    "status": { "type": "idle" },
+    "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
     "cwd": "/Users/pz/w/gode",
     "turns": [
       {
@@ -626,13 +630,13 @@ Response:
 
 Behavior:
 
-- Reads a persisted session snapshot first.
-- Falls back to persisted session metadata and then in-memory desktop threads.
+- Reads a persisted thread snapshot first.
+- Falls back to persisted thread metadata and then in-memory protocol threads.
 - Returns `{"thread": null}` when the thread is unknown.
 
 ### `thread/archive`
 
-Purpose: Move a desktop thread/session out of the active session list.
+Purpose: Archive a thread and remove it from active app-server thread lists.
 
 Request:
 
@@ -653,9 +657,11 @@ Response:
 
 Behavior:
 
-- Archives the persisted session when the active session store supports it.
-- Removes transient desktop bookkeeping for the thread.
-- Subsequent `thread/list` calls omit the archived thread.
+- Calls the runtime thread archive path for the supplied `threadId`.
+- Removes in-memory protocol thread and selected model bookkeeping for the
+  thread.
+- After archive, `thread/list` no longer returns the thread and `thread/read`
+  returns `{ "thread": null }`.
 
 ### `turn/start`
 
@@ -668,7 +674,11 @@ Request:
   "threadId": "thread-123",
   "input": [
     { "type": "text", "text": "inspect this repo" }
-  ]
+  ],
+  "modelProvider": "openai",
+  "model": "gpt-5.5",
+  "reasoning": "high",
+  "policyMode": "default"
 }
 ```
 
@@ -684,7 +694,9 @@ Behavior:
 
 - Concatenates text input blocks with newlines.
 - Uses `prompt` as a transition fallback only when text input is empty.
-- Uses the thread's selected provider/model when known.
+- Uses explicit model/provider/reasoning overrides first, then the thread's
+  selected provider/model/reasoning when known.
+- Applies `policyMode` as the live policy mode before starting the turn.
 - Starts a runtime turn and records the active turn id for optional
   `turn/interrupt`.
 
@@ -693,8 +705,8 @@ Notifications:
 - `turn/started`
 - `thread/status/changed` with status `running`
 - zero or more `item/agentMessage/delta`, `item/started`, and `item/completed`
-- optional wait-state notifications: `session/approvalRequested`,
-  `session/userInputRequested`, or `session/planExitRequested`, paired with
+- optional wait-state notifications: `thread/approvalRequested`,
+  `thread/userInputRequested`, or `thread/planExitRequested`, paired with
   their corresponding resolved notifications when the client answers
 - terminal `turn/completed`
 - `thread/status/changed` with status `idle`
@@ -760,7 +772,7 @@ Errors:
 - If no `turnId` is supplied and no active turn is known, returns code
   `-32602` with message `no active turn for thread ...`.
 
-### `session/get`
+### `thread/state`
 
 Purpose: Read current policy mode and any pending plan-exit request.
 
@@ -775,19 +787,19 @@ Response:
 ```json
 {
   "mode": "plan",
-  "pending_plan_exit": {
-    "thread_id": "thread-123",
-    "turn_id": "turn-123",
-    "request_id": "request-123",
-    "target_mode": "default",
-    "plan_summary": "Implement the test first.",
-    "requested_at": "2026-05-18T12:00:00Z",
-    "expires_at": null
+  "pendingPlanExit": {
+    "threadId": "thread-123",
+    "turnId": "turn-123",
+    "requestId": "request-123",
+    "targetMode": "default",
+    "planSummary": "Implement the test first.",
+    "requestedAt": "2026-05-18T12:00:00Z",
+    "expiresAt": null
   }
 }
 ```
 
-### `session/set_mode`
+### `thread/set_mode`
 
 Purpose: Set the live policy mode.
 
@@ -795,7 +807,7 @@ Request:
 
 ```json
 {
-  "mode": "accept_edits",
+  "mode": "accept_all",
   "reason": "desktop toggle"
 }
 ```
@@ -804,11 +816,11 @@ Response:
 
 ```json
 {
-  "mode": "accept_edits"
+  "mode": "accept_all"
 }
 ```
 
-### `session/exit_plan`
+### `thread/exit_plan`
 
 Purpose: Approve or reject a pending plan-mode exit.
 
@@ -816,7 +828,7 @@ Request:
 
 ```json
 {
-  "request_id": "request-123",
+  "requestId": "request-123",
   "approved": true
 }
 ```
@@ -830,7 +842,7 @@ Response:
 }
 ```
 
-### `session/resolve_approval`
+### `thread/resolve_approval`
 
 Purpose: Resolve a pending tool approval.
 
@@ -838,7 +850,7 @@ Request:
 
 ```json
 {
-  "approval_id": "approval-123",
+  "approvalId": "approval-123",
   "approved": true
 }
 ```
@@ -851,7 +863,7 @@ Response:
 }
 ```
 
-### `session/resolve_user_input`
+### `thread/resolve_user_input`
 
 Purpose: Resolve a pending `request_user_input` tool request.
 
@@ -859,7 +871,7 @@ Request:
 
 ```json
 {
-  "request_id": "input-123",
+  "requestId": "input-123",
   "answers": {
     "choice": "continue"
   }
@@ -1630,12 +1642,12 @@ or the remote WebSocket notification stream for remote clients.
 {
   "thread": {
     "id": "thread-123",
-    "sessionId": "thread-123",
     "preview": "Untitled thread",
     "modelProvider": "openai",
+    "model": "gpt-5.5",
     "createdAt": 1770000000,
     "updatedAt": 1770000000,
-    "status": { "type": "idle" },
+    "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
     "cwd": "/Users/pz/w/gode"
   }
 }
@@ -1679,11 +1691,11 @@ or the remote WebSocket notification stream for remote clients.
 ```json
 {
   "threadId": "thread-123",
-  "status": { "type": "running", "activeFlags": ["approvalRequired"] }
+  "status": { "type": "running", "activeTurnId": "turn-123", "activeFlags": ["approvalRequired"] }
 }
 ```
 
-`session/approvalRequested`:
+`thread/approvalRequested`:
 
 ```json
 {
@@ -1696,11 +1708,11 @@ or the remote WebSocket notification stream for remote clients.
 }
 ```
 
-Clients answer with `session/resolve_approval`. `session/approvalResolved`
+Clients answer with `thread/resolve_approval`. `thread/approvalResolved`
 echoes `threadId`, `turnId`, `approvalId`, `toolId`, `toolName`, and
 `approved`.
 
-`session/userInputRequested`:
+`thread/userInputRequested`:
 
 ```json
 {
@@ -1717,10 +1729,10 @@ echoes `threadId`, `turnId`, `approvalId`, `toolId`, `toolName`, and
 }
 ```
 
-Clients answer with `session/resolve_user_input`. `session/userInputResolved`
+Clients answer with `thread/resolve_user_input`. `thread/userInputResolved`
 echoes `threadId`, `turnId`, `requestId`, and `answers`.
 
-`session/planExitRequested`:
+`thread/planExitRequested`:
 
 ```json
 {
@@ -1732,14 +1744,15 @@ echoes `threadId`, `turnId`, `requestId`, and `answers`.
 }
 ```
 
-Clients answer with `session/exit_plan`. `session/planExitResolved` echoes
+Clients answer with `thread/exit_plan`. `thread/planExitResolved` echoes
 `threadId`, `turnId`, `requestId`, `approved`, `targetMode`, and
 `resolvedMode`.
 
 Ordering:
 
 - `turn/started` is emitted before terminal `turn/completed`.
-- A running status notification is emitted when a turn starts.
+- A running status notification is emitted when a turn starts and includes the
+  active turn id.
 - Wait states keep `status.type` as `running` and set `activeFlags` to
   `approvalRequired`, `userInputRequired`, or `planExitRequired`.
 - An idle status notification is emitted after completed, failed, or
@@ -1851,8 +1864,8 @@ Cancellation and interruption:
 
 ## Persistence and Contract Notes
 
-- `thread/list` and `thread/read` use persisted sessions first and in-memory
-  desktop threads as a fallback.
+- `thread/list` and `thread/read` use persisted threads first and in-memory
+  protocol threads as a fallback.
 - `providers/select`, `settings/set_web_search`, and
   `settings/set_default_mode` persist only when the app-server instance enables
   user-config persistence.
