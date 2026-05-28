@@ -93,6 +93,23 @@ test("working indicator follows active thread work without covering waits", () =
   assert.equal(shouldShowThreadWorkingIndicator(thread("thread-b", 90), 0, []), false);
 });
 
+test("message snapshots are reused for unchanged thread objects", () => {
+  const current = {
+    ...thread("thread-a", 100),
+    turns: [{
+      id: "turn-a",
+      itemsView: "default",
+      status: "completed",
+      items: [{ id: "message-a", type: "userMessage", text: "Hello" }],
+    }],
+  };
+
+  const first = messagesFromThread(current);
+  const second = messagesFromThread(current);
+
+  assert.equal(first, second);
+});
+
 test("typed item events project into stable reasoning and final message items", () => {
   let current = {
     ...thread("thread-a", 100),
