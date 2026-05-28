@@ -30,6 +30,42 @@ test("typed reasoning items hydrate content as assistant thinking messages", () 
   ]);
 });
 
+test("typed reasoning item content separates distinct blocks with blank lines", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        {
+          id: "turn-1-agent-reasoning",
+          type: "reasoning",
+          content: ["First thought.", "Second thought."],
+        },
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages[0].text).toBe("First thought.\n\nSecond thought.");
+});
+
+test("typed reasoning item content does not add blank lines within a streaming block", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        {
+          id: "turn-1-agent-reasoning",
+          type: "reasoning",
+          content: ["First chunk. Continued chunk."],
+        },
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages[0].text).toBe("First chunk. Continued chunk.");
+});
+
 test("thread snapshots derive messages from canonical typed items only", () => {
   const messages = messagesFromThread({
     id: "thread-1",
