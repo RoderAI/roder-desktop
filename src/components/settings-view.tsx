@@ -308,9 +308,16 @@ function ThemeEditor({
 function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }): React.JSX.Element {
   return (
     <SettingsRow label={label}>
-      <label className="flex h-8 w-[174px] items-center gap-2 rounded-lg bg-muted px-2 text-base text-foreground">
-        <input type="color" value={value} className="size-5 border-0 bg-transparent p-0" onChange={(event) => onChange(event.currentTarget.value)} />
+      <div className="flex h-8 w-[174px] items-center gap-2 rounded-lg bg-muted px-2 text-base text-foreground">
         <input
+          aria-label={`${label} color`}
+          type="color"
+          value={value}
+          className="size-5 border-0 bg-transparent p-0"
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        <input
+          aria-label={`${label} hex value`}
           value={value.toUpperCase()}
           className="min-w-0 flex-1 bg-transparent font-mono outline-none"
           onChange={(event) => {
@@ -320,7 +327,7 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
             }
           }}
         />
-      </label>
+      </div>
     </SettingsRow>
   );
 }
