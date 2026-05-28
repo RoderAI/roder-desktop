@@ -108,7 +108,9 @@ function ModelVisibilityRow({
             <span className="rounded-full bg-muted px-2 py-0.5 text-base text-muted-foreground">Selected</span>
           )}
         </div>
-        {model.description && <div className="mt-0.5 truncate text-base text-muted-foreground">{model.description}</div>}
+        {model.description && (
+          <div className="mt-0.5 truncate text-base text-muted-foreground">{model.description}</div>
+        )}
       </div>
       {visible && <Check className="size-4 shrink-0 text-primary" />}
     </button>
@@ -124,7 +126,12 @@ function VisibilitySwitch({ checked, disabled }: { checked: boolean; disabled: b
         disabled && "opacity-50",
       )}
     >
-      <span className={cn("absolute left-1 top-1 size-4 rounded-full bg-white transition-transform", checked && "translate-x-4")} />
+      <span
+        className={cn(
+          "absolute left-1 top-1 size-4 rounded-full bg-white transition-transform",
+          checked && "translate-x-4",
+        )}
+      />
     </span>
   );
 }

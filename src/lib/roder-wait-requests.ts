@@ -1,4 +1,11 @@
-import type { AgentWaitRequest, PendingWaitRequestsByThread, RoderItem, RoderNotification, RoderQuestionOption, RoderUserInputQuestion } from "@/types/roder";
+import type {
+  AgentWaitRequest,
+  PendingWaitRequestsByThread,
+  RoderItem,
+  RoderNotification,
+  RoderQuestionOption,
+  RoderUserInputQuestion,
+} from "@/types/roder";
 
 const emptyWaitRequests: AgentWaitRequest[] = [];
 
@@ -114,7 +121,11 @@ function upsertWaitRequest(
   return { ...pending, [threadId]: nextRequests };
 }
 
-function removeWaitRequest(pending: PendingWaitRequestsByThread, threadId: string, requestId: string): PendingWaitRequestsByThread {
+function removeWaitRequest(
+  pending: PendingWaitRequestsByThread,
+  threadId: string,
+  requestId: string,
+): PendingWaitRequestsByThread {
   if (!threadId || !requestId || !pending[threadId]) {
     return pending;
   }
@@ -126,7 +137,10 @@ function removeWaitRequest(pending: PendingWaitRequestsByThread, threadId: strin
   return { ...pending, [threadId]: nextRequests };
 }
 
-function clearWaitRequestsForThread(pending: PendingWaitRequestsByThread, threadId: string): PendingWaitRequestsByThread {
+function clearWaitRequestsForThread(
+  pending: PendingWaitRequestsByThread,
+  threadId: string,
+): PendingWaitRequestsByThread {
   if (!threadId || !pending[threadId]) {
     return pending;
   }
@@ -156,11 +170,13 @@ function questionsParam(value: unknown): RoderUserInputQuestion[] {
     if (!id || !text) {
       return [];
     }
-    return [{
-      id,
-      question: text,
-      options: optionsParam(question.options),
-    }];
+    return [
+      {
+        id,
+        question: text,
+        options: optionsParam(question.options),
+      },
+    ];
   });
 }
 
@@ -176,10 +192,12 @@ function optionsParam(value: unknown): RoderQuestionOption[] {
     if (!label) {
       return [];
     }
-    return [{
-      label,
-      description: stringParam(option.description),
-    }];
+    return [
+      {
+        label,
+        description: stringParam(option.description),
+      },
+    ];
   });
 }
 

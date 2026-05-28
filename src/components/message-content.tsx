@@ -39,7 +39,10 @@ const markdownComponents: Components = {
   },
   inlineCode({ children, className, ...props }) {
     return (
-      <code className={cn(className, "message-inline-code rounded-md px-1.5 py-0.5 text-[1em] text-foreground")} {...props}>
+      <code
+        className={cn(className, "message-inline-code rounded-md px-1.5 py-0.5 text-[1em] text-foreground")}
+        {...props}
+      >
         {children}
       </code>
     );
@@ -92,9 +95,12 @@ function isInlineCodeOnly(children: ReactNode): boolean {
   const meaningfulChildren = Array.isArray(children)
     ? children.filter((child) => !(typeof child === "string" && child.trim() === ""))
     : [children];
-  return meaningfulChildren.length === 1 && isValidElement<{ className?: string }>(meaningfulChildren[0])
-    && typeof meaningfulChildren[0].props.className === "string"
-    && meaningfulChildren[0].props.className.includes("message-inline-code");
+  return (
+    meaningfulChildren.length === 1 &&
+    isValidElement<{ className?: string }>(meaningfulChildren[0]) &&
+    typeof meaningfulChildren[0].props.className === "string" &&
+    meaningfulChildren[0].props.className.includes("message-inline-code")
+  );
 }
 
 export function MessageContent({ isStreaming = false, text }: MessageContentProps): React.JSX.Element {

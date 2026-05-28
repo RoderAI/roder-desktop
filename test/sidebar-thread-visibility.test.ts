@@ -10,8 +10,20 @@ test("collapsed sidebar groups show at most five threads and report the hidden c
 
   const result = visibleThreadsForGroup(threads, false);
 
-  expect(result.visibleThreads.map((item) => item.id)).toEqual(["thread-1", "thread-2", "thread-3", "thread-4", "thread-5"]);
-  expect(result.primaryThreads.map((item) => item.id)).toEqual(["thread-1", "thread-2", "thread-3", "thread-4", "thread-5"]);
+  expect(result.visibleThreads.map((item) => item.id)).toEqual([
+    "thread-1",
+    "thread-2",
+    "thread-3",
+    "thread-4",
+    "thread-5",
+  ]);
+  expect(result.primaryThreads.map((item) => item.id)).toEqual([
+    "thread-1",
+    "thread-2",
+    "thread-3",
+    "thread-4",
+    "thread-5",
+  ]);
   expect(result.overflowThreads.map((item) => item.id)).toEqual(["thread-6", "thread-7"]);
   expect(result.hiddenCount).toBe(2);
   expect(result.canShowMore).toBe(true);

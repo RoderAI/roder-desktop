@@ -25,7 +25,10 @@ export const TooltipContent = React.forwardRef<
     <TooltipPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-50">
       <TooltipPrimitive.Popup
         ref={ref}
-        className={cn("rounded-md bg-primary px-2 py-1 text-base text-primary-foreground shadow-md outline-none", className)}
+        className={cn(
+          "rounded-md bg-primary px-2 py-1 text-base text-primary-foreground shadow-md outline-none",
+          className,
+        )}
         {...props}
       />
     </TooltipPrimitive.Positioner>

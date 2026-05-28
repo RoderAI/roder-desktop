@@ -58,7 +58,12 @@ function themePresetFromExtensionTheme(theme: ExtensionTheme): ThemePreset {
   };
 }
 
-function themePalette(theme: ExtensionTheme, fallback: ThemePalette, presetId: string, presetName: string): ThemePalette {
+function themePalette(
+  theme: ExtensionTheme,
+  fallback: ThemePalette,
+  presetId: string,
+  presetName: string,
+): ThemePalette {
   return {
     presetId,
     presetName,

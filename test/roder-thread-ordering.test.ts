@@ -1,5 +1,12 @@
 import { expect, test } from "vitest";
-import { applyThreadItemEvent, isThreadRunning, markThreadStatus, messagesFromThread, shouldShowThreadWorkingIndicator, upsertThread } from "../src/lib/roder-thread";
+import {
+  applyThreadItemEvent,
+  isThreadRunning,
+  markThreadStatus,
+  messagesFromThread,
+  shouldShowThreadWorkingIndicator,
+  upsertThread,
+} from "../src/lib/roder-thread";
 
 function thread(id, updatedAt) {
   return {
@@ -52,7 +59,10 @@ test("explicit status changes update thread activity", () => {
 
 test("working indicator follows active thread work without covering waits", () => {
   const running = { ...thread("thread-a", 100), status: { type: "running", activeTurnId: "turn-a", activeFlags: [] } };
-  const waiting = { ...running, status: { type: "running", activeTurnId: "turn-a", activeFlags: ["approvalRequired"] } };
+  const waiting = {
+    ...running,
+    status: { type: "running", activeTurnId: "turn-a", activeFlags: ["approvalRequired"] },
+  };
   const streamingAssistantMessages = [{ id: "message-1", role: "assistant", text: "Hello", status: "streaming" }];
   const streamingToolMessages = [{ id: "tool-1", role: "tool", text: "Reading", status: "streaming" }];
   const staleAssistantStreamWithLaterTool = [
@@ -72,12 +82,14 @@ test("working indicator follows active thread work without covering waits", () =
 test("message snapshots are reused for unchanged thread objects", () => {
   const current = {
     ...thread("thread-a", 100),
-    turns: [{
-      id: "turn-a",
-      itemsView: "default",
-      status: "completed",
-      items: [{ id: "message-a", type: "userMessage", text: "Hello" }],
-    }],
+    turns: [
+      {
+        id: "turn-a",
+        itemsView: "default",
+        status: "completed",
+        items: [{ id: "message-a", type: "userMessage", text: "Hello" }],
+      },
+    ],
   };
 
   const first = messagesFromThread(current);

@@ -193,14 +193,18 @@ function navigationHistory(webContents: WebContents): {
   goBack?: () => void;
   goForward?: () => void;
 } | null {
-  return (webContents as WebContents & {
-    navigationHistory?: {
-      canGoBack?: () => boolean;
-      canGoForward?: () => boolean;
-      goBack?: () => void;
-      goForward?: () => void;
-    };
-  }).navigationHistory ?? null;
+  return (
+    (
+      webContents as WebContents & {
+        navigationHistory?: {
+          canGoBack?: () => boolean;
+          canGoForward?: () => boolean;
+          goBack?: () => void;
+          goForward?: () => void;
+        };
+      }
+    ).navigationHistory ?? null
+  );
 }
 
 function annotationScript(): string {

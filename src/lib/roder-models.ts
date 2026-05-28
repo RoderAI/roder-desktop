@@ -28,7 +28,11 @@ export function visibleModelsFor(models: RoderModel[], explicitIds: string[]): R
   return models.filter((model) => visible.has(model.id));
 }
 
-export function effectiveSelectedModel(models: RoderModel[], visibleModelIds: string[], selectedModel: string): RoderModel | undefined {
+export function effectiveSelectedModel(
+  models: RoderModel[],
+  visibleModelIds: string[],
+  selectedModel: string,
+): RoderModel | undefined {
   const visibleModels = visibleModelsFor(models, visibleModelIds);
   return visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
 }

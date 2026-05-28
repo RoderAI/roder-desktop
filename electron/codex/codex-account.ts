@@ -84,7 +84,7 @@ export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {
   try {
     const [codexAuth, roderAuth, limits] = await Promise.all([readCodexAuth(), readRoderAuth(), readLatestLimits()]);
     const displayName = roderAuth.signedIn
-      ? codexAuth.displayName ?? (roderAuth.accountId ? `Codex account ${shortId(roderAuth.accountId)}` : null)
+      ? (codexAuth.displayName ?? (roderAuth.accountId ? `Codex account ${shortId(roderAuth.accountId)}` : null))
       : null;
     return {
       signedIn: roderAuth.signedIn,
@@ -162,10 +162,24 @@ async function readCodexAuth(): Promise<{
     return { signedIn: false, displayName: null, accountId: null, planType: null };
   }
   const idToken = parseIdToken(auth.tokens?.id_token);
-  const signedIn = Boolean(auth.tokens?.access_token || auth.tokens?.refresh_token || auth.tokens?.access || auth.tokens?.refresh || auth.auth_mode);
+  const signedIn = Boolean(
+    auth.tokens?.access_token ||
+    auth.tokens?.refresh_token ||
+    auth.tokens?.access ||
+    auth.tokens?.refresh ||
+    auth.auth_mode,
+  );
   return {
     signedIn,
-    displayName: firstText(auth.email, auth.account_email, auth.chatgpt_email, auth.user?.email, idToken?.email, idToken?.name, auth.auth_mode === "chatgpt" ? "Codex account" : null),
+    displayName: firstText(
+      auth.email,
+      auth.account_email,
+      auth.chatgpt_email,
+      auth.user?.email,
+      idToken?.email,
+      idToken?.name,
+      auth.auth_mode === "chatgpt" ? "Codex account" : null,
+    ),
     accountId: firstText(auth.account_id, auth.accountId, auth.user?.id, idToken?.sub),
     planType: firstText(auth.plan_type, auth.planType, auth.user?.plan_type),
   };
@@ -180,7 +194,10 @@ async function readRoderAuth(): Promise<{ signedIn: boolean; accountId: string |
 }
 
 async function readLatestLimits(): Promise<{ raw: RawRateLimits; updatedAt: string; planType: string | null } | null> {
-  const files = await collectJsonlFiles([join(homedir(), ".codex", "sessions"), join(homedir(), ".codex", "archived_sessions")]);
+  const files = await collectJsonlFiles([
+    join(homedir(), ".codex", "sessions"),
+    join(homedir(), ".codex", "archived_sessions"),
+  ]);
   let latest: { timestamp: number; raw: RawRateLimits } | null = null;
 
   for (const file of files.slice(0, 160)) {
@@ -189,7 +206,11 @@ async function readLatestLimits(): Promise<{ raw: RawRateLimits; updatedAt: stri
       if (!line.trim()) {
         continue;
       }
-      const parsed = parseJson<{ type?: string; timestamp?: string; payload?: { type?: string; rate_limits?: RawRateLimits } }>(line);
+      const parsed = parseJson<{
+        type?: string;
+        timestamp?: string;
+        payload?: { type?: string; rate_limits?: RawRateLimits };
+      }>(line);
       if (parsed?.type !== "event_msg" || parsed.payload?.type !== "token_count" || !parsed.payload.rate_limits) {
         continue;
       }
@@ -239,12 +260,12 @@ function normalizeRateWindow(label: string, raw: RawRateWindow | null): CodexRat
   }
   const usedPercent = clamp(raw.used_percent ?? 0, 0, 100);
   const remainingPercent = clamp(100 - usedPercent, 0, 100);
-  const resetsAt = Number.isFinite(raw.resets_at) ? raw.resets_at ?? null : null;
+  const resetsAt = Number.isFinite(raw.resets_at) ? (raw.resets_at ?? null) : null;
   return {
     label,
     usedPercent,
     remainingPercent,
-    windowMinutes: Number.isFinite(raw.window_minutes) ? raw.window_minutes ?? null : null,
+    windowMinutes: Number.isFinite(raw.window_minutes) ? (raw.window_minutes ?? null) : null,
     resetsAt,
     resetLabel: formatResetLabel(resetsAt),
   };
@@ -304,7 +325,9 @@ function resolveRoderBinary(): { command: string; args: string[] } {
   if (existsSync(bundled)) {
     return { command: bundled, args: [] };
   }
-  throw new Error(`Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`);
+  throw new Error(
+    `Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`,
+  );
 }
 
 function roderAuthPath(): string {

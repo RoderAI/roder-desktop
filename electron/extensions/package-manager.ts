@@ -14,7 +14,10 @@ export type ArchiveExtractionOptions = {
   installBasePath: string;
 };
 
-export async function readExtensionPackageFromFolder(folderPath: string, appVersion: string): Promise<ExtensionPackage> {
+export async function readExtensionPackageFromFolder(
+  folderPath: string,
+  appVersion: string,
+): Promise<ExtensionPackage> {
   const packageRoot = resolve(folderPath);
   const packageJsonPath = join(packageRoot, "package.json");
   let packageJson: unknown;
@@ -38,7 +41,10 @@ export async function readExtensionPackageFromFolder(folderPath: string, appVers
   }
 }
 
-export async function extractExtensionPackageArchive(archivePath: string, options: ArchiveExtractionOptions): Promise<ExtensionPackage> {
+export async function extractExtensionPackageArchive(
+  archivePath: string,
+  options: ArchiveExtractionOptions,
+): Promise<ExtensionPackage> {
   if (!archivePath.endsWith(".rdx")) {
     throw new Error("Extension archive must use the .rdx extension");
   }
@@ -102,7 +108,12 @@ function safeArchiveEntryName(name: string): string | null {
   if (!normalized) {
     return null;
   }
-  if (isAbsolute(normalized) || normalized === ".." || normalized.startsWith(`..${sep}`) || normalized.startsWith("../")) {
+  if (
+    isAbsolute(normalized) ||
+    normalized === ".." ||
+    normalized.startsWith(`..${sep}`) ||
+    normalized.startsWith("../")
+  ) {
     throw new Error(`Unsafe extension archive entry: ${name}`);
   }
   return normalized;

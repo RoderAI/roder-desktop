@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "react", "jsx-a11y", "node", "promise", "vitest"],
+  "env": {
+    "browser": true,
+    "es2023": true,
+    "node": true
+  },
+  "settings": {
+    "react": {
+      "version": "19.2.6"
+    }
+  },
+  "ignorePatterns": ["coverage/**", "out/**", "packages/*/dist/**", "resources/bin/**"],
+  "rules": {
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "overrides": [
+    {
+      "files": ["test/**/*.test.ts"],
+      "env": {
+        "vitest": true
+      }
+    }
+  ]
+}

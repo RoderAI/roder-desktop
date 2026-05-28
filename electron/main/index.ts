@@ -12,7 +12,12 @@ import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
-import { createApplicationMenuTemplate, installNewProjectShortcut, installNewThreadShortcut, type AppCommand } from "./shortcuts";
+import {
+  createApplicationMenuTemplate,
+  installNewProjectShortcut,
+  installNewThreadShortcut,
+  type AppCommand,
+} from "./shortcuts";
 
 const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
@@ -146,9 +151,11 @@ ipcMain.handle("workspace:openFolder", async (_event, defaultPath?: string) => {
     properties: ["openDirectory", "createDirectory"],
   };
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
-  return result.canceled ? null : result.filePaths[0] ?? null;
+  return result.canceled ? null : (result.filePaths[0] ?? null);
 });
-ipcMain.handle("terminal:start", (_event, options: { cols?: number; rows?: number }) => terminal.start({ ...options, cwd: process.cwd() }));
+ipcMain.handle("terminal:start", (_event, options: { cols?: number; rows?: number }) =>
+  terminal.start({ ...options, cwd: process.cwd() }),
+);
 ipcMain.handle("terminal:write", (_event, data: string) => terminal.write(data));
 ipcMain.handle("terminal:resize", (_event, cols: number, rows: number) => terminal.resize(cols, rows));
 ipcMain.handle("terminal:stop", () => terminal.stop());
@@ -219,17 +226,24 @@ ipcMain.handle("extensions:reload", async (_event, id: string) => {
   await getExtensionHost().reloadExtension(id);
   return getExtensionCatalog().list();
 });
-ipcMain.handle("extensions:updatePreference", async (_event, id: string, key: string, value: string | boolean | null) => {
-  await getExtensionCatalog().updatePreference(id, key, value);
-  return getExtensionCatalog().list();
-});
+ipcMain.handle(
+  "extensions:updatePreference",
+  async (_event, id: string, key: string, value: string | boolean | null) => {
+    await getExtensionCatalog().updatePreference(id, key, value);
+    return getExtensionCatalog().list();
+  },
+);
 ipcMain.handle("extensions:readLogs", (_event, id: string) => getExtensionCatalog().readLogs(id));
 ipcMain.handle("extensions:activate", async (_event, id: string) => {
   await getExtensionHost().activateExtension(id);
   return getExtensionCatalog().list();
 });
-ipcMain.handle("extensions:executeCommand", (_event, commandId: string, args?: unknown[]) => getExtensionHost().executeCommand(commandId, args ?? []));
-ipcMain.handle("extensions:executeTool", (_event, toolId: string, input?: Record<string, unknown>) => getExtensionHost().executeTool(toolId, (input ?? {}) as JsonObject));
+ipcMain.handle("extensions:executeCommand", (_event, commandId: string, args?: unknown[]) =>
+  getExtensionHost().executeCommand(commandId, args ?? []),
+);
+ipcMain.handle("extensions:executeTool", (_event, toolId: string, input?: Record<string, unknown>) =>
+  getExtensionHost().executeTool(toolId, (input ?? {}) as JsonObject),
+);
 ipcMain.handle("extensions:readPanel", async (_event, extensionId: string, panelId: string) => {
   const extension = await getExtensionCatalog().get(extensionId);
   const panel = extension?.manifest.contributes.views.panels.find((candidate) => candidate.id === panelId);

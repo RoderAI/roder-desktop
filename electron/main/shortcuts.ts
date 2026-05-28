@@ -22,12 +22,7 @@ export function isNewProjectShortcutInput(input: ShortcutInput, platform: NodeJS
   return isShortcutInputForKey(input, "o", "KeyO", platform);
 }
 
-function isShortcutInputForKey(
-  input: ShortcutInput,
-  key: string,
-  code: string,
-  platform: NodeJS.Platform,
-): boolean {
+function isShortcutInputForKey(input: ShortcutInput, key: string, code: string, platform: NodeJS.Platform): boolean {
   if (input.type !== "keyDown" || input.isAutoRepeat || input.isComposing) {
     return false;
   }

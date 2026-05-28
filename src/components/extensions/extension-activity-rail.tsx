@@ -55,7 +55,12 @@ export function ExtensionActivityRail({
                 )}
                 aria-hidden="true"
               />
-              {selected && <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" aria-hidden="true" />}
+              {selected && (
+                <span
+                  className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+                  aria-hidden="true"
+                />
+              )}
             </button>
           );
         })}

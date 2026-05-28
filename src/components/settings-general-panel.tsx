@@ -2,14 +2,7 @@ import { Check, Save } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type { PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
@@ -58,10 +51,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
     () => models.find((model) => model.id === defaultModel) ?? models[0],
     [models, defaultModel],
   );
-  const modelItems = useMemo(
-    () => Object.fromEntries(models.map((model) => [model.id, modelName(model)])),
-    [models],
-  );
+  const modelItems = useMemo(() => Object.fromEntries(models.map((model) => [model.id, modelName(model)])), [models]);
   const canSave = Boolean(selectedModelRecord) && !saving;
 
   async function saveDefaultControls(): Promise<void> {
@@ -135,7 +125,10 @@ export function GeneralSettingsPanel(): React.JSX.Element {
           </Select>
         </SettingsRow>
 
-        <SettingsRow label="Policy mode" description={policyOptions.find((option) => option.mode === defaultPolicyMode)?.description ?? ""}>
+        <SettingsRow
+          label="Policy mode"
+          description={policyOptions.find((option) => option.mode === defaultPolicyMode)?.description ?? ""}
+        >
           <Select
             items={Object.fromEntries(policyOptions.map((option) => [option.mode, option.label]))}
             value={defaultPolicyMode}

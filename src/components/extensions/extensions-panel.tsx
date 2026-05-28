@@ -13,7 +13,10 @@ type ExtensionsPanelProps = {
   onSelectedExtensionChange?: (extensionId: string) => void;
 };
 
-export function ExtensionsPanel({ selectedExtensionId, onSelectedExtensionChange }: ExtensionsPanelProps): React.JSX.Element {
+export function ExtensionsPanel({
+  selectedExtensionId,
+  onSelectedExtensionChange,
+}: ExtensionsPanelProps): React.JSX.Element {
   const extensions = useExtensionsStore((state) => state.extensions);
   const loading = useExtensionsStore((state) => state.loading);
   const error = useExtensionsStore((state) => state.error);
@@ -24,7 +27,8 @@ export function ExtensionsPanel({ selectedExtensionId, onSelectedExtensionChange
   const executeTool = useExtensionsStore((state) => state.executeTool);
   const openSettings = useThemeStore((state) => state.openSettings);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
-  const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
+  const selectedExtension =
+    sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const panels = useMemo(
     () => selectedExtension?.manifest.contributes.views.panels.filter((panel) => panel.html) ?? [],
     [selectedExtension],
@@ -56,7 +60,9 @@ export function ExtensionsPanel({ selectedExtensionId, onSelectedExtensionChange
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-base font-medium text-foreground">
         <Puzzle className="size-4 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate">Extension Sidebar</span>
-        <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-base font-normal text-sidebar-muted">{sidebarExtensions.length}</span>
+        <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-base font-normal text-sidebar-muted">
+          {sidebarExtensions.length}
+        </span>
       </div>
       {error && (
         <div className="border-b border-border px-3 py-2">
@@ -88,7 +94,11 @@ export function ExtensionsPanel({ selectedExtensionId, onSelectedExtensionChange
           )}
           <div className="min-h-0 flex-1 overflow-y-auto sidebar-scroll bg-background">
             {selectedPanel ? (
-              <ExtensionWebviewPanel extensionId={selectedExtension.id} panelId={selectedPanel.id} title={selectedPanel.title} />
+              <ExtensionWebviewPanel
+                extensionId={selectedExtension.id}
+                panelId={selectedPanel.id}
+                title={selectedPanel.title}
+              />
             ) : (
               <ContributionShortcuts extension={selectedExtension} onCommand={executeCommand} onTool={executeTool} />
             )}
@@ -132,16 +142,24 @@ function ContributionShortcuts({
         Actions
       </div>
       <div className="flex flex-wrap gap-1.5">
-      {command && (
-        <button type="button" className="h-8 rounded-md bg-sidebar-accent px-2 text-base text-sidebar-foreground hover:bg-accent" onClick={() => void onCommand(command.id)}>
-          Run {command.title}
-        </button>
-      )}
-      {tool && (
-        <button type="button" className="h-8 rounded-md bg-sidebar-accent px-2 text-base text-sidebar-foreground hover:bg-accent" onClick={() => void onTool(tool.id)}>
-          Call {tool.title}
-        </button>
-      )}
+        {command && (
+          <button
+            type="button"
+            className="h-8 rounded-md bg-sidebar-accent px-2 text-base text-sidebar-foreground hover:bg-accent"
+            onClick={() => void onCommand(command.id)}
+          >
+            Run {command.title}
+          </button>
+        )}
+        {tool && (
+          <button
+            type="button"
+            className="h-8 rounded-md bg-sidebar-accent px-2 text-base text-sidebar-foreground hover:bg-accent"
+            onClick={() => void onTool(tool.id)}
+          >
+            Call {tool.title}
+          </button>
+        )}
       </div>
     </section>
   );
@@ -164,13 +182,19 @@ function EmptyExtensions({
     <div className="space-y-3 px-3 py-4 text-base text-muted-foreground">
       <p>Extensions with panels, commands, or tools appear here. Manage installed extensions and themes in Settings.</p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" onClick={onInstallFolder}>Folder</Button>
-        <Button variant="secondary" size="sm" onClick={onInstallArchive}>.rdx</Button>
+        <Button variant="secondary" size="sm" onClick={onInstallFolder}>
+          Folder
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onInstallArchive}>
+          .rdx
+        </Button>
         <Button variant="ghost" size="sm" disabled={loading} onClick={onRefresh}>
           <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
           Refresh
         </Button>
-        <Button variant="ghost" size="sm" onClick={onSettings}>Settings</Button>
+        <Button variant="ghost" size="sm" onClick={onSettings}>
+          Settings
+        </Button>
       </div>
     </div>
   );

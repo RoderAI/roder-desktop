@@ -235,7 +235,9 @@ export class RoderAppServerClient extends EventEmitter {
       };
     }
 
-    throw new Error(`Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`);
+    throw new Error(
+      `Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`,
+    );
   }
 
   #setStatus(status: RoderStatus): void {

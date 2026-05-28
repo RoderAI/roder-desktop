@@ -59,17 +59,19 @@ function expectManifestIssues(
   paths: string[],
   extraCheck?: (issue: ManifestValidationError["issues"][number]) => boolean,
 ): void {
-  expect(action).toThrow(ManifestValidationError);
+  let thrownError: unknown;
   try {
     action();
   } catch (error) {
-    expect(error).toBeInstanceOf(ManifestValidationError);
-    const validationError = error as ManifestValidationError;
-    for (const path of paths) {
-      expect(validationError.issues.some((issue) => issue.path === path)).toBe(true);
-    }
-    if (extraCheck) {
-      expect(validationError.issues.some(extraCheck)).toBe(true);
-    }
+    thrownError = error;
   }
+
+  expect(thrownError).toBeInstanceOf(ManifestValidationError);
+  if (!(thrownError instanceof ManifestValidationError)) {
+    throw new Error("Expected manifest validation to fail");
+  }
+
+  const missingPaths = paths.filter((path) => !thrownError.issues.some((issue) => issue.path === path));
+  expect(missingPaths).toEqual([]);
+  expect(extraCheck ? thrownError.issues.some(extraCheck) : true).toBe(true);
 }

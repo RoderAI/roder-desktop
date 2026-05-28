@@ -26,11 +26,7 @@ import {
   sourceLabel,
   variantLabel,
 } from "@/lib/plugins-marketplace";
-import type {
-  DedupedMarketplacePlugin,
-  MarketplacePluginVariant,
-  PluginInstallPreview,
-} from "@/types/plugins";
+import type { DedupedMarketplacePlugin, MarketplacePluginVariant, PluginInstallPreview } from "@/types/plugins";
 
 export function PluginDetailsDialog({
   open,
@@ -147,11 +143,16 @@ export function PluginDetailsDialog({
           <PluginDetailSection title="Related variants">
             <div className="flex flex-col gap-2">
               {plugin.variants.map((candidate) => (
-                <div key={pluginVariantKey(candidate)} className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/30 px-3 py-2 text-base">
+                <div
+                  key={pluginVariantKey(candidate)}
+                  className="flex flex-wrap items-center gap-2 rounded-xl bg-muted/30 px-3 py-2 text-base"
+                >
                   <span className="font-medium text-foreground">{variantLabel(candidate)}</span>
                   <Badge variant="outline">{candidate.marketplaceId}</Badge>
                   <Badge variant="muted">{candidate.kind}</Badge>
-                  <Badge variant={candidate.risk === "passive" ? "secondary" : "outline"}>{riskLabel(candidate.risk)}</Badge>
+                  <Badge variant={candidate.risk === "passive" ? "secondary" : "outline"}>
+                    {riskLabel(candidate.risk)}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -223,7 +224,9 @@ function DetailPills({ items, emptyLabel }: { items: string[]; emptyLabel: strin
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((item, index) => (
-        <Badge key={`${item}:${index}`} variant="outline">{item}</Badge>
+        <Badge key={`${item}:${index}`} variant="outline">
+          {item}
+        </Badge>
       ))}
     </div>
   );
@@ -233,7 +236,9 @@ function DetailLine({ label, value }: { label: string; value: string }): React.J
   return (
     <div className="min-w-0">
       <div className="text-muted-foreground">{label}</div>
-      <div className="truncate font-medium text-foreground" title={value}>{value}</div>
+      <div className="truncate font-medium text-foreground" title={value}>
+        {value}
+      </div>
     </div>
   );
 }
