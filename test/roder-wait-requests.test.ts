@@ -1,20 +1,5 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { Script } from "node:vm";
-import { test } from "node:test";
-import ts from "typescript";
-
-const helperSource = readFileSync(new URL("../src/lib/roder-wait-requests.ts", import.meta.url), "utf8");
-const compiled = ts.transpileModule(helperSource, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2023,
-  },
-}).outputText;
-
-const module = { exports: {} };
-new Script(compiled).runInNewContext({ exports: module.exports, module });
-const { reducePendingWaitRequests, shouldDisplayStartedItem, waitRequestsForThread } = module.exports;
+import { expect, test } from "vitest";
+import { reducePendingWaitRequests, shouldDisplayStartedItem, waitRequestsForThread } from "../src/lib/roder-wait-requests";
 
 test("approval requests are stored by thread and removed by resolution", () => {
   const requested = reducePendingWaitRequests({}, {
@@ -29,7 +14,7 @@ test("approval requests are stored by thread and removed by resolution", () => {
     },
   }, "");
 
-  assert.deepEqual(plain(waitRequestsForThread(requested, "thread-1")), [{
+  expect(plain(waitRequestsForThread(requested, "thread-1"))).toEqual([{
     kind: "approval",
     id: "approval-1",
     approvalId: "approval-1",
@@ -49,7 +34,7 @@ test("approval requests are stored by thread and removed by resolution", () => {
     },
   }, "");
 
-  assert.deepEqual(plain(waitRequestsForThread(resolved, "thread-1")), []);
+  expect(plain(waitRequestsForThread(resolved, "thread-1"))).toEqual([]);
 });
 
 test("user input requests keep questions and turn completion clears stale waits", () => {
@@ -72,7 +57,7 @@ test("user input requests keep questions and turn completion clears stale waits"
     },
   }, "");
 
-  assert.deepEqual(plain(waitRequestsForThread(requested, "thread-2")), [{
+  expect(plain(waitRequestsForThread(requested, "thread-2"))).toEqual([{
     kind: "userInput",
     id: "input-1",
     requestId: "input-1",
@@ -98,7 +83,7 @@ test("user input requests keep questions and turn completion clears stale waits"
     },
   }, "");
 
-  assert.deepEqual(plain(waitRequestsForThread(completed, "thread-2")), []);
+  expect(plain(waitRequestsForThread(completed, "thread-2"))).toEqual([]);
 });
 
 test("plan exit requests are stored and removed by resolution", () => {
@@ -113,7 +98,7 @@ test("plan exit requests are stored and removed by resolution", () => {
     },
   }, "");
 
-  assert.deepEqual(plain(waitRequestsForThread(requested, "thread-3")), [{
+  expect(plain(waitRequestsForThread(requested, "thread-3"))).toEqual([{
     kind: "planExit",
     id: "plan-exit-1",
     requestId: "plan-exit-1",
@@ -132,22 +117,22 @@ test("plan exit requests are stored and removed by resolution", () => {
     },
   }, "");
 
-  assert.deepEqual(plain(waitRequestsForThread(resolved, "thread-3")), []);
+  expect(plain(waitRequestsForThread(resolved, "thread-3"))).toEqual([]);
 });
 
 test("missing thread wait requests reuse a stable empty array", () => {
   const first = waitRequestsForThread({}, "missing-thread");
   const second = waitRequestsForThread({}, "missing-thread");
 
-  assert.equal(first, second);
+  expect(first).toBe(second);
 });
 
 test("item started filtering accepts only typed assistant and tool execution items", () => {
-  assert.equal(shouldDisplayStartedItem({ type: "agentMessage" }), true);
-  assert.equal(shouldDisplayStartedItem({ type: "toolExecution" }), true);
-  assert.equal(shouldDisplayStartedItem({ type: "tool.started" }), false);
-  assert.equal(shouldDisplayStartedItem({ type: "toolCall" }), false);
-  assert.equal(shouldDisplayStartedItem({ type: "userMessage" }), false);
+  expect(shouldDisplayStartedItem({ type: "agentMessage" })).toBe(true);
+  expect(shouldDisplayStartedItem({ type: "toolExecution" })).toBe(true);
+  expect(shouldDisplayStartedItem({ type: "tool.started" })).toBe(false);
+  expect(shouldDisplayStartedItem({ type: "toolCall" })).toBe(false);
+  expect(shouldDisplayStartedItem({ type: "userMessage" })).toBe(false);
 });
 
 function plain(value) {

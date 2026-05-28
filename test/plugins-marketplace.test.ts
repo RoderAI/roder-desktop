@@ -1,26 +1,5 @@
-import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { test } from "node:test";
-import ts from "typescript";
-
-async function loadMarketplaceModule() {
-  const source = readFileSync(new URL("../src/lib/plugins-marketplace.ts", import.meta.url), "utf8");
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      target: ts.ScriptTarget.ES2022,
-      verbatimModuleSyntax: true,
-    },
-  });
-  const directory = mkdtempSync(join(tmpdir(), "roder-plugins-marketplace-"));
-  mkdirSync(directory, { recursive: true });
-  const path = join(directory, `plugins-marketplace-${Date.now()}.mjs`);
-  writeFileSync(path, output.outputText);
-  return import(`${path}?t=${Date.now()}`);
-}
+import { expect, test } from "vitest";
+import * as marketplaceModule from "../src/lib/plugins-marketplace";
 
 const baseHints = {
   skills: false,
@@ -34,8 +13,8 @@ const baseHints = {
   assets: false,
 };
 
-test("selects the recommended marketplace plugin variant by variant key", async () => {
-  const { recommendedVariant, pluginVariantKey } = await loadMarketplaceModule();
+test("selects the recommended marketplace plugin variant by variant key", () => {
+  const { recommendedVariant, pluginVariantKey } = marketplaceModule;
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -50,11 +29,11 @@ test("selects the recommended marketplace plugin variant by variant key", async 
 
   const selected = recommendedVariant(plugin);
 
-  assert.equal(pluginVariantKey(selected), "cursor-plugins:repo-tools");
+  expect(pluginVariantKey(selected)).toBe("cursor-plugins:repo-tools");
 });
 
-test("merges installed variants from search rows and installed plugin records", async () => {
-  const { installedVariantSet } = await loadMarketplaceModule();
+test("merges installed variants from search rows and installed plugin records", () => {
+  const { installedVariantSet } = marketplaceModule;
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -76,12 +55,12 @@ test("merges installed variants from search rows and installed plugin records", 
 
   const keys = installedVariantSet(plugin, installed);
 
-  assert.equal(keys.has("cursor-plugins:repo-tools"), true);
-  assert.equal(keys.has("claude-plugins-official:repo-tools-claude"), true);
+  expect(keys.has("cursor-plugins:repo-tools")).toBe(true);
+  expect(keys.has("claude-plugins-official:repo-tools-claude")).toBe(true);
 });
 
-test("derives plugin row install status from installed plugin records", async () => {
-  const { pluginInstallStatus } = await loadMarketplaceModule();
+test("derives plugin row install status from installed plugin records", () => {
+  const { pluginInstallStatus } = marketplaceModule;
   const staleSearchPlugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -104,13 +83,13 @@ test("derives plugin row install status from installed plugin records", async ()
 
   const status = pluginInstallStatus(staleSearchPlugin, staleSearchPlugin.variants[0], installed);
 
-  assert.equal(status.pluginInstalled, true);
-  assert.equal(status.variantInstalled, true);
-  assert.equal(status.variantKey, "cursor-plugins:repo-tools");
+  expect(status.pluginInstalled).toBe(true);
+  expect(status.variantInstalled).toBe(true);
+  expect(status.variantKey).toBe("cursor-plugins:repo-tools");
 });
 
-test("ignores installed plugin records for unrelated plugin rows", async () => {
-  const { pluginInstallStatus } = await loadMarketplaceModule();
+test("ignores installed plugin records for unrelated plugin rows", () => {
+  const { pluginInstallStatus } = marketplaceModule;
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -133,12 +112,12 @@ test("ignores installed plugin records for unrelated plugin rows", async () => {
 
   const status = pluginInstallStatus(plugin, plugin.variants[0], installed);
 
-  assert.equal(status.pluginInstalled, false);
-  assert.equal(status.variantInstalled, false);
+  expect(status.pluginInstalled).toBe(false);
+  expect(status.variantInstalled).toBe(false);
 });
 
-test("prepares installed plugin records for the installed tab", async () => {
-  const { visibleInstalledPlugins } = await loadMarketplaceModule();
+test("prepares installed plugin records for the installed tab", () => {
+  const { visibleInstalledPlugins } = marketplaceModule;
   const installed = [
     installedRecord("cursor-plugins", "zeta-tools", "zeta-tools", { state: "disabled" }),
     installedRecord("cursor-plugins", "alpha-tools", "alpha-tools"),
@@ -147,26 +126,26 @@ test("prepares installed plugin records for the installed tab", async () => {
 
   const visible = visibleInstalledPlugins(installed);
 
-  assert.deepEqual(visible.map((record) => record.variantKey), [
+  expect(visible.map((record) => record.variantKey)).toEqual([
     "cursor-plugins:alpha-tools",
     "cursor-plugins:zeta-tools",
   ]);
 });
 
-test("summarizes component hints and marketplace sources for the UI", async () => {
-  const { activeComponentLabels, homepageIconUrl, sourceLabel, riskLabel, variantLabel } = await loadMarketplaceModule();
+test("summarizes component hints and marketplace sources for the UI", () => {
+  const { activeComponentLabels, homepageIconUrl, sourceLabel, riskLabel, variantLabel } = marketplaceModule;
 
-  assert.deepEqual(activeComponentLabels({ ...baseHints, skills: true, mcpServers: true, hooks: true }), ["Skills", "MCP", "Hooks"]);
-  assert.equal(sourceLabel({ kind: "marketplacePath", marketplace_id: "local-cursor", path: "Repo Tools" }), "local-cursor / Repo Tools");
-  assert.equal(variantLabel(variant("codex-plugins", "alpaca")), "alpaca");
-  assert.equal(homepageIconUrl("https://alpaca.markets/docs"), "https://www.google.com/s2/favicons?domain=alpaca.markets&sz=64");
-  assert.equal(homepageIconUrl("not a url"), undefined);
-  assert.equal(sourceLabel({ kind: "npm", package: "@example/plugin", version: "1.2.3" }), "@example/plugin@1.2.3");
-  assert.equal(riskLabel("startsProcess"), "Starts process");
+  expect(activeComponentLabels({ ...baseHints, skills: true, mcpServers: true, hooks: true })).toEqual(["Skills", "MCP", "Hooks"]);
+  expect(sourceLabel({ kind: "marketplacePath", marketplace_id: "local-cursor", path: "Repo Tools" })).toBe("local-cursor / Repo Tools");
+  expect(variantLabel(variant("codex-plugins", "alpaca"))).toBe("alpaca");
+  expect(homepageIconUrl("https://alpaca.markets/docs")).toBe("https://www.google.com/s2/favicons?domain=alpaca.markets&sz=64");
+  expect(homepageIconUrl("not a url")).toBe(undefined);
+  expect(sourceLabel({ kind: "npm", package: "@example/plugin", version: "1.2.3" })).toBe("@example/plugin@1.2.3");
+  expect(riskLabel("startsProcess")).toBe("Starts process");
 });
 
-test("marks baked-in default marketplaces as needing explicit enablement", async () => {
-  const { defaultSelectionForMarketplace, marketplaceIsActive, marketplaceNeedsEnable } = await loadMarketplaceModule();
+test("marks baked-in default marketplaces as needing explicit enablement", () => {
+  const { defaultSelectionForMarketplace, marketplaceIsActive, marketplaceNeedsEnable } = marketplaceModule;
   const bakedIn = {
     id: "codex-plugins",
     isDefault: true,
@@ -180,15 +159,15 @@ test("marks baked-in default marketplaces as needing explicit enablement", async
     state: "refreshed",
   };
 
-  assert.equal(defaultSelectionForMarketplace(bakedIn), "codex");
-  assert.equal(marketplaceIsActive(bakedIn), false);
-  assert.equal(marketplaceNeedsEnable(bakedIn), true);
-  assert.equal(marketplaceIsActive(refreshed), true);
-  assert.equal(marketplaceNeedsEnable(refreshed), false);
+  expect(defaultSelectionForMarketplace(bakedIn)).toBe("codex");
+  expect(marketplaceIsActive(bakedIn)).toBe(false);
+  expect(marketplaceNeedsEnable(bakedIn)).toBe(true);
+  expect(marketplaceIsActive(refreshed)).toBe(true);
+  expect(marketplaceNeedsEnable(refreshed)).toBe(false);
 });
 
-test("filters marketplace plugin variants by provider", async () => {
-  const { pluginForProvider, pluginVariantKey } = await loadMarketplaceModule();
+test("filters marketplace plugin variants by provider", () => {
+  const { pluginForProvider, pluginVariantKey } = marketplaceModule;
   const marketplaces = [
     marketplace("claude-plugins-official", "claude", true),
     marketplace("cursor-plugins", "cursor", true),
@@ -210,14 +189,14 @@ test("filters marketplace plugin variants by provider", async () => {
   const cursorPlugin = pluginForProvider(plugin, "cursor", marketplaces);
   const localPlugin = pluginForProvider(plugin, "local", marketplaces);
 
-  assert.deepEqual(cursorPlugin.variants.map(pluginVariantKey), ["cursor-plugins:repo-tools-cursor"]);
-  assert.equal(cursorPlugin.recommendedVariantKey, "cursor-plugins:repo-tools-cursor");
-  assert.deepEqual(cursorPlugin.installedVariants, ["cursor-plugins:repo-tools-cursor"]);
-  assert.deepEqual(localPlugin.variants.map(pluginVariantKey), ["local-dev:repo-tools-local"]);
+  expect(cursorPlugin.variants.map(pluginVariantKey)).toEqual(["cursor-plugins:repo-tools-cursor"]);
+  expect(cursorPlugin.recommendedVariantKey).toBe("cursor-plugins:repo-tools-cursor");
+  expect(cursorPlugin.installedVariants).toEqual(["cursor-plugins:repo-tools-cursor"]);
+  expect(localPlugin.variants.map(pluginVariantKey)).toEqual(["local-dev:repo-tools-local"]);
 });
 
-test("builds category options and filters plugins by selected categories", async () => {
-  const { categoryOptionsForPlugins, pluginMatchesCategories } = await loadMarketplaceModule();
+test("builds category options and filters plugins by selected categories", () => {
+  const { categoryOptionsForPlugins, pluginMatchesCategories } = marketplaceModule;
   const workflowPlugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -233,14 +212,14 @@ test("builds category options and filters plugins by selected categories", async
     installedVariants: [],
   };
 
-  assert.deepEqual(categoryOptionsForPlugins([workflowPlugin, dataPlugin]), ["data-tools", "workflow"]);
-  assert.equal(pluginMatchesCategories(workflowPlugin, []), true);
-  assert.equal(pluginMatchesCategories(workflowPlugin, ["workflow"]), true);
-  assert.equal(pluginMatchesCategories(workflowPlugin, ["data-tools"]), false);
+  expect(categoryOptionsForPlugins([workflowPlugin, dataPlugin])).toEqual(["data-tools", "workflow"]);
+  expect(pluginMatchesCategories(workflowPlugin, [])).toBe(true);
+  expect(pluginMatchesCategories(workflowPlugin, ["workflow"])).toBe(true);
+  expect(pluginMatchesCategories(workflowPlugin, ["data-tools"])).toBe(false);
 });
 
-test("builds marketplace lookup maps for plugin row derivation", async () => {
-  const { buildMarketplacePluginLookups, pluginVariantKey } = await loadMarketplaceModule();
+test("builds marketplace lookup maps for plugin row derivation", () => {
+  const { buildMarketplacePluginLookups, pluginVariantKey } = marketplaceModule;
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -260,31 +239,22 @@ test("builds marketplace lookup maps for plugin row derivation", async () => {
 
   const lookups = buildMarketplacePluginLookups([plugin], installed);
 
-  assert.deepEqual([...lookups.installedByVariantKey.keys()].sort(), [
+  expect([...lookups.installedByVariantKey.keys()].sort()).toEqual([
     "claude-plugins-official:repo-tools-claude",
     "cursor-plugins:repo-tools-cursor",
   ]);
-  assert.deepEqual(
-    lookups.installedByCanonicalSlug.get("repo-tools").map((record) => record.variantKey).sort(),
-    ["claude-plugins-official:repo-tools-claude", "cursor-plugins:repo-tools-cursor"],
-  );
-  assert.deepEqual(
-    [...lookups.marketplaceMatchByVariantKey.keys()].sort(),
-    plugin.variants.concat(plugin.relatedCandidates).map(pluginVariantKey).sort(),
-  );
-  assert.equal(
-    lookups.marketplaceMatchesByCanonicalSlug.get("repo-tools")[0].plugin.displayName,
-    "Repo Tools",
-  );
+  expect(lookups.installedByCanonicalSlug.get("repo-tools").map((record) => record.variantKey).sort()).toEqual(["claude-plugins-official:repo-tools-claude", "cursor-plugins:repo-tools-cursor"]);
+  expect([...lookups.marketplaceMatchByVariantKey.keys()].sort()).toEqual(plugin.variants.concat(plugin.relatedCandidates).map(pluginVariantKey).sort());
+  expect(lookups.marketplaceMatchesByCanonicalSlug.get("repo-tools")[0].plugin.displayName).toBe("Repo Tools");
 });
 
-test("derives installed matches and stable row keys from marketplace lookups", async () => {
+test("derives installed matches and stable row keys from marketplace lookups", () => {
   const {
     buildMarketplacePluginLookups,
     marketplacePluginForInstalled,
     pluginInstallStatusFromLookups,
     pluginSearchRowKey,
-  } = await loadMarketplaceModule();
+  } = marketplaceModule;
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
@@ -302,15 +272,15 @@ test("derives installed matches and stable row keys from marketplace lookups", a
   const match = marketplacePluginForInstalled(installed[0], lookups);
   const status = pluginInstallStatusFromLookups(plugin, plugin.variants[0], lookups);
 
-  assert.equal(match.variant.pluginId, "repo-tools-cursor");
-  assert.equal(status.pluginInstalled, true);
-  assert.equal(status.variantInstalled, true);
-  assert.equal(status.variantKey, "cursor-plugins:repo-tools-cursor");
-  assert.equal(pluginSearchRowKey(plugin), "repo-tools:cursor-plugins:repo-tools-cursor|local-dev:repo-tools-local");
+  expect(match.variant.pluginId).toBe("repo-tools-cursor");
+  expect(status.pluginInstalled).toBe(true);
+  expect(status.variantInstalled).toBe(true);
+  expect(status.variantKey).toBe("cursor-plugins:repo-tools-cursor");
+  expect(pluginSearchRowKey(plugin)).toBe("repo-tools:cursor-plugins:repo-tools-cursor|local-dev:repo-tools-local");
 });
 
-test("builds source code links for marketplace plugin variants", async () => {
-  const { sourceCodeUrl } = await loadMarketplaceModule();
+test("builds source code links for marketplace plugin variants", () => {
+  const { sourceCodeUrl } = marketplaceModule;
   const marketplaces = [
     {
       id: "codex-plugins",
@@ -323,16 +293,10 @@ test("builds source code links for marketplace plugin variants", async () => {
     },
   ];
 
-  assert.equal(
-    sourceCodeUrl({ kind: "marketplacePath", marketplace_id: "codex-plugins", path: "browser" }, marketplaces),
-    "https://github.com/openai/plugins/tree/main/plugins/browser",
-  );
-  assert.equal(
-    sourceCodeUrl({ kind: "git", url: "https://github.com/example/tools.git", path: "plugins/lint", refName: "stable" }, []),
-    "https://github.com/example/tools/tree/stable/plugins/lint",
-  );
-  assert.equal(sourceCodeUrl({ kind: "npm", package: "@example/plugin", version: "1.2.3" }, []), "https://www.npmjs.com/package/%40example%2Fplugin");
-  assert.equal(sourceCodeUrl({ kind: "git", url: "git@example.com:internal/tools.git", path: "plugins/lint" }, []), undefined);
+  expect(sourceCodeUrl({ kind: "marketplacePath", marketplace_id: "codex-plugins", path: "browser" }, marketplaces)).toBe("https://github.com/openai/plugins/tree/main/plugins/browser");
+  expect(sourceCodeUrl({ kind: "git", url: "https://github.com/example/tools.git", path: "plugins/lint", refName: "stable" }, [])).toBe("https://github.com/example/tools/tree/stable/plugins/lint");
+  expect(sourceCodeUrl({ kind: "npm", package: "@example/plugin", version: "1.2.3" }, [])).toBe("https://www.npmjs.com/package/%40example%2Fplugin");
+  expect(sourceCodeUrl({ kind: "git", url: "git@example.com:internal/tools.git", path: "plugins/lint" }, [])).toBe(undefined);
 });
 
 function variant(marketplaceId, pluginId, overrides = {}) {
