@@ -2,31 +2,27 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { roderIpc } from "@/lib/roder-ipc";
 import {
+  applyThreadItemEvent,
   activeTurnIdForThread,
-  assistantMessageId,
-  messagesFromRoderItem,
-  messagesFromThread,
   markThreadStatus,
-  normalizeAssistantPhase,
   sortThreadsByUpdatedAt,
-  upsertConversationMessage,
   upsertThread,
 } from "@/lib/roder-thread";
-import { reducePendingWaitRequests, setWaitRequestResolving, shouldDisplayStartedItem } from "@/lib/roder-wait-requests";
+import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-wait-requests";
 import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/roder-models";
 import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, requireAbsoluteCwd, upsertWorkspaceRecent } from "@/lib/roder-workspaces";
 import type {
   ApprovalWaitRequest,
-  ConversationMessage,
   DesktopAttachment,
   PendingWaitRequestsByThread,
   PolicyMode,
   PlanExitWaitRequest,
   RoderModel,
   RoderNotification,
-  RoderItem,
   RoderStatus,
   RoderThread,
+  RoderThreadItemEvent,
+  RoderTurn,
   NavigationEntry,
   ReasoningEffort,
   SystemAppearance,
@@ -39,7 +35,6 @@ type RoderStore = {
   stderr: string[];
   threads: RoderThread[];
   threadDetails: Record<string, RoderThread>;
-  messagesByThread: Record<string, ConversationMessage[]>;
   threadControlsByThread: Record<string, ThreadControlState>;
   activeThreadId: string;
   backStack: NavigationEntry[];
@@ -132,16 +127,118 @@ function firstThreadId(threads: RoderThread[], fallback: string): string {
   return threads[0]?.id ?? fallback;
 }
 
-function activeMessages(messagesByThread: Record<string, ConversationMessage[]>, threadId: string): ConversationMessage[] {
-  return messagesByThread[threadId] ?? [];
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 function notificationParams(notification: RoderNotification): Record<string, unknown> {
   return isRecord(notification.params) ? notification.params : {};
+}
+
+function isItemEventNotification(method: string): boolean {
+  return method === "item/started"
+    || method === "item/completed"
+    || method === "item/agentMessage/delta"
+    || method === "item/reasoning/textDelta"
+    || method === "item/reasoning/summaryPartAdded"
+    || method === "item/reasoning/summaryTextDelta";
+}
+
+function threadItemEventParam(params: Record<string, unknown>): RoderThreadItemEvent | null {
+  if (
+    typeof params.seq !== "number"
+    || typeof params.eventId !== "string"
+    || typeof params.threadId !== "string"
+    || typeof params.turnId !== "string"
+    || typeof params.timestamp !== "string"
+    || !isRecord(params.event)
+    || typeof params.event.type !== "string"
+  ) {
+    return null;
+  }
+  return params as RoderThreadItemEvent;
+}
+
+function threadForState(state: RoderStore, threadId: string): RoderThread | undefined {
+  return state.threadDetails[threadId] ?? state.threads.find((thread) => thread.id === threadId);
+}
+
+function upsertTurn(thread: RoderThread | undefined, incoming: RoderTurn): RoderThread | undefined {
+  if (!thread) {
+    return thread;
+  }
+  const turns = thread.turns ? [...thread.turns] : [];
+  const index = turns.findIndex((turn) => turn.id === incoming.id);
+  if (index === -1) {
+    turns.push(incoming);
+  } else {
+    turns[index] = { ...turns[index], ...incoming, items: incoming.items.length ? incoming.items : turns[index].items };
+  }
+  return { ...thread, turns };
+}
+
+function completeTurn(thread: RoderThread | undefined, turnId: string, turnPatch: Record<string, unknown>): RoderThread | undefined {
+  if (!thread) {
+    return thread;
+  }
+  const turns = thread.turns ? [...thread.turns] : [];
+  const index = turns.findIndex((turn) => turn.id === turnId);
+  const status = turnStatusParam(turnPatch.status);
+  const error = turnErrorParam(turnPatch.error);
+  const completedAt = typeof turnPatch.completedAt === "number" ? turnPatch.completedAt : null;
+  const durationMs = typeof turnPatch.durationMs === "number" ? turnPatch.durationMs : null;
+  const nextStatus = status === "failed" ? "failed" : "completed";
+  const existing = index === -1
+    ? {
+        id: turnId,
+        items: [],
+        itemsView: "default",
+        status: nextStatus,
+        error,
+        completedAt,
+        durationMs,
+      }
+    : turns[index];
+  const nextTurn: RoderTurn = {
+    ...existing,
+    status: nextStatus,
+    error,
+    completedAt,
+    durationMs,
+    items: existing.items.map((item) => item.status === "inProgress" ? { ...item, status: nextStatus } : item),
+  };
+  if (index === -1) {
+    turns.push(nextTurn);
+  } else {
+    turns[index] = nextTurn;
+  }
+  return { ...thread, turns };
+}
+
+function turnStatusParam(value: unknown): RoderTurn["status"] {
+  return value === "failed" ? "failed" : value === "inProgress" ? "inProgress" : "completed";
+}
+
+function turnErrorParam(value: unknown): RoderTurn["error"] {
+  if (isRecord(value) && typeof value.message === "string") {
+    return { message: value.message };
+  }
+  if (typeof value === "string" && value.trim()) {
+    return { message: value };
+  }
+  return null;
+}
+
+function markThreadDetailStatus(
+  threadDetails: Record<string, RoderThread>,
+  threadId: string,
+  status: RoderThread["status"],
+): Record<string, RoderThread> {
+  const thread = threadDetails[threadId];
+  if (!thread) {
+    return threadDetails;
+  }
+  return { ...threadDetails, [threadId]: { ...thread, status } };
 }
 
 export const useRoderStore = create<RoderStore>()(
@@ -151,7 +248,6 @@ export const useRoderStore = create<RoderStore>()(
       stderr: [],
       threads: [],
       threadDetails: {},
-      messagesByThread: {},
       threadControlsByThread: {},
       activeThreadId: "",
       backStack: [],
@@ -238,7 +334,7 @@ export const useRoderStore = create<RoderStore>()(
 
       selectThread: async (threadId, options = { pushHistory: true }) => {
         const current = get();
-        if (threadId === current.activeThreadId && current.messagesByThread[threadId]) {
+        if (threadId === current.activeThreadId && current.threadDetails[threadId]) {
           return;
         }
 
@@ -263,7 +359,6 @@ export const useRoderStore = create<RoderStore>()(
           const thread = normalizeThreadCwd(result.thread, get().status.cwd);
           set((state) => ({
             threadDetails: { ...state.threadDetails, [threadId]: thread },
-            messagesByThread: { ...state.messagesByThread, [threadId]: messagesFromThread(thread) },
             threads: upsertThread(state.threads, thread),
             selectedWorkspaceCwd: thread.cwd,
             selectedModel: state.threadControlsByThread[threadId]?.model || thread.model || state.defaultModel,
@@ -290,13 +385,11 @@ export const useRoderStore = create<RoderStore>()(
             : current.activeThreadId;
           set((state) => {
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
-            const { [threadId]: _archivedMessages, ...messagesByThread } = state.messagesByThread;
             return {
-            threads: state.threads.filter((thread) => thread.id !== threadId),
-            threadDetails,
-            messagesByThread,
-            threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
-            activeThreadId: nextActiveThreadId,
+              threads: state.threads.filter((thread) => thread.id !== threadId),
+              threadDetails,
+              threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
+              activeThreadId: nextActiveThreadId,
               backStack: state.backStack.filter((entry) => entry.threadId !== threadId),
               forwardStack: state.forwardStack.filter((entry) => entry.threadId !== threadId),
             };
@@ -367,7 +460,7 @@ export const useRoderStore = create<RoderStore>()(
         }
 
         let threadId = get().activeThreadId;
-        const activeThread = get().threads.find((thread) => thread.id === threadId);
+        const activeThread = get().threadDetails[threadId] ?? get().threads.find((thread) => thread.id === threadId);
         const activeTurnId = activeTurnIdForThread(activeThread);
         const steering = threadId !== "" && activeTurnId !== "";
         let markedTurnStarting = false;
@@ -392,6 +485,7 @@ export const useRoderStore = create<RoderStore>()(
           threadId = thread.id;
           set((state) => ({
             threads: upsertThread(state.threads, thread),
+            threadDetails: { ...state.threadDetails, [threadId]: thread },
             activeThreadId: threadId,
             selectedWorkspaceCwd: thread.cwd,
             selectedModel: thread.model || result.model || selectedModel,
@@ -406,16 +500,6 @@ export const useRoderStore = create<RoderStore>()(
           }));
           }
 
-          set((state) => ({
-            messagesByThread: {
-              ...state.messagesByThread,
-              [threadId]: [
-                ...activeMessages(state.messagesByThread, threadId),
-                { id: crypto.randomUUID(), threadId, role: "user", text: userMessageText(text, attachments), status: "complete" },
-              ],
-            },
-          }));
-
           if (steering) {
             await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
             return;
@@ -424,6 +508,7 @@ export const useRoderStore = create<RoderStore>()(
           markedTurnStarting = true;
           set((state) => ({
             threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: null, activeFlags: [] }),
+            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, { type: "running", activeTurnId: null, activeFlags: [] }),
           }));
           const turnState = get();
           const turnModel = effectiveSelectedModel(turnState.models, turnState.visibleModelIds, turnState.selectedModel);
@@ -437,6 +522,7 @@ export const useRoderStore = create<RoderStore>()(
           if (started.turnId) {
             set((state) => ({
               threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: started.turnId, activeFlags: [] }),
+              threadDetails: markThreadDetailStatus(state.threadDetails, threadId, { type: "running", activeTurnId: started.turnId, activeFlags: [] }),
             }));
           }
         } catch (error) {
@@ -446,6 +532,9 @@ export const useRoderStore = create<RoderStore>()(
             threads: markedTurnStarting
               ? markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
               : state.threads,
+            threadDetails: markedTurnStarting
+              ? markThreadDetailStatus(state.threadDetails, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
+              : state.threadDetails,
           }));
         }
       },
@@ -654,6 +743,7 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
   const thread = normalizeThreadCwd(result.thread, get().status.cwd);
   set((state) => ({
     threads: upsertThread(state.threads, thread),
+    threadDetails: { ...state.threadDetails, [thread.id]: thread },
     activeThreadId: thread.id,
     selectedWorkspaceCwd: thread.cwd,
     selectedModel: thread.model || result.model || selectedModel,
@@ -665,7 +755,6 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
       policyMode: state.defaultPolicyMode,
     }),
     workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-    messagesByThread: { ...state.messagesByThread, [thread.id]: [] },
     backStack: state.activeThreadId ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80) : state.backStack,
     forwardStack: [],
     busy: false,
@@ -682,31 +771,10 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     return {
       ...waitPatch,
       threads: upsertThread(state.threads, thread),
+      threadDetails: { ...state.threadDetails, [thread.id]: state.threadDetails[thread.id] ?? thread },
       activeThreadId: state.activeThreadId || thread.id,
       selectedWorkspaceCwd: thread.cwd,
       workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-      messagesByThread: { ...state.messagesByThread, [thread.id]: state.messagesByThread[thread.id] ?? [] },
-    };
-  }
-
-  if (notification.method === "item/started") {
-    const item = isRecord(params.item) ? params.item : {};
-    if (!shouldDisplayStartedItem(item)) {
-      return waitPatch;
-    }
-    const threadId = String(params.threadId ?? state.activeThreadId);
-    const [message] = messagesFromRoderItem(threadId, String(params.turnId ?? ""), item as RoderItem, "inProgress");
-    if (!message || (message.role === "assistant" && !message.text)) {
-      return waitPatch;
-    }
-    const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
-    upsertConversationMessage(nextMessages, message);
-    return {
-      ...waitPatch,
-      messagesByThread: {
-        ...state.messagesByThread,
-        [threadId]: nextMessages,
-      },
     };
   }
 
@@ -714,61 +782,37 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const threadId = String(params.threadId ?? state.activeThreadId);
     const turn = isRecord(params.turn) ? params.turn : {};
     const turnId = String(turn.id ?? "");
+    const nextThread = upsertTurn(threadForState(state, threadId), {
+      id: turnId,
+      items: [],
+      itemsView: String(turn.itemsView ?? "default"),
+      status: "inProgress",
+      error: null,
+      startedAt: typeof turn.startedAt === "number" ? turn.startedAt : null,
+      completedAt: null,
+      durationMs: null,
+    });
     return {
       ...waitPatch,
       activeThreadId: state.activeThreadId || threadId,
       threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: turnId || null, activeFlags: [] }),
+      threadDetails: nextThread ? { ...state.threadDetails, [threadId]: nextThread } : state.threadDetails,
       busy: threadId === state.activeThreadId ? true : state.busy,
     };
   }
 
-  if (notification.method === "item/agentMessage/delta") {
-    const threadId = String(params.threadId ?? state.activeThreadId);
-    const itemId = String(params.itemId ?? "");
-    const delta = String(params.delta ?? "");
-    const phase = normalizeAssistantPhase(typeof params.phase === "string" ? params.phase : undefined);
-    const messageId = assistantMessageId(itemId, phase);
-    const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
-    const index = nextMessages.findIndex((message) => message.id === messageId);
-    if (index === -1) {
-      nextMessages.push({
-        id: messageId,
-        threadId,
-        turnId: String(params.turnId ?? ""),
-        role: "assistant",
-        text: delta,
-        phase,
-        status: "streaming",
-      });
-    } else {
-      nextMessages[index] = { ...nextMessages[index], text: nextMessages[index].text + delta, status: "streaming", phase };
-    }
-    return {
-      ...waitPatch,
-      messagesByThread: {
-        ...state.messagesByThread,
-        [threadId]: nextMessages,
-      },
-    };
-  }
-
-  if (notification.method === "item/completed") {
-    const item = isRecord(params.item) ? params.item : {};
-    const threadId = String(params.threadId ?? state.activeThreadId);
-    const messages = messagesFromRoderItem(threadId, String(params.turnId ?? ""), item as RoderItem, "completed");
-    if (messages.length === 0) {
+  if (isItemEventNotification(notification.method)) {
+    const itemEvent = threadItemEventParam(params);
+    if (!itemEvent) {
       return waitPatch;
     }
-    const nextMessages = [...activeMessages(state.messagesByThread, threadId)];
-    for (const message of messages) {
-      upsertConversationMessage(nextMessages, message);
+    const thread = applyThreadItemEvent(threadForState(state, itemEvent.threadId), itemEvent);
+    if (!thread) {
+      return waitPatch;
     }
     return {
       ...waitPatch,
-      messagesByThread: {
-        ...state.messagesByThread,
-        [threadId]: nextMessages,
-      },
+      threadDetails: { ...state.threadDetails, [itemEvent.threadId]: thread },
     };
   }
 
@@ -776,19 +820,10 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const turn = isRecord(params.turn) ? params.turn : {};
     const threadId = String(params.threadId ?? state.activeThreadId);
     const turnId = String(turn.id ?? "");
-    const nextMessages = activeMessages(state.messagesByThread, threadId).map((message) =>
-      message.status === "streaming" ? { ...message, status: "complete" as const } : message,
-    );
-    const failedMessage = turnFailureMessage(threadId, turnId, turn);
-    if (failedMessage) {
-      upsertConversationMessage(nextMessages, failedMessage);
-    }
+    const nextThread = completeTurn(threadForState(state, threadId), turnId, turn);
     return {
       ...waitPatch,
-      messagesByThread: {
-        ...state.messagesByThread,
-        [threadId]: nextMessages,
-      },
+      threadDetails: nextThread ? { ...state.threadDetails, [threadId]: nextThread } : state.threadDetails,
       threads: markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] }),
       busy: threadId === state.activeThreadId ? false : state.busy,
     };
@@ -800,6 +835,7 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     return {
       ...waitPatch,
       threads: markThreadStatus(state.threads, threadId, status),
+      threadDetails: markThreadDetailStatus(state.threadDetails, threadId, status),
     };
   }
 
@@ -816,25 +852,4 @@ function markWaitRequestResolving(
   set((state) => ({
     pendingWaitRequestsByThread: setWaitRequestResolving(state.pendingWaitRequestsByThread, threadId, requestId, resolving, error),
   }));
-}
-
-function turnFailureMessage(threadId: string, turnId: string, turn: Record<string, unknown>): ConversationMessage | null {
-  if (turn.status !== "failed") {
-    return null;
-  }
-  const error = isRecord(turn.error) ? turn.error : {};
-  const message = typeof error.message === "string" && error.message.trim() ? error.message.trim() : "The agent turn failed.";
-  return {
-    id: `turn-error:${turnId || threadId}`,
-    threadId,
-    turnId,
-    role: "system",
-    text: message,
-    status: "failed",
-  };
-}
-
-function userMessageText(prompt: string, attachments: DesktopAttachment[]): string {
-  const attachmentText = attachments.length > 0 ? `Attached ${attachments.length} file${attachments.length === 1 ? "" : "s"}: ${attachments.map((attachment) => attachment.name).join(", ")}` : "";
-  return [prompt, attachmentText].filter(Boolean).join("\n\n");
 }

@@ -11,466 +11,149 @@ const roderThreadModule = loadTypescriptModule("../src/lib/roder-thread.ts", (id
   }
   throw new Error(`Unexpected import: ${id}`);
 });
-const { messagesFromTurn } = roderThreadModule.exports;
+const { messagesFromThread, messagesFromTurn } = roderThreadModule.exports;
 
-test("read-file tool calls keep a compact completed title from display payload", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-tool-started",
-        type: "toolCall",
-        payload: {
-          path: "docs/README.md",
-          tool: "read_file",
-          tool_call_id: "tool-read-1",
-        },
-      },
-      {
-        id: "item-tool-completed",
-        text: "# Full file contents\n\nLots of text.",
-        type: "toolMessage",
-        payload: {
-          path: "docs/README.md",
-          tool_call_id: "tool-read-1",
-        },
-      },
+test("typed reasoning items hydrate content as assistant thinking messages", () => {
+  const messages = messagesFromTurn("thread-1", turn([
+    {
+      id: "turn-1-agent-reasoning",
+      type: "reasoning",
+      summary: ["Inspecting project"],
+      content: ["Checking the saved context."],
+    },
+  ], "completed"));
+
+  assert.deepEqual(plain(messages), [
+    {
+      id: "turn-1-agent-reasoning",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      role: "assistant",
+      text: "Checking the saved context.",
+      phase: "reasoning",
+      status: "complete",
+    },
+  ]);
+});
+
+test("thread snapshots derive messages from canonical typed items only", () => {
+  const messages = messagesFromThread({
+    id: "thread-1",
+    turns: [
+      turn([
+        { id: "turn-1-user", text: "can you implement a new design?", type: "userMessage" },
+        tool("tool-read-1", "read_file", { path: "app.css" }, "completed", "# app css"),
+        { id: "turn-1-agent-reasoning", type: "reasoning", content: ["Inspecting styles"], status: "inProgress" },
+        { id: "turn-1-agent-final_answer", type: "agentMessage", text: "Done", phase: "final_answer", status: "completed" },
+      ], "inProgress"),
     ],
-    itemsView: "default",
-    status: "completed",
+    status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
   });
+
+  assert.deepEqual(plain(messages.map(({ id, role, text, phase, status }) => ({ id, role, text, phase, status }))), [
+    { id: "turn-1-user", role: "user", text: "can you implement a new design?", status: "complete" },
+    { id: "tool:tool-read-1", role: "tool", text: "Read app.css", status: "complete" },
+    { id: "turn-1-agent-reasoning", role: "assistant", text: "Inspecting styles", phase: "reasoning", status: "streaming" },
+    { id: "turn-1-agent-final_answer", role: "assistant", text: "Done", phase: "final_answer", status: "complete" },
+  ]);
+});
+
+test("typed tool execution items summarize input and output", () => {
+  const messages = messagesFromTurn("thread-1", turn([
+    tool("tool-list-1", "list_files", { path: "." }, "completed", "src\nCargo.toml"),
+  ], "completed"));
 
   assert.equal(messages.length, 1);
   assert.equal(messages[0].role, "tool");
-  assert.equal(messages[0].toolName, "read_file");
-  assert.equal(messages[0].toolSubject, "README.md");
-  assert.equal(messages[0].toolSummary, "Read README.md");
-  assert.equal(messages[0].text, "Read README.md");
+  assert.equal(messages[0].toolName, "list_files");
+  assert.equal(messages[0].toolSummary, "Listed files in .");
+  assert.equal(messages[0].toolOutput, "src\nCargo.toml");
 });
 
-test("read-file tool calls use filenames from top-level payload fields", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-tool-completed",
-        text: "read file",
-        type: "tool.completed",
-        payload: {
-          path: "src/components/transcript.tsx",
-          tool: "read_file",
-          tool_call_id: "tool-read-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].toolSummary, "Read transcript.tsx");
-});
-
-test("common tool calls are summarized like compact transcript activity", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-list",
-        type: "tool.completed",
-        payload: {
-          path: ".",
-          tool: "list_files",
-          tool_call_id: "tool-list-1",
-        },
-      },
-      {
-        id: "item-search",
-        type: "tool.completed",
-        payload: {
-          query: "ToolTimelineItem",
-          path: "src/components",
-          tool: "search_files",
-          tool_call_id: "tool-search-1",
-        },
-      },
-      {
-        id: "item-grep-result-data",
-        type: "tool.completed",
-        payload: {
-          query: "ToolTimelineItem",
-          path: "test",
-          tool: "grep",
-          tool_call_id: "tool-grep-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
+test("common typed tool executions are summarized as compact activity", () => {
+  const messages = messagesFromTurn("thread-1", turn([
+    tool("tool-list-1", "list_files", { path: "." }),
+    tool("tool-search-1", "search_files", { query: "ToolTimelineItem", path: "src/components" }),
+    tool("tool-glob-1", "glob", { pattern: "src/**/*.tsx", path: "." }),
+    tool("tool-write-1", "write_file", { path: "src/lib/roder-thread.ts" }),
+    tool("tool-edit-1", "edit", { path: "src/components/transcript.tsx" }),
+  ], "completed"));
 
   assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
     "Listed files in .",
-    'Searched for "ToolTimelineItem" in src/components',
-    'Searched for "ToolTimelineItem" in test',
-  ]);
-  assert.deepEqual(plain(messages.map((message) => message.toolSubject)), [
-    ".",
-    "ToolTimelineItem in src/components",
-    "ToolTimelineItem in test",
-  ]);
-});
-
-test("list-files tool calls include the listed directory", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-list-input",
-        type: "tool.completed",
-        payload: {
-          path: "src/components",
-          tool: "list_files",
-          tool_call_id: "tool-list-1",
-        },
-      },
-      {
-        id: "item-list-reload",
-        type: "tool.completed",
-        payload: {
-          path: "docs",
-          tool: "list_files",
-          tool_call_id: "tool-list-2",
-        },
-      },
-      {
-        id: "item-list-result-data",
-        type: "tool.completed",
-        payload: {
-          path: ".",
-          tool: "list_files",
-          tool_call_id: "tool-list-3",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
-    "Listed files in src/components",
-    "Listed files in docs",
-    "Listed files in .",
-  ]);
-});
-
-test("skill tool calls are summarized as compact read activity", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-skill",
-        type: "tool.completed",
-        payload: {
-          displayName: "ai-sdk",
-          name: "ai-sdk",
-          tool: "read_skill",
-          tool_call_id: "tool-skill-1",
-        },
-      },
-      {
-        id: "item-skill-file",
-        type: "tool.completed",
-        payload: {
-          name: "vercel-react-best-practices",
-          path: "rules/async-parallel.md",
-          tool: "read_skill_file",
-          tool_call_id: "tool-skill-file-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
-    "Read ai-sdk Skill",
-    "Read vercel-react-best-practices async-parallel.md",
-  ]);
-});
-
-test("goal and glob tool calls are summarized as plain activity", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-goal",
-        text: "Goal active: Understand the app.",
-        type: "tool.completed",
-        payload: {
-          tool: "create_goal",
-          tool_call_id: "tool-goal-1",
-        },
-      },
-      {
-        id: "item-glob",
-        type: "tool.completed",
-        payload: {
-          pattern: "src/**/*.tsx",
-          path: ".",
-          tool: "glob",
-          tool_call_id: "tool-glob-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
-    "Goal active: Understand the app.",
-    'Searched for "src/**/*.tsx" in .',
-  ]);
-});
-
-test("write and edit tools use display payload paths", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-write",
-        type: "tool.completed",
-        payload: {
-          path: "src/lib/roder-thread.ts",
-          tool: "write_file",
-          tool_call_id: "tool-write-1",
-        },
-      },
-      {
-        id: "item-edit",
-        type: "tool.completed",
-        payload: {
-          path: "src/components/transcript.tsx",
-          tool: "edit",
-          tool_call_id: "tool-edit-1",
-        },
-      },
-      {
-        id: "item-multi-edit",
-        type: "tool.started",
-        payload: {
-          path: "src/style.css",
-          tool: "multi_edit",
-          tool_call_id: "tool-edit-2",
-        },
-      },
-      {
-        id: "item-patch",
-        type: "tool.completed",
-        payload: {
-          tool: "apply_patch",
-          tool_call_id: "tool-patch-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
+    "Searched for \"ToolTimelineItem\" in src/components",
+    "Searched for \"src/**/*.tsx\" in .",
     "Wrote roder-thread.ts",
     "Edited transcript.tsx",
-    "Editing style.css",
-    "Applied patch",
   ]);
 });
 
-test("shell tools summarize the command and keep input and output details", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-shell-started",
-        type: "tool.started",
-        payload: {
-          command: "pwd",
-          tool: "shell",
-          tool_call_id: "tool-shell-1",
-        },
-      },
-      {
-        id: "item-shell-completed",
-        text: "/Users/jonathan/project\n",
-        type: "tool.completed",
-        payload: {
-          command: "pwd",
-          tool: "shell",
-          tool_call_id: "tool-shell-1",
-        },
-      },
-      {
-        id: "item-exec-started",
-        type: "tool.started",
-        payload: {
-          cmd: "pnpm test",
-          tool: "exec_command",
-          tool_call_id: "tool-exec-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.equal(messages.length, 2);
-  assert.equal(messages[0].toolSummary, "Ran pwd");
-  assert.equal(messages[0].text, "Ran pwd");
-  assert.equal(messages[0].toolInput, "pwd");
-  assert.equal(messages[0].toolOutput, "/Users/jonathan/project\n");
-  assert.equal(messages[0].toolSubject, "pwd");
-  assert.equal(messages[1].toolSummary, "Running pnpm test");
-  assert.equal(messages[1].toolInput, "pnpm test");
-  assert.equal(messages[1].toolSubject, "pnpm test");
-});
-
-test("shell tools stay hidden before the command arrives", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-exec-started",
-        type: "tool.started",
-        payload: {
-          tool: "exec_command",
-          tool_call_id: "tool-exec-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "running",
-  });
-
-  assert.equal(messages.length, 0);
-});
-
-test("completed generic shell results keep the running command summary", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-shell-started",
-        type: "tool.started",
-        payload: {
-          command: "git status",
-          tool: "shell",
-          tool_call_id: "tool-shell-1",
-        },
-      },
-      {
-        id: "item-shell-result",
-        text: "On branch main\nStatus: completed\nWall time: 1.002 seconds\n",
-        type: "toolMessage",
-        payload: {
-          tool_call_id: "tool-shell-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
+test("shell tools summarize the command and keep cleaned output details", () => {
+  const messages = messagesFromTurn("thread-1", turn([
+    tool(
+      "tool-shell-1",
+      "shell",
+      { command: "pnpm test" },
+      "completed",
+      "exit_code=0\noutput_bytes=12\nall tests passed",
+    ),
+  ], "completed"));
 
   assert.equal(messages.length, 1);
-  assert.equal(messages[0].toolName, "shell");
-  assert.equal(messages[0].toolSummary, "Ran git status");
-  assert.equal(messages[0].toolInput, "git status");
-  assert.equal(messages[0].toolOutput, "On branch main\n");
+  assert.equal(messages[0].toolSummary, "Ran pnpm test");
+  assert.equal(messages[0].toolInput, "pnpm test");
+  assert.equal(messages[0].toolOutput, "all tests passed");
 });
 
-test("shell tool output hides command runner metadata", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-shell-started",
-        type: "tool.started",
-        payload: {
-          command: "pwd",
-          tool: "shell",
-          tool_call_id: "tool-shell-1",
-        },
-      },
-      {
-        id: "item-shell-result",
-        text: "Exit code: 0\nWall time: 0.060 seconds\nOutput:\n/Users/jonathandavies/Developer/gode/gode-desktop\n",
-        type: "toolMessage",
-        payload: {
-          tool_call_id: "tool-shell-1",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
-
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].toolOutput, "/Users/jonathandavies/Developer/gode/gode-desktop\n");
-});
-
-test("failed tool calls keep contract display context", () => {
-  const messages = messagesFromTurn("thread-1", {
-    id: "turn-1",
-    items: [
-      {
-        id: "item-read-failed",
-        status: "failed",
-        text: "path does not exist",
-        type: "toolMessage",
-        toolName: "read_file",
-        toolCallId: "tool-read-1",
-        payload: {
-          path: "src/missing.ts",
-        },
-      },
-      {
-        id: "item-search-failed",
-        status: "failed",
-        text: "search failed",
-        type: "toolMessage",
-        toolName: "grep",
-        toolCallId: "tool-grep-1",
-        payload: {
-          query: "needle",
-          path: "src",
-        },
-      },
-      {
-        id: "item-write-failed",
-        status: "failed",
-        text: "permission denied",
-        type: "toolMessage",
-        toolName: "write_file",
-        toolCallId: "tool-write-1",
-        payload: {
-          path: "src/protected.ts",
-        },
-      },
-    ],
-    itemsView: "default",
-    status: "completed",
-  });
+test("failed typed tool executions keep display context", () => {
+  const messages = messagesFromTurn("thread-1", turn([
+    tool("tool-read-1", "read_file", { path: "missing.ts" }, "failed", undefined, "not found"),
+    tool("tool-search-1", "search_files", { query: "needle", path: "src" }, "failed", undefined, "no matches"),
+    tool("tool-write-1", "write_file", { path: "protected.ts" }, "failed", undefined, "permission denied"),
+  ], "completed"));
 
   assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
     "Failed to read missing.ts",
-    'Failed to search for "needle" in src',
+    "Failed to search for \"needle\" in src",
     "Failed to write protected.ts",
   ]);
 });
+
+test("shell tools stay hidden before the command arrives", () => {
+  const messages = messagesFromTurn("thread-1", turn([
+    tool("tool-shell-1", "shell", undefined, "inProgress"),
+  ], "inProgress"));
+
+  assert.deepEqual(plain(messages), []);
+});
+
+function turn(items, status = "completed") {
+  return {
+    id: "turn-1",
+    items,
+    itemsView: "default",
+    status,
+  };
+}
+
+function tool(id, toolName, input, status = "completed", output, error) {
+  return {
+    id,
+    type: "toolExecution",
+    toolName,
+    toolCallId: id,
+    status,
+    input,
+    output,
+    error,
+  };
+}
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function loadTypescriptModule(path, requireFn = () => ({})) {
+function loadTypescriptModule(path, resolver = () => ({})) {
   const source = readFileSync(new URL(path, import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
@@ -479,6 +162,10 @@ function loadTypescriptModule(path, requireFn = () => ({})) {
     },
   }).outputText;
   const module = { exports: {} };
-  new Script(compiled).runInNewContext({ exports: module.exports, module, require: requireFn });
+  new Script(compiled).runInNewContext({
+    exports: module.exports,
+    module,
+    require: resolver,
+  });
   return module;
 }

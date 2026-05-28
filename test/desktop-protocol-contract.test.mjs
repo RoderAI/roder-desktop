@@ -49,10 +49,11 @@ test("desktop code and docs do not use legacy session protocol methods", () => {
   }
 });
 
-test("desktop store turns failed turn completions into visible failed system messages", () => {
-  assert.match(storeSource, /turnFailureMessage/);
-  assert.match(storeSource, /role:\s*"system"/);
-  assert.match(storeSource, /status:\s*"failed"/);
+test("desktop derives failed turn completions as visible failed system messages", () => {
+  const threadSource = readFileSync(new URL("../src/lib/roder-thread.ts", import.meta.url), "utf8");
+  assert.match(threadSource, /turn\.error\?\.message/);
+  assert.match(threadSource, /role:\s*"system"/);
+  assert.match(threadSource, /status:\s*"failed"/);
 });
 
 test("desktop selected controls are sent with turns instead of persisted as defaults", () => {
