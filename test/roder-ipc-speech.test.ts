@@ -1,29 +1,15 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { Script } from "node:vm";
-import { test } from "node:test";
-import ts from "typescript";
+import { expect, test, vi } from "vitest";
 
-const source = readFileSync(new URL("../src/lib/roder-ipc.ts", import.meta.url), "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2023,
-  },
-}).outputText;
-
-function loadRoderIpc(request) {
-  const module = { exports: {} };
-  new Script(compiled).runInNewContext({
-    exports: module.exports,
-    module,
-    window: {
-      roderDesktop: {
-        request,
-      },
+async function loadRoderIpc(request) {
+  vi.resetModules();
+  globalThis.window = {
+    roderDesktop: {
+      request,
+      onNotification: () => () => undefined,
+      onStderr: () => () => undefined,
     },
-  });
-  return module.exports.roderIpc;
+  };
+  return (await import("../src/lib/roder-ipc")).roderIpc;
 }
 
 test("listSpeechProviders sends the speech/providers/list request to the app-server", async () => {
@@ -31,15 +17,15 @@ test("listSpeechProviders sends the speech/providers/list request to the app-ser
   const mockProviders = [
     { id: "openai-speech", name: "OpenAI Speech", recommended: true },
   ];
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { providers: mockProviders };
   });
 
   const result = await roderIpc.listSpeechProviders();
 
-  assert.deepEqual(result, { providers: mockProviders });
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(result).toEqual({ providers: mockProviders });
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "speech/providers/list",
       params: {},
@@ -55,7 +41,7 @@ test("transcribeSpeech sends the speech/transcribe request with correct paramete
     text: "Hello world",
     segments: [],
   };
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return mockResult;
   });
@@ -74,8 +60,8 @@ test("transcribeSpeech sends the speech/transcribe request with correct paramete
 
   const result = await roderIpc.transcribeSpeech(params);
 
-  assert.deepEqual(result, mockResult);
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(result).toEqual(mockResult);
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "speech/transcribe",
       params,

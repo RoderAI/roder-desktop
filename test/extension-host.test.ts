@@ -1,54 +1,9 @@
-import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { test } from "node:test";
-import ts from "typescript";
-
-async function loadExtensionModules() {
-  const directory = testModuleTemp("roder-extension-host-");
-  writeTranspiledModule("../electron/extensions/manifest.ts", join(directory, "manifest.mjs"));
-  writeTranspiledModule("../electron/extensions/package-manager.ts", join(directory, "package-manager.mjs"), {
-    "./manifest": "./manifest.mjs",
-  });
-  writeTranspiledModule("../electron/extensions/catalog.ts", join(directory, "catalog.mjs"), {
-    "./manifest": "./manifest.mjs",
-    "./package-manager": "./package-manager.mjs",
-  });
-  writeTranspiledModule("../electron/extensions/extension-host-runner.ts", join(directory, "extension-host-runner.mjs"));
-  writeTranspiledModule("../electron/extensions/extension-host.ts", join(directory, "extension-host.mjs"), {
-    "./catalog": "./catalog.mjs",
-    "./extension-host-runner": "./extension-host-runner.mjs",
-  });
-  const catalogModule = await import(`${join(directory, "catalog.mjs")}?t=${Date.now()}`);
-  const hostModule = await import(`${join(directory, "extension-host.mjs")}?t=${Date.now()}`);
-  return {
-    ExtensionCatalog: catalogModule.ExtensionCatalog,
-    ExtensionHost: hostModule.ExtensionHost,
-  };
-}
-
-function testModuleTemp(prefix) {
-  const directory = join(process.cwd(), "node_modules", ".cache");
-  mkdirSync(directory, { recursive: true });
-  return mkdtempSync(join(directory, prefix));
-}
-
-function writeTranspiledModule(sourcePath, outputPath, replacements = {}) {
-  let source = readFileSync(new URL(sourcePath, import.meta.url), "utf8");
-  for (const [from, to] of Object.entries(replacements)) {
-    source = source.replaceAll(`"${from}"`, `"${to}"`);
-  }
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      target: ts.ScriptTarget.ES2022,
-      verbatimModuleSyntax: true,
-    },
-  });
-  writeFileSync(outputPath, output.outputText);
-}
+import { expect, test } from "vitest";
+import { ExtensionCatalog } from "../electron/extensions/catalog";
+import { ExtensionHost } from "../electron/extensions/extension-host";
 
 function createExecutableExtensionFixture() {
   const directory = mkdtempSync(join(tmpdir(), "hosted-roder-extension-"));
@@ -109,7 +64,6 @@ export async function activate(context) {
 }
 
 test("extension host activates an installed extension and executes commands and tools", async () => {
-  const { ExtensionCatalog, ExtensionHost } = await loadExtensionModules();
   const userDataPath = mkdtempSync(join(tmpdir(), "roder-host-user-data-"));
   const catalog = new ExtensionCatalog({ userDataPath, appVersion: "0.1.0" });
   const installed = await catalog.installFromFolder(createExecutableExtensionFixture());
@@ -122,13 +76,13 @@ test("extension host activates an installed extension and executes commands and 
 
   try {
     const command = await host.executeCommand("hello-host.sayHello");
-    assert.equal(command.extensionId, installed.id);
-    assert.deepEqual(command.result, { greeting: "Hello host", extensionId: installed.id });
+    expect(command.extensionId).toBe(installed.id);
+    expect(command.result).toEqual({ greeting: "Hello host", extensionId: installed.id });
 
     const firstTool = await host.executeTool("hello-host.echo", { text: "one" });
-    assert.deepEqual(firstTool.result, { text: "one", runCount: 1 });
+    expect(firstTool.result).toEqual({ text: "one", runCount: 1 });
     const secondTool = await host.executeTool("hello-host.echo", { text: "two" });
-    assert.deepEqual(secondTool.result, { text: "two", runCount: 2 });
+    expect(secondTool.result).toEqual({ text: "two", runCount: 2 });
     await waitForLog(catalog, installed.id, /info: Hello host/);
   } finally {
     await host.stopAll();
@@ -136,7 +90,6 @@ test("extension host activates an installed extension and executes commands and 
 });
 
 test("extension host refuses disabled extension contributions", async () => {
-  const { ExtensionCatalog, ExtensionHost } = await loadExtensionModules();
   const userDataPath = mkdtempSync(join(tmpdir(), "roder-host-user-data-"));
   const catalog = new ExtensionCatalog({ userDataPath, appVersion: "0.1.0" });
   const installed = await catalog.installFromFolder(createExecutableExtensionFixture());
@@ -149,7 +102,7 @@ test("extension host refuses disabled extension contributions", async () => {
   });
 
   try {
-    await assert.rejects(() => host.executeCommand("hello-host.sayHello"), /No enabled extension contributes command/);
+    await expect(() => host.executeCommand("hello-host.sayHello")).rejects.toThrow(/No enabled extension contributes command/);
   } finally {
     await host.stopAll();
   }
@@ -163,5 +116,5 @@ async function waitForLog(catalog, extensionId, pattern) {
     }
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  assert.match((await catalog.readLogs(extensionId)).join("\n"), pattern);
+  expect((await catalog.readLogs(extensionId)).join("\n")).toMatch(pattern);
 }

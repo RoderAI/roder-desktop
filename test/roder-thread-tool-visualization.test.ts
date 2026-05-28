@@ -1,17 +1,5 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { Script } from "node:vm";
-import { test } from "node:test";
-import ts from "typescript";
-
-const toolDisplayModule = loadTypescriptModule("../src/lib/tool-display.ts");
-const roderThreadModule = loadTypescriptModule("../src/lib/roder-thread.ts", (id) => {
-  if (id === "@/lib/tool-display") {
-    return toolDisplayModule.exports;
-  }
-  throw new Error(`Unexpected import: ${id}`);
-});
-const { messagesFromThread, messagesFromTurn } = roderThreadModule.exports;
+import { expect, test } from "vitest";
+import { messagesFromThread, messagesFromTurn } from "../src/lib/roder-thread";
 
 test("typed reasoning items hydrate content as assistant thinking messages", () => {
   const messages = messagesFromTurn("thread-1", turn([
@@ -23,7 +11,7 @@ test("typed reasoning items hydrate content as assistant thinking messages", () 
     },
   ], "completed"));
 
-  assert.deepEqual(plain(messages), [
+  expect(plain(messages)).toEqual([
     {
       id: "turn-1-agent-reasoning",
       threadId: "thread-1",
@@ -50,7 +38,7 @@ test("thread snapshots derive messages from canonical typed items only", () => {
     status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
   });
 
-  assert.deepEqual(plain(messages.map(({ id, role, text, phase, status }) => ({ id, role, text, phase, status }))), [
+  expect(plain(messages.map(({ id, role, text, phase, status }) => ({ id, role, text, phase, status })))).toEqual([
     { id: "turn-1-user", role: "user", text: "can you implement a new design?", status: "complete" },
     { id: "tool:tool-read-1", role: "tool", text: "Read app.css", status: "complete" },
     { id: "turn-1-agent-reasoning", role: "assistant", text: "Inspecting styles", phase: "reasoning", status: "streaming" },
@@ -63,11 +51,11 @@ test("typed tool execution items summarize input and output", () => {
     tool("tool-list-1", "list_files", { path: "." }, "completed", "src\nCargo.toml"),
   ], "completed"));
 
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].role, "tool");
-  assert.equal(messages[0].toolName, "list_files");
-  assert.equal(messages[0].toolSummary, "Listed files in .");
-  assert.equal(messages[0].toolOutput, "src\nCargo.toml");
+  expect(messages.length).toBe(1);
+  expect(messages[0].role).toBe("tool");
+  expect(messages[0].toolName).toBe("list_files");
+  expect(messages[0].toolSummary).toBe("Listed files in .");
+  expect(messages[0].toolOutput).toBe("src\nCargo.toml");
 });
 
 test("common typed tool executions are summarized as compact activity", () => {
@@ -79,7 +67,7 @@ test("common typed tool executions are summarized as compact activity", () => {
     tool("tool-edit-1", "edit", { path: "src/components/transcript.tsx" }),
   ], "completed"));
 
-  assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
+  expect(plain(messages.map((message) => message.toolSummary))).toEqual([
     "Listed files in .",
     "Searched for \"ToolTimelineItem\" in src/components",
     "Searched for \"src/**/*.tsx\" in .",
@@ -99,10 +87,10 @@ test("shell tools summarize the command and keep cleaned output details", () => 
     ),
   ], "completed"));
 
-  assert.equal(messages.length, 1);
-  assert.equal(messages[0].toolSummary, "Ran pnpm test");
-  assert.equal(messages[0].toolInput, "pnpm test");
-  assert.equal(messages[0].toolOutput, "all tests passed");
+  expect(messages.length).toBe(1);
+  expect(messages[0].toolSummary).toBe("Ran pnpm test");
+  expect(messages[0].toolInput).toBe("pnpm test");
+  expect(messages[0].toolOutput).toBe("all tests passed");
 });
 
 test("failed typed tool executions keep display context", () => {
@@ -112,7 +100,7 @@ test("failed typed tool executions keep display context", () => {
     tool("tool-write-1", "write_file", { path: "protected.ts" }, "failed", undefined, "permission denied"),
   ], "completed"));
 
-  assert.deepEqual(plain(messages.map((message) => message.toolSummary)), [
+  expect(plain(messages.map((message) => message.toolSummary))).toEqual([
     "Failed to read missing.ts",
     "Failed to search for \"needle\" in src",
     "Failed to write protected.ts",
@@ -124,7 +112,28 @@ test("shell tools stay hidden before the command arrives", () => {
     tool("tool-shell-1", "shell", undefined, "inProgress"),
   ], "inProgress"));
 
-  assert.deepEqual(plain(messages), []);
+  expect(plain(messages)).toEqual([]);
+});
+
+test("failed turns surface the turn error as a failed system message", () => {
+  const messages = messagesFromTurn("thread-1", {
+    id: "turn-1",
+    items: [],
+    itemsView: "default",
+    status: "failed",
+    error: { message: "Sandbox denied command" },
+  });
+
+  expect(plain(messages)).toEqual([
+    {
+      id: "turn-1:error",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      role: "system",
+      text: "Sandbox denied command",
+      status: "failed",
+    },
+  ]);
 });
 
 function turn(items, status = "completed") {
@@ -151,21 +160,4 @@ function tool(id, toolName, input, status = "completed", output, error) {
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-function loadTypescriptModule(path, resolver = () => ({})) {
-  const source = readFileSync(new URL(path, import.meta.url), "utf8");
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2023,
-    },
-  }).outputText;
-  const module = { exports: {} };
-  new Script(compiled).runInNewContext({
-    exports: module.exports,
-    module,
-    require: resolver,
-  });
-  return module;
 }
