@@ -89,7 +89,9 @@ function requiredHex(value: unknown, label: string): string {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function clamp(value: number, min: number, max: number): number {

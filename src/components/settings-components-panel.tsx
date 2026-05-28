@@ -1,5 +1,18 @@
-import { Check, Copy, MoreHorizontal, MousePointer2, Pause, Play, Plus, RefreshCw, Settings2, Trash2, Wand2, Zap } from "lucide-react";
-import { useEffect, useState, type CSSProperties } from "react";
+import {
+  Check,
+  Copy,
+  MoreHorizontal,
+  MousePointer2,
+  Pause,
+  Play,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Trash2,
+  Wand2,
+  Zap,
+} from "lucide-react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import {
   type PluginActionState,
   pluginActionButtonVariant,
@@ -37,7 +50,13 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-const buttonVariants: Array<NonNullable<ButtonProps["variant"]>> = ["default", "secondary", "outline", "subtle", "ghost"];
+const buttonVariants: Array<NonNullable<ButtonProps["variant"]>> = [
+  "default",
+  "secondary",
+  "outline",
+  "subtle",
+  "ghost",
+];
 const buttonSizes: Array<NonNullable<ButtonProps["size"]>> = ["default", "sm", "compact", "icon"];
 const densityOptions = {
   compact: "Compact",
@@ -104,7 +123,10 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
     setPluginActionReplayKey((key) => key + 1);
   }
 
-  function updatePluginActionTiming<K extends keyof typeof pluginActionTiming>(key: K, value: (typeof pluginActionTiming)[K]): void {
+  function updatePluginActionTiming<K extends keyof typeof pluginActionTiming>(
+    key: K,
+    value: (typeof pluginActionTiming)[K],
+  ): void {
     setPluginActionTiming((current) => ({ ...current, [key]: value }));
   }
 
@@ -112,7 +134,9 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
     <div className="flex flex-col gap-5">
       <header>
         <h1 className="text-[20px] font-semibold">Components</h1>
-        <p className="mt-1 text-base text-muted-foreground">Buttons, menus, and selection controls in the current theme.</p>
+        <p className="mt-1 text-base text-muted-foreground">
+          Buttons, menus, and selection controls in the current theme.
+        </p>
       </header>
 
       <DirectorySection title="Buttons" note="Variants">
@@ -192,7 +216,11 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
       <DirectorySection title="Selects" note="Dropdown controls">
         <div className="grid gap-4 md:grid-cols-2">
           <SampleBlock label="Default">
-            <Select items={densityOptions} value={density} onValueChange={(value) => setDensity(value ?? "comfortable")}>
+            <Select
+              items={densityOptions}
+              value={density}
+              onValueChange={(value) => setDensity(value ?? "comfortable")}
+            >
               <SelectTrigger className="w-[220px] border border-border bg-card">
                 <SelectValue />
               </SelectTrigger>
@@ -228,20 +256,18 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Component settings</DialogTitle>
-                <DialogDescription>
-                  Dialog content inherits the current theme and base UI text size.
-                </DialogDescription>
+                <DialogDescription>Dialog content inherits the current theme and base UI text size.</DialogDescription>
               </DialogHeader>
               <div className="rounded-md border border-border bg-background px-3 py-3 text-muted-foreground">
                 Use dialogs for focused secondary workflows that should not live permanently in the main surface.
               </div>
               <DialogFooter>
                 <DialogClose
-                  render={(
+                  render={
                     <Button variant="secondary" size="sm">
                       Done
                     </Button>
-                  )}
+                  }
                 />
               </DialogFooter>
             </DialogContent>
@@ -287,7 +313,10 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
             <Button
               variant={pluginActionButtonVariant(pluginActionState)}
               size="sm"
-              className={cn("w-40 transition-none", pluginActionStateIsPending(pluginActionState) && "plugin-action-button-pending")}
+              className={cn(
+                "w-40 transition-none",
+                pluginActionStateIsPending(pluginActionState) && "plugin-action-button-pending",
+              )}
             >
               <PluginActionDemoContent
                 replayKey={pluginActionReplayKey}
@@ -413,7 +442,15 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
   );
 }
 
-function DirectorySection({ children, note, title }: { children: React.ReactNode; note: string; title: string }): React.JSX.Element {
+function DirectorySection({
+  children,
+  note,
+  title,
+}: {
+  children: React.ReactNode;
+  note: string;
+  title: string;
+}): React.JSX.Element {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
@@ -486,13 +523,19 @@ function TuningSlider({
   suffix?: string;
   value: number;
 }): React.JSX.Element {
+  const inputId = useId();
+
   return (
-    <label className="grid gap-2">
-      <span className="flex items-center justify-between gap-3 text-base">
+    <div className="grid gap-2">
+      <label className="flex items-center justify-between gap-3 text-base" htmlFor={inputId}>
         <span className="font-medium">{label}</span>
-        <span className="font-mono text-muted-foreground">{formatSliderValue(value)}{suffix}</span>
-      </span>
+        <span className="font-mono text-muted-foreground">
+          {formatSliderValue(value)}
+          {suffix}
+        </span>
+      </label>
       <input
+        id={inputId}
         className="h-2 w-full accent-foreground"
         max={max}
         min={min}
@@ -501,7 +544,7 @@ function TuningSlider({
         value={value}
         onChange={(event) => onChange(Number(event.currentTarget.value))}
       />
-    </label>
+    </div>
   );
 }
 

@@ -35,5 +35,9 @@ test("filters theme-only extensions out of sidebar contributions", async () => {
     }),
   ];
 
-  expect(getSidebarExtensions(extensions).map((extension) => extension.id)).toEqual(["html-panel", "command-only", "tool-only"]);
+  expect(getSidebarExtensions(extensions).map((extension) => extension.id)).toEqual([
+    "html-panel",
+    "command-only",
+    "tool-only",
+  ]);
 });

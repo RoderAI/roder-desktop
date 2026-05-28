@@ -9,8 +9,20 @@ import {
   upsertThread,
 } from "@/lib/roder-thread";
 import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-wait-requests";
-import { compactVisibleModelIds, effectiveSelectedModel, selectedModelProvider, visibleModelIdsFor, visibleModelsFor } from "@/lib/roder-models";
-import { normalizeCwd, normalizeThreadCwd, normalizeThreadsCwd, requireAbsoluteCwd, upsertWorkspaceRecent } from "@/lib/roder-workspaces";
+import {
+  compactVisibleModelIds,
+  effectiveSelectedModel,
+  selectedModelProvider,
+  visibleModelIdsFor,
+  visibleModelsFor,
+} from "@/lib/roder-models";
+import {
+  normalizeCwd,
+  normalizeThreadCwd,
+  normalizeThreadsCwd,
+  requireAbsoluteCwd,
+  upsertWorkspaceRecent,
+} from "@/lib/roder-workspaces";
 import type {
   ApprovalWaitRequest,
   DesktopAttachment,
@@ -136,23 +148,25 @@ function notificationParams(notification: RoderNotification): Record<string, unk
 }
 
 function isItemEventNotification(method: string): boolean {
-  return method === "item/started"
-    || method === "item/completed"
-    || method === "item/agentMessage/delta"
-    || method === "item/reasoning/textDelta"
-    || method === "item/reasoning/summaryPartAdded"
-    || method === "item/reasoning/summaryTextDelta";
+  return (
+    method === "item/started" ||
+    method === "item/completed" ||
+    method === "item/agentMessage/delta" ||
+    method === "item/reasoning/textDelta" ||
+    method === "item/reasoning/summaryPartAdded" ||
+    method === "item/reasoning/summaryTextDelta"
+  );
 }
 
 function threadItemEventParam(params: Record<string, unknown>): RoderThreadItemEvent | null {
   if (
-    typeof params.seq !== "number"
-    || typeof params.eventId !== "string"
-    || typeof params.threadId !== "string"
-    || typeof params.turnId !== "string"
-    || typeof params.timestamp !== "string"
-    || !isRecord(params.event)
-    || typeof params.event.type !== "string"
+    typeof params.seq !== "number" ||
+    typeof params.eventId !== "string" ||
+    typeof params.threadId !== "string" ||
+    typeof params.turnId !== "string" ||
+    typeof params.timestamp !== "string" ||
+    !isRecord(params.event) ||
+    typeof params.event.type !== "string"
   ) {
     return null;
   }
@@ -177,7 +191,11 @@ function upsertTurn(thread: RoderThread | undefined, incoming: RoderTurn): Roder
   return { ...thread, turns };
 }
 
-function completeTurn(thread: RoderThread | undefined, turnId: string, turnPatch: Record<string, unknown>): RoderThread | undefined {
+function completeTurn(
+  thread: RoderThread | undefined,
+  turnId: string,
+  turnPatch: Record<string, unknown>,
+): RoderThread | undefined {
   if (!thread) {
     return thread;
   }
@@ -188,24 +206,25 @@ function completeTurn(thread: RoderThread | undefined, turnId: string, turnPatch
   const completedAt = typeof turnPatch.completedAt === "number" ? turnPatch.completedAt : null;
   const durationMs = typeof turnPatch.durationMs === "number" ? turnPatch.durationMs : null;
   const nextStatus = status === "failed" ? "failed" : "completed";
-  const existing = index === -1
-    ? {
-        id: turnId,
-        items: [],
-        itemsView: "default",
-        status: nextStatus,
-        error,
-        completedAt,
-        durationMs,
-      }
-    : turns[index];
+  const existing =
+    index === -1
+      ? {
+          id: turnId,
+          items: [],
+          itemsView: "default",
+          status: nextStatus,
+          error,
+          completedAt,
+          durationMs,
+        }
+      : turns[index];
   const nextTurn: RoderTurn = {
     ...existing,
     status: nextStatus,
     error,
     completedAt,
     durationMs,
-    items: existing.items.map((item) => item.status === "inProgress" ? { ...item, status: nextStatus } : item),
+    items: existing.items.map((item) => (item.status === "inProgress" ? { ...item, status: nextStatus } : item)),
   };
   if (index === -1) {
     turns.push(nextTurn);
@@ -288,12 +307,18 @@ export const useRoderStore = create<RoderStore>()(
             ? current.activeThreadId
             : firstThreadId(threads, "");
           const activeThread = threads.find((thread) => thread.id === activeThreadId);
-          const selectedWorkspaceCwd = normalizeCwd(current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "", status.cwd);
+          const selectedWorkspaceCwd = normalizeCwd(
+            current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "",
+            status.cwd,
+          );
           const currentSelectedModel = visibleModels.some((model) => model.id === settings.default_model)
             ? settings.default_model
             : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || settings.default_model;
           const defaultPolicyMode = normalizePolicyMode(settings.default_mode);
-          const defaultReasoning = normalizeReasoningEffort(settings.default_reasoning || models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort);
+          const defaultReasoning = normalizeReasoningEffort(
+            settings.default_reasoning ||
+              models.find((model) => model.id === currentSelectedModel)?.defaultReasoningEffort,
+          );
 
           set({
             status,
@@ -340,9 +365,10 @@ export const useRoderStore = create<RoderStore>()(
 
         set({
           activeThreadId: threadId,
-          backStack: options.pushHistory && current.activeThreadId
-            ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
-            : current.backStack,
+          backStack:
+            options.pushHistory && current.activeThreadId
+              ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
+              : current.backStack,
           forwardStack: options.pushHistory ? [] : current.forwardStack,
           error: null,
         });
@@ -380,9 +406,8 @@ export const useRoderStore = create<RoderStore>()(
           await roderIpc.archiveThread(threadId);
           const current = get();
           const nextThreads = current.threads.filter((thread) => thread.id !== threadId);
-          const nextActiveThreadId = current.activeThreadId === threadId
-            ? firstThreadId(nextThreads, "")
-            : current.activeThreadId;
+          const nextActiveThreadId =
+            current.activeThreadId === threadId ? firstThreadId(nextThreads, "") : current.activeThreadId;
           set((state) => {
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
             return {
@@ -481,23 +506,23 @@ export const useRoderStore = create<RoderStore>()(
             if (!result.thread) {
               throw new Error("roder app-server did not return a thread");
             }
-          const thread = normalizeThreadCwd(result.thread, get().status.cwd);
-          threadId = thread.id;
-          set((state) => ({
-            threads: upsertThread(state.threads, thread),
-            threadDetails: { ...state.threadDetails, [threadId]: thread },
-            activeThreadId: threadId,
-            selectedWorkspaceCwd: thread.cwd,
-            selectedModel: thread.model || result.model || selectedModel,
-            selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
-            selectedPolicyMode: state.defaultPolicyMode,
-            threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
-              model: thread.model || result.model || selectedModel,
-              reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
-              policyMode: state.defaultPolicyMode,
-            }),
-            workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-          }));
+            const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+            threadId = thread.id;
+            set((state) => ({
+              threads: upsertThread(state.threads, thread),
+              threadDetails: { ...state.threadDetails, [threadId]: thread },
+              activeThreadId: threadId,
+              selectedWorkspaceCwd: thread.cwd,
+              selectedModel: thread.model || result.model || selectedModel,
+              selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+              selectedPolicyMode: state.defaultPolicyMode,
+              threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
+                model: thread.model || result.model || selectedModel,
+                reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+                policyMode: state.defaultPolicyMode,
+              }),
+              workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+            }));
           }
 
           if (steering) {
@@ -507,11 +532,23 @@ export const useRoderStore = create<RoderStore>()(
 
           markedTurnStarting = true;
           set((state) => ({
-            threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: null, activeFlags: [] }),
-            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, { type: "running", activeTurnId: null, activeFlags: [] }),
+            threads: markThreadStatus(state.threads, threadId, {
+              type: "running",
+              activeTurnId: null,
+              activeFlags: [],
+            }),
+            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
+              type: "running",
+              activeTurnId: null,
+              activeFlags: [],
+            }),
           }));
           const turnState = get();
-          const turnModel = effectiveSelectedModel(turnState.models, turnState.visibleModelIds, turnState.selectedModel);
+          const turnModel = effectiveSelectedModel(
+            turnState.models,
+            turnState.visibleModelIds,
+            turnState.selectedModel,
+          );
           const selectedTurnModel = turnModel?.id ?? turnState.selectedModel;
           const started = await roderIpc.startTurn(threadId, text, attachments, {
             modelProvider: turnModel?.modelProvider ?? selectedModelProvider(turnState.models, selectedTurnModel),
@@ -521,8 +558,16 @@ export const useRoderStore = create<RoderStore>()(
           });
           if (started.turnId) {
             set((state) => ({
-              threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: started.turnId, activeFlags: [] }),
-              threadDetails: markThreadDetailStatus(state.threadDetails, threadId, { type: "running", activeTurnId: started.turnId, activeFlags: [] }),
+              threads: markThreadStatus(state.threads, threadId, {
+                type: "running",
+                activeTurnId: started.turnId,
+                activeFlags: [],
+              }),
+              threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
+                type: "running",
+                activeTurnId: started.turnId,
+                activeFlags: [],
+              }),
             }));
           }
         } catch (error) {
@@ -533,7 +578,11 @@ export const useRoderStore = create<RoderStore>()(
               ? markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
               : state.threads,
             threadDetails: markedTurnStarting
-              ? markThreadDetailStatus(state.threadDetails, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
+              ? markThreadDetailStatus(state.threadDetails, threadId, {
+                  type: "idle",
+                  activeTurnId: null,
+                  activeFlags: [],
+                })
               : state.threadDetails,
           }));
         }
@@ -569,33 +618,38 @@ export const useRoderStore = create<RoderStore>()(
         const mode = normalizePolicyMode(defaultPolicyMode);
         set({ defaultPolicyMode: mode, error: null });
       },
-      setSelectedModel: (selectedModel) => set((state) => ({
-        selectedModel,
-        threadControlsByThread: updateActiveThreadControls(state, { model: selectedModel }),
-      })),
-      setModelVisibility: (modelId, visible) => set((state) => {
-        const currentVisibleIds = visibleModelIdsFor(state.models, state.visibleModelIds);
-        const currentVisible = new Set(currentVisibleIds);
-        if (visible) {
-          currentVisible.add(modelId);
-        } else {
-          currentVisible.delete(modelId);
-        }
-        const nextVisibleIds = state.models.map((model) => model.id).filter((id) => currentVisible.has(id));
-        if (nextVisibleIds.length === 0) {
-          return {};
-        }
-        const selectedModel = nextVisibleIds.includes(state.selectedModel) ? state.selectedModel : nextVisibleIds[0] ?? state.selectedModel;
-        return {
-          visibleModelIds: compactVisibleModelIds(state.models, nextVisibleIds),
+      setSelectedModel: (selectedModel) =>
+        set((state) => ({
           selectedModel,
-        };
-      }),
+          threadControlsByThread: updateActiveThreadControls(state, { model: selectedModel }),
+        })),
+      setModelVisibility: (modelId, visible) =>
+        set((state) => {
+          const currentVisibleIds = visibleModelIdsFor(state.models, state.visibleModelIds);
+          const currentVisible = new Set(currentVisibleIds);
+          if (visible) {
+            currentVisible.add(modelId);
+          } else {
+            currentVisible.delete(modelId);
+          }
+          const nextVisibleIds = state.models.map((model) => model.id).filter((id) => currentVisible.has(id));
+          if (nextVisibleIds.length === 0) {
+            return {};
+          }
+          const selectedModel = nextVisibleIds.includes(state.selectedModel)
+            ? state.selectedModel
+            : (nextVisibleIds[0] ?? state.selectedModel);
+          return {
+            visibleModelIds: compactVisibleModelIds(state.models, nextVisibleIds),
+            selectedModel,
+          };
+        }),
       resetVisibleModels: () => set({ visibleModelIds: [] }),
-      setSelectedReasoning: (selectedReasoning) => set((state) => ({
-        selectedReasoning,
-        threadControlsByThread: updateActiveThreadControls(state, { reasoning: selectedReasoning }),
-      })),
+      setSelectedReasoning: (selectedReasoning) =>
+        set((state) => ({
+          selectedReasoning,
+          threadControlsByThread: updateActiveThreadControls(state, { reasoning: selectedReasoning }),
+        })),
       setSelectedPolicyMode: (selectedPolicyMode) => {
         const mode = normalizePolicyMode(selectedPolicyMode);
         set((state) => ({
@@ -627,13 +681,14 @@ export const useRoderStore = create<RoderStore>()(
           defaultPolicyMode: normalizePolicyMode(mode.default_mode || state.defaultPolicyMode),
         });
       },
-      setSelectedWorkspaceCwd: (cwd) => set((state) => {
-        const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
-        return {
-          selectedWorkspaceCwd,
-          workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, selectedWorkspaceCwd),
-        };
-      }),
+      setSelectedWorkspaceCwd: (cwd) =>
+        set((state) => {
+          const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
+          return {
+            selectedWorkspaceCwd,
+            workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, selectedWorkspaceCwd),
+          };
+        }),
       openWorkspaceFolder: async () => {
         const state = get();
         const folder = await roderIpc.openWorkspaceFolder(state.selectedWorkspaceCwd || state.status.cwd);
@@ -666,10 +721,11 @@ export const useRoderStore = create<RoderStore>()(
         }
       },
       applyAppearance: (appearance) => set({ appearance }),
-      applyStatus: (status) => set((state) => ({
-        status,
-        selectedWorkspaceCwd: state.selectedWorkspaceCwd || status.cwd || "",
-      })),
+      applyStatus: (status) =>
+        set((state) => ({
+          status,
+          selectedWorkspaceCwd: state.selectedWorkspaceCwd || status.cwd || "",
+        })),
       applyStderr: (message) => set((state) => ({ stderr: [message, ...state.stderr].slice(0, 8) })),
       applyNotification: (notification) => set((state) => reduceNotification(state, notification)),
     }),
@@ -755,7 +811,9 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
       policyMode: state.defaultPolicyMode,
     }),
     workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-    backStack: state.activeThreadId ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80) : state.backStack,
+    backStack: state.activeThreadId
+      ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80)
+      : state.backStack,
     forwardStack: [],
     busy: false,
   }));
@@ -763,8 +821,13 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
 
 function reduceNotification(state: RoderStore, notification: RoderNotification): Partial<RoderStore> {
   const params = notificationParams(notification);
-  const pendingWaitRequestsByThread = reducePendingWaitRequests(state.pendingWaitRequestsByThread, notification, state.activeThreadId);
-  const waitPatch = pendingWaitRequestsByThread === state.pendingWaitRequestsByThread ? {} : { pendingWaitRequestsByThread };
+  const pendingWaitRequestsByThread = reducePendingWaitRequests(
+    state.pendingWaitRequestsByThread,
+    notification,
+    state.activeThreadId,
+  );
+  const waitPatch =
+    pendingWaitRequestsByThread === state.pendingWaitRequestsByThread ? {} : { pendingWaitRequestsByThread };
 
   if (notification.method === "thread/started" && isRecord(params.thread)) {
     const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
@@ -795,7 +858,11 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     return {
       ...waitPatch,
       activeThreadId: state.activeThreadId || threadId,
-      threads: markThreadStatus(state.threads, threadId, { type: "running", activeTurnId: turnId || null, activeFlags: [] }),
+      threads: markThreadStatus(state.threads, threadId, {
+        type: "running",
+        activeTurnId: turnId || null,
+        activeFlags: [],
+      }),
       threadDetails: nextThread ? { ...state.threadDetails, [threadId]: nextThread } : state.threadDetails,
       busy: threadId === state.activeThreadId ? true : state.busy,
     };
@@ -831,7 +898,9 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
 
   if (notification.method === "thread/status/changed") {
     const threadId = String(params.threadId ?? "");
-    const status = isRecord(params.status) ? (params.status as RoderThread["status"]) : { type: "idle", activeTurnId: null, activeFlags: [] };
+    const status = isRecord(params.status)
+      ? (params.status as RoderThread["status"])
+      : { type: "idle", activeTurnId: null, activeFlags: [] };
     return {
       ...waitPatch,
       threads: markThreadStatus(state.threads, threadId, status),
@@ -850,6 +919,12 @@ function markWaitRequestResolving(
   error?: string,
 ): void {
   set((state) => ({
-    pendingWaitRequestsByThread: setWaitRequestResolving(state.pendingWaitRequestsByThread, threadId, requestId, resolving, error),
+    pendingWaitRequestsByThread: setWaitRequestResolving(
+      state.pendingWaitRequestsByThread,
+      threadId,
+      requestId,
+      resolving,
+      error,
+    ),
   }));
 }

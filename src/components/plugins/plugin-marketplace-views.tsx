@@ -25,14 +25,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import {
   categoryLabel,
   homepageIconUrl,
@@ -41,11 +34,7 @@ import {
   recommendedVariant,
   sourceCodeUrl,
 } from "@/lib/plugins-marketplace";
-import type {
-  MarketplacePluginLookups,
-  MarketplacePluginMatch,
-  PluginInstallStatus,
-} from "@/lib/plugins-marketplace";
+import type { MarketplacePluginLookups, MarketplacePluginMatch, PluginInstallStatus } from "@/lib/plugins-marketplace";
 import { cn } from "@/lib/utils";
 import type {
   DedupedMarketplacePlugin,
@@ -190,7 +179,9 @@ export function PluginSearchRow({
           ) : (
             <h2 className="truncate text-center text-base font-medium">{plugin.displayName}</h2>
           )}
-          <p className="mx-auto mt-2 line-clamp-2 min-h-12 max-w-2xl text-center text-base leading-6 text-muted-foreground">{plugin.description || "No description provided."}</p>
+          <p className="mx-auto mt-2 line-clamp-2 min-h-12 max-w-2xl text-center text-base leading-6 text-muted-foreground">
+            {plugin.description || "No description provided."}
+          </p>
         </div>
 
         {variant && (
@@ -319,7 +310,13 @@ export function MarketplaceSettingsDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8" aria-label="Marketplace settings" title="Marketplace settings">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          aria-label="Marketplace settings"
+          title="Marketplace settings"
+        >
           <Settings className="size-3.5" />
         </Button>
       </DialogTrigger>
@@ -418,7 +415,9 @@ function InstalledPluginRow({
           ) : (
             <h2 className="truncate text-center text-base font-medium">{displayName}</h2>
           )}
-          <p className="mx-auto mt-2 line-clamp-2 min-h-12 max-w-2xl text-center text-base leading-6 text-muted-foreground">{description}</p>
+          <p className="mx-auto mt-2 line-clamp-2 min-h-12 max-w-2xl text-center text-base leading-6 text-muted-foreground">
+            {description}
+          </p>
         </div>
 
         <div className="grid shrink-0 grid-cols-2 gap-3">
@@ -486,11 +485,31 @@ function LocalMarketplaceForm({
         <Plus className="size-3.5" />
         Add local provider
       </div>
-      <input className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring" value={id} placeholder="id" onChange={(event) => setId(event.currentTarget.value)} />
-      <input className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring" value={displayName} placeholder="Display name" onChange={(event) => setDisplayName(event.currentTarget.value)} />
-      <input className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring" value={path} placeholder="/path/to/marketplace" onChange={(event) => setPath(event.currentTarget.value)} />
+      <input
+        className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
+        value={id}
+        placeholder="id"
+        onChange={(event) => setId(event.currentTarget.value)}
+      />
+      <input
+        className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
+        value={displayName}
+        placeholder="Display name"
+        onChange={(event) => setDisplayName(event.currentTarget.value)}
+      />
+      <input
+        className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
+        value={path}
+        placeholder="/path/to/marketplace"
+        onChange={(event) => setPath(event.currentTarget.value)}
+      />
       <div className="flex gap-2">
-        <select className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring" value={kind} onChange={(event) => setKind(event.currentTarget.value as MarketplaceKind | "")} aria-label="Local marketplace kind">
+        <select
+          className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
+          value={kind}
+          onChange={(event) => setKind(event.currentTarget.value as MarketplaceKind | "")}
+          aria-label="Local marketplace kind"
+        >
           <option value="">Infer kind</option>
           <option value="claude">Claude</option>
           <option value="cursor">Cursor</option>

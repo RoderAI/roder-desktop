@@ -14,9 +14,7 @@ async function loadRoderIpc(request) {
 
 test("listSpeechProviders sends the speech/providers/list request to the app-server", async () => {
   const calls = [];
-  const mockProviders = [
-    { id: "openai-speech", name: "OpenAI Speech", recommended: true },
-  ];
+  const mockProviders = [{ id: "openai-speech", name: "OpenAI Speech", recommended: true }];
   const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { providers: mockProviders };

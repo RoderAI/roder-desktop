@@ -1,4 +1,11 @@
-import type { JsonSchema, RoderExtensionActivationEvent, RoderExtensionCapability, RoderPreferenceType, RoderThemeDefinition, RoderThemeScheme } from "@roderai/extension-api";
+import type {
+  JsonSchema,
+  RoderExtensionActivationEvent,
+  RoderExtensionCapability,
+  RoderPreferenceType,
+  RoderThemeDefinition,
+  RoderThemeScheme,
+} from "@roderai/extension-api";
 
 export type RoderExtensionManifest = {
   id: string;

@@ -59,7 +59,11 @@ export function extensionToolName(params: unknown, catalog: ExtensionCatalogSnap
   return extensionToolSpecs(catalog).some((tool) => tool.name === name) ? name : undefined;
 }
 
-export async function callExtensionTool(host: ExtensionHost, toolName: string, params: unknown): Promise<ToolsCallResult> {
+export async function callExtensionTool(
+  host: ExtensionHost,
+  toolName: string,
+  params: unknown,
+): Promise<ToolsCallResult> {
   const request = params as ToolsCallParams | undefined;
   const input = request?.arguments ?? request?.input ?? {};
   try {
@@ -79,5 +83,9 @@ export async function callExtensionTool(host: ExtensionHost, toolName: string, p
 }
 
 function isToolsListResult(value: unknown): value is ToolsListResult {
-  return value !== null && typeof value === "object" && (Array.isArray((value as ToolsListResult).tools) || (value as ToolsListResult).tools === undefined);
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (Array.isArray((value as ToolsListResult).tools) || (value as ToolsListResult).tools === undefined)
+  );
 }

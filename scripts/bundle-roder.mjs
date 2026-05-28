@@ -30,12 +30,7 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-const builtBinary = resolve(
-  roderSource,
-  "target",
-  "debug",
-  process.platform === "win32" ? "roder.exe" : "roder",
-);
+const builtBinary = resolve(roderSource, "target", "debug", process.platform === "win32" ? "roder.exe" : "roder");
 const copied = spawnSync("cp", [builtBinary, output], {
   stdio: "inherit",
 });

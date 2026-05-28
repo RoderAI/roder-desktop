@@ -26,7 +26,17 @@ export type ThemeSettings = {
   codeFontSize: number;
 };
 
-export type SettingsSection = "general" | "appearance" | "components" | "models" | "extensions" | "configuration" | "personalization" | "mcp" | "git" | "usage";
+export type SettingsSection =
+  | "general"
+  | "appearance"
+  | "components"
+  | "models"
+  | "extensions"
+  | "configuration"
+  | "personalization"
+  | "mcp"
+  | "git"
+  | "usage";
 
 type ThemeStore = {
   settingsOpen: boolean;
@@ -189,24 +199,29 @@ export const useThemeStore = create<ThemeStore>()(
       openSettings: (section = "appearance") => set({ settingsOpen: true, settingsSection: section }),
       closeSettings: () => set({ settingsOpen: false }),
       setSettingsSection: (settingsSection) => set({ settingsSection }),
-      setExtensionThemePresets: (extensionThemePresets) => set((state) => ({
-        extensionThemePresets,
-        settings: reconcileSelectedPresets(state.settings, extensionThemePresets),
-      })),
+      setExtensionThemePresets: (extensionThemePresets) =>
+        set((state) => ({
+          extensionThemePresets,
+          settings: reconcileSelectedPresets(state.settings, extensionThemePresets),
+        })),
       setMode: (mode) => set((state) => ({ settings: { ...state.settings, mode } })),
-      applyPreset: (scheme, presetId) => set((state) => {
-        const preset = [...themePresets, ...state.extensionThemePresets].find((item) => item.id === presetId && item.scheme === scheme);
-        if (!preset) {
-          return {};
-        }
-        return { settings: { ...state.settings, [scheme]: paletteFromPreset(preset) } };
-      }),
-      updatePalette: (scheme, patch) => set((state) => ({
-        settings: {
-          ...state.settings,
-          [scheme]: { ...state.settings[scheme], ...patch, presetId: patch.presetId ?? "custom" },
-        },
-      })),
+      applyPreset: (scheme, presetId) =>
+        set((state) => {
+          const preset = [...themePresets, ...state.extensionThemePresets].find(
+            (item) => item.id === presetId && item.scheme === scheme,
+          );
+          if (!preset) {
+            return {};
+          }
+          return { settings: { ...state.settings, [scheme]: paletteFromPreset(preset) } };
+        }),
+      updatePalette: (scheme, patch) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            [scheme]: { ...state.settings[scheme], ...patch, presetId: patch.presetId ?? "custom" },
+          },
+        })),
       setPointerCursors: (pointerCursors) => set((state) => ({ settings: { ...state.settings, pointerCursors } })),
       setUiFontSize: (uiFontSize) => set((state) => ({ settings: { ...state.settings, uiFontSize } })),
       setCodeFontSize: (codeFontSize) => set((state) => ({ settings: { ...state.settings, codeFontSize } })),
@@ -284,7 +299,11 @@ function reconcileSelectedPresets(settings: ThemeSettings, extensionPresets: The
   };
 }
 
-function reconcileSelectedPreset(scheme: ThemeScheme, palette: ThemePalette, extensionPresets: ThemePreset[]): ThemePalette {
+function reconcileSelectedPreset(
+  scheme: ThemeScheme,
+  palette: ThemePalette,
+  extensionPresets: ThemePreset[],
+): ThemePalette {
   if (palette.presetId === "custom") {
     return palette;
   }
@@ -318,9 +337,17 @@ export function presetsForScheme(scheme: ThemeScheme, extensionPresets: ThemePre
   return [...themePresets, ...extensionPresets].filter((preset) => preset.scheme === scheme);
 }
 
-export function selectedPresetLabel(scheme: ThemeScheme, palette: ThemePalette, extensionPresets: ThemePreset[] = []): string {
+export function selectedPresetLabel(
+  scheme: ThemeScheme,
+  palette: ThemePalette,
+  extensionPresets: ThemePreset[] = [],
+): string {
   if (palette.presetId === "custom") {
     return "Custom";
   }
-  return presetsForScheme(scheme, extensionPresets).find((preset) => preset.id === palette.presetId)?.name ?? palette.presetName ?? palette.presetId;
+  return (
+    presetsForScheme(scheme, extensionPresets).find((preset) => preset.id === palette.presetId)?.name ??
+    palette.presetName ??
+    palette.presetId
+  );
 }

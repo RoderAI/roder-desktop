@@ -1,4 +1,14 @@
-import { ChevronDown, ExternalLink, Gauge, Loader2, LogIn, LogOut, Settings, SlidersHorizontal, UserCircle } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  Gauge,
+  Loader2,
+  LogIn,
+  LogOut,
+  Settings,
+  SlidersHorizontal,
+  UserCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -54,8 +64,12 @@ export function SidebarAccountMenu(): React.JSX.Element {
     }
   }
 
-  const label = account?.roderSignedIn ? account?.displayName ?? "Codex account" : "Sign in to Codex";
-  const secondary = account?.roderSignedIn ? "Roder connected" : account?.codexSignedIn ? "Codex CLI detected" : "Connect provider";
+  const label = account?.roderSignedIn ? (account?.displayName ?? "Codex account") : "Sign in to Codex";
+  const secondary = account?.roderSignedIn
+    ? "Roder connected"
+    : account?.codexSignedIn
+      ? "Codex CLI detected"
+      : "Connect provider";
 
   return (
     <div className="no-drag shrink-0 border-t border-border/70 p-3">
@@ -84,8 +98,16 @@ export function SidebarAccountMenu(): React.JSX.Element {
         >
           <DropdownMenuGroup className="space-y-1">
             <MenuRow muted icon={<UserCircle className="size-4" />} label={label} />
-            <MenuRow muted icon={<Settings className="size-4" />} label="Personal account" detail={account?.planType ?? undefined} />
-            <DropdownMenuItem className="h-10 rounded-xl px-3 text-base focus:bg-accent" onSelect={() => openSettings("appearance")}>
+            <MenuRow
+              muted
+              icon={<Settings className="size-4" />}
+              label="Personal account"
+              detail={account?.planType ?? undefined}
+            />
+            <DropdownMenuItem
+              className="h-10 rounded-xl px-3 text-base focus:bg-accent"
+              onSelect={() => openSettings("appearance")}
+            >
               <Settings className="size-4" />
               Settings
             </DropdownMenuItem>
@@ -100,7 +122,9 @@ export function SidebarAccountMenu(): React.JSX.Element {
           >
             <Gauge className="size-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Rate limits remaining</span>
-            <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", limitsOpen && "rotate-180")} />
+            <ChevronDown
+              className={cn("size-4 shrink-0 text-muted-foreground transition-transform", limitsOpen && "rotate-180")}
+            />
           </button>
 
           {limitsOpen && (
@@ -137,7 +161,11 @@ export function SidebarAccountMenu(): React.JSX.Element {
               disabled={busy === "login" || account?.loginPending}
               onClick={() => void login()}
             >
-              {busy === "login" || account?.loginPending ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
+              {busy === "login" || account?.loginPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LogIn className="size-4" />
+              )}
               {account?.loginPending ? "Opening browser..." : "Log in with Codex"}
             </button>
           )}
@@ -159,7 +187,12 @@ function MenuRow({
   muted?: boolean;
 }): React.JSX.Element {
   return (
-    <div className={cn("flex h-10 items-center gap-3 rounded-xl px-3", muted ? "text-muted-foreground" : "text-foreground")}>
+    <div
+      className={cn(
+        "flex h-10 items-center gap-3 rounded-xl px-3",
+        muted ? "text-muted-foreground" : "text-foreground",
+      )}
+    >
       {icon}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {detail && <span className="shrink-0 text-base uppercase tracking-normal">{detail}</span>}
@@ -171,13 +204,18 @@ function LimitLine({ window, fallback }: { window: CodexRateWindow | null; fallb
   return (
     <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-base">
       <span className="truncate text-foreground">{window?.label ?? fallback}</span>
-      <span className="font-mono text-muted-foreground">{window ? `${Math.round(window.remainingPercent)}%` : "--"}</span>
+      <span className="font-mono text-muted-foreground">
+        {window ? `${Math.round(window.remainingPercent)}%` : "--"}
+      </span>
       <span className="w-14 text-right font-mono text-muted-foreground">{window?.resetLabel || "--"}</span>
     </div>
   );
 }
 
 function initials(value: string): string {
-  const [first = "G", second = ""] = value.replace(/@.*/, "").split(/[.\s_-]+/).filter(Boolean);
+  const [first = "G", second = ""] = value
+    .replace(/@.*/, "")
+    .split(/[.\s_-]+/)
+    .filter(Boolean);
   return `${first[0] ?? "G"}${second[0] ?? ""}`.toUpperCase();
 }

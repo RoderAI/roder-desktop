@@ -1,4 +1,12 @@
-import type { ConversationMessage, RoderItem, RoderThread, RoderThreadItemDelta, RoderThreadItemEvent, RoderThreadItemEventKind, RoderTurn } from "@/types/roder";
+import type {
+  ConversationMessage,
+  RoderItem,
+  RoderThread,
+  RoderThreadItemDelta,
+  RoderThreadItemEvent,
+  RoderThreadItemEventKind,
+  RoderTurn,
+} from "@/types/roder";
 import { isShellToolName } from "@/lib/tool-display";
 
 const emptyMessages: ConversationMessage[] = [];
@@ -20,7 +28,11 @@ export function upsertThread(threads: RoderThread[], incoming: RoderThread): Rod
   return nextThreads;
 }
 
-export function markThreadStatus(threads: RoderThread[], threadId: string, status: RoderThread["status"]): RoderThread[] {
+export function markThreadStatus(
+  threads: RoderThread[],
+  threadId: string,
+  status: RoderThread["status"],
+): RoderThread[] {
   if (!threadId) {
     return threads;
   }
@@ -42,8 +54,8 @@ export function shouldShowThreadWorkingIndicator(
   if (hasCurrentAssistantStream(messages)) {
     return false;
   }
-  return !thread?.status.activeFlags.some((flag) =>
-    flag === "approvalRequired" || flag === "userInputRequired" || flag === "planExitRequired"
+  return !thread?.status.activeFlags.some(
+    (flag) => flag === "approvalRequired" || flag === "userInputRequired" || flag === "planExitRequired",
   );
 }
 
@@ -51,21 +63,25 @@ export function activeTurnIdForThread(thread: RoderThread | undefined): string {
   return thread?.status.activeTurnId ?? "";
 }
 
-export function applyThreadItemEvent(thread: RoderThread | undefined, event: RoderThreadItemEvent): RoderThread | undefined {
+export function applyThreadItemEvent(
+  thread: RoderThread | undefined,
+  event: RoderThreadItemEvent,
+): RoderThread | undefined {
   if (!thread) {
     return thread;
   }
   const turns = thread.turns ? [...thread.turns] : [];
   const turnIndex = turns.findIndex((turn) => turn.id === event.turnId);
-  const turn = turnIndex === -1
-    ? {
-        id: event.turnId,
-        items: [],
-        itemsView: "default",
-        status: "inProgress" as const,
-        error: null,
-      }
-    : turns[turnIndex];
+  const turn =
+    turnIndex === -1
+      ? {
+          id: event.turnId,
+          items: [],
+          itemsView: "default",
+          status: "inProgress" as const,
+          error: null,
+        }
+      : turns[turnIndex];
   const nextTurn = {
     ...turn,
     items: applyThreadItemEventToItems(turn.items, event.event),
@@ -143,9 +159,21 @@ function itemFromDelta(itemId: string, delta: RoderThreadItemDelta): RoderItem {
     return { id: itemId, type: "agentMessage", text: "", phase: delta.phase, status: "inProgress" };
   }
   if (delta.type === "reasoningText") {
-    return { id: itemId, type: "reasoning", content: emptyStringSlots(delta.contentIndex), summary: [], status: "inProgress" };
+    return {
+      id: itemId,
+      type: "reasoning",
+      content: emptyStringSlots(delta.contentIndex),
+      summary: [],
+      status: "inProgress",
+    };
   }
-  return { id: itemId, type: "reasoning", summary: emptyStringSlots(delta.summaryIndex), content: [], status: "inProgress" };
+  return {
+    id: itemId,
+    type: "reasoning",
+    summary: emptyStringSlots(delta.summaryIndex),
+    content: [],
+    status: "inProgress",
+  };
 }
 
 function applyThreadItemDelta(item: RoderItem, delta: RoderThreadItemDelta): RoderItem {
@@ -240,11 +268,18 @@ export function completeAssistantStreamsBeforeLaterTools(messages: ConversationM
 }
 
 function hasCurrentAssistantStream(messages: ConversationMessage[]): boolean {
-  const lastActiveMessage = [...messages].reverse().find((message) => message.role === "assistant" || message.role === "tool");
+  const lastActiveMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "assistant" || message.role === "tool");
   return lastActiveMessage?.role === "assistant" && lastActiveMessage.status === "streaming";
 }
 
-export function messagesFromRoderItem(threadId: string, turnId: string, item: RoderItem, turnStatus: string): ConversationMessage[] {
+export function messagesFromRoderItem(
+  threadId: string,
+  turnId: string,
+  item: RoderItem,
+  turnStatus: string,
+): ConversationMessage[] {
   const toolMessage = toolMessageFromItem(threadId, turnId, item);
   if (toolMessage) {
     return [toolMessage];
@@ -260,27 +295,31 @@ export function messagesFromRoderItem(threadId: string, turnId: string, item: Ro
   }
   if (item.type === "agentMessage") {
     const phase = normalizeAssistantPhase(item.phase);
-    return [{
-      id: assistantMessageId(item.id, phase),
-      threadId,
-      turnId,
-      role: "assistant",
-      text,
-      phase,
-      status: itemMessageStatus(item, turnStatus),
-    }];
+    return [
+      {
+        id: assistantMessageId(item.id, phase),
+        threadId,
+        turnId,
+        role: "assistant",
+        text,
+        phase,
+        status: itemMessageStatus(item, turnStatus),
+      },
+    ];
   }
   if (item.type === "reasoning") {
     const phase = "reasoning";
-    return [{
-      id: item.id,
-      threadId,
-      turnId,
-      role: "assistant",
-      text,
-      phase,
-      status: itemMessageStatus(item, turnStatus),
-    }];
+    return [
+      {
+        id: item.id,
+        threadId,
+        turnId,
+        role: "assistant",
+        text,
+        phase,
+        status: itemMessageStatus(item, turnStatus),
+      },
+    ];
   }
   if (item.type === "error") {
     return [{ id: item.id, threadId, turnId, role: "system", text, status: "failed" }];
@@ -288,7 +327,10 @@ export function messagesFromRoderItem(threadId: string, turnId: string, item: Ro
   return [];
 }
 
-export function upsertConversationMessage(messages: ConversationMessage[], incoming: ConversationMessage): ConversationMessage[] {
+export function upsertConversationMessage(
+  messages: ConversationMessage[],
+  incoming: ConversationMessage,
+): ConversationMessage[] {
   const key = messageKey(incoming);
   const index = messages.findIndex((message) => messageKey(message) === key);
   if (index === -1) {
@@ -590,7 +632,11 @@ function shellCommand(input: Record<string, unknown>, payload: Record<string, un
   );
 }
 
-function toolSubject(toolName: string, input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+function toolSubject(
+  toolName: string,
+  input: Record<string, unknown>,
+  payload: Record<string, unknown>,
+): string | undefined {
   if (toolName === "read_file") {
     const path = firstString(payload.path, payload.file, input.path, input.file);
     return path ? basename(path) : undefined;
@@ -608,7 +654,16 @@ function toolSubject(toolName: string, input: Record<string, unknown>, payload: 
     return toolPath(input, payload);
   }
   if (toolName === "grep" || toolName === "search_files" || toolName === "glob") {
-    const query = firstString(payload.query, payload.pattern, payload.regex, payload.glob, input.query, input.pattern, input.regex, input.glob);
+    const query = firstString(
+      payload.query,
+      payload.pattern,
+      payload.regex,
+      payload.glob,
+      input.query,
+      input.pattern,
+      input.regex,
+      input.glob,
+    );
     const path = toolPath(input, payload);
     if (!query) {
       return undefined;
@@ -658,7 +713,13 @@ function searchSummary(status: "running" | "complete" | "failed", query: string,
   return path ? `${verb} "${query}" in ${path}` : `${verb} "${query}"`;
 }
 
-function toolActionSummary(status: "running" | "complete" | "failed", completed: string, running: string, failed: string, subject: string): string {
+function toolActionSummary(
+  status: "running" | "complete" | "failed",
+  completed: string,
+  running: string,
+  failed: string,
+  subject: string,
+): string {
   const verb = status === "failed" ? failed : status === "running" ? running : completed;
   return `${verb} ${subject}`;
 }

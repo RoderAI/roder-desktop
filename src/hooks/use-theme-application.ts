@@ -109,9 +109,13 @@ function mix(left: string, right: string, weight: number): string {
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const value = hex.replace("#", "").trim();
-  const normalized = value.length === 3
-    ? value.split("").map((char) => `${char}${char}`).join("")
-    : value;
+  const normalized =
+    value.length === 3
+      ? value
+          .split("")
+          .map((char) => `${char}${char}`)
+          .join("")
+      : value;
   if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
     return null;
   }

@@ -1,4 +1,14 @@
-import type { DesktopAttachment, PolicyMode, RoderModel, RoderStatus, RoderThread, SystemAppearance, TurnInputItem, SpeechProviderDescriptor, SpeechTranscribeResult } from "@/types/roder";
+import type {
+  DesktopAttachment,
+  PolicyMode,
+  RoderModel,
+  RoderStatus,
+  RoderThread,
+  SystemAppearance,
+  TurnInputItem,
+  SpeechProviderDescriptor,
+  SpeechTranscribeResult,
+} from "@/types/roder";
 
 export type ThreadListResult = {
   data: RoderThread[];
@@ -92,10 +102,21 @@ export const roderIpc = {
   archiveThread: (threadId: string) =>
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
   startThread: (model: string, cwd: string, modelProvider?: string, reasoning?: string) =>
-    window.roderDesktop.request("thread/start", { model, cwd, modelProvider, reasoning, ephemeral: false }) as Promise<ThreadStartResult>,
+    window.roderDesktop.request("thread/start", {
+      model,
+      cwd,
+      modelProvider,
+      reasoning,
+      ephemeral: false,
+    }) as Promise<ThreadStartResult>,
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
     window.roderDesktop.request("providers/select", { provider, model, reasoning }) as Promise<ProviderSelectResult>,
-  startTurn: (threadId: string, prompt: string, attachments: DesktopAttachment[] = [], options: TurnStartOptions = {}) => {
+  startTurn: (
+    threadId: string,
+    prompt: string,
+    attachments: DesktopAttachment[] = [],
+    options: TurnStartOptions = {},
+  ) => {
     const input = turnInput(prompt, attachments);
     if (input.length > 0) {
       return window.roderDesktop.request("turn/start", { threadId, input, ...options }) as Promise<TurnStartResult>;
@@ -108,10 +129,16 @@ export const roderIpc = {
     return window.roderDesktop.request("turn/steer", params) as Promise<TurnSteerResult>;
   },
   interruptTurn: (threadId: string, turnId?: string) =>
-    window.roderDesktop.request("turn/interrupt", { threadId, turnId: turnId || undefined }) as Promise<TurnInterruptResult>,
+    window.roderDesktop.request("turn/interrupt", {
+      threadId,
+      turnId: turnId || undefined,
+    }) as Promise<TurnInterruptResult>,
   threadState: () => window.roderDesktop.request("thread/state", {}) as Promise<ThreadStateResult>,
   resolveApproval: (params: { approvalId: string; approved: boolean }) =>
-    window.roderDesktop.request("thread/resolve_approval", { approvalId: params.approvalId, approved: params.approved }),
+    window.roderDesktop.request("thread/resolve_approval", {
+      approvalId: params.approvalId,
+      approved: params.approved,
+    }),
   resolveUserInput: (params: { requestId: string; answers: Record<string, string> }) =>
     window.roderDesktop.request("thread/resolve_user_input", { requestId: params.requestId, answers: params.answers }),
   exitPlan: (params: { requestId: string; approved: boolean }) =>
@@ -135,8 +162,7 @@ export const roderIpc = {
     language?: string;
     prompt?: string;
     diarization?: boolean;
-  }) =>
-    window.roderDesktop.request("speech/transcribe", params) as Promise<SpeechTranscribeResult>,
+  }) => window.roderDesktop.request("speech/transcribe", params) as Promise<SpeechTranscribeResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),
   onNotification: window.roderDesktop.onNotification,
   onStderr: window.roderDesktop.onStderr,

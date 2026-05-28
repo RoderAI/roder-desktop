@@ -45,52 +45,61 @@ export function Transcript({
       showWorkingIndicator ? "working" : "idle",
     ].join(":");
   }, [messages, showWorkingIndicator]);
-  const transcriptEntries = useMemo(() => groupToolMessagesForTranscript(messages, { activeTurnId }), [activeTurnId, messages]);
+  const transcriptEntries = useMemo(
+    () => groupToolMessagesForTranscript(messages, { activeTurnId }),
+    [activeTurnId, messages],
+  );
 
-  const syncPinnedState = useCallback((viewport: HTMLDivElement) => {
-    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    const nextPinned = distanceFromBottom <= bottomThresholdPx;
-    const wasPinned = pinnedToBottomRef.current;
-    pinnedToBottomRef.current = nextPinned;
-    if (wasPinned !== nextPinned) {
-      onCanScrollToBottomChange?.(!nextPinned);
-    }
-  }, [onCanScrollToBottomChange]);
+  const syncPinnedState = useCallback(
+    (viewport: HTMLDivElement) => {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      const nextPinned = distanceFromBottom <= bottomThresholdPx;
+      const wasPinned = pinnedToBottomRef.current;
+      pinnedToBottomRef.current = nextPinned;
+      if (wasPinned !== nextPinned) {
+        onCanScrollToBottomChange?.(!nextPinned);
+      }
+    },
+    [onCanScrollToBottomChange],
+  );
 
-  const setViewportNode = useCallback((viewport: HTMLDivElement | null) => {
-    viewportRef.current = viewport;
-    if (!viewport) {
-      return;
-    }
+  const setViewportNode = useCallback(
+    (viewport: HTMLDivElement | null) => {
+      viewportRef.current = viewport;
+      if (!viewport) {
+        return;
+      }
 
-    const followChanged = lastFollowSignalRef.current !== followSignal;
-    const messageChanged = lastMessageVersionRef.current !== messageVersion;
-    lastFollowSignalRef.current = followSignal;
-    lastMessageVersionRef.current = messageVersion;
+      const followChanged = lastFollowSignalRef.current !== followSignal;
+      const messageChanged = lastMessageVersionRef.current !== messageVersion;
+      lastFollowSignalRef.current = followSignal;
+      lastMessageVersionRef.current = messageVersion;
 
-    if (followChanged) {
-      pinnedToBottomRef.current = true;
-      onCanScrollToBottomChange?.(false);
-      requestAnimationFrame(() => {
-        if (viewportRef.current === viewport) {
-          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
-        }
-      });
-      return;
-    }
+      if (followChanged) {
+        pinnedToBottomRef.current = true;
+        onCanScrollToBottomChange?.(false);
+        requestAnimationFrame(() => {
+          if (viewportRef.current === viewport) {
+            viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+          }
+        });
+        return;
+      }
 
-    if (messageChanged) {
-      requestAnimationFrame(() => {
-        if (viewportRef.current !== viewport) {
-          return;
-        }
-        if (pinnedToBottomRef.current) {
-          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
-        }
-        syncPinnedState(viewport);
-      });
-    }
-  }, [followSignal, messageVersion, onCanScrollToBottomChange, syncPinnedState]);
+      if (messageChanged) {
+        requestAnimationFrame(() => {
+          if (viewportRef.current !== viewport) {
+            return;
+          }
+          if (pinnedToBottomRef.current) {
+            viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
+          }
+          syncPinnedState(viewport);
+        });
+      }
+    },
+    [followSignal, messageVersion, onCanScrollToBottomChange, syncPinnedState],
+  );
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -106,7 +115,8 @@ export function Transcript({
             const previousIsTool = isToolEntry(transcriptEntries[index - 1]);
             const nextIsTool = isToolEntry(transcriptEntries[index + 1]);
             const entryIsTool = isToolEntry(entry);
-            const isPhaseMessage = message?.role === "assistant" && Boolean(message.phase && message.phase !== "final_answer");
+            const isPhaseMessage =
+              message?.role === "assistant" && Boolean(message.phase && message.phase !== "final_answer");
 
             return (
               <article
@@ -132,9 +142,15 @@ export function Transcript({
                 ) : message?.role === "tool" ? (
                   <ToolTimelineItem message={message} />
                 ) : isPhaseMessage ? (
-                  <PhaseMessage isStreaming={message.status === "streaming"} text={message.text || (message.status === "streaming" ? " " : "")} />
+                  <PhaseMessage
+                    isStreaming={message.status === "streaming"}
+                    text={message.text || (message.status === "streaming" ? " " : "")}
+                  />
                 ) : message?.role === "assistant" ? (
-                  <MessageContent isStreaming={message.status === "streaming"} text={message.text || (message.status === "streaming" ? " " : "")} />
+                  <MessageContent
+                    isStreaming={message.status === "streaming"}
+                    text={message.text || (message.status === "streaming" ? " " : "")}
+                  />
                 ) : (
                   <div className="font-medium text-base leading-[1.55]">{message?.text}</div>
                 )}
@@ -164,9 +180,11 @@ function ThreadWorkingIndicator(): React.JSX.Element {
 }
 
 function isToolEntry(entry: ReturnType<typeof groupToolMessagesForTranscript>[number] | undefined): boolean {
-  return entry?.kind === "activityGroup"
-    || entry?.kind === "readFileGroup"
-    || entry?.kind === "readSkillGroup"
-    || entry?.kind === "searchGroup"
-    || entry?.message.role === "tool";
+  return (
+    entry?.kind === "activityGroup" ||
+    entry?.kind === "readFileGroup" ||
+    entry?.kind === "readSkillGroup" ||
+    entry?.kind === "searchGroup" ||
+    entry?.message.role === "tool"
+  );
 }

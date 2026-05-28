@@ -1,6 +1,12 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, normalize, resolve, sep } from "node:path";
-import type { JsonSchema, RoderExtensionActivationEvent, RoderExtensionCapability, RoderPreferenceType, RoderThemeScheme } from "@roderai/extension-api";
+import type {
+  JsonSchema,
+  RoderExtensionActivationEvent,
+  RoderExtensionCapability,
+  RoderPreferenceType,
+  RoderThemeScheme,
+} from "@roderai/extension-api";
 
 export type RoderExtensionManifest = {
   id: string;
@@ -104,13 +110,17 @@ const capabilities = new Set<RoderExtensionCapability>([
 ]);
 
 const preferenceTypes = new Set<RoderPreferenceType>(["text", "password", "checkbox", "dropdown", "file", "directory"]);
-const activationEventPattern = /^(onStartupFinished|onWorkspace|onCommand:[A-Za-z0-9_.-]+|onTool:[A-Za-z0-9_.-]+|onView:[A-Za-z0-9_.-]+)$/;
+const activationEventPattern =
+  /^(onStartupFinished|onWorkspace|onCommand:[A-Za-z0-9_.-]+|onTool:[A-Za-z0-9_.-]+|onView:[A-Za-z0-9_.-]+)$/;
 const contributionIdPattern = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 const namePattern = /^(?:@[a-z0-9-]+\/)?[a-z0-9][a-z0-9._-]*$/;
 const publisherPattern = /^[a-z0-9][a-z0-9-]*$/;
 const semverPattern = /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/;
 
-export function validateExtensionManifest(packageJson: unknown, options: ManifestValidationOptions = {}): RoderExtensionManifest {
+export function validateExtensionManifest(
+  packageJson: unknown,
+  options: ManifestValidationOptions = {},
+): RoderExtensionManifest {
   const issues: ManifestValidationIssue[] = [];
   const root = asRecord(packageJson);
   if (!root) {
@@ -146,7 +156,12 @@ export function validateExtensionManifest(packageJson: unknown, options: Manifes
     issues.push({ path: "roder.engines.roder", message: `does not support Roder ${options.appVersion ?? "0.0.0"}` });
   }
 
-  const activationEvents = validateStringArray(roder.activationEvents, "roder.activationEvents", issues, activationEventPattern);
+  const activationEvents = validateStringArray(
+    roder.activationEvents,
+    "roder.activationEvents",
+    issues,
+    activationEventPattern,
+  );
   const extensionCapabilities = validateCapabilities(roder.capabilities, issues);
   const contributes = validateContributions(roder.contributes, issues);
   validateActivationTargets(activationEvents, contributes, issues);
@@ -197,7 +212,10 @@ export function validateExtensionManifest(packageJson: unknown, options: Manifes
   return manifest;
 }
 
-export function manifestFromPackageJson(packageJson: unknown, options?: ManifestValidationOptions): RoderExtensionManifest {
+export function manifestFromPackageJson(
+  packageJson: unknown,
+  options?: ManifestValidationOptions,
+): RoderExtensionManifest {
   return validateExtensionManifest(packageJson, options);
 }
 
@@ -275,10 +293,17 @@ function validateConfiguration(value: unknown, issues: ManifestValidationIssue[]
     const record = asRecord(item);
     const key = requiredString(record?.key, `roder.contributes.configuration[${index}].key`, issues);
     const title = requiredString(record?.title, `roder.contributes.configuration[${index}].title`, issues);
-    const type = requiredString(record?.type, `roder.contributes.configuration[${index}].type`, issues) as RoderPreferenceType;
+    const type = requiredString(
+      record?.type,
+      `roder.contributes.configuration[${index}].type`,
+      issues,
+    ) as RoderPreferenceType;
     validateContributionId(key, `roder.contributes.configuration[${index}].key`, issues);
     if (type && !preferenceTypes.has(type)) {
-      issues.push({ path: `roder.contributes.configuration[${index}].type`, message: "must be a supported preference type" });
+      issues.push({
+        path: `roder.contributes.configuration[${index}].type`,
+        message: "must be a supported preference type",
+      });
     }
     return {
       key,
@@ -331,7 +356,11 @@ function validateThemes(value: unknown, issues: ManifestValidationIssue[]): Rode
     const id = requiredString(record?.id, `roder.contributes.themes[${index}].id`, issues);
     const label = requiredString(record?.label, `roder.contributes.themes[${index}].label`, issues);
     const path = requiredString(record?.path, `roder.contributes.themes[${index}].path`, issues);
-    const scheme = requiredString(record?.scheme, `roder.contributes.themes[${index}].scheme`, issues) as RoderThemeScheme;
+    const scheme = requiredString(
+      record?.scheme,
+      `roder.contributes.themes[${index}].scheme`,
+      issues,
+    ) as RoderThemeScheme;
     validateContributionId(id, `roder.contributes.themes[${index}].id`, issues);
     if (scheme !== "light" && scheme !== "dark") {
       issues.push({ path: `roder.contributes.themes[${index}].scheme`, message: "must be light or dark" });
@@ -370,7 +399,12 @@ function validateActivationTargets(
   }
 }
 
-function validateStringArray(value: unknown, path: string, issues: ManifestValidationIssue[], pattern?: RegExp): RoderExtensionActivationEvent[] {
+function validateStringArray(
+  value: unknown,
+  path: string,
+  issues: ManifestValidationIssue[],
+  pattern?: RegExp,
+): RoderExtensionActivationEvent[] {
   if (!Array.isArray(value)) {
     issues.push({ path, message: "must be an array of strings" });
     return [];
@@ -426,7 +460,11 @@ function validateOptionalStringArray(value: unknown, path: string, issues: Manif
   }) as string[];
 }
 
-function validatePreferenceOptions(value: unknown, path: string, issues: ManifestValidationIssue[]): Array<{ label: string; value: string }> | undefined {
+function validatePreferenceOptions(
+  value: unknown,
+  path: string,
+  issues: ManifestValidationIssue[],
+): Array<{ label: string; value: string }> | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -445,7 +483,10 @@ function validatePreferenceOptions(value: unknown, path: string, issues: Manifes
 
 function validateContributionId(value: string, path: string, issues: ManifestValidationIssue[]): void {
   if (value && !contributionIdPattern.test(value)) {
-    issues.push({ path, message: "must start with a letter or number and contain only letters, numbers, dots, dashes, and underscores" });
+    issues.push({
+      path,
+      message: "must start with a letter or number and contain only letters, numbers, dots, dashes, and underscores",
+    });
   }
 }
 
@@ -494,7 +535,12 @@ function requiredString(value: unknown, path: string, issues: ManifestValidation
   return value.trim();
 }
 
-function optionalString(value: unknown, path: string, issues: ManifestValidationIssue[], assign: (value: string) => void): void {
+function optionalString(
+  value: unknown,
+  path: string,
+  issues: ManifestValidationIssue[],
+  assign: (value: string) => void,
+): void {
   if (value === undefined) {
     return;
   }
@@ -514,9 +560,11 @@ function defaultPreferenceValue(value: unknown): string | boolean | null | undef
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function stripScope(name: string): string {
-  return name.includes("/") ? name.split("/").pop() ?? name : name;
+  return name.includes("/") ? (name.split("/").pop() ?? name) : name;
 }

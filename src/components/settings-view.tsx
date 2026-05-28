@@ -51,16 +51,76 @@ export function SettingsView(): React.JSX.Element {
           Back to app
         </button>
         <nav className="no-drag flex flex-col gap-1">
-          <SettingsNavItem id="general" active={settingsSection === "general"} icon={<Cog className="size-4" />} label="General" onClick={setSettingsSection} />
-          <SettingsNavItem id="appearance" active={settingsSection === "appearance"} icon={<Paintbrush className="size-4" />} label="Appearance" onClick={setSettingsSection} />
-          <SettingsNavItem id="components" active={settingsSection === "components"} icon={<Component className="size-4" />} label="Components" onClick={setSettingsSection} />
-          <SettingsNavItem id="models" active={settingsSection === "models"} icon={<Bot className="size-4" />} label="Models" onClick={setSettingsSection} />
-          <SettingsNavItem id="extensions" active={settingsSection === "extensions"} icon={<Puzzle className="size-4" />} label="Extensions" onClick={setSettingsSection} />
-          <SettingsNavItem id="configuration" active={settingsSection === "configuration"} icon={<Braces className="size-4" />} label="Configuration" onClick={setSettingsSection} />
-          <SettingsNavItem id="personalization" active={settingsSection === "personalization"} icon={<UserRound className="size-4" />} label="Personalization" onClick={setSettingsSection} />
-          <SettingsNavItem id="mcp" active={settingsSection === "mcp"} icon={<Server className="size-4" />} label="MCP servers" onClick={setSettingsSection} />
-          <SettingsNavItem id="git" active={settingsSection === "git"} icon={<GitBranch className="size-4" />} label="Git" onClick={setSettingsSection} />
-          <SettingsNavItem id="usage" active={settingsSection === "usage"} icon={<Database className="size-4" />} label="Usage" onClick={setSettingsSection} />
+          <SettingsNavItem
+            id="general"
+            active={settingsSection === "general"}
+            icon={<Cog className="size-4" />}
+            label="General"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="appearance"
+            active={settingsSection === "appearance"}
+            icon={<Paintbrush className="size-4" />}
+            label="Appearance"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="components"
+            active={settingsSection === "components"}
+            icon={<Component className="size-4" />}
+            label="Components"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="models"
+            active={settingsSection === "models"}
+            icon={<Bot className="size-4" />}
+            label="Models"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="extensions"
+            active={settingsSection === "extensions"}
+            icon={<Puzzle className="size-4" />}
+            label="Extensions"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="configuration"
+            active={settingsSection === "configuration"}
+            icon={<Braces className="size-4" />}
+            label="Configuration"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="personalization"
+            active={settingsSection === "personalization"}
+            icon={<UserRound className="size-4" />}
+            label="Personalization"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="mcp"
+            active={settingsSection === "mcp"}
+            icon={<Server className="size-4" />}
+            label="MCP servers"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="git"
+            active={settingsSection === "git"}
+            icon={<GitBranch className="size-4" />}
+            label="Git"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
+            id="usage"
+            active={settingsSection === "usage"}
+            icon={<Database className="size-4" />}
+            label="Usage"
+            onClick={setSettingsSection}
+          />
         </nav>
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto px-10 py-12">
@@ -118,7 +178,8 @@ function SettingsPlaceholder({ section }: { section: SettingsSection }): React.J
     <section className="rounded-xl border border-border bg-card px-5 py-5 shadow-sm">
       <h1 className="text-base font-medium">{title}</h1>
       <p className="mt-2 max-w-[560px] text-base text-muted-foreground">
-        This section is wired into settings navigation. Controls for {title.toLowerCase()} can be added here without changing the settings shell.
+        This section is wired into settings navigation. Controls for {title.toLowerCase()} can be added here without
+        changing the settings shell.
       </p>
     </section>
   );
@@ -183,7 +244,10 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
       />
 
       <div className="divide-y divide-border border-t border-border px-5">
-        <SettingsRow label="Use pointer cursors" description="Change the cursor when hovering over interactive elements">
+        <SettingsRow
+          label="Use pointer cursors"
+          description="Change the cursor when hovering over interactive elements"
+        >
           <Switch checked={settings.pointerCursors} onChange={setPointerCursors} />
         </SettingsRow>
         <SettingsRow label="UI font size" description="Adjust the base size used for the Roder UI">
@@ -197,13 +261,24 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
   );
 }
 
-function ModeButton({ mode, active, onClick }: { mode: ThemeMode; active: boolean; onClick: () => void }): React.JSX.Element {
+function ModeButton({
+  mode,
+  active,
+  onClick,
+}: {
+  mode: ThemeMode;
+  active: boolean;
+  onClick: () => void;
+}): React.JSX.Element {
   const Icon = mode === "light" ? Sun : mode === "dark" ? Moon : Laptop;
   const label = mode === "system" ? "System" : mode[0].toUpperCase() + mode.slice(1);
   return (
     <button
       type="button"
-      className={cn("flex h-8 items-center gap-2 rounded-lg px-3 text-base text-muted-foreground", active && "bg-card text-foreground shadow-sm")}
+      className={cn(
+        "flex h-8 items-center gap-2 rounded-lg px-3 text-base text-muted-foreground",
+        active && "bg-card text-foreground shadow-sm",
+      )}
       onClick={onClick}
     >
       <Icon className="size-4" />
@@ -223,7 +298,10 @@ function ThemePreview({ light, dark }: { light: ThemePalette; dark: ThemePalette
 
 function PreviewPane({ palette, side }: { palette: ThemePalette; side: "left" | "right" }): React.JSX.Element {
   return (
-    <div className={cn("px-4 py-3", side === "left" ? "border-r border-border" : "")} style={{ background: palette.background, color: palette.foreground }}>
+    <div
+      className={cn("px-4 py-3", side === "left" ? "border-r border-border" : "")}
+      style={{ background: palette.background, color: palette.foreground }}
+    >
       <div className="mb-2 text-muted-foreground">const themePreview: ThemeConfig = {"{"}</div>
       <CodeLine index={1} label="surface" value={palette.translucentSidebar ? "sidebar-elevated" : "sidebar"} />
       <CodeLine index={2} label="accent" value={palette.accent} accent={palette.accent} />
@@ -233,7 +311,17 @@ function PreviewPane({ palette, side }: { palette: ThemePalette; side: "left" | 
   );
 }
 
-function CodeLine({ index, label, value, accent }: { index: number; label: string; value: string; accent?: string }): React.JSX.Element {
+function CodeLine({
+  index,
+  label,
+  value,
+  accent,
+}: {
+  index: number;
+  label: string;
+  value: string;
+  accent?: string;
+}): React.JSX.Element {
   return (
     <div className="grid grid-cols-[28px_1fr] gap-3">
       <span className="text-right opacity-55">{index}</span>
@@ -274,7 +362,9 @@ function ThemeEditor({
           <option value="custom">Custom</option>
           {!hasSelectedPreset && <option value={palette.presetId}>{selectedLabel}</option>}
           {presets.map((preset) => (
-            <option key={preset.id} value={preset.id}>{preset.name}</option>
+            <option key={preset.id} value={preset.id}>
+              {preset.name}
+            </option>
           ))}
         </select>
       </div>
@@ -285,7 +375,10 @@ function ThemeEditor({
         <TextRow label="UI font" value={palette.uiFont} onChange={(uiFont) => onChange({ uiFont })} />
         <TextRow label="Code font" value={palette.codeFont} onChange={(codeFont) => onChange({ codeFont })} />
         <SettingsRow label="Translucent sidebar">
-          <Switch checked={palette.translucentSidebar} onChange={(translucentSidebar) => onChange({ translucentSidebar })} />
+          <Switch
+            checked={palette.translucentSidebar}
+            onChange={(translucentSidebar) => onChange({ translucentSidebar })}
+          />
         </SettingsRow>
         <SettingsRow label="Contrast">
           <div className="flex min-w-[260px] items-center gap-4">
@@ -305,12 +398,27 @@ function ThemeEditor({
   );
 }
 
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }): React.JSX.Element {
+function ColorRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}): React.JSX.Element {
   return (
     <SettingsRow label={label}>
-      <label className="flex h-8 w-[174px] items-center gap-2 rounded-lg bg-muted px-2 text-base text-foreground">
-        <input type="color" value={value} className="size-5 border-0 bg-transparent p-0" onChange={(event) => onChange(event.currentTarget.value)} />
+      <div className="flex h-8 w-[174px] items-center gap-2 rounded-lg bg-muted px-2 text-base text-foreground">
         <input
+          aria-label={`${label} color`}
+          type="color"
+          value={value}
+          className="size-5 border-0 bg-transparent p-0"
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        <input
+          aria-label={`${label} hex value`}
           value={value.toUpperCase()}
           className="min-w-0 flex-1 bg-transparent font-mono outline-none"
           onChange={(event) => {
@@ -320,12 +428,20 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
             }
           }}
         />
-      </label>
+      </div>
     </SettingsRow>
   );
 }
 
-function TextRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }): React.JSX.Element {
+function TextRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}): React.JSX.Element {
   return (
     <SettingsRow label={label}>
       <input
@@ -337,7 +453,15 @@ function TextRow({ label, value, onChange }: { label: string; value: string; onC
   );
 }
 
-function SettingsRow({ label, description, children }: { label: string; description?: string; children: React.ReactNode }): React.JSX.Element {
+function SettingsRow({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
   return (
     <div className="flex min-h-11 items-center gap-5 py-2">
       <div className="min-w-0 flex-1">
@@ -353,11 +477,19 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: b
   return (
     <button
       type="button"
-      className={cn("relative h-6 w-10 shrink-0 overflow-hidden rounded-full transition-colors", checked ? "bg-primary" : "bg-muted")}
+      className={cn(
+        "relative h-6 w-10 shrink-0 overflow-hidden rounded-full transition-colors",
+        checked ? "bg-primary" : "bg-muted",
+      )}
       onClick={() => onChange(!checked)}
       aria-pressed={checked}
     >
-      <span className={cn("absolute left-0 top-1 size-4 rounded-full bg-white transition-transform", checked ? "translate-x-5" : "translate-x-1")} />
+      <span
+        className={cn(
+          "absolute left-0 top-1 size-4 rounded-full bg-white transition-transform",
+          checked ? "translate-x-5" : "translate-x-1",
+        )}
+      />
     </button>
   );
 }

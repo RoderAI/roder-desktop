@@ -9,15 +9,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-muted/50 text-foreground hover:bg-muted/80",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         accent: "bg-blue-600 text-white hover:bg-blue-500",
         success: "bg-emerald-600 text-white hover:bg-emerald-500",
         warning: "bg-amber-100/70 text-amber-500 hover:bg-amber-100",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         outline: "border border-border bg-card hover:bg-accent",
-        subtle:
-          "bg-card/70 text-foreground shadow-sm ring-1 ring-border hover:bg-card",
+        subtle: "bg-card/70 text-foreground shadow-sm ring-1 ring-border hover:bg-card",
       },
       size: {
         default: "h-11 px-5",
@@ -38,34 +36,29 @@ export type ButtonProps = React.ComponentPropsWithoutRef<typeof BaseButton> &
     asChild?: boolean;
   };
 
-export const Button = React.forwardRef<
-  React.ElementRef<typeof BaseButton>,
-  ButtonProps
->(({ asChild = false, children, className, variant, size, ...props }, ref) => {
-  const hasIconWithText = buttonHasIconWithText(children);
-  const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-4 pr-5 [&_svg]:size-4" : undefined;
+export const Button = React.forwardRef<React.ElementRef<typeof BaseButton>, ButtonProps>(
+  ({ asChild = false, children, className, variant, size, ...props }, ref) => {
+    const hasIconWithText = buttonHasIconWithText(children);
+    const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-4 pr-5 [&_svg]:size-4" : undefined;
 
-  if (asChild && React.isValidElement(children)) {
+    if (asChild && React.isValidElement(children)) {
+      return (
+        <BaseButton
+          className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)}
+          ref={ref}
+          render={children}
+          {...props}
+        />
+      );
+    }
+
     return (
-      <BaseButton
-        className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)}
-        ref={ref}
-        render={children}
-        {...props}
-      />
+      <BaseButton className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)} ref={ref} {...props}>
+        {children}
+      </BaseButton>
     );
-  }
-
-  return (
-    <BaseButton
-      className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)}
-      ref={ref}
-      {...props}
-    >
-      {children}
-    </BaseButton>
-  );
-});
+  },
+);
 
 Button.displayName = "Button";
 

@@ -9,7 +9,10 @@ import { useRoderStore } from "@/stores/roder-store";
 export function useRoderAgent() {
   useRoderStoreBootstrap();
   const state = useRoderStore(useShallow(selectAgentState));
-  const models = useMemo(() => visibleModelsFor(state.allModels, state.visibleModelIds), [state.allModels, state.visibleModelIds]);
+  const models = useMemo(
+    () => visibleModelsFor(state.allModels, state.visibleModelIds),
+    [state.allModels, state.visibleModelIds],
+  );
 
   return {
     ...state,
@@ -43,7 +46,8 @@ function useRoderStoreBootstrap(): void {
 }
 
 function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
-  const activeThread = state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
+  const activeThread =
+    state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
   const messages = messagesFromThread(activeThread);
   const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
   return {

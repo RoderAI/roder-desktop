@@ -122,11 +122,14 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     selectedImageIdRef.current = selectedImageId;
   }, [selectedImageId]);
 
-  useEffect(() => () => {
-    for (const image of imagesRef.current) {
-      URL.revokeObjectURL(image.objectUrl);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      for (const image of imagesRef.current) {
+        URL.revokeObjectURL(image.objectUrl);
+      }
+    },
+    [],
+  );
 
   function beginStroke(event: React.PointerEvent<HTMLCanvasElement>): void {
     event.preventDefault();
@@ -377,7 +380,10 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
             <button
               key={swatch}
               type="button"
-              className={cn("size-5 rounded-full border border-border ring-offset-2 ring-offset-card", color === swatch && "ring-2 ring-ring")}
+              className={cn(
+                "size-5 rounded-full border border-border ring-offset-2 ring-offset-card",
+                color === swatch && "ring-2 ring-ring",
+              )}
               style={{ backgroundColor: swatch }}
               aria-label={`Use color ${swatch}`}
               title={swatch}
@@ -414,7 +420,11 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
           <ToolbarButton label="Undo mark" disabled={strokes.length === 0 && shapes.length === 0} onClick={undo}>
             <RotateCcw className="size-4" />
           </ToolbarButton>
-          <ToolbarButton label="Clear canvas" disabled={strokes.length === 0 && shapes.length === 0 && images.length === 0} onClick={clear}>
+          <ToolbarButton
+            label="Clear canvas"
+            disabled={strokes.length === 0 && shapes.length === 0 && images.length === 0}
+            onClick={clear}
+          >
             <Trash2 className="size-4" />
           </ToolbarButton>
           <ToolbarButton label="Attach canvas screenshot" disabled={capturing} onClick={attachCanvas}>
@@ -425,7 +435,10 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
       <div className="min-h-0 flex-1 p-3">
         <div
           ref={wrapperRef}
-          className={cn("relative h-full overflow-hidden rounded-xl border border-border bg-background shadow-inner", dragActive && "ring-2 ring-ring")}
+          className={cn(
+            "relative h-full overflow-hidden rounded-xl border border-border bg-background shadow-inner",
+            dragActive && "ring-2 ring-ring",
+          )}
           onDragEnter={(event) => {
             if (event.dataTransfer.types.includes("Files")) {
               setDragActive(true);
@@ -446,7 +459,10 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
           onDrop={(event) => {
             event.preventDefault();
             setDragActive(false);
-            void addDroppedImages(event.dataTransfer.files, pointFromClient(event.clientX, event.clientY, event.currentTarget));
+            void addDroppedImages(
+              event.dataTransfer.files,
+              pointFromClient(event.clientX, event.clientY, event.currentTarget),
+            );
           }}
         >
           <canvas
@@ -472,7 +488,9 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
       </div>
       <div className="flex h-9 shrink-0 items-center gap-2 border-t border-border px-3 text-base text-muted-foreground">
         <span>Canvas</span>
-        <span className="truncate">Drop images, resize them, add shapes or pencil notes, then attach the PNG to the prompt.</span>
+        <span className="truncate">
+          Drop images, resize them, add shapes or pencil notes, then attach the PNG to the prompt.
+        </span>
       </div>
     </div>
   );
