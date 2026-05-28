@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * 120ms   button fade reaches its target opacity
  */
 const SCROLL_BUTTON_TIMING = {
-  fade:   120,  // button opacity transition
+  fade: 120, // button opacity transition
 };
 
 type ComposerScrollButtonStyle = CSSProperties & {
@@ -81,25 +81,31 @@ export function Composer({
     requestAnimationFrame(resizeTextarea);
   }, [resizeTextarea]);
 
-  const setTextareaNode = useCallback((node: HTMLTextAreaElement | null) => {
-    textareaRef.current = node;
-    if (!node) {
-      return;
-    }
-    resizeTextarea();
-    if (focusSignal > 0 && focusedSignalRef.current !== focusSignal) {
-      focusedSignalRef.current = focusSignal;
-      node.focus();
-    }
-  }, [focusSignal, resizeTextarea]);
+  const setTextareaNode = useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      textareaRef.current = node;
+      if (!node) {
+        return;
+      }
+      resizeTextarea();
+      if (focusSignal > 0 && focusedSignalRef.current !== focusSignal) {
+        focusedSignalRef.current = focusSignal;
+        node.focus();
+      }
+    },
+    [focusSignal, resizeTextarea],
+  );
 
-  const appendTranscribedText = useCallback((text: string) => {
-    setPrompt((previous) => {
-      const trimmed = previous.trim();
-      return trimmed ? `${trimmed} ${text}` : text;
-    });
-    scheduleTextareaResize();
-  }, [scheduleTextareaResize]);
+  const appendTranscribedText = useCallback(
+    (text: string) => {
+      setPrompt((previous) => {
+        const trimmed = previous.trim();
+        return trimmed ? `${trimmed} ${text}` : text;
+      });
+      scheduleTextareaResize();
+    },
+    [scheduleTextareaResize],
+  );
   const {
     isRecording,
     isTranscribing,
@@ -136,9 +142,7 @@ export function Composer({
   }
 
   function removeAttachment(id: string): void {
-    onAttachmentsChange(
-      attachments.filter((attachment) => attachment.id !== id),
-    );
+    onAttachmentsChange(attachments.filter((attachment) => attachment.id !== id));
   }
 
   function attachFiles(files: FileList | File[]): void {
@@ -167,10 +171,7 @@ export function Composer({
       }}
       onDragLeave={(event) => {
         const nextTarget = event.relatedTarget;
-        if (
-          !(nextTarget instanceof Node) ||
-          !event.currentTarget.contains(nextTarget)
-        ) {
+        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
           setDragActive(false);
         }
       }}
@@ -215,11 +216,7 @@ export function Composer({
           <Textarea
             ref={setTextareaNode}
             value={prompt}
-            placeholder={
-              busy
-                ? "Queue a follow-up or steer the current run"
-                : "Send follow-up"
-            }
+            placeholder={busy ? "Queue a follow-up or steer the current run" : "Send follow-up"}
             className="min-h-16 overflow-hidden border-0 bg-transparent px-1 py-2 text-[var(--font-size-composer)] leading-6 shadow-none focus-visible:border-transparent focus-visible:ring-0"
             onChange={(event) => {
               setPrompt(event.target.value);
@@ -235,11 +232,7 @@ export function Composer({
               }
             }}
           />
-          {recordingError && (
-            <div className="text-sm text-destructive px-1 pb-2">
-              {recordingError}
-            </div>
-          )}
+          {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
           <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <Button
@@ -251,10 +244,7 @@ export function Composer({
               >
                 <Plus className="size-5" />
               </Button>
-              <PolicyModePicker
-                selectedMode={selectedPolicyMode}
-                onChange={onSelectedPolicyModeChange}
-              />
+              <PolicyModePicker selectedMode={selectedPolicyMode} onChange={onSelectedPolicyModeChange} />
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -264,17 +254,13 @@ export function Composer({
                   "size-9 shrink-0 rounded-full",
                   isRecording
                     ? "bg-destructive/10 text-destructive animate-pulse hover:bg-destructive/20 hover:text-destructive"
-                    : "text-muted-foreground"
+                    : "text-muted-foreground",
                 )}
                 aria-label={isRecording ? "Stop recording" : "Record voice prompt"}
                 onClick={toggleRecording}
                 disabled={isTranscribing}
               >
-                {isTranscribing ? (
-                  <Loader2 className="size-5 animate-spin" />
-                ) : (
-                  <Mic className="size-5" />
-                )}
+                {isTranscribing ? <Loader2 className="size-5 animate-spin" /> : <Mic className="size-5" />}
               </Button>
               <ModelPicker
                 models={models}
@@ -330,22 +316,12 @@ function SubmitOrStopButton({
       data-state={busy ? "stop" : "send"}
       onClick={busy ? onStop : onSubmit}
     >
-      {busy ? (
-        <Square className="size-4 fill-current" />
-      ) : (
-        <ArrowUp className="size-5" />
-      )}
+      {busy ? <Square className="size-4 fill-current" /> : <ArrowUp className="size-5" />}
     </Button>
   );
 }
 
-function ScrollToBottomButton({
-  visible,
-  onClick,
-}: {
-  visible: boolean;
-  onClick: () => void;
-}): React.JSX.Element {
+function ScrollToBottomButton({ visible, onClick }: { visible: boolean; onClick: () => void }): React.JSX.Element {
   return (
     <div
       className="composer-scroll-button-region absolute -top-11 left-0 flex items-center"

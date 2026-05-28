@@ -51,7 +51,12 @@ export function isCommandActivityTool(toolName: string | undefined): boolean {
 }
 
 export function isExplorationActivityTool(toolName: string | undefined): boolean {
-  return isFileActivityTool(toolName) || isSearchActivityTool(toolName) || isCommandActivityTool(toolName) || toolName === "read_skill";
+  return (
+    isFileActivityTool(toolName) ||
+    isSearchActivityTool(toolName) ||
+    isCommandActivityTool(toolName) ||
+    toolName === "read_skill"
+  );
 }
 
 export function isFileActivityTool(toolName: string | undefined): boolean {
@@ -63,13 +68,15 @@ export function isSearchActivityTool(toolName: string | undefined): boolean {
 }
 
 export function isShellToolName(toolName: string | undefined): boolean {
-  return toolName === "shell"
-    || toolName === "exec_command"
-    || toolName === "command"
-    || toolName === "run_command"
-    || toolName === "process.spawn"
-    || toolName?.includes("shell_command") === true
-    || toolName?.includes("exec_command") === true;
+  return (
+    toolName === "shell" ||
+    toolName === "exec_command" ||
+    toolName === "command" ||
+    toolName === "run_command" ||
+    toolName === "process.spawn" ||
+    toolName?.includes("shell_command") === true ||
+    toolName?.includes("exec_command") === true
+  );
 }
 
 export function usesSummaryAsToolTitle(toolName: string | undefined): boolean {

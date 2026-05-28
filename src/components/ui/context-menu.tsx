@@ -13,17 +13,18 @@ type ContextMenuContentProps = React.ComponentPropsWithoutRef<typeof BaseContext
   sideOffset?: React.ComponentPropsWithoutRef<typeof BaseContextMenu.Positioner>["sideOffset"];
 };
 
-export const ContextMenuContent = React.forwardRef<React.ElementRef<typeof BaseContextMenu.Popup>, ContextMenuContentProps>(
-  function ContextMenuContent({ align = "start", className, side, sideOffset = 6, ...props }, ref) {
-    return (
-      <BaseContextMenu.Portal>
-        <BaseContextMenu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
-          <BaseContextMenu.Popup ref={ref} className={cn(dropdownMenuContentClassName, className)} {...props} />
-        </BaseContextMenu.Positioner>
-      </BaseContextMenu.Portal>
-    );
-  },
-);
+export const ContextMenuContent = React.forwardRef<
+  React.ElementRef<typeof BaseContextMenu.Popup>,
+  ContextMenuContentProps
+>(function ContextMenuContent({ align = "start", className, side, sideOffset = 6, ...props }, ref) {
+  return (
+    <BaseContextMenu.Portal>
+      <BaseContextMenu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
+        <BaseContextMenu.Popup ref={ref} className={cn(dropdownMenuContentClassName, className)} {...props} />
+      </BaseContextMenu.Positioner>
+    </BaseContextMenu.Portal>
+  );
+});
 
 type ContextMenuItemProps = Omit<React.ComponentPropsWithoutRef<typeof BaseContextMenu.Item>, "onSelect"> & {
   onSelect?: (event: React.MouseEvent<HTMLElement>) => void;

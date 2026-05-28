@@ -49,7 +49,8 @@ export function installedVariantSet(plugin: DedupedMarketplacePlugin, installed:
   for (const record of installed) {
     if (
       record.state !== "uninstalled" &&
-      (record.identityKey.canonicalSlug === plugin.identityKey.canonicalSlug || pluginVariantKeys.has(record.variantKey))
+      (record.identityKey.canonicalSlug === plugin.identityKey.canonicalSlug ||
+        pluginVariantKeys.has(record.variantKey))
     ) {
       keys.add(record.variantKey);
     }
@@ -145,13 +146,15 @@ export function marketplacePluginForInstalled(
     return exactMatch;
   }
 
-  const [fallbackMatch] = lookups.marketplaceMatchesByCanonicalSlug.get(installedPlugin.identityKey.canonicalSlug) ?? [];
+  const [fallbackMatch] =
+    lookups.marketplaceMatchesByCanonicalSlug.get(installedPlugin.identityKey.canonicalSlug) ?? [];
   const fallbackVariant = fallbackMatch ? recommendedVariant(fallbackMatch.plugin) : undefined;
   return fallbackMatch && fallbackVariant ? { plugin: fallbackMatch.plugin, variant: fallbackVariant } : undefined;
 }
 
 export function pluginSearchRowKey(plugin: DedupedMarketplacePlugin): string {
-  const variantKeys = plugin.variants.map(pluginVariantKey).toSorted().join("|") || plugin.recommendedVariantKey || "no-variants";
+  const variantKeys =
+    plugin.variants.map(pluginVariantKey).toSorted().join("|") || plugin.recommendedVariantKey || "no-variants";
   return `${plugin.identityKey.canonicalSlug}:${variantKeys}`;
 }
 
@@ -181,7 +184,9 @@ export function pluginMatchesCategories(plugin: DedupedMarketplacePlugin, catego
   if (categories.length === 0) {
     return true;
   }
-  const selected = new Set(categories.map(normalizeCategory).filter((category): category is string => Boolean(category)));
+  const selected = new Set(
+    categories.map(normalizeCategory).filter((category): category is string => Boolean(category)),
+  );
   return plugin.variants.some((variant) => {
     const category = normalizeCategory(variant.category);
     return category ? selected.has(category) : false;
@@ -219,7 +224,9 @@ export function defaultSelectionForMarketplace(
   }
 }
 
-export function defaultSelectionForProvider(provider: MarketplaceProviderSelection): DefaultMarketplaceSelection | undefined {
+export function defaultSelectionForProvider(
+  provider: MarketplaceProviderSelection,
+): DefaultMarketplaceSelection | undefined {
   switch (provider) {
     case "anthropic":
     case "cursor":
@@ -245,14 +252,17 @@ export function pluginForProvider(
     return undefined;
   }
   const variantKeys = new Set(variants.map(pluginVariantKey));
-  const relatedCandidates = plugin.relatedCandidates.filter((variant) => pluginVariantMatchesProvider(variant, provider, marketplaces));
+  const relatedCandidates = plugin.relatedCandidates.filter((variant) =>
+    pluginVariantMatchesProvider(variant, provider, marketplaces),
+  );
   return {
     ...plugin,
     variants,
     relatedCandidates,
-    recommendedVariantKey: plugin.recommendedVariantKey && variantKeys.has(plugin.recommendedVariantKey)
-      ? plugin.recommendedVariantKey
-      : pluginVariantKey(variants[0]!),
+    recommendedVariantKey:
+      plugin.recommendedVariantKey && variantKeys.has(plugin.recommendedVariantKey)
+        ? plugin.recommendedVariantKey
+        : pluginVariantKey(variants[0]!),
     installedVariants: plugin.installedVariants.filter((variantKey) => variantKeys.has(variantKey)),
   };
 }
@@ -270,11 +280,20 @@ function pluginVariantMatchesProvider(
     return marketplace ? marketplace.source.kind === "localPath" || !marketplace.isDefault : false;
   }
   const providerKind = provider === "anthropic" ? "claude" : provider;
-  return variant.kind === providerKind || defaultSelectionForMarketplace({ id: variant.marketplaceId, isDefault: marketplace?.isDefault ?? true }) === provider;
+  return (
+    variant.kind === providerKind ||
+    defaultSelectionForMarketplace({ id: variant.marketplaceId, isDefault: marketplace?.isDefault ?? true }) ===
+      provider
+  );
 }
 
 export function marketplaceIsActive(marketplace: Pick<MarketplaceDescriptor, "enabled" | "state">): boolean {
-  return marketplace.enabled && marketplace.state !== "bakedIn" && marketplace.state !== "removedByUser" && marketplace.state !== "disabled";
+  return (
+    marketplace.enabled &&
+    marketplace.state !== "bakedIn" &&
+    marketplace.state !== "removedByUser" &&
+    marketplace.state !== "disabled"
+  );
 }
 
 export function marketplaceNeedsEnable(
@@ -383,7 +402,11 @@ export function sourceCodeUrl(
 function marketplaceSourceCodeUrl(source: MarketplaceSource, pluginPath: string): string | undefined {
   switch (source.kind) {
     case "github":
-      return githubSourceCodeUrl(source.repo, joinedPluginPath(source.pluginRoot ?? undefined, pluginPath), source.refName ?? undefined);
+      return githubSourceCodeUrl(
+        source.repo,
+        joinedPluginPath(source.pluginRoot ?? undefined, pluginPath),
+        source.refName ?? undefined,
+      );
     case "git":
       return gitSourceCodeUrl(source.url, pluginPath, source.refName ?? undefined);
     case "httpJson":
@@ -500,7 +523,10 @@ function normalizeRelativePath(path?: string | null): string | undefined {
 }
 
 function encodePathSegments(path: string): string {
-  return path.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+  return path
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }
 
 function trimGitSuffix(value: string): string {

@@ -99,7 +99,11 @@ test("adjacent search tool messages collapse into one transcript group", () => {
           id: "tool-group:search:tool-1:tool-3",
           kind: "searchGroup",
           messages: [
-            createToolMessage("tool-1", "glob", 'Searched "node_modules/.pnpm/7zip-bin@5.2.0/node_modules/7zip-bin/README.md"'),
+            createToolMessage(
+              "tool-1",
+              "glob",
+              'Searched "node_modules/.pnpm/7zip-bin@5.2.0/node_modules/7zip-bin/README.md"',
+            ),
             createToolMessage("tool-2", "glob", 'Searched "examples/extensions/aurora-theme/package.json"'),
             createToolMessage("tool-3", "search_files", 'Searched for "ToolTimelineItem" in src/components'),
           ],
@@ -225,10 +229,13 @@ test("running tool runs stay expanded while progress is active", () => {
 });
 
 test("completed tools stay expanded while their turn is still active", () => {
-  const grouped = groupToolMessagesForTranscript([
-    createToolMessage("tool-1", "read_file", "Read README.md", "turn-1"),
-    createToolMessage("tool-2", "grep", 'Searched for "Transcript" in src', "turn-1"),
-  ], { activeTurnId: "turn-1" });
+  const grouped = groupToolMessagesForTranscript(
+    [
+      createToolMessage("tool-1", "read_file", "Read README.md", "turn-1"),
+      createToolMessage("tool-2", "grep", 'Searched for "Transcript" in src', "turn-1"),
+    ],
+    { activeTurnId: "turn-1" },
+  );
 
   expect(plain(grouped)).toEqual([
     {

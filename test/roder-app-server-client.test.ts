@@ -8,7 +8,11 @@ type MockChildProcess = EventEmitter & {
   stderr: MockStream;
   kill: () => void;
 };
-type SpawnMock = (command: string, args: string[], options: { env?: Record<string, string | undefined> }) => MockChildProcess;
+type SpawnMock = (
+  command: string,
+  args: string[],
+  options: { env?: Record<string, string | undefined> },
+) => MockChildProcess;
 
 const mockState = vi.hoisted(() => ({
   app: {

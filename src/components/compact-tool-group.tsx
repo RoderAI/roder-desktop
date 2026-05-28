@@ -4,7 +4,13 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
 import { DisclosureChevron, groupStatus, groupStatusLabel, ShimmerText, toolTextClass } from "./tool-timeline-shared";
 
-export function CompactToolGroup({ kind, messages }: { kind: ToolGroupKind; messages: ConversationMessage[] }): React.JSX.Element {
+export function CompactToolGroup({
+  kind,
+  messages,
+}: {
+  kind: ToolGroupKind;
+  messages: ConversationMessage[];
+}): React.JSX.Element {
   const status = groupStatus(messages);
   const title = groupTitle(kind, messages);
   const Title = status === "running" ? ShimmerText : "span";
@@ -24,7 +30,11 @@ export function CompactToolGroup({ kind, messages }: { kind: ToolGroupKind; mess
       <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">
         <ul className="space-y-0.5 py-1">
           {messages.map((message) => (
-            <li className="min-w-0 truncate" key={message.toolCallId || message.id} title={message.toolSubject || message.toolSummary || message.text}>
+            <li
+              className="min-w-0 truncate"
+              key={message.toolCallId || message.id}
+              title={message.toolSubject || message.toolSummary || message.text}
+            >
               {groupItemLabel(kind, message)}
             </li>
           ))}

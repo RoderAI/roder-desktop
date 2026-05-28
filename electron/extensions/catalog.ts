@@ -67,7 +67,9 @@ export class ExtensionCatalog {
   async list(): Promise<ExtensionCatalogSnapshot> {
     const catalog = await this.#read();
     return {
-      extensions: [...catalog.extensions].sort((left, right) => left.manifest.displayName.localeCompare(right.manifest.displayName)),
+      extensions: [...catalog.extensions].sort((left, right) =>
+        left.manifest.displayName.localeCompare(right.manifest.displayName),
+      ),
     };
   }
 
@@ -97,7 +99,11 @@ export class ExtensionCatalog {
     });
   }
 
-  async #installPackage(manifest: RoderExtensionManifest, packageRoot: string, source: ExtensionSource): Promise<ExtensionCatalogRecord> {
+  async #installPackage(
+    manifest: RoderExtensionManifest,
+    packageRoot: string,
+    source: ExtensionSource,
+  ): Promise<ExtensionCatalogRecord> {
     const catalog = await this.#read();
     const existing = catalog.extensions.find((extension) => extension.id === manifest.id);
     const timestamp = this.#timestamp();
@@ -206,7 +212,10 @@ export class ExtensionCatalog {
     }));
   }
 
-  async #updateRecord(id: string, update: (record: ExtensionCatalogRecord) => ExtensionCatalogRecord): Promise<ExtensionCatalogRecord> {
+  async #updateRecord(
+    id: string,
+    update: (record: ExtensionCatalogRecord) => ExtensionCatalogRecord,
+  ): Promise<ExtensionCatalogRecord> {
     const catalog = await this.#read();
     const index = catalog.extensions.findIndex((extension) => extension.id === id);
     if (index === -1) {
@@ -224,7 +233,9 @@ export class ExtensionCatalog {
       const parsed = JSON.parse(await readFile(this.#catalogPath(), "utf8")) as Partial<PersistedCatalog>;
       return {
         version: 1,
-        extensions: Array.isArray(parsed.extensions) ? parsed.extensions.map(normalizeRecord).filter(isExtensionCatalogRecord) : [],
+        extensions: Array.isArray(parsed.extensions)
+          ? parsed.extensions.map(normalizeRecord).filter(isExtensionCatalogRecord)
+          : [],
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -279,7 +290,13 @@ function appendLog(logs: string[], timestamp: string, message: string): string[]
 
 function normalizeRecord(value: unknown): ExtensionCatalogRecord | undefined {
   const record = value as Partial<ExtensionCatalogRecord> | undefined;
-  if (!record || typeof record.id !== "string" || !record.manifest || !record.source || !["dev", "archive"].includes(record.source.type)) {
+  if (
+    !record ||
+    typeof record.id !== "string" ||
+    !record.manifest ||
+    !record.source ||
+    !["dev", "archive"].includes(record.source.type)
+  ) {
     return undefined;
   }
   return {

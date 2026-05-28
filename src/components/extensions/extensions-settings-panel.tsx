@@ -24,12 +24,21 @@ export function ExtensionsSettingsPanel({ surface = "settings" }: ExtensionsSett
   }, [load]);
 
   return (
-    <section className={cn("bg-card", surface === "settings" ? "rounded-xl border border-border shadow-sm" : "min-h-full")}>
-      <header className={cn("flex items-start justify-between gap-4 border-b border-border py-4", surface === "settings" ? "px-5" : "px-3")}>
+    <section
+      className={cn("bg-card", surface === "settings" ? "rounded-xl border border-border shadow-sm" : "min-h-full")}
+    >
+      <header
+        className={cn(
+          "flex items-start justify-between gap-4 border-b border-border py-4",
+          surface === "settings" ? "px-5" : "px-3",
+        )}
+      >
         <div>
           <h1 className="text-base font-medium">Extensions</h1>
           <p className="mt-1 text-base text-muted-foreground">
-            {extensions.length === 0 ? "No local extensions installed" : `${extensions.length} local extension${extensions.length === 1 ? "" : "s"} installed`}
+            {extensions.length === 0
+              ? "No local extensions installed"
+              : `${extensions.length} local extension${extensions.length === 1 ? "" : "s"} installed`}
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -46,14 +55,31 @@ export function ExtensionsSettingsPanel({ surface = "settings" }: ExtensionsSett
         </div>
       </header>
 
-      {error && <div className={cn("border-b border-border py-3 text-base text-destructive", surface === "settings" ? "px-5" : "px-3")}>{error}</div>}
+      {error && (
+        <div
+          className={cn(
+            "border-b border-border py-3 text-base text-destructive",
+            surface === "settings" ? "px-5" : "px-3",
+          )}
+        >
+          {error}
+        </div>
+      )}
       {lastResult && (
-        <pre className={cn("max-h-48 overflow-auto border-b border-border bg-muted/50 py-3 text-base text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>{lastResult}</pre>
+        <pre
+          className={cn(
+            "max-h-48 overflow-auto border-b border-border bg-muted/50 py-3 text-base text-muted-foreground",
+            surface === "settings" ? "px-5" : "px-3",
+          )}
+        >
+          {lastResult}
+        </pre>
       )}
 
       {extensions.length === 0 ? (
         <div className={cn("py-8 text-base text-muted-foreground", surface === "settings" ? "px-5" : "px-3")}>
-          Build an extension, then install its folder or packaged .rdx archive here. Local folders stay linked; archives are copied into app storage.
+          Build an extension, then install its folder or packaged .rdx archive here. Local folders stay linked; archives
+          are copied into app storage.
         </div>
       ) : (
         <div className="divide-y divide-border">
@@ -96,12 +122,18 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-base font-medium">{extension.manifest.displayName}</h2>
-            <Badge variant={extension.enabled ? "secondary" : "muted"}>{extension.enabled ? "Enabled" : "Disabled"}</Badge>
-            <Badge variant={extension.activationState === "failed" ? "outline" : "muted"}>{extension.activationState}</Badge>
+            <Badge variant={extension.enabled ? "secondary" : "muted"}>
+              {extension.enabled ? "Enabled" : "Disabled"}
+            </Badge>
+            <Badge variant={extension.activationState === "failed" ? "outline" : "muted"}>
+              {extension.activationState}
+            </Badge>
           </div>
           <p className="mt-1 max-w-[620px] text-base text-muted-foreground">{extension.manifest.description}</p>
           <p className="mt-2 truncate text-base text-muted-foreground">
-            {extension.source.type === "archive" ? `Packaged archive: ${extension.source.archivePath ?? extension.source.path}` : extension.source.path}
+            {extension.source.type === "archive"
+              ? `Packaged archive: ${extension.source.archivePath ?? extension.source.path}`
+              : extension.source.path}
           </p>
           <p className="mt-1 text-base text-muted-foreground">{capabilitySummary}</p>
           {extension.lastError && <p className="mt-2 text-base text-destructive">{extension.lastError}</p>}
@@ -157,19 +189,25 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
 
       {extension.manifest.contributes.configuration.length > 0 && (
         <div className="mt-4 rounded-lg border border-border">
-          <div className="border-b border-border px-3 py-2 text-base font-medium text-muted-foreground">Preferences</div>
+          <div className="border-b border-border px-3 py-2 text-base font-medium text-muted-foreground">
+            Preferences
+          </div>
           <div className="divide-y divide-border">
             {extension.manifest.contributes.configuration.map((preference) => (
               <label key={preference.key} className="flex items-center justify-between gap-4 px-3 py-2 text-base">
                 <span className="min-w-0">
                   <span className="block text-foreground">{preference.title}</span>
-                  {preference.description && <span className="block text-base text-muted-foreground">{preference.description}</span>}
+                  {preference.description && (
+                    <span className="block text-base text-muted-foreground">{preference.description}</span>
+                  )}
                 </span>
                 {preference.type === "checkbox" ? (
                   <input
                     type="checkbox"
                     checked={Boolean(extension.preferences[preference.key])}
-                    onChange={(event) => void updatePreference(extension.id, preference.key, event.currentTarget.checked)}
+                    onChange={(event) =>
+                      void updatePreference(extension.id, preference.key, event.currentTarget.checked)
+                    }
                   />
                 ) : (
                   <input

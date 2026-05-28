@@ -26,30 +26,12 @@ export function AgentWaitCards({
     <div className="mx-auto mb-3 flex w-full max-w-[980px] flex-col gap-3 px-8">
       {requests.map((request) => {
         if (request.kind === "approval") {
-          return (
-            <ApprovalWaitCard
-              key={request.id}
-              request={request}
-              onResolve={onResolveApproval}
-            />
-          );
+          return <ApprovalWaitCard key={request.id} request={request} onResolve={onResolveApproval} />;
         }
         if (request.kind === "userInput") {
-          return (
-            <UserInputWaitCard
-              key={request.id}
-              request={request}
-              onResolve={onResolveUserInput}
-            />
-          );
+          return <UserInputWaitCard key={request.id} request={request} onResolve={onResolveUserInput} />;
         }
-        return (
-          <PlanExitWaitCard
-            key={request.id}
-            request={request}
-            onResolve={onExitPlan}
-          />
-        );
+        return <PlanExitWaitCard key={request.id} request={request} onResolve={onExitPlan} />;
       })}
     </div>
   );
@@ -68,7 +50,7 @@ function ApprovalWaitCard({
       title={`${request.toolName || "Tool"} approval`}
       description={request.reason || "This tool is waiting for approval."}
       error={request.error}
-      actions={(
+      actions={
         <>
           <Button
             variant="outline"
@@ -79,17 +61,12 @@ function ApprovalWaitCard({
             <X className="size-4" />
             Reject
           </Button>
-          <Button
-            variant="accent"
-            size="sm"
-            disabled={request.resolving}
-            onClick={() => void onResolve(request, true)}
-          >
+          <Button variant="accent" size="sm" disabled={request.resolving} onClick={() => void onResolve(request, true)}>
             <Check className="size-4" />
             Approve
           </Button>
         </>
-      )}
+      }
     />
   );
 }
@@ -106,7 +83,8 @@ function UserInputWaitCard({
     [request.questions],
   );
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers);
-  const canSubmit = request.questions.every((question) => (answers[question.id] ?? "").trim()) || request.questions.length === 0;
+  const canSubmit =
+    request.questions.every((question) => (answers[question.id] ?? "").trim()) || request.questions.length === 0;
 
   return (
     <WaitCard
@@ -114,13 +92,16 @@ function UserInputWaitCard({
       title="Input requested"
       description="The agent is waiting for your answer."
       error={request.error}
-      body={(
+      body={
         <div className="mt-3 flex flex-col gap-3">
           {request.questions.map((question) => {
             const options = question.options ?? [];
             return (
               <div key={question.id} className="flex flex-col gap-2">
-                <label className="text-base font-medium text-foreground" htmlFor={`wait-input-${request.id}-${question.id}`}>
+                <label
+                  className="text-base font-medium text-foreground"
+                  htmlFor={`wait-input-${request.id}-${question.id}`}
+                >
                   {question.question}
                 </label>
                 {options.length > 0 ? (
@@ -157,8 +138,8 @@ function UserInputWaitCard({
             );
           })}
         </div>
-      )}
-      actions={(
+      }
+      actions={
         <Button
           variant="accent"
           size="sm"
@@ -168,7 +149,7 @@ function UserInputWaitCard({
           <Check className="size-4" />
           Submit
         </Button>
-      )}
+      }
     />
   );
 }
@@ -188,7 +169,7 @@ function PlanExitWaitCard({
       title="Exit plan mode"
       description={description}
       error={request.error}
-      actions={(
+      actions={
         <>
           <Button
             variant="outline"
@@ -199,17 +180,12 @@ function PlanExitWaitCard({
             <X className="size-4" />
             Reject
           </Button>
-          <Button
-            variant="accent"
-            size="sm"
-            disabled={request.resolving}
-            onClick={() => void onResolve(request, true)}
-          >
+          <Button variant="accent" size="sm" disabled={request.resolving} onClick={() => void onResolve(request, true)}>
             <Check className="size-4" />
             Approve
           </Button>
         </>
-      )}
+      }
     />
   );
 }

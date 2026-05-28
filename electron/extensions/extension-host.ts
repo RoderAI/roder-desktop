@@ -161,7 +161,9 @@ export class ExtensionHost {
     child.on("message", (message) => void this.#handleMessage(hostProcess, message as RunnerMessage));
     child.once("exit", (code, signal) => {
       this.#processes.delete(record.id);
-      const message = signal ? `Extension host exited with signal ${signal}` : `Extension host exited with code ${code ?? 0}`;
+      const message = signal
+        ? `Extension host exited with signal ${signal}`
+        : `Extension host exited with code ${code ?? 0}`;
       for (const pending of hostProcess.pending.values()) {
         pending.reject(new Error(message));
       }
@@ -235,8 +237,9 @@ export class ExtensionHost {
 
   async #recordForCommand(commandId: string): Promise<ExtensionCatalogRecord> {
     const snapshot = await this.#catalog.list();
-    const record = snapshot.extensions.find((extension) =>
-      extension.enabled && extension.manifest.contributes.commands.some((command) => command.id === commandId),
+    const record = snapshot.extensions.find(
+      (extension) =>
+        extension.enabled && extension.manifest.contributes.commands.some((command) => command.id === commandId),
     );
     if (!record) {
       throw new Error(`No enabled extension contributes command ${commandId}`);
@@ -246,8 +249,8 @@ export class ExtensionHost {
 
   async #recordForTool(toolId: string): Promise<ExtensionCatalogRecord> {
     const snapshot = await this.#catalog.list();
-    const record = snapshot.extensions.find((extension) =>
-      extension.enabled && extension.manifest.contributes.tools.some((tool) => tool.id === toolId),
+    const record = snapshot.extensions.find(
+      (extension) => extension.enabled && extension.manifest.contributes.tools.some((tool) => tool.id === toolId),
     );
     if (!record) {
       throw new Error(`No enabled extension contributes tool ${toolId}`);

@@ -18,10 +18,7 @@ test("selects the recommended marketplace plugin variant by variant key", () => 
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
-    variants: [
-      variant("claude-plugins-official", "repo-tools-claude"),
-      variant("cursor-plugins", "repo-tools"),
-    ],
+    variants: [variant("claude-plugins-official", "repo-tools-claude"), variant("cursor-plugins", "repo-tools")],
     relatedCandidates: [],
     recommendedVariantKey: "cursor-plugins:repo-tools",
     installedVariants: [],
@@ -135,10 +132,18 @@ test("prepares installed plugin records for the installed tab", () => {
 test("summarizes component hints and marketplace sources for the UI", () => {
   const { activeComponentLabels, homepageIconUrl, sourceLabel, riskLabel, variantLabel } = marketplaceModule;
 
-  expect(activeComponentLabels({ ...baseHints, skills: true, mcpServers: true, hooks: true })).toEqual(["Skills", "MCP", "Hooks"]);
-  expect(sourceLabel({ kind: "marketplacePath", marketplace_id: "local-cursor", path: "Repo Tools" })).toBe("local-cursor / Repo Tools");
+  expect(activeComponentLabels({ ...baseHints, skills: true, mcpServers: true, hooks: true })).toEqual([
+    "Skills",
+    "MCP",
+    "Hooks",
+  ]);
+  expect(sourceLabel({ kind: "marketplacePath", marketplace_id: "local-cursor", path: "Repo Tools" })).toBe(
+    "local-cursor / Repo Tools",
+  );
   expect(variantLabel(variant("codex-plugins", "alpaca"))).toBe("alpaca");
-  expect(homepageIconUrl("https://alpaca.markets/docs")).toBe("https://www.google.com/s2/favicons?domain=alpaca.markets&sz=64");
+  expect(homepageIconUrl("https://alpaca.markets/docs")).toBe(
+    "https://www.google.com/s2/favicons?domain=alpaca.markets&sz=64",
+  );
   expect(homepageIconUrl("not a url")).toBe(undefined);
   expect(sourceLabel({ kind: "npm", package: "@example/plugin", version: "1.2.3" })).toBe("@example/plugin@1.2.3");
   expect(riskLabel("startsProcess")).toBe("Starts process");
@@ -223,10 +228,7 @@ test("builds marketplace lookup maps for plugin row derivation", () => {
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
-    variants: [
-      variant("cursor-plugins", "repo-tools-cursor"),
-      variant("local-dev", "repo-tools-local"),
-    ],
+    variants: [variant("cursor-plugins", "repo-tools-cursor"), variant("local-dev", "repo-tools-local")],
     relatedCandidates: [variant("claude-plugins-official", "repo-tools-claude")],
     recommendedVariantKey: "cursor-plugins:repo-tools-cursor",
     installedVariants: [],
@@ -243,8 +245,15 @@ test("builds marketplace lookup maps for plugin row derivation", () => {
     "claude-plugins-official:repo-tools-claude",
     "cursor-plugins:repo-tools-cursor",
   ]);
-  expect(lookups.installedByCanonicalSlug.get("repo-tools").map((record) => record.variantKey).sort()).toEqual(["claude-plugins-official:repo-tools-claude", "cursor-plugins:repo-tools-cursor"]);
-  expect([...lookups.marketplaceMatchByVariantKey.keys()].sort()).toEqual(plugin.variants.concat(plugin.relatedCandidates).map(pluginVariantKey).sort());
+  expect(
+    lookups.installedByCanonicalSlug
+      .get("repo-tools")
+      .map((record) => record.variantKey)
+      .sort(),
+  ).toEqual(["claude-plugins-official:repo-tools-claude", "cursor-plugins:repo-tools-cursor"]);
+  expect([...lookups.marketplaceMatchByVariantKey.keys()].sort()).toEqual(
+    plugin.variants.concat(plugin.relatedCandidates).map(pluginVariantKey).sort(),
+  );
   expect(lookups.marketplaceMatchesByCanonicalSlug.get("repo-tools")[0].plugin.displayName).toBe("Repo Tools");
 });
 
@@ -258,10 +267,7 @@ test("derives installed matches and stable row keys from marketplace lookups", (
   const plugin = {
     displayName: "Repo Tools",
     identityKey: { canonicalSlug: "repo-tools", normalizedName: "repo-tools" },
-    variants: [
-      variant("cursor-plugins", "repo-tools-cursor"),
-      variant("local-dev", "repo-tools-local"),
-    ],
+    variants: [variant("cursor-plugins", "repo-tools-cursor"), variant("local-dev", "repo-tools-local")],
     relatedCandidates: [],
     recommendedVariantKey: "cursor-plugins:repo-tools-cursor",
     installedVariants: [],
@@ -293,17 +299,34 @@ test("builds source code links for marketplace plugin variants", () => {
     },
   ];
 
-  expect(sourceCodeUrl({ kind: "marketplacePath", marketplace_id: "codex-plugins", path: "browser" }, marketplaces)).toBe("https://github.com/openai/plugins/tree/main/plugins/browser");
-  expect(sourceCodeUrl({ kind: "git", url: "https://github.com/example/tools.git", path: "plugins/lint", refName: "stable" }, [])).toBe("https://github.com/example/tools/tree/stable/plugins/lint");
-  expect(sourceCodeUrl({ kind: "npm", package: "@example/plugin", version: "1.2.3" }, [])).toBe("https://www.npmjs.com/package/%40example%2Fplugin");
-  expect(sourceCodeUrl({ kind: "git", url: "git@example.com:internal/tools.git", path: "plugins/lint" }, [])).toBe(undefined);
+  expect(
+    sourceCodeUrl({ kind: "marketplacePath", marketplace_id: "codex-plugins", path: "browser" }, marketplaces),
+  ).toBe("https://github.com/openai/plugins/tree/main/plugins/browser");
+  expect(
+    sourceCodeUrl(
+      { kind: "git", url: "https://github.com/example/tools.git", path: "plugins/lint", refName: "stable" },
+      [],
+    ),
+  ).toBe("https://github.com/example/tools/tree/stable/plugins/lint");
+  expect(sourceCodeUrl({ kind: "npm", package: "@example/plugin", version: "1.2.3" }, [])).toBe(
+    "https://www.npmjs.com/package/%40example%2Fplugin",
+  );
+  expect(sourceCodeUrl({ kind: "git", url: "git@example.com:internal/tools.git", path: "plugins/lint" }, [])).toBe(
+    undefined,
+  );
 });
 
 function variant(marketplaceId, pluginId, overrides = {}) {
   return {
     marketplaceId,
     pluginId,
-    kind: marketplaceId.startsWith("cursor") ? "cursor" : marketplaceId.startsWith("codex") ? "codex" : marketplaceId.startsWith("local") ? "custom" : "claude",
+    kind: marketplaceId.startsWith("cursor")
+      ? "cursor"
+      : marketplaceId.startsWith("codex")
+        ? "codex"
+        : marketplaceId.startsWith("local")
+          ? "custom"
+          : "claude",
     source: { kind: "marketplacePath", marketplace_id: marketplaceId, path: pluginId },
     category: null,
     tags: [],
@@ -319,7 +342,10 @@ function marketplace(id, kind, isDefault, sourceKind = "github") {
     id,
     kind,
     isDefault,
-    source: sourceKind === "localPath" ? { kind: "localPath", path: `/tmp/${id}` } : { kind: "github", repo: `example/${id}` },
+    source:
+      sourceKind === "localPath"
+        ? { kind: "localPath", path: `/tmp/${id}` }
+        : { kind: "github", repo: `example/${id}` },
   };
 }
 

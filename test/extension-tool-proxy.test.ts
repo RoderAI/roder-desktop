@@ -24,7 +24,10 @@ function catalogSnapshot(enabled = true) {
 }
 
 test("tool proxy merges enabled extension tools into tools/list", async () => {
-  const result = mergeExtensionTools({ tools: [{ name: "native", description: "Native", input_schema: {} }] }, catalogSnapshot());
+  const result = mergeExtensionTools(
+    { tools: [{ name: "native", description: "Native", input_schema: {} }] },
+    catalogSnapshot(),
+  );
 
   expect(result.tools.map((tool) => tool.name)).toEqual(["native", "hello-roder.echo"]);
   expect(result.tools[1].source).toBe("desktop-extension");
@@ -49,7 +52,7 @@ test("tool proxy executes extension tool calls through the host", async () => {
 
   const result = await callExtensionTool(host, "hello-roder.echo", { arguments: { text: "hi" } });
   expect(result).toEqual({
-    text: "{\"input\":{\"text\":\"hi\"}}",
+    text: '{"input":{"text":"hi"}}',
     data: { input: { text: "hi" } },
     is_error: false,
   });

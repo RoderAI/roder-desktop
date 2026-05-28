@@ -145,111 +145,111 @@ can change it with `thread/set_mode` or `settings/set_default_mode`.
 
 Core:
 
-| Method | Purpose |
-| --- | --- |
-| `initialize` | Desktop startup handshake with active provider, model, and cwd. |
-| `extensions/list` | List extension manifests and capability status. |
-| `providers/list` | List providers, auth status, capabilities, and models. |
-| `providers/configure` | Persist an API key for an API-key provider. |
-| `providers/select` | Select active default provider/model/reasoning. |
-| `model/list` | List desktop model descriptors. |
-| `settings/get` | Read hosted web search mode and default policy mode. |
-| `settings/set_web_search` | Set hosted web search mode. |
-| `settings/set_default_mode` | Set default policy mode. |
-| `auth/codex/login` | Start Codex OAuth login. |
-| `auth/codex/status` | Read Codex OAuth status. |
-| `auth/codex/logout` | Clear Codex OAuth credentials. |
-| `auth/supergrok/login` | Start SuperGrok OAuth login. |
-| `auth/supergrok/status` | Read SuperGrok OAuth status. |
-| `auth/supergrok/logout` | Clear SuperGrok OAuth credentials. |
+| Method                      | Purpose                                                         |
+| --------------------------- | --------------------------------------------------------------- |
+| `initialize`                | Desktop startup handshake with active provider, model, and cwd. |
+| `extensions/list`           | List extension manifests and capability status.                 |
+| `providers/list`            | List providers, auth status, capabilities, and models.          |
+| `providers/configure`       | Persist an API key for an API-key provider.                     |
+| `providers/select`          | Select active default provider/model/reasoning.                 |
+| `model/list`                | List desktop model descriptors.                                 |
+| `settings/get`              | Read hosted web search mode and default policy mode.            |
+| `settings/set_web_search`   | Set hosted web search mode.                                     |
+| `settings/set_default_mode` | Set default policy mode.                                        |
+| `auth/codex/login`          | Start Codex OAuth login.                                        |
+| `auth/codex/status`         | Read Codex OAuth status.                                        |
+| `auth/codex/logout`         | Clear Codex OAuth credentials.                                  |
+| `auth/supergrok/login`      | Start SuperGrok OAuth login.                                    |
+| `auth/supergrok/status`     | Read SuperGrok OAuth status.                                    |
+| `auth/supergrok/logout`     | Clear SuperGrok OAuth credentials.                              |
 
 Threads and turns:
 
-| Method | Purpose |
-| --- | --- |
-| `thread/start` | Create a desktop thread. |
-| `thread/list` | List desktop threads. |
-| `thread/read` | Read a desktop thread with optional turns. |
-| `thread/archive` | Archive a desktop thread so it no longer appears in active lists. |
-| `turn/start` | Start a desktop turn from rich text input. |
-| `turn/steer` | Add user input to an active desktop turn. |
-| `turn/interrupt` | Interrupt an active desktop turn. |
-| `thread/state` | Read policy mode and pending plan-exit state. |
-| `thread/set_mode` | Set the live policy mode. |
-| `thread/exit_plan` | Resolve a pending plan-exit request. |
-| `thread/resolve_approval` | Resolve a pending tool approval request. |
-| `thread/resolve_user_input` | Resolve a pending model-requested user input request. |
+| Method                      | Purpose                                                           |
+| --------------------------- | ----------------------------------------------------------------- |
+| `thread/start`              | Create a desktop thread.                                          |
+| `thread/list`               | List desktop threads.                                             |
+| `thread/read`               | Read a desktop thread with optional turns.                        |
+| `thread/archive`            | Archive a desktop thread so it no longer appears in active lists. |
+| `turn/start`                | Start a desktop turn from rich text input.                        |
+| `turn/steer`                | Add user input to an active desktop turn.                         |
+| `turn/interrupt`            | Interrupt an active desktop turn.                                 |
+| `thread/state`              | Read policy mode and pending plan-exit state.                     |
+| `thread/set_mode`           | Set the live policy mode.                                         |
+| `thread/exit_plan`          | Resolve a pending plan-exit request.                              |
+| `thread/resolve_approval`   | Resolve a pending tool approval request.                          |
+| `thread/resolve_user_input` | Resolve a pending model-requested user input request.             |
 
 Tools, commands, files, agents, and tasks:
 
-| Method | Purpose |
-| --- | --- |
-| `tools/list` | List runtime tool specs. |
-| `tools/call` | Directly call allowed workflow tools. |
-| `commands/list` | List configured slash commands. |
-| `commands/expand` | Expand a command to a model prompt and context blocks. |
-| `commands/run` | Expand a command and start a turn. |
-| `fs/readFile` | Read an absolute host file as base64. |
-| `fs/readDirectory` | List direct children of an absolute host directory. |
-| `command/exec` | Run a non-PTY command subject to policy checks. |
-| `agents/list` | List subagent definitions visible to the runtime. |
-| `tasks/submit` | Submit a background task. |
-| `tasks/list` | List task handles. |
-| `tasks/get` | Read task handle plus logs. |
-| `tasks/cancel` | Cancel a task. |
-| `tasks/subscribe` | Return supported task event kinds. |
+| Method             | Purpose                                                |
+| ------------------ | ------------------------------------------------------ |
+| `tools/list`       | List runtime tool specs.                               |
+| `tools/call`       | Directly call allowed workflow tools.                  |
+| `commands/list`    | List configured slash commands.                        |
+| `commands/expand`  | Expand a command to a model prompt and context blocks. |
+| `commands/run`     | Expand a command and start a turn.                     |
+| `fs/readFile`      | Read an absolute host file as base64.                  |
+| `fs/readDirectory` | List direct children of an absolute host directory.    |
+| `command/exec`     | Run a non-PTY command subject to policy checks.        |
+| `agents/list`      | List subagent definitions visible to the runtime.      |
+| `tasks/submit`     | Submit a background task.                              |
+| `tasks/list`       | List task handles.                                     |
+| `tasks/get`        | Read task handle plus logs.                            |
+| `tasks/cancel`     | Cancel a task.                                         |
+| `tasks/subscribe`  | Return supported task event kinds.                     |
 
 Teams and panes:
 
-| Method | Purpose |
-| --- | --- |
-| `team/start` | Start an agent team. |
-| `team/list` | List active/persisted teams. |
-| `team/read` | Read a team and mailbox messages. |
-| `team/member/start` | Add a teammate. |
-| `team/member/message` | Send a direct teammate message. |
-| `team/member/interrupt` | Interrupt a teammate. |
-| `team/member/focus` | Validate and acknowledge focused teammate. |
-| `team/cleanup` | Cleanup team state. |
-| `team/pane/focus` | Unsupported in headless app-server clients. |
-| `team/pane/cleanup` | Unsupported in headless app-server clients. |
+| Method                  | Purpose                                     |
+| ----------------------- | ------------------------------------------- |
+| `team/start`            | Start an agent team.                        |
+| `team/list`             | List active/persisted teams.                |
+| `team/read`             | Read a team and mailbox messages.           |
+| `team/member/start`     | Add a teammate.                             |
+| `team/member/message`   | Send a direct teammate message.             |
+| `team/member/interrupt` | Interrupt a teammate.                       |
+| `team/member/focus`     | Validate and acknowledge focused teammate.  |
+| `team/cleanup`          | Cleanup team state.                         |
+| `team/pane/focus`       | Unsupported in headless app-server clients. |
+| `team/pane/cleanup`     | Unsupported in headless app-server clients. |
 
 Review, hunks, workflow imports, media, memory, and speech:
 
-| Method | Purpose |
-| --- | --- |
-| `turn/subagentTraces/list` | List subagent traces for a turn. |
-| `turn/subagentTrace/read` | Read paged subagent trace deltas. |
-| `plan/review/read` | Read a plan review. |
-| `plan/review/comment` | Add a review comment and steer the turn. |
-| `plan/review/rewrite` | Request a plan rewrite and steer the turn. |
-| `plan/review/approve` | Approve a plan review. |
-| `plan/review/reject` | Reject a plan review. |
-| `hunk/list` | List recorded hunks, optionally by turn/review. |
-| `hunk/read` | Read a paged hunk diff. |
-| `hunk/rollback` | Confirm and apply a hunk reverse patch. |
-| `workflow/scan` | Scan workflow imports. |
-| `workflow/preview` | Preview workflow import items. |
-| `workflow/enable` | Enable a workflow import. |
-| `workflow/ignore` | Ignore a workflow import. |
-| `workflow/refresh` | Re-scan and detect stale enabled imports. |
-| `workflow/remove` | Remove an enabled workflow import decision. |
-| `media/list` | List media artifacts. |
-| `media/read` | Read artifact bytes as base64. |
-| `media/thumbnail` | Read an artifact preview. |
-| `media/delete` | Delete an artifact. |
-| `media/attachToTurn` | Convert an artifact to a turn attachment/image. |
-| `memory/list` | List memory records. |
-| `memory/read` | Read one memory. |
-| `memory/save` | Save a memory. |
-| `memory/update` | Update a memory. |
-| `memory/delete` | Delete a memory. |
-| `memory/query` | Search memories. |
-| `memory/provider/list` | List embedding providers and selected provider. |
-| `memory/provider/set` | Persist the embedding provider/model. |
-| `memory/recall/preview` | Preview recall citations/results for a turn. |
-| `speech/providers/list` | Discover available speech transcription providers. |
-| `speech/transcribe` | Transcribe an audio recording to text. |
+| Method                     | Purpose                                            |
+| -------------------------- | -------------------------------------------------- |
+| `turn/subagentTraces/list` | List subagent traces for a turn.                   |
+| `turn/subagentTrace/read`  | Read paged subagent trace deltas.                  |
+| `plan/review/read`         | Read a plan review.                                |
+| `plan/review/comment`      | Add a review comment and steer the turn.           |
+| `plan/review/rewrite`      | Request a plan rewrite and steer the turn.         |
+| `plan/review/approve`      | Approve a plan review.                             |
+| `plan/review/reject`       | Reject a plan review.                              |
+| `hunk/list`                | List recorded hunks, optionally by turn/review.    |
+| `hunk/read`                | Read a paged hunk diff.                            |
+| `hunk/rollback`            | Confirm and apply a hunk reverse patch.            |
+| `workflow/scan`            | Scan workflow imports.                             |
+| `workflow/preview`         | Preview workflow import items.                     |
+| `workflow/enable`          | Enable a workflow import.                          |
+| `workflow/ignore`          | Ignore a workflow import.                          |
+| `workflow/refresh`         | Re-scan and detect stale enabled imports.          |
+| `workflow/remove`          | Remove an enabled workflow import decision.        |
+| `media/list`               | List media artifacts.                              |
+| `media/read`               | Read artifact bytes as base64.                     |
+| `media/thumbnail`          | Read an artifact preview.                          |
+| `media/delete`             | Delete an artifact.                                |
+| `media/attachToTurn`       | Convert an artifact to a turn attachment/image.    |
+| `memory/list`              | List memory records.                               |
+| `memory/read`              | Read one memory.                                   |
+| `memory/save`              | Save a memory.                                     |
+| `memory/update`            | Update a memory.                                   |
+| `memory/delete`            | Delete a memory.                                   |
+| `memory/query`             | Search memories.                                   |
+| `memory/provider/list`     | List embedding providers and selected provider.    |
+| `memory/provider/set`      | Persist the embedding provider/model.              |
+| `memory/recall/preview`    | Preview recall citations/results for a turn.       |
+| `speech/providers/list`    | Discover available speech transcription providers. |
+| `speech/transcribe`        | Transcribe an audio recording to text.             |
 
 ## Detailed Method Reference
 
@@ -672,9 +672,7 @@ Request:
 ```json
 {
   "threadId": "thread-123",
-  "input": [
-    { "type": "text", "text": "inspect this repo" }
-  ],
+  "input": [{ "type": "text", "text": "inspect this repo" }],
   "modelProvider": "openai",
   "model": "gpt-5.5",
   "reasoning": "high",
@@ -722,9 +720,7 @@ Request:
 {
   "threadId": "thread-123",
   "expectedTurnId": "turn-123",
-  "input": [
-    { "type": "text", "text": "also check the app-server tests" }
-  ]
+  "input": [{ "type": "text", "text": "also check the app-server tests" }]
 }
 ```
 
@@ -928,9 +924,7 @@ Response:
 
 ```json
 {
-  "entries": [
-    { "fileName": "api.md", "isDirectory": false, "isFile": true }
-  ]
+  "entries": [{ "fileName": "api.md", "isDirectory": false, "isFile": true }]
 }
 ```
 
@@ -1219,9 +1213,7 @@ Examples:
     "executor_id": "task",
     "status": "completed"
   },
-  "logs": [
-    { "stream": "stdout", "chunk": "done\n", "timestamp": "2026-05-18T12:00:00Z" }
-  ],
+  "logs": [{ "stream": "stdout", "chunk": "done\n", "timestamp": "2026-05-18T12:00:00Z" }],
   "dropped_bytes": 0
 }
 ```
@@ -1235,13 +1227,7 @@ Errors:
 ```json
 {
   "subscribed": true,
-  "event_kinds": [
-    "task.started",
-    "task.output",
-    "task.completed",
-    "task.failed",
-    "task.cancelled"
-  ]
+  "event_kinds": ["task.started", "task.output", "task.completed", "task.failed", "task.cancelled"]
 }
 ```
 
@@ -1330,9 +1316,7 @@ Request:
 {
   "leadThreadId": "thread-123",
   "displayMode": "in_process",
-  "members": [
-    { "name": "Reviewer", "modelProvider": "openai", "model": "gpt-5.5" }
-  ]
+  "members": [{ "name": "Reviewer", "modelProvider": "openai", "model": "gpt-5.5" }]
 }
 ```
 

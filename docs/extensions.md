@@ -101,17 +101,9 @@ The root `package.json` must include standard npm metadata and a `roder` object.
       "roder": ">=0.0.0"
     },
     "main": "dist/extension.js",
-    "activationEvents": [
-      "onStartupFinished",
-      "onCommand:hello-roder.sayHello",
-      "onTool:hello-roder.echo"
-    ],
-    "capabilities": [
-      "desktop.notification"
-    ],
-    "categories": [
-      "Other"
-    ],
+    "activationEvents": ["onStartupFinished", "onCommand:hello-roder.sayHello", "onTool:hello-roder.echo"],
+    "capabilities": ["desktop.notification"],
+    "categories": ["Other"],
     "contributes": {
       "commands": [],
       "tools": [],
@@ -307,9 +299,7 @@ export async function activate(context: RoderExtensionContext): Promise<void> {
         category: "Hello Roder",
       },
       async () => {
-        const greeting = String(
-          context.preferences["hello-roder.greeting"] ?? "Hello from an extension",
-        );
+        const greeting = String(context.preferences["hello-roder.greeting"] ?? "Hello from an extension");
         await context.globalState.update("lastCommandRunAt", new Date().toISOString());
         await context.notifications.showInformationMessage(greeting);
         return { greeting };
@@ -641,10 +631,7 @@ import type { RoderExtensionContext } from "@roderai/extension-api";
 
 export async function activate(context: RoderExtensionContext): Promise<void> {
   context.subscriptions.push(
-    context.commands.registerCommand(
-      { id: "sample.hello", title: "Say Hello" },
-      async () => "Hello from Roder",
-    ),
+    context.commands.registerCommand({ id: "sample.hello", title: "Say Hello" }, async () => "Hello from Roder"),
   );
 }
 ```

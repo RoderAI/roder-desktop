@@ -113,7 +113,9 @@ test("catalog rejects folders with invalid manifests", async () => {
   manifest.roder.main = "../escape.js";
   writeFileSync(join(fixturePath, "package.json"), JSON.stringify(manifest, null, 2));
 
-  await expect(() => catalog.installFromFolder(fixturePath)).rejects.toThrow(/relative path inside the extension package/);
+  await expect(() => catalog.installFromFolder(fixturePath)).rejects.toThrow(
+    /relative path inside the extension package/,
+  );
 });
 
 test("catalog rejects .rdx archives with unsafe paths", async () => {

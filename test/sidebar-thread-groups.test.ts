@@ -21,7 +21,11 @@ test("sidebar project order keeps existing projects in place and prepends new pr
     thread("thread-b", "/workspace/project-b"),
   ];
 
-  expect(Array.from(sidebarProjectOrder(threads, currentOrder))).toEqual(["/workspace/project-c", "/workspace/project-a", "/workspace/project-b"]);
+  expect(Array.from(sidebarProjectOrder(threads, currentOrder))).toEqual([
+    "/workspace/project-c",
+    "/workspace/project-a",
+    "/workspace/project-b",
+  ]);
 });
 
 test("sidebar project groups follow the stable project order", () => {
