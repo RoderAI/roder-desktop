@@ -112,6 +112,36 @@ test("startTurn sends selected controls with the next turn", async () => {
   ]);
 });
 
+test("startThread sends the first prompt so the app-server can name immediately", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return {
+      thread: { id: "thread-1", preview: "Untitled thread" },
+      model: params.model,
+      modelProvider: params.modelProvider,
+      reasoning: params.reasoning,
+      cwd: params.cwd,
+    };
+  });
+
+  await roderIpc.startThread("gpt-5.5", "/workspace", "openai", "high", { initialPrompt: "fix the tests" });
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "thread/start",
+      params: {
+        model: "gpt-5.5",
+        cwd: "/workspace",
+        modelProvider: "openai",
+        reasoning: "high",
+        ephemeral: false,
+        initialPrompt: "fix the tests",
+      },
+    },
+  ]);
+});
+
 test("wait request resolvers use thread protocol methods and camelCase params", async () => {
   const calls = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {

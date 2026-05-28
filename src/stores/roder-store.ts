@@ -502,6 +502,7 @@ export const useRoderStore = create<RoderStore>()(
               cwd,
               model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
               state.defaultReasoning,
+              { initialPrompt: text },
             );
             if (!result.thread) {
               throw new Error("roder app-server did not return a thread");
