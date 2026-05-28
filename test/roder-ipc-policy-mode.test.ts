@@ -1,42 +1,28 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { Script } from "node:vm";
-import { test } from "node:test";
-import ts from "typescript";
+import { expect, test, vi } from "vitest";
 
-const source = readFileSync(new URL("../src/lib/roder-ipc.ts", import.meta.url), "utf8");
-const compiled = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2023,
-  },
-}).outputText;
-
-function loadRoderIpc(request) {
-  const module = { exports: {} };
-  new Script(compiled).runInNewContext({
-    exports: module.exports,
-    module,
-    window: {
-      roderDesktop: {
-        request,
-      },
+async function loadRoderIpc(request) {
+  vi.resetModules();
+  globalThis.window = {
+    roderDesktop: {
+      request,
+      onNotification: () => () => undefined,
+      onStderr: () => () => undefined,
     },
-  });
-  return module.exports.roderIpc;
+  };
+  return (await import("../src/lib/roder-ipc")).roderIpc;
 }
 
 test("threadState reads the live policy mode from the app-server", async () => {
   const calls = [];
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { mode: "plan", pendingPlanExit: null };
   });
 
   const result = await roderIpc.threadState();
 
-  assert.deepEqual(result, { mode: "plan", pendingPlanExit: null });
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(result).toEqual({ mode: "plan", pendingPlanExit: null });
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "thread/state",
       params: {},
@@ -46,15 +32,15 @@ test("threadState reads the live policy mode from the app-server", async () => {
 
 test("setThreadMode sends the policy mode wire value to the app-server", async () => {
   const calls = [];
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { mode: params.mode };
   });
 
   const result = await roderIpc.setThreadMode("accept_all", "desktop permission selector");
 
-  assert.deepEqual(result, { mode: "accept_all" });
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(result).toEqual({ mode: "accept_all" });
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "thread/set_mode",
       params: {
@@ -67,7 +53,7 @@ test("setThreadMode sends the policy mode wire value to the app-server", async (
 
 test("default settings use provider and settings protocol methods", async () => {
   const calls = [];
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     if (method === "providers/select") {
       return { provider: params.provider, model: params.model, reasoning: params.reasoning };
@@ -78,7 +64,7 @@ test("default settings use provider and settings protocol methods", async () => 
   await roderIpc.selectProviderDefaults("openai", "gpt-5.5", "high");
   await roderIpc.setDefaultMode("plan");
 
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "providers/select",
       params: {
@@ -98,7 +84,7 @@ test("default settings use provider and settings protocol methods", async () => 
 
 test("startTurn sends selected controls with the next turn", async () => {
   const calls = [];
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { turnId: "turn-1" };
   });
@@ -110,8 +96,8 @@ test("startTurn sends selected controls with the next turn", async () => {
     policyMode: "plan",
   });
 
-  assert.deepEqual(result, { turnId: "turn-1" });
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(result).toEqual({ turnId: "turn-1" });
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "turn/start",
       params: {
@@ -128,7 +114,7 @@ test("startTurn sends selected controls with the next turn", async () => {
 
 test("wait request resolvers use thread protocol methods and camelCase params", async () => {
   const calls = [];
-  const roderIpc = loadRoderIpc(async (method, params) => {
+  const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
     return { resolved: true };
   });
@@ -137,7 +123,7 @@ test("wait request resolvers use thread protocol methods and camelCase params", 
   await roderIpc.resolveUserInput({ requestId: "input-1", answers: { mode: "Default" } });
   await roderIpc.exitPlan({ requestId: "plan-1", approved: true });
 
-  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "thread/resolve_approval",
       params: {

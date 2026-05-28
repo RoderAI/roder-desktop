@@ -1,17 +1,5 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { Script } from "node:vm";
-import { test } from "node:test";
-import ts from "typescript";
-
-const toolDisplayModule = loadTypescriptModule("../src/lib/tool-display.ts");
-const toolMessageGroupsModule = loadTypescriptModule("../src/lib/tool-message-groups.ts", (id) => {
-  if (id === "@/lib/tool-display") {
-    return toolDisplayModule.exports;
-  }
-  throw new Error(`Unexpected import: ${id}`);
-});
-const { groupToolMessagesForTranscript } = toolMessageGroupsModule.exports;
+import { expect, test } from "vitest";
+import { groupToolMessagesForTranscript } from "../src/lib/tool-message-groups";
 
 test("adjacent read-file tool messages collapse into one transcript group", () => {
   const grouped = groupToolMessagesForTranscript([
@@ -21,7 +9,7 @@ test("adjacent read-file tool messages collapse into one transcript group", () =
     createToolMessage("tool-3", "read_file", "Read tsconfig.json"),
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       id: "activity-group:tool-1:tool-2",
       kind: "activityGroup",
@@ -60,7 +48,7 @@ test("adjacent skill read tool messages collapse into one transcript group", () 
     createToolMessage("tool-3", "read_file", "Read README.md"),
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       id: "activity-group:tool-1:tool-3",
       kind: "activityGroup",
@@ -96,7 +84,7 @@ test("adjacent search tool messages collapse into one transcript group", () => {
     createAssistantMessage("Done."),
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       id: "activity-group:tool-1:tool-3",
       kind: "activityGroup",
@@ -135,7 +123,7 @@ test("completed tool runs collapse into one expandable activity group", () => {
     createAssistantMessage("Done."),
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       kind: "message",
       message: createUserMessage("Inspect this repo."),
@@ -182,7 +170,7 @@ test("goal updates stay visible before collapsed exploration activity", () => {
     createToolMessage("tool-3", "read_file", "Read README.md"),
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       kind: "message",
       message: createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
@@ -220,7 +208,7 @@ test("running tool runs stay expanded while progress is active", () => {
     },
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       id: "tool-group:read_file:tool-1:tool-2",
       kind: "readFileGroup",
@@ -242,7 +230,7 @@ test("completed tools stay expanded while their turn is still active", () => {
     createToolMessage("tool-2", "grep", 'Searched for "Transcript" in src', "turn-1"),
   ], { activeTurnId: "turn-1" });
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       kind: "message",
       message: createToolMessage("tool-1", "read_file", "Read README.md", "turn-1"),
@@ -261,7 +249,7 @@ test("failed tool activity stays inside the completed exploration group", () => 
     createToolMessage("tool-3", "grep", 'Searched for "Transcript" in src'),
   ]);
 
-  assert.deepEqual(plain(grouped), [
+  expect(plain(grouped)).toEqual([
     {
       id: "activity-group:tool-1:tool-3",
       kind: "activityGroup",
@@ -331,17 +319,4 @@ function createAssistantMessage(text) {
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-function loadTypescriptModule(path, requireFn = () => ({})) {
-  const source = readFileSync(new URL(path, import.meta.url), "utf8");
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2023,
-    },
-  }).outputText;
-  const module = { exports: {} };
-  new Script(compiled).runInNewContext({ exports: module.exports, module, require: requireFn });
-  return module;
 }
