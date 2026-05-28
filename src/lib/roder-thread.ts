@@ -384,7 +384,7 @@ function extractItemText(item: RoderItem): string {
     return item.text;
   }
   if (item.type === "reasoning") {
-    return item.content?.join("") || item.summary?.join("\n") || "";
+    return reasoningBlocksText(item.content) || reasoningBlocksText(item.summary) || "";
   }
   if (item.type === "error") {
     return item.message;
@@ -393,6 +393,10 @@ function extractItemText(item: RoderItem): string {
     return item.summary;
   }
   return "";
+}
+
+function reasoningBlocksText(blocks: string[] | undefined): string {
+  return blocks?.filter((block) => block.length > 0).join("\n\n") ?? "";
 }
 
 function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem): ConversationMessage | null {
