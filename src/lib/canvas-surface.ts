@@ -93,7 +93,15 @@ export function drawShape(context: CanvasRenderingContext2D, shape: CanvasShape)
     if (shape.kind === "rectangle") {
       context.rect(rect.x, rect.y, rect.width, rect.height);
     } else {
-      context.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width / 2, rect.height / 2, 0, 0, Math.PI * 2);
+      context.ellipse(
+        rect.x + rect.width / 2,
+        rect.y + rect.height / 2,
+        rect.width / 2,
+        rect.height / 2,
+        0,
+        0,
+        Math.PI * 2,
+      );
     }
   }
 
@@ -147,7 +155,12 @@ export function imageRect(image: CanvasImage): { x: number; y: number; width: nu
 export function imageAtPoint(point: Point, images: CanvasImage[]): CanvasImage | null {
   for (let index = images.length - 1; index >= 0; index -= 1) {
     const image = images[index];
-    if (point.x >= image.x && point.x <= image.x + image.width && point.y >= image.y && point.y <= image.y + image.height) {
+    if (
+      point.x >= image.x &&
+      point.x <= image.x + image.width &&
+      point.y >= image.y &&
+      point.y <= image.y + image.height
+    ) {
       return image;
     }
   }
@@ -201,7 +214,12 @@ export function drawImageSelection(context: CanvasRenderingContext2D, image: Can
     { x: image.x, y: image.y + image.height },
     { x: image.x + image.width, y: image.y + image.height },
   ]) {
-    context.fillRect(point.x - resizeHandleSize / 2, point.y - resizeHandleSize / 2, resizeHandleSize, resizeHandleSize);
+    context.fillRect(
+      point.x - resizeHandleSize / 2,
+      point.y - resizeHandleSize / 2,
+      resizeHandleSize,
+      resizeHandleSize,
+    );
   }
   context.restore();
 }
@@ -212,7 +230,9 @@ function distance(left: Point, right: Point): number {
 
 function resizeWidthFromDrag(interaction: ImageInteraction, dx: number, dy: number, aspect: number): number {
   const fromX =
-    interaction.corner === "sw" || interaction.corner === "nw" ? interaction.original.width - dx : interaction.original.width + dx;
+    interaction.corner === "sw" || interaction.corner === "nw"
+      ? interaction.original.width - dx
+      : interaction.original.width + dx;
   const fromY =
     interaction.corner === "ne" || interaction.corner === "nw"
       ? (interaction.original.height - dy) * aspect

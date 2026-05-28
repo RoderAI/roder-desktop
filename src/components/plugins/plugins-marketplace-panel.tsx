@@ -21,10 +21,7 @@ import {
   recommendedVariant,
   visibleInstalledPlugins,
 } from "@/lib/plugins-marketplace";
-import type {
-  MarketplaceProviderSelection,
-  PluginInstallStatus,
-} from "@/lib/plugins-marketplace";
+import type { MarketplaceProviderSelection, PluginInstallStatus } from "@/lib/plugins-marketplace";
 import { cn } from "@/lib/utils";
 import { usePluginsStore } from "@/stores/plugins-store";
 import type { DedupedMarketplacePlugin } from "@/types/plugins";
@@ -57,7 +54,10 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
     [installedPlugins, plugins],
   );
   const providerPlugins = React.useMemo(
-    () => plugins.map((plugin) => pluginForProvider(plugin, provider, marketplaces)).filter((plugin): plugin is DedupedMarketplacePlugin => Boolean(plugin)),
+    () =>
+      plugins
+        .map((plugin) => pluginForProvider(plugin, provider, marketplaces))
+        .filter((plugin): plugin is DedupedMarketplacePlugin => Boolean(plugin)),
     [marketplaces, plugins, provider],
   );
   const categoryOptions = React.useMemo(() => categoryOptionsForPlugins(providerPlugins), [providerPlugins]);
@@ -153,15 +153,13 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
               Explore
             </PluginsTabButton>
           </div>
-          <MarketplaceSettingsDialog
-            loading={loading}
-            onAdd={addLocalMarketplace}
-            onRefresh={refreshProvider}
-          />
+          <MarketplaceSettingsDialog loading={loading} onAdd={addLocalMarketplace} onRefresh={refreshProvider} />
         </div>
       </header>
 
-      {error && <div className="border-b border-border bg-destructive/10 px-4 py-2 text-base text-destructive">{error}</div>}
+      {error && (
+        <div className="border-b border-border bg-destructive/10 px-4 py-2 text-base text-destructive">{error}</div>
+      )}
 
       {activeTab === "installed" ? (
         <InstalledPluginsTab
@@ -262,9 +260,7 @@ function PluginsTabButton({
       aria-selected={active}
       className={cn(
         "inline-flex h-9 items-center gap-2 rounded-full px-3 text-base font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-        active
-          ? "bg-muted/50 text-foreground"
-          : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
+        active ? "bg-muted/50 text-foreground" : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
       )}
       onClick={onClick}
     >

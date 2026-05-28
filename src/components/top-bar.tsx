@@ -213,7 +213,9 @@ function CollapsedBreadcrumb({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={8} className="w-[380px] rounded-xl p-1.5">
           <DropdownMenuGroup className="max-h-[320px] overflow-y-auto">
-            <div className="px-2 pb-1 pt-1 text-base font-medium text-muted-foreground">Threads in {activeFolderLabel}</div>
+            <div className="px-2 pb-1 pt-1 text-base font-medium text-muted-foreground">
+              Threads in {activeFolderLabel}
+            </div>
             {threads.length > 0 ? (
               threads.map((item) => {
                 const selected = item.id === thread?.id;

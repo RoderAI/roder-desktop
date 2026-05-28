@@ -50,7 +50,14 @@ export async function activate(context) {
           capabilities: ["desktop.notification"],
           contributes: {
             commands: [{ id: "hello-host.sayHello", title: "Say Hello" }],
-            tools: [{ id: "hello-host.echo", title: "Echo Text", description: "Echoes text.", inputSchema: { type: "object" } }],
+            tools: [
+              {
+                id: "hello-host.echo",
+                title: "Echo Text",
+                description: "Echoes text.",
+                inputSchema: { type: "object" },
+              },
+            ],
             configuration: [{ key: "hello-host.greeting", title: "Greeting", type: "text", default: "Hello host" }],
             views: { panels: [] },
           },
@@ -102,7 +109,9 @@ test("extension host refuses disabled extension contributions", async () => {
   });
 
   try {
-    await expect(() => host.executeCommand("hello-host.sayHello")).rejects.toThrow(/No enabled extension contributes command/);
+    await expect(() => host.executeCommand("hello-host.sayHello")).rejects.toThrow(
+      /No enabled extension contributes command/,
+    );
   } finally {
     await host.stopAll();
   }

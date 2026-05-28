@@ -49,7 +49,10 @@ export type ToolMessageGroupingOptions = {
   activeTurnId?: string;
 };
 
-export function groupToolMessagesForTranscript(messages: ConversationMessage[], options: ToolMessageGroupingOptions = {}): TranscriptMessageEntry[] {
+export function groupToolMessagesForTranscript(
+  messages: ConversationMessage[],
+  options: ToolMessageGroupingOptions = {},
+): TranscriptMessageEntry[] {
   return groupCompletedActivityRuns(groupAdjacentToolMessages(messages), options);
 }
 
@@ -97,7 +100,10 @@ function groupAdjacentToolMessages(messages: ConversationMessage[]): TranscriptT
   return entries;
 }
 
-function groupCompletedActivityRuns(entries: TranscriptToolEntry[], options: ToolMessageGroupingOptions): TranscriptMessageEntry[] {
+function groupCompletedActivityRuns(
+  entries: TranscriptToolEntry[],
+  options: ToolMessageGroupingOptions,
+): TranscriptMessageEntry[] {
   const grouped: TranscriptMessageEntry[] = [];
   let pendingEntries: TranscriptToolEntry[] = [];
 
@@ -154,11 +160,15 @@ function toolMessageStableId(message: ConversationMessage): string {
 
 function isCompletedToolEntry(entry: TranscriptToolEntry, options: ToolMessageGroupingOptions): boolean {
   const messages = toolMessagesFromEntry(entry);
-  return messages.length > 0 && messages.every((message) =>
-    isExplorationActivity(message)
-    && !(options.activeTurnId && message.turnId === options.activeTurnId)
-    && message.toolStatus !== "running"
-    && message.status !== "streaming"
+  return (
+    messages.length > 0 &&
+    messages.every(
+      (message) =>
+        isExplorationActivity(message) &&
+        !(options.activeTurnId && message.turnId === options.activeTurnId) &&
+        message.toolStatus !== "running" &&
+        message.status !== "streaming",
+    )
   );
 }
 

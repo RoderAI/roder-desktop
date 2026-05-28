@@ -50,5 +50,7 @@ test("reads and validates extension theme definitions", async () => {
 });
 
 test("rejects extension themes outside the package root", async () => {
-  await expect(() => readExtensionTheme(extensionRecord("../escape.json"), "aurora-dark")).rejects.toThrow(/outside the extension package/);
+  await expect(() => readExtensionTheme(extensionRecord("../escape.json"), "aurora-dark")).rejects.toThrow(
+    /outside the extension package/,
+  );
 });

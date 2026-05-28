@@ -9,20 +9,19 @@ type DialogTriggerProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
   asChild?: boolean;
 };
 
-export const DialogTrigger = React.forwardRef<
-  HTMLButtonElement,
-  DialogTriggerProps
->(({ asChild = false, children, ...props }, ref) => {
-  if (asChild && React.isValidElement(children)) {
-    return <DialogPrimitive.Trigger ref={ref} render={children} {...props} />;
-  }
+export const DialogTrigger = React.forwardRef<HTMLButtonElement, DialogTriggerProps>(
+  ({ asChild = false, children, ...props }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+      return <DialogPrimitive.Trigger ref={ref} render={children} {...props} />;
+    }
 
-  return (
-    <DialogPrimitive.Trigger ref={ref} {...props}>
-      {children}
-    </DialogPrimitive.Trigger>
-  );
-});
+    return (
+      <DialogPrimitive.Trigger ref={ref} {...props}>
+        {children}
+      </DialogPrimitive.Trigger>
+    );
+  },
+);
 
 DialogTrigger.displayName = "DialogTrigger";
 
@@ -59,17 +58,11 @@ export const DialogContent = React.forwardRef<
 
 DialogContent.displayName = "DialogContent";
 
-export function DialogHeader({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
+export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
   return <div className={cn("flex flex-col gap-1.5 pr-8", className)} {...props} />;
 }
 
-export function DialogFooter({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
+export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
   return <div className={cn("flex justify-end gap-2", className)} {...props} />;
 }
 
@@ -77,11 +70,7 @@ export const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
-    ref={ref}
-    className={cn("font-medium text-foreground", className)}
-    {...props}
-  />
+  <DialogPrimitive.Title ref={ref} className={cn("font-medium text-foreground", className)} {...props} />
 ));
 
 DialogTitle.displayName = "DialogTitle";
@@ -90,11 +79,7 @@ export const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn("leading-6 text-muted-foreground", className)}
-    {...props}
-  />
+  <DialogPrimitive.Description ref={ref} className={cn("leading-6 text-muted-foreground", className)} {...props} />
 ));
 
 DialogDescription.displayName = "DialogDescription";

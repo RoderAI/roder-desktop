@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { createApplicationMenuTemplate, isNewProjectShortcutInput, isNewThreadShortcutInput } from "../electron/main/shortcuts";
+import {
+  createApplicationMenuTemplate,
+  isNewProjectShortcutInput,
+  isNewThreadShortcutInput,
+} from "../electron/main/shortcuts";
 
 function input(overrides = {}) {
   return {

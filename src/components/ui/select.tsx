@@ -35,22 +35,24 @@ type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.
   sideOffset?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>["sideOffset"];
 };
 
-export const SelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Popup>,
-  SelectContentProps
->(({ align = "start", className, children, position: _position, side, sideOffset = 6, ...props }, ref) => (
-  <SelectPrimitive.Portal>
-    <SelectPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
-      <SelectPrimitive.Popup
-        ref={ref}
-        className={cn("min-w-48 overflow-hidden rounded-md border border-border bg-popover shadow-md outline-none", className)}
-        {...props}
-      >
-        <SelectPrimitive.List className="p-1">{children}</SelectPrimitive.List>
-      </SelectPrimitive.Popup>
-    </SelectPrimitive.Positioner>
-  </SelectPrimitive.Portal>
-));
+export const SelectContent = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Popup>, SelectContentProps>(
+  ({ align = "start", className, children, position: _position, side, sideOffset = 6, ...props }, ref) => (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
+        <SelectPrimitive.Popup
+          ref={ref}
+          className={cn(
+            "min-w-48 overflow-hidden rounded-md border border-border bg-popover shadow-md outline-none",
+            className,
+          )}
+          {...props}
+        >
+          <SelectPrimitive.List className="p-1">{children}</SelectPrimitive.List>
+        </SelectPrimitive.Popup>
+      </SelectPrimitive.Positioner>
+    </SelectPrimitive.Portal>
+  ),
+);
 
 SelectContent.displayName = "SelectContent";
 
@@ -60,7 +62,10 @@ export const SelectItem = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
-    className={cn("relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-base outline-none focus:bg-accent", className)}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-base outline-none focus:bg-accent",
+      className,
+    )}
     {...props}
   >
     <span className="absolute left-2 flex size-3.5 items-center justify-center">

@@ -68,7 +68,8 @@ export function App(): React.JSX.Element {
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const extensions = useExtensionsStore((state) => state.extensions);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
-  const selectedExtension = sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
+  const selectedExtension =
+    sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
@@ -118,13 +119,16 @@ export function App(): React.JSX.Element {
     setComposerFocusSignal((value) => value + 1);
     void createAgentThread();
   }, [createAgentThread, followBottom, showChat]);
-  const newThreadInFolder = useCallback((path: string) => {
-    showChat();
-    followBottom();
-    setComposerFocusSignal((value) => value + 1);
-    setSelectedWorkspaceCwd(path);
-    void createAgentThread();
-  }, [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat]);
+  const newThreadInFolder = useCallback(
+    (path: string) => {
+      showChat();
+      followBottom();
+      setComposerFocusSignal((value) => value + 1);
+      setSelectedWorkspaceCwd(path);
+      void createAgentThread();
+    },
+    [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat],
+  );
   const newProject = useCallback(() => {
     showChat();
     followBottom();
@@ -175,30 +179,42 @@ export function App(): React.JSX.Element {
     setSelectedExtensionId((extensionId) => extensionId ?? selectedExtension?.id ?? null);
     setActiveTool("extensions");
   }, [activeTool, selectedExtension, showChat]);
-  const selectExtensionFromRail = useCallback((extensionId: string) => {
-    showChat();
-    setSelectedExtensionId(extensionId);
-    setActiveTool("extensions");
-  }, [showChat]);
-  const toggleToolPanel = useCallback((toolName: NonNullable<ToolPanel>) => {
-    showChat();
-    setActiveTool((tool) => (tool === toolName ? null : toolName));
-  }, [showChat]);
+  const selectExtensionFromRail = useCallback(
+    (extensionId: string) => {
+      showChat();
+      setSelectedExtensionId(extensionId);
+      setActiveTool("extensions");
+    },
+    [showChat],
+  );
+  const toggleToolPanel = useCallback(
+    (toolName: NonNullable<ToolPanel>) => {
+      showChat();
+      setActiveTool((tool) => (tool === toolName ? null : toolName));
+    },
+    [showChat],
+  );
   const openPlugins = useCallback(() => {
     closeSettings();
     setActiveTool(null);
     setMainView("plugins");
   }, [closeSettings]);
-  const beginSidebarResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    beginHorizontalResize(event, leftSidebarWidth, (startWidth, deltaX) => {
-      setLeftSidebarWidth(clamp(startWidth + deltaX, 220, 420));
-    });
-  }, [leftSidebarWidth]);
-  const beginToolPanelResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    beginHorizontalResize(event, toolPanelWidth, (startWidth, deltaX) => {
-      setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
-    });
-  }, [toolPanelWidth]);
+  const beginSidebarResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      beginHorizontalResize(event, leftSidebarWidth, (startWidth, deltaX) => {
+        setLeftSidebarWidth(clamp(startWidth + deltaX, 220, 420));
+      });
+    },
+    [leftSidebarWidth],
+  );
+  const beginToolPanelResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      beginHorizontalResize(event, toolPanelWidth, (startWidth, deltaX) => {
+        setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
+      });
+    },
+    [toolPanelWidth],
+  );
   const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
 
   return (
@@ -304,10 +320,19 @@ export function App(): React.JSX.Element {
                   {activeTool === "terminal" && <TerminalPanel />}
                   {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
                   {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
-                  {activeTool === "extensions" && <ExtensionsPanel selectedExtensionId={selectedExtensionId} onSelectedExtensionChange={setSelectedExtensionId} />}
+                  {activeTool === "extensions" && (
+                    <ExtensionsPanel
+                      selectedExtensionId={selectedExtensionId}
+                      onSelectedExtensionChange={setSelectedExtensionId}
+                    />
+                  )}
                 </div>
               )}
-              <ExtensionActivityRail active={activeTool === "extensions"} activeExtensionId={selectedExtensionId} onSelectExtension={selectExtensionFromRail} />
+              <ExtensionActivityRail
+                active={activeTool === "extensions"}
+                activeExtensionId={selectedExtensionId}
+                onSelectExtension={selectExtensionFromRail}
+              />
             </div>
           </>
         )}

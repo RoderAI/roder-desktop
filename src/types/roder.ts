@@ -430,7 +430,11 @@ declare global {
       extensionsEnable: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsDisable: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsReload: (id: string) => Promise<ExtensionCatalogSnapshot>;
-      extensionsUpdatePreference: (id: string, key: string, value: string | boolean | null) => Promise<ExtensionCatalogSnapshot>;
+      extensionsUpdatePreference: (
+        id: string,
+        key: string,
+        value: string | boolean | null,
+      ) => Promise<ExtensionCatalogSnapshot>;
       extensionsReadLogs: (id: string) => Promise<string[]>;
       extensionsActivate: (id: string) => Promise<ExtensionCatalogSnapshot>;
       extensionsExecuteCommand: (commandId: string, args?: unknown[]) => Promise<unknown>;

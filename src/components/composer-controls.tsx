@@ -44,13 +44,9 @@ export function PolicyModePicker({
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-foreground">{option.label}</div>
-                <div className="mt-0.5 text-sm leading-5 text-muted-foreground">
-                  {option.description}
-                </div>
+                <div className="mt-0.5 text-sm leading-5 text-muted-foreground">{option.description}</div>
               </div>
-              {option.mode === selected.mode && (
-                <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              )}
+              {option.mode === selected.mode && <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
@@ -96,11 +92,7 @@ export function AttachmentChip({
   const isImage = attachment.type.startsWith("image/");
   return (
     <span className="flex max-w-[220px] items-center gap-2 rounded-full bg-muted px-3 py-1 text-base text-muted-foreground">
-      {isImage ? (
-        <ImageIcon className="size-4 shrink-0" />
-      ) : (
-        <FileText className="size-4 shrink-0" />
-      )}
+      {isImage ? <ImageIcon className="size-4 shrink-0" /> : <FileText className="size-4 shrink-0" />}
       <span className="truncate">{attachment.name}</span>
       <button
         type="button"
@@ -128,12 +120,8 @@ export function ModelPicker({
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
   const visibleModels: RoderModel[] =
-    models.length > 0
-      ? models
-      : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
-  const selected =
-    visibleModels.find((model) => model.id === selectedModel) ??
-    visibleModels[0];
+    models.length > 0 ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
+  const selected = visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
@@ -143,12 +131,9 @@ export function ModelPicker({
         limit={10}
         itemToStringLabel={modelName}
         itemToStringValue={(model) => `${model.modelProvider}:${model.id}`}
-        isItemEqualToValue={(item, value) =>
-          item.id === value.id && item.modelProvider === value.modelProvider
-        }
+        isItemEqualToValue={(item, value) => item.id === value.id && item.modelProvider === value.modelProvider}
         filter={(model, inputValue) => {
-          const haystack =
-            `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase();
+          const haystack = `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase();
           return haystack.includes(inputValue.trim().toLowerCase());
         }}
         onValueChange={(model) => {
@@ -157,28 +142,13 @@ export function ModelPicker({
           }
         }}
       >
-        <Combobox.Trigger
-          className={cn(dropdownMenuTriggerVariants({ variant: "pill" }))}
-          aria-label="Choose model"
-        >
-          <Combobox.Value>
-            {(model: RoderModel | null) => (
-              <span>{modelName(model ?? selected)}</span>
-            )}
-          </Combobox.Value>
+        <Combobox.Trigger className={cn(dropdownMenuTriggerVariants({ variant: "pill" }))} aria-label="Choose model">
+          <Combobox.Value>{(model: RoderModel | null) => <span>{modelName(model ?? selected)}</span>}</Combobox.Value>
           <DropdownTriggerChevron />
         </Combobox.Trigger>
         <Combobox.Portal>
-          <Combobox.Positioner
-            align="end"
-            side="top"
-            sideOffset={8}
-            className="z-50"
-          >
-            <Combobox.Popup
-              className={cn(dropdownMenuContentClassName, "w-[320px] p-0")}
-              aria-label="Choose model"
-            >
+          <Combobox.Positioner align="end" side="top" sideOffset={8} className="z-50">
+            <Combobox.Popup className={cn(dropdownMenuContentClassName, "w-[320px] p-0")} aria-label="Choose model">
               <div className="flex h-11 items-center gap-2.5 border-b border-border px-3.5">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
                 <Combobox.Input
@@ -187,24 +157,17 @@ export function ModelPicker({
                 />
               </div>
               <Combobox.Empty>
-                <div className="px-3.5 py-4 text-base text-muted-foreground">
-                  No matching models
-                </div>
+                <div className="px-3.5 py-4 text-base text-muted-foreground">No matching models</div>
               </Combobox.Empty>
               <Combobox.List className="max-h-[286px] overflow-y-auto p-1.5">
                 {(model: RoderModel) => (
                   <Combobox.Item
                     key={`${model.modelProvider}:${model.id}`}
                     value={model}
-                    className={cn(
-                      dropdownMenuItemClassName,
-                      "h-9 data-[selected]:font-medium",
-                    )}
+                    className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
                   >
                     <ProviderLogo provider={model.modelProvider} />
-                    <span className="min-w-0 flex-1 truncate text-foreground">
-                      {modelName(model)}
-                    </span>
+                    <span className="min-w-0 flex-1 truncate text-foreground">{modelName(model)}</span>
                     <Combobox.ItemIndicator
                       keepMounted
                       className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
@@ -219,10 +182,7 @@ export function ModelPicker({
         </Combobox.Portal>
       </Combobox.Root>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          variant="pill"
-          aria-label={`Choose thinking effort: ${reasoningLabel(selectedReasoning)}`}
-        >
+        <DropdownMenuTrigger variant="pill" aria-label={`Choose thinking effort: ${reasoningLabel(selectedReasoning)}`}>
           <span>{reasoningLabel(selectedReasoning)}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" sideOffset={8}>
@@ -234,12 +194,8 @@ export function ModelPicker({
                 className="h-9 text-base"
                 onSelect={() => onReasoningChange(reasoning)}
               >
-                <span className="min-w-0 flex-1">
-                  {reasoningName(reasoning)}
-                </span>
-                {reasoning === selectedReasoning && (
-                  <Check className="size-3.5 text-primary" />
-                )}
+                <span className="min-w-0 flex-1">{reasoningName(reasoning)}</span>
+                {reasoning === selectedReasoning && <Check className="size-3.5 text-primary" />}
               </DropdownMenuItem>
             ))}
           </DropdownMenuGroup>
@@ -373,19 +329,9 @@ function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
       aria-hidden="true"
     >
       {logo ? (
-        <svg
-          viewBox={logo.viewBox ?? "0 0 24 24"}
-          className="size-4"
-          fill="currentColor"
-          fillRule="evenodd"
-        >
+        <svg viewBox={logo.viewBox ?? "0 0 24 24"} className="size-4" fill="currentColor" fillRule="evenodd">
           {logo.paths.map((path) => (
-            <path
-              key={path.d}
-              d={path.d}
-              clipRule={path.clipRule}
-              fill={path.fill}
-            />
+            <path key={path.d} d={path.d} clipRule={path.clipRule} fill={path.fill} />
           ))}
         </svg>
       ) : (

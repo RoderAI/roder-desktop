@@ -16,20 +16,20 @@ This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain t
 
 ## Active PRDs
 
-| ID | PRD | Status | Current Stage | Updated | Verification | Next Action |
-| --- | --- | --- | --- | --- | --- | --- |
+| ID  | PRD                                                                     | Status      | Current Stage                                       | Updated    | Verification                                                                                       | Next Action                                                                                                 |
+| --- | ----------------------------------------------------------------------- | ----------- | --------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | 001 | [Desktop Custom User Extensions](001-desktop-custom-user-extensions.md) | In progress | 6 - Developer Tooling, Packaging, And Documentation | 2026-05-18 | Sidebar cleanup and theme label persistence passed `pnpm typecheck`, `pnpm test`, and `pnpm build` | Add richer bidirectional panel APIs, safe mode, signed-package docs, and Rust app-server reverse-RPC bridge |
 
 ## Completed PRDs
 
-| ID | PRD | Completed | Evidence |
-| --- | --- | --- | --- |
+| ID  | PRD                                                               | Completed  | Evidence                                                                                                                                                                                                                                           |
+| --- | ----------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 002 | [Desktop Plugins Marketplace](002-desktop-plugins-marketplace.md) | 2026-05-19 | Plugins main view no longer mounts the app title top bar; inactive default marketplaces expose `Enable`; plugin rows expose `Source` links; `pnpm test`, `pnpm typecheck`, `git diff --check`, `pnpm build`, and shimmed roadmap validation passed |
 
 ## Superseded PRDs
 
-| ID | PRD | Replaced By | Reason |
-| --- | --- | --- | --- |
+| ID  | PRD | Replaced By | Reason |
+| --- | --- | ----------- | ------ |
 
 ## Update Rules
 

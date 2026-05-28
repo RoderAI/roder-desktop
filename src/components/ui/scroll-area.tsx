@@ -7,20 +7,19 @@ type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement> & {
   onViewportScroll?: React.UIEventHandler<HTMLDivElement>;
 };
 
-export const ScrollArea = React.forwardRef<
-  HTMLDivElement,
-  ScrollAreaProps
->(({ className, children, viewportClassName, viewportRef, onViewportScroll, ...props }, ref) => (
-  <div ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
-    <div
-      ref={viewportRef}
-      className={cn("size-full overflow-auto rounded-[inherit]", viewportClassName)}
-      onScroll={onViewportScroll}
-    >
-      {children}
+export const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
+  ({ className, children, viewportClassName, viewportRef, onViewportScroll, ...props }, ref) => (
+    <div ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
+      <div
+        ref={viewportRef}
+        className={cn("size-full overflow-auto rounded-[inherit]", viewportClassName)}
+        onScroll={onViewportScroll}
+      >
+        {children}
+      </div>
     </div>
-  </div>
-));
+  ),
+);
 
 ScrollArea.displayName = "ScrollArea";
 

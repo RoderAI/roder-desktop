@@ -114,12 +114,17 @@ export type RoderSecretStorage = {
 };
 
 export type RoderCommands = {
-  registerCommand<TResult = unknown>(command: RoderCommandRegistration, handler: RoderCommandHandler<readonly unknown[], TResult>): Disposable;
+  registerCommand<TResult = unknown>(
+    command: RoderCommandRegistration,
+    handler: RoderCommandHandler<readonly unknown[], TResult>,
+  ): Disposable;
   executeCommand<TResult = unknown>(id: string, ...args: unknown[]): Promise<TResult>;
 };
 
 export type RoderTools = {
-  registerTool<TInput extends JsonObject = JsonObject, TResult extends JsonValue = JsonValue>(registration: RoderToolRegistration<TInput, TResult>): Disposable;
+  registerTool<TInput extends JsonObject = JsonObject, TResult extends JsonValue = JsonValue>(
+    registration: RoderToolRegistration<TInput, TResult>,
+  ): Disposable;
 };
 
 export type RoderNotifications = {
