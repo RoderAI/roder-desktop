@@ -1,5 +1,8 @@
-import type { ConversationMessage, RoderItem, RoderThread, RoderTurn } from "@/types/roder";
+import type { ConversationMessage, RoderItem, RoderThread, RoderThreadItemDelta, RoderThreadItemEvent, RoderThreadItemEventKind, RoderTurn } from "@/types/roder";
 import { isShellToolName } from "@/lib/tool-display";
+
+const emptyMessages: ConversationMessage[] = [];
+const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
 
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
   return [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
@@ -36,7 +39,7 @@ export function shouldShowThreadWorkingIndicator(
   if (!isThreadRunning(thread) || waitRequestCount > 0) {
     return false;
   }
-  if (messages.some((message) => message.role === "assistant" && message.status === "streaming")) {
+  if (hasCurrentAssistantStream(messages)) {
     return false;
   }
   return !thread?.status.activeFlags.some((flag) =>
@@ -48,21 +51,197 @@ export function activeTurnIdForThread(thread: RoderThread | undefined): string {
   return thread?.status.activeTurnId ?? "";
 }
 
+export function applyThreadItemEvent(thread: RoderThread | undefined, event: RoderThreadItemEvent): RoderThread | undefined {
+  if (!thread) {
+    return thread;
+  }
+  const turns = thread.turns ? [...thread.turns] : [];
+  const turnIndex = turns.findIndex((turn) => turn.id === event.turnId);
+  const turn = turnIndex === -1
+    ? {
+        id: event.turnId,
+        items: [],
+        itemsView: "default",
+        status: "inProgress" as const,
+        error: null,
+      }
+    : turns[turnIndex];
+  const nextTurn = {
+    ...turn,
+    items: applyThreadItemEventToItems(turn.items, event.event),
+  };
+  if (turnIndex === -1) {
+    turns.push(nextTurn);
+  } else {
+    turns[turnIndex] = nextTurn;
+  }
+  return { ...thread, turns };
+}
+
+export function applyThreadItemEventToItems(items: RoderItem[], event: RoderThreadItemEventKind): RoderItem[] {
+  if (event.type === "itemStarted") {
+    return upsertRoderItem(items, event.item, mergeStartedItem);
+  }
+  if (event.type === "itemCompleted") {
+    return upsertRoderItem(items, event.item, mergeCompletedItem);
+  }
+  const index = items.findIndex((item) => item.id === event.itemId);
+  if (index === -1) {
+    return [...items, applyThreadItemDelta(itemFromDelta(event.itemId, event.delta), event.delta)];
+  }
+  const nextItems = [...items];
+  nextItems[index] = applyThreadItemDelta(nextItems[index], event.delta);
+  return nextItems;
+}
+
+function upsertRoderItem(
+  items: RoderItem[],
+  incoming: RoderItem,
+  merge: (existing: RoderItem, incoming: RoderItem) => RoderItem,
+): RoderItem[] {
+  const index = items.findIndex((item) => item.id === incoming.id);
+  if (index === -1) {
+    return [...items, incoming];
+  }
+  const nextItems = [...items];
+  nextItems[index] = merge(nextItems[index], incoming);
+  return nextItems;
+}
+
+function mergeStartedItem(existing: RoderItem, incoming: RoderItem): RoderItem {
+  return mergeCompletedItem(existing, incoming);
+}
+
+function mergeCompletedItem(existing: RoderItem, incoming: RoderItem): RoderItem {
+  if (existing.type === "reasoning" && incoming.type === "reasoning") {
+    return {
+      ...existing,
+      summary: incoming.summary?.length ? incoming.summary : existing.summary,
+      content: incoming.content?.length ? incoming.content : existing.content,
+      status: incoming.status ?? "completed",
+    };
+  }
+  if (existing.type === "toolExecution" && incoming.type === "toolExecution") {
+    return {
+      ...existing,
+      status: incoming.status,
+      input: incoming.input ?? existing.input,
+      output: incoming.output ?? existing.output,
+      error: incoming.error ?? existing.error,
+      toolName: incoming.toolName || existing.toolName,
+      toolCallId: incoming.toolCallId || existing.toolCallId,
+    };
+  }
+  if (existing.type === "agentMessage" && incoming.type === "agentMessage" && !incoming.text) {
+    return { ...existing, phase: incoming.phase ?? existing.phase, status: incoming.status ?? existing.status };
+  }
+  return incoming;
+}
+
+function itemFromDelta(itemId: string, delta: RoderThreadItemDelta): RoderItem {
+  if (delta.type === "agentMessageText") {
+    return { id: itemId, type: "agentMessage", text: "", phase: delta.phase, status: "inProgress" };
+  }
+  if (delta.type === "reasoningText") {
+    return { id: itemId, type: "reasoning", content: emptyStringSlots(delta.contentIndex), summary: [], status: "inProgress" };
+  }
+  return { id: itemId, type: "reasoning", summary: emptyStringSlots(delta.summaryIndex), content: [], status: "inProgress" };
+}
+
+function applyThreadItemDelta(item: RoderItem, delta: RoderThreadItemDelta): RoderItem {
+  if (item.type === "agentMessage" && delta.type === "agentMessageText") {
+    return {
+      ...item,
+      text: item.text + delta.delta,
+      phase: item.phase ?? delta.phase,
+      status: "inProgress",
+    };
+  }
+  if (item.type === "reasoning" && delta.type === "reasoningText") {
+    const content = item.content ? [...item.content] : [];
+    ensureStringSlot(content, delta.contentIndex);
+    content[delta.contentIndex] += delta.delta;
+    return { ...item, content, status: "inProgress" };
+  }
+  if (item.type === "reasoning" && delta.type === "reasoningSummaryPartAdded") {
+    const summary = item.summary ? [...item.summary] : [];
+    ensureStringSlot(summary, delta.summaryIndex);
+    return { ...item, summary, status: "inProgress" };
+  }
+  if (item.type === "reasoning" && delta.type === "reasoningSummaryText") {
+    const summary = item.summary ? [...item.summary] : [];
+    ensureStringSlot(summary, delta.summaryIndex);
+    summary[delta.summaryIndex] += delta.delta;
+    return { ...item, summary, status: "inProgress" };
+  }
+  return applyThreadItemDelta(itemFromDelta(item.id, delta), delta);
+}
+
+function emptyStringSlots(index: number): string[] {
+  return Array.from({ length: index + 1 }, () => "");
+}
+
+function ensureStringSlot(values: string[], index: number): void {
+  while (values.length <= index) {
+    values.push("");
+  }
+}
+
 export function messagesFromThread(thread: RoderThread | undefined): ConversationMessage[] {
-  if (!thread?.turns) {
-    return [];
+  if (!thread?.turns || thread.turns.length === 0) {
+    return emptyMessages;
   }
 
-  return thread.turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
+  const cachedMessages = messagesByThread.get(thread);
+  if (cachedMessages) {
+    return cachedMessages;
+  }
+
+  const messages = thread.turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
+  messagesByThread.set(thread, messages);
+  return messages;
 }
 
 export function messagesFromTurn(threadId: string, turn: RoderTurn): ConversationMessage[] {
-  return turn.items.reduce<ConversationMessage[]>((messages, item) => {
+  const messages = turn.items.reduce<ConversationMessage[]>((messages, item) => {
     for (const message of messagesFromRoderItem(threadId, turn.id, item, turn.status)) {
       upsertConversationMessage(messages, message);
     }
     return messages;
   }, []);
+  if (turn.error?.message) {
+    upsertConversationMessage(messages, {
+      id: `${turn.id}:error`,
+      threadId,
+      turnId: turn.id,
+      role: "system",
+      text: turn.error.message,
+      status: "failed",
+    });
+  }
+  return completeAssistantStreamsBeforeLaterTools(messages);
+}
+
+export function completeAssistantStreamsBeforeLaterTools(messages: ConversationMessage[]): ConversationMessage[] {
+  let sawLaterToolByTurn = new Set<string>();
+  const nextMessages = [...messages];
+  for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+    const message = nextMessages[index];
+    const turnId = message.turnId ?? "";
+    if (message.role === "tool") {
+      sawLaterToolByTurn = new Set(sawLaterToolByTurn).add(turnId);
+      continue;
+    }
+    if (message.role === "assistant" && message.status === "streaming" && sawLaterToolByTurn.has(turnId)) {
+      nextMessages[index] = { ...message, status: "complete" };
+    }
+  }
+  return nextMessages;
+}
+
+function hasCurrentAssistantStream(messages: ConversationMessage[]): boolean {
+  const lastActiveMessage = [...messages].reverse().find((message) => message.role === "assistant" || message.role === "tool");
+  return lastActiveMessage?.role === "assistant" && lastActiveMessage.status === "streaming";
 }
 
 export function messagesFromRoderItem(threadId: string, turnId: string, item: RoderItem, turnStatus: string): ConversationMessage[] {
@@ -73,9 +252,6 @@ export function messagesFromRoderItem(threadId: string, turnId: string, item: Ro
 
   const text = extractItemText(item);
   if (!text) {
-    return [];
-  }
-  if (isLegacyToolLabel(text)) {
     return [];
   }
 
@@ -91,7 +267,19 @@ export function messagesFromRoderItem(threadId: string, turnId: string, item: Ro
       role: "assistant",
       text,
       phase,
-      status: turnStatus === "inProgress" ? "streaming" : "complete",
+      status: itemMessageStatus(item, turnStatus),
+    }];
+  }
+  if (item.type === "reasoning") {
+    const phase = "reasoning";
+    return [{
+      id: item.id,
+      threadId,
+      turnId,
+      role: "assistant",
+      text,
+      phase,
+      status: itemMessageStatus(item, turnStatus),
     }];
   }
   if (item.type === "error") {
@@ -125,34 +313,58 @@ export function normalizeAssistantPhase(phase?: string): string | undefined {
   return normalized || undefined;
 }
 
+function itemMessageStatus(item: RoderItem, turnStatus: string): ConversationMessage["status"] {
+  return messageStatusFromProtocolStatus(item.status) ?? messageStatusFromTurnStatus(turnStatus);
+}
+
+function messageStatusFromProtocolStatus(status: RoderItem["status"]): ConversationMessage["status"] | undefined {
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "completed") {
+    return "complete";
+  }
+  if (status === "inProgress") {
+    return "streaming";
+  }
+  return undefined;
+}
+
+function messageStatusFromTurnStatus(turnStatus: string): ConversationMessage["status"] {
+  if (turnStatus === "failed") {
+    return "failed";
+  }
+  return turnStatus === "inProgress" ? "streaming" : "complete";
+}
+
 function extractItemText(item: RoderItem): string {
-  if (typeof item.text === "string") {
+  if (item.type === "userMessage" || item.type === "agentMessage") {
     return item.text;
   }
-  if (item.payload && typeof item.payload === "object" && "text" in item.payload) {
-    const text = (item.payload as { text?: unknown }).text;
-    return typeof text === "string" ? text : "";
+  if (item.type === "reasoning") {
+    return item.content?.join("") || item.summary?.join("\n") || "";
+  }
+  if (item.type === "error") {
+    return item.message;
+  }
+  if (item.type === "compaction") {
+    return item.summary;
   }
   return "";
 }
 
-function isLegacyToolLabel(text: string): boolean {
-  return /^Tool\s+\S+\s+(result|failed):\s*$/i.test(text.trim());
-}
-
 function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem): ConversationMessage | null {
-  if (!isToolItem(item)) {
+  if (item.type !== "toolExecution") {
     return null;
   }
 
-  const payload = asRecord(item.payload);
-  const raw = asRecord(item.raw);
-  const input = inputFromToolItem(item, payload);
-  const toolName = firstString(item.toolName, payload.tool, payload.name, raw.name, item.type === "toolMessage" ? "tool" : undefined) ?? "tool";
-  const toolCallId = firstString(item.toolCallId, payload.tool_call_id, payload.toolCallId, payload.call_id, raw.call_id);
+  const payload: Record<string, unknown> = {};
+  const input = asRecord(item.input);
+  const toolName = item.toolName || "tool";
+  const toolCallId = item.toolCallId || item.id;
   const toolStatus = toolStatusFromItem(item);
-  const output = toolOutputText(item, payload);
-  const detailOutput = toolDetailOutputText(item, payload);
+  const output = item.error ?? item.output ?? "";
+  const detailOutput = rawString(item.output, item.error) ?? "";
   const summary = summarizeTool(toolName, toolStatus, input, output, payload);
   const command = shellCommand(input, payload);
   if (isShellToolName(toolName) && toolStatus === "running" && !command) {
@@ -171,7 +383,7 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
     toolCallId,
     toolStatus,
     toolInput: isShellToolName(toolName) ? command : undefined,
-    toolOutput: toolDetailOutput(toolName, detailOutput),
+    toolOutput: toolDetailOutput(toolName, detailOutput) ?? (detailOutput || undefined),
     toolSubject: toolSubject(toolName, input, payload),
     toolSummary: summary,
   };
@@ -184,36 +396,14 @@ function toolDetailOutput(toolName: string, detailOutput: string): string | unde
   return isShellToolName(toolName) ? stripShellHarnessMetadata(detailOutput) : detailOutput;
 }
 
-function isToolItem(item: RoderItem): boolean {
-  return item.type === "toolCall" || item.type === "toolMessage" || item.type.startsWith("tool.");
-}
-
-function toolStatusFromItem(item: RoderItem): "running" | "complete" | "failed" {
-  const sourceKind = item.sourceKind ?? "";
-  if (item.type === "tool.failed" || sourceKind === "tool.failed") {
+function toolStatusFromItem(item: Extract<RoderItem, { type: "toolExecution" }>): "running" | "complete" | "failed" {
+  if (item.status === "failed") {
     return "failed";
   }
-  if (item.type === "tool.requested" || item.type === "tool.started" || sourceKind === "tool.requested" || sourceKind === "tool.started") {
-    return "running";
-  }
-  if (item.type === "tool.completed" || sourceKind === "tool.completed" || item.type === "toolMessage") {
-    return item.status === "failed" ? "failed" : "complete";
+  if (item.status === "completed") {
+    return "complete";
   }
   return "running";
-}
-
-function toolOutputText(item: RoderItem, payload: Record<string, unknown>): string {
-  if (item.type === "toolCall" || item.type === "tool.requested" || item.type === "tool.started") {
-    return firstString(payload.text, payload.output, payload.error) ?? "";
-  }
-  return firstString(item.text, payload.text, payload.output, payload.error, extractItemText(item)) ?? "";
-}
-
-function toolDetailOutputText(item: RoderItem, payload: Record<string, unknown>): string {
-  if (item.type === "toolCall" || item.type === "tool.requested" || item.type === "tool.started") {
-    return rawString(payload.text, payload.output, payload.error) ?? "";
-  }
-  return rawString(item.text, payload.text, payload.output, payload.error, extractItemText(item)) ?? "";
 }
 
 function summarizeTool(
@@ -359,10 +549,6 @@ function messageKey(message: ConversationMessage): string {
   return message.id;
 }
 
-function inputFromToolItem(item: RoderItem, payload: Record<string, unknown>): Record<string, unknown> {
-  return item.type === "toolCall" ? payload : {};
-}
-
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) {
@@ -440,6 +626,11 @@ function toolSubject(toolName: string, input: Record<string, unknown>, payload: 
 }
 
 function stripShellHarnessMetadata(output: string): string {
+  const compactRunnerMatch = /^exit_code=[^\r\n]*\r?\noutput_bytes=[^\r\n]*\r?\n([\s\S]*)$/i.exec(output);
+  if (compactRunnerMatch) {
+    return compactRunnerMatch[1];
+  }
+
   const runnerMatch = /^(?:Exit code:\s*[^\r\n]*\r?\n)?Wall time:\s*[^\r\n]*\r?\nOutput:\r?\n([\s\S]*)$/i.exec(output);
   if (runnerMatch) {
     return runnerMatch[1];
@@ -477,7 +668,7 @@ function compactLine(value: string | undefined): string {
 }
 
 function looksLikeResultSummary(value: string): boolean {
-  return isLegacyToolLabel(value) || value.includes("\n") || value.length > 160;
+  return value.includes("\n") || value.length > 160;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

@@ -142,10 +142,11 @@ test("missing thread wait requests reuse a stable empty array", () => {
   assert.equal(first, second);
 });
 
-test("item started filtering includes canonical toolCall items", () => {
+test("item started filtering accepts only typed assistant and tool execution items", () => {
   assert.equal(shouldDisplayStartedItem({ type: "agentMessage" }), true);
-  assert.equal(shouldDisplayStartedItem({ type: "tool.started" }), true);
-  assert.equal(shouldDisplayStartedItem({ type: "toolCall" }), true);
+  assert.equal(shouldDisplayStartedItem({ type: "toolExecution" }), true);
+  assert.equal(shouldDisplayStartedItem({ type: "tool.started" }), false);
+  assert.equal(shouldDisplayStartedItem({ type: "toolCall" }), false);
   assert.equal(shouldDisplayStartedItem({ type: "userMessage" }), false);
 });
 
