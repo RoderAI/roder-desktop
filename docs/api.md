@@ -516,6 +516,7 @@ Request:
   "modelProvider": "openai",
   "reasoning": "high",
   "cwd": "/Users/pz/w/gode",
+  "initialPrompt": "inspect this repo",
   "ephemeral": false
 }
 ```
@@ -547,6 +548,7 @@ Behavior:
 - Rejects missing, empty, or relative `cwd`; thread snapshots do not fall back to the app-server process cwd.
 - Stores the selected provider/model/reasoning for later `turn/start` overrides.
 - If `reasoning` is omitted, returns and stores the effective reasoning effort for the selected model.
+- If `initialPrompt` is supplied, uses it as the first-turn prompt context for immediate thread naming.
 - Emits `thread/started`.
 - `ephemeral` is accepted by the DTO but is not currently used by the handler.
 
