@@ -1,6 +1,9 @@
 import type { ConversationMessage, RoderItem, RoderThread, RoderThreadItemDelta, RoderThreadItemEvent, RoderThreadItemEventKind, RoderTurn } from "@/types/roder";
 import { isShellToolName } from "@/lib/tool-display";
 
+const emptyMessages: ConversationMessage[] = [];
+const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
+
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
   return [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
 }
@@ -185,11 +188,18 @@ function ensureStringSlot(values: string[], index: number): void {
 }
 
 export function messagesFromThread(thread: RoderThread | undefined): ConversationMessage[] {
-  if (!thread?.turns) {
-    return [];
+  if (!thread?.turns || thread.turns.length === 0) {
+    return emptyMessages;
   }
 
-  return thread.turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
+  const cachedMessages = messagesByThread.get(thread);
+  if (cachedMessages) {
+    return cachedMessages;
+  }
+
+  const messages = thread.turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
+  messagesByThread.set(thread, messages);
+  return messages;
 }
 
 export function messagesFromTurn(threadId: string, turn: RoderTurn): ConversationMessage[] {

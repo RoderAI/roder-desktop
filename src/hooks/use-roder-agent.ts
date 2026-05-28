@@ -5,9 +5,6 @@ import { activeTurnIdForThread, messagesFromThread } from "@/lib/roder-thread";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
-import type { ConversationMessage } from "@/types/roder";
-
-const emptyMessages: ConversationMessage[] = [];
 
 export function useRoderAgent() {
   useRoderStoreBootstrap();
@@ -47,7 +44,7 @@ function useRoderStoreBootstrap(): void {
 
 function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
   const activeThread = state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
-  const messages = activeThread ? messagesFromThread(activeThread) : emptyMessages;
+  const messages = messagesFromThread(activeThread);
   const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
   return {
     status: state.status,
