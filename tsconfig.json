@@ -25,5 +25,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["electron", "src", "packages/extension-api/src", "electron.vite.config.ts"]
+  "include": ["electron", "src", "packages/extension-api/src", "electron.vite.config.ts", "vitest.config.ts"]
 }

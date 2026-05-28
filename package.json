@@ -10,7 +10,9 @@
     "build": "pnpm bundle:roder && pnpm typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "dist": "pnpm build && electron-builder",
-    "test": "node --test test/*.test.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck && pnpm --filter aurora-theme-extension typecheck"
   },
   "build": {
@@ -48,11 +50,13 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "4.1.6",
     "electron": "^42.2.0",
     "electron-builder": "^26.8.1",
     "npm-run-all": "^4.1.5",
     "typescript": "~6.0.2",
     "vite": "^7.3.3",
+    "vitest": "^4.1.6",
     "wait-on": "^9.0.10"
   },
   "dependencies": {

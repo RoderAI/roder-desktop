@@ -1,29 +1,5 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { Script } from "node:vm";
-import { test } from "node:test";
-import ts from "typescript";
-
-const helperSource = readFileSync(new URL("../src/lib/roder-thread.ts", import.meta.url), "utf8");
-const compiled = ts.transpileModule(helperSource, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2023,
-  },
-}).outputText;
-
-const module = { exports: {} };
-new Script(compiled).runInNewContext({
-  exports: module.exports,
-  module,
-  require: (specifier) => {
-    if (specifier === "@/lib/tool-display") {
-      return { isShellToolName: () => false };
-    }
-    throw new Error(`Unexpected require: ${specifier}`);
-  },
-});
-const { applyThreadItemEvent, isThreadRunning, markThreadStatus, messagesFromThread, shouldShowThreadWorkingIndicator, upsertThread } = module.exports;
+import { expect, test } from "vitest";
+import { applyThreadItemEvent, isThreadRunning, markThreadStatus, messagesFromThread, shouldShowThreadWorkingIndicator, upsertThread } from "../src/lib/roder-thread";
 
 function thread(id, updatedAt) {
   return {
@@ -42,8 +18,8 @@ test("updating an existing thread keeps its sidebar position", () => {
 
   const result = upsertThread(threads, thread("thread-c", 200));
 
-  assert.deepEqual(Array.from(result, (item) => item.id), ["thread-a", "thread-b", "thread-c"]);
-  assert.equal(result[2].updatedAt, 200);
+  expect(Array.from(result, (item) => item.id)).toEqual(["thread-a", "thread-b", "thread-c"]);
+  expect(result[2].updatedAt).toBe(200);
 });
 
 test("new threads are added at the top of the sidebar order", () => {
@@ -51,7 +27,7 @@ test("new threads are added at the top of the sidebar order", () => {
 
   const result = upsertThread(threads, thread("thread-c", 80));
 
-  assert.deepEqual(Array.from(result, (item) => item.id), ["thread-c", "thread-a", "thread-b"]);
+  expect(Array.from(result, (item) => item.id)).toEqual(["thread-c", "thread-a", "thread-b"]);
 });
 
 test("backend thread snapshots replace local activity status", () => {
@@ -59,19 +35,19 @@ test("backend thread snapshots replace local activity status", () => {
 
   const result = upsertThread([running], thread("thread-a", 120));
 
-  assert.deepEqual(result[0].status, { type: "idle", activeTurnId: null, activeFlags: [] });
+  expect(result[0].status).toEqual({ type: "idle", activeTurnId: null, activeFlags: [] });
 });
 
 test("explicit status changes update thread activity", () => {
   const threads = [thread("thread-a", 100), thread("thread-b", 90)];
 
   const running = markThreadStatus(threads, "thread-b", { type: "running", activeTurnId: "turn-b", activeFlags: [] });
-  assert.equal(isThreadRunning(running[1]), true);
-  assert.equal(running[1].status.activeTurnId, "turn-b");
+  expect(isThreadRunning(running[1])).toBe(true);
+  expect(running[1].status.activeTurnId).toBe("turn-b");
 
   const idle = markThreadStatus(running, "thread-b", { type: "idle", activeTurnId: null, activeFlags: [] });
-  assert.equal(isThreadRunning(idle[1]), false);
-  assert.equal(idle[1].status.activeTurnId, null);
+  expect(isThreadRunning(idle[1])).toBe(false);
+  expect(idle[1].status.activeTurnId).toBe(null);
 });
 
 test("working indicator follows active thread work without covering waits", () => {
@@ -84,13 +60,13 @@ test("working indicator follows active thread work without covering waits", () =
     { id: "tool-1", turnId: "turn-a", role: "tool", text: "Read src", status: "complete" },
   ];
 
-  assert.equal(shouldShowThreadWorkingIndicator(running, 0, []), true);
-  assert.equal(shouldShowThreadWorkingIndicator(running, 0, streamingToolMessages), true);
-  assert.equal(shouldShowThreadWorkingIndicator(running, 0, streamingAssistantMessages), false);
-  assert.equal(shouldShowThreadWorkingIndicator(running, 0, staleAssistantStreamWithLaterTool), true);
-  assert.equal(shouldShowThreadWorkingIndicator(running, 1, []), false);
-  assert.equal(shouldShowThreadWorkingIndicator(waiting, 0, []), false);
-  assert.equal(shouldShowThreadWorkingIndicator(thread("thread-b", 90), 0, []), false);
+  expect(shouldShowThreadWorkingIndicator(running, 0, [])).toBe(true);
+  expect(shouldShowThreadWorkingIndicator(running, 0, streamingToolMessages)).toBe(true);
+  expect(shouldShowThreadWorkingIndicator(running, 0, streamingAssistantMessages)).toBe(false);
+  expect(shouldShowThreadWorkingIndicator(running, 0, staleAssistantStreamWithLaterTool)).toBe(true);
+  expect(shouldShowThreadWorkingIndicator(running, 1, [])).toBe(false);
+  expect(shouldShowThreadWorkingIndicator(waiting, 0, [])).toBe(false);
+  expect(shouldShowThreadWorkingIndicator(thread("thread-b", 90), 0, [])).toBe(false);
 });
 
 test("message snapshots are reused for unchanged thread objects", () => {
@@ -107,7 +83,7 @@ test("message snapshots are reused for unchanged thread objects", () => {
   const first = messagesFromThread(current);
   const second = messagesFromThread(current);
 
-  assert.equal(first, second);
+  expect(first).toBe(second);
 });
 
 test("typed item events project into stable reasoning and final message items", () => {
@@ -154,14 +130,14 @@ test("typed item events project into stable reasoning and final message items", 
   });
 
   const items = current.turns[0].items;
-  assert.equal(items.length, 2);
-  assert.equal(items[0].type, "reasoning");
-  assert.deepEqual(Array.from(items[0].content), ["thinking"]);
-  assert.equal(items[1].type, "agentMessage");
-  assert.equal(items[1].text, "done");
+  expect(items.length).toBe(2);
+  expect(items[0].type).toBe("reasoning");
+  expect(Array.from(items[0].content)).toEqual(["thinking"]);
+  expect(items[1].type).toBe("agentMessage");
+  expect(items[1].text).toBe("done");
 
   const messages = messagesFromThread(current);
-  assert.deepEqual(plain(messages.map((message) => [message.id, message.text, message.phase])), [
+  expect(plain(messages.map((message) => [message.id, message.text, message.phase]))).toEqual([
     ["turn-a-agent-reasoning", "thinking", "reasoning"],
     ["turn-a-agent-final_answer", "done", "final_answer"],
   ]);

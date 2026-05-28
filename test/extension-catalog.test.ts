@@ -1,45 +1,9 @@
-import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { zipSync } from "fflate";
-import ts from "typescript";
-
-async function loadCatalogModule() {
-  const directory = testModuleTemp("roder-extension-catalog-");
-  writeTranspiledModule("../electron/extensions/manifest.ts", join(directory, "manifest.mjs"));
-  writeTranspiledModule("../electron/extensions/package-manager.ts", join(directory, "package-manager.mjs"), {
-    "./manifest": "./manifest.mjs",
-  });
-  writeTranspiledModule("../electron/extensions/catalog.ts", join(directory, "catalog.mjs"), {
-    "./manifest": "./manifest.mjs",
-    "./package-manager": "./package-manager.mjs",
-  });
-  return import(`${join(directory, "catalog.mjs")}?t=${Date.now()}`);
-}
-
-function testModuleTemp(prefix) {
-  const directory = join(process.cwd(), "node_modules", ".cache");
-  mkdirSync(directory, { recursive: true });
-  return mkdtempSync(join(directory, prefix));
-}
-
-function writeTranspiledModule(sourcePath, outputPath, replacements = {}) {
-  let source = readFileSync(new URL(sourcePath, import.meta.url), "utf8");
-  for (const [from, to] of Object.entries(replacements)) {
-    source = source.replaceAll(`"${from}"`, `"${to}"`);
-  }
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      target: ts.ScriptTarget.ES2022,
-      verbatimModuleSyntax: true,
-    },
-  });
-  writeFileSync(outputPath, output.outputText);
-}
+import { ExtensionCatalog } from "../electron/extensions/catalog";
 
 function createExtensionFixture() {
   const directory = mkdtempSync(join(tmpdir(), "hello-roder-extension-"));
@@ -74,28 +38,26 @@ function createExtensionFixture() {
 }
 
 test("catalog installs a local extension folder and persists its record", async () => {
-  const { ExtensionCatalog } = await loadCatalogModule();
   const userDataPath = mkdtempSync(join(tmpdir(), "roder-user-data-"));
   const fixturePath = createExtensionFixture();
   const now = () => new Date("2026-05-18T21:45:00.000Z");
   const catalog = new ExtensionCatalog({ userDataPath, appVersion: "0.1.0", now });
 
   const installed = await catalog.installFromFolder(fixturePath);
-  assert.equal(installed.id, "roder.hello-roder-extension");
-  assert.equal(installed.enabled, true);
-  assert.equal(installed.source.type, "dev");
-  assert.equal(installed.source.path, fixturePath);
-  assert.deepEqual(installed.capabilities, [{ capability: "desktop.notification", status: "pending" }]);
-  assert.equal(installed.preferences["hello-roder.greeting"], "Hi");
+  expect(installed.id).toBe("roder.hello-roder-extension");
+  expect(installed.enabled).toBe(true);
+  expect(installed.source.type).toBe("dev");
+  expect(installed.source.path).toBe(fixturePath);
+  expect(installed.capabilities).toEqual([{ capability: "desktop.notification", status: "pending" }]);
+  expect(installed.preferences["hello-roder.greeting"]).toBe("Hi");
 
   const reloaded = new ExtensionCatalog({ userDataPath, appVersion: "0.1.0", now });
   const snapshot = await reloaded.list();
-  assert.equal(snapshot.extensions.length, 1);
-  assert.equal(snapshot.extensions[0].manifest.displayName, "Hello Roder");
+  expect(snapshot.extensions.length).toBe(1);
+  expect(snapshot.extensions[0].manifest.displayName).toBe("Hello Roder");
 });
 
 test("catalog installs an .rdx archive into app storage", async () => {
-  const { ExtensionCatalog } = await loadCatalogModule();
   const userDataPath = mkdtempSync(join(tmpdir(), "roder-user-data-"));
   const fixturePath = createExtensionFixture();
   const archivePath = join(mkdtempSync(join(tmpdir(), "roder-rdx-")), "hello.rdx");
@@ -109,18 +71,17 @@ test("catalog installs an .rdx archive into app storage", async () => {
   const catalog = new ExtensionCatalog({ userDataPath, appVersion: "0.1.0" });
 
   const installed = await catalog.installFromArchive(archivePath);
-  assert.equal(installed.id, "roder.hello-roder-extension");
-  assert.equal(installed.source.type, "archive");
-  assert.equal(installed.source.archivePath, archivePath);
-  assert.match(installed.source.path, /extensions\/installed\/roder\.hello-roder-extension$/);
+  expect(installed.id).toBe("roder.hello-roder-extension");
+  expect(installed.source.type).toBe("archive");
+  expect(installed.source.archivePath).toBe(archivePath);
+  expect(installed.source.path).toMatch(/extensions\/installed\/roder\.hello-roder-extension$/);
 
   const snapshot = await catalog.list();
-  assert.equal(snapshot.extensions[0].source.type, "archive");
-  assert.equal(snapshot.extensions[0].manifest.displayName, "Hello Roder");
+  expect(snapshot.extensions[0].source.type).toBe("archive");
+  expect(snapshot.extensions[0].manifest.displayName).toBe("Hello Roder");
 });
 
 test("catalog can disable, re-enable, reload, update preferences, and uninstall", async () => {
-  const { ExtensionCatalog } = await loadCatalogModule();
   const catalog = new ExtensionCatalog({
     userDataPath: mkdtempSync(join(tmpdir(), "roder-user-data-")),
     appVersion: "0.1.0",
@@ -129,21 +90,20 @@ test("catalog can disable, re-enable, reload, update preferences, and uninstall"
   const installed = await catalog.installFromFolder(createExtensionFixture());
 
   const disabled = await catalog.disable(installed.id);
-  assert.equal(disabled.enabled, false);
+  expect(disabled.enabled).toBe(false);
   const enabled = await catalog.enable(installed.id);
-  assert.equal(enabled.enabled, true);
+  expect(enabled.enabled).toBe(true);
   const updated = await catalog.updatePreference(installed.id, "hello-roder.greeting", "Aloha");
-  assert.equal(updated.preferences["hello-roder.greeting"], "Aloha");
+  expect(updated.preferences["hello-roder.greeting"]).toBe("Aloha");
   const reloaded = await catalog.reload(installed.id);
-  assert.equal(reloaded.activationState, "inactive");
-  assert.match((await catalog.readLogs(installed.id)).join("\n"), /Reload requested/);
+  expect(reloaded.activationState).toBe("inactive");
+  expect((await catalog.readLogs(installed.id)).join("\n")).toMatch(/Reload requested/);
 
   const snapshot = await catalog.uninstall(installed.id);
-  assert.equal(snapshot.extensions.length, 0);
+  expect(snapshot.extensions.length).toBe(0);
 });
 
 test("catalog rejects folders with invalid manifests", async () => {
-  const { ExtensionCatalog } = await loadCatalogModule();
   const catalog = new ExtensionCatalog({
     userDataPath: mkdtempSync(join(tmpdir(), "roder-user-data-")),
     appVersion: "0.1.0",
@@ -153,11 +113,10 @@ test("catalog rejects folders with invalid manifests", async () => {
   manifest.roder.main = "../escape.js";
   writeFileSync(join(fixturePath, "package.json"), JSON.stringify(manifest, null, 2));
 
-  await assert.rejects(() => catalog.installFromFolder(fixturePath), /relative path inside the extension package/);
+  await expect(() => catalog.installFromFolder(fixturePath)).rejects.toThrow(/relative path inside the extension package/);
 });
 
 test("catalog rejects .rdx archives with unsafe paths", async () => {
-  const { ExtensionCatalog } = await loadCatalogModule();
   const catalog = new ExtensionCatalog({
     userDataPath: mkdtempSync(join(tmpdir(), "roder-user-data-")),
     appVersion: "0.1.0",
@@ -172,5 +131,5 @@ test("catalog rejects .rdx archives with unsafe paths", async () => {
     }),
   );
 
-  await assert.rejects(() => catalog.installFromArchive(archivePath), /Unsafe extension archive entry/);
+  await expect(() => catalog.installFromArchive(archivePath)).rejects.toThrow(/Unsafe extension archive entry/);
 });
