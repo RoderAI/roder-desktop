@@ -1,5 +1,5 @@
 import { Check, Copy, MoreHorizontal, MousePointer2, Pause, Play, Plus, RefreshCw, Settings2, Trash2, Wand2, Zap } from "lucide-react";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import {
   type PluginActionState,
   pluginActionButtonVariant,
@@ -486,13 +486,16 @@ function TuningSlider({
   suffix?: string;
   value: number;
 }): React.JSX.Element {
+  const inputId = useId();
+
   return (
-    <label className="grid gap-2">
-      <span className="flex items-center justify-between gap-3 text-base">
+    <div className="grid gap-2">
+      <label className="flex items-center justify-between gap-3 text-base" htmlFor={inputId}>
         <span className="font-medium">{label}</span>
         <span className="font-mono text-muted-foreground">{formatSliderValue(value)}{suffix}</span>
-      </span>
+      </label>
       <input
+        id={inputId}
         className="h-2 w-full accent-foreground"
         max={max}
         min={min}
@@ -501,7 +504,7 @@ function TuningSlider({
         value={value}
         onChange={(event) => onChange(Number(event.currentTarget.value))}
       />
-    </label>
+    </div>
   );
 }
 

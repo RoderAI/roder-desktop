@@ -1,11 +1,21 @@
+import type { EventEmitter } from "node:events";
 import { beforeEach, expect, test, vi } from "vitest";
+
+type MockStream = EventEmitter & { setEncoding: (encoding: string) => void };
+type MockChildProcess = EventEmitter & {
+  stdin: { write: (line: string, callback?: (error?: Error | null) => void) => boolean };
+  stdout: MockStream;
+  stderr: MockStream;
+  kill: () => void;
+};
+type SpawnMock = (command: string, args: string[], options: { env?: Record<string, string | undefined> }) => MockChildProcess;
 
 const mockState = vi.hoisted(() => ({
   app: {
     isPackaged: false,
-    getVersion: vi.fn(() => "9.8.7"),
+    getVersion: vi.fn<() => string>(() => "9.8.7"),
   },
-  existsSync: vi.fn(() => true),
+  existsSync: vi.fn<() => boolean>(() => true),
   spawned: [] as Array<{
     command: string;
     args: string[];
@@ -32,27 +42,22 @@ vi.mock("node:fs", async (importOriginal) => {
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
-  const { EventEmitter } = await import("node:events");
+  const { EventEmitter: NodeEventEmitter } = await import("node:events");
 
   return {
     ...actual,
-    spawn: vi.fn((command: string, args: string[], options: { env?: Record<string, string | undefined> }) => {
-      const stdout = new EventEmitter() as EventEmitter & { setEncoding: (encoding: string) => void };
-      const stderr = new EventEmitter() as EventEmitter & { setEncoding: (encoding: string) => void };
-      const child = new EventEmitter() as EventEmitter & {
-        stdin: { write: (line: string, callback?: (error?: Error | null) => void) => boolean };
-        stdout: typeof stdout;
-        stderr: typeof stderr;
-        kill: () => void;
-      };
+    spawn: vi.fn<SpawnMock>((command, args, options) => {
+      const stdout = new NodeEventEmitter() as MockStream;
+      const stderr = new NodeEventEmitter() as MockStream;
+      const child = new NodeEventEmitter() as MockChildProcess;
 
-      stdout.setEncoding = vi.fn();
-      stderr.setEncoding = vi.fn();
+      stdout.setEncoding = vi.fn<(encoding: string) => void>();
+      stderr.setEncoding = vi.fn<(encoding: string) => void>();
       child.stdout = stdout;
       child.stderr = stderr;
-      child.kill = vi.fn();
+      child.kill = vi.fn<() => void>();
       child.stdin = {
-        write: vi.fn((line: string, callback?: (error?: Error | null) => void) => {
+        write: vi.fn<MockChildProcess["stdin"]["write"]>((line, callback) => {
           const request = JSON.parse(line.trim());
           mockState.requests.push(request);
           queueMicrotask(() => {
