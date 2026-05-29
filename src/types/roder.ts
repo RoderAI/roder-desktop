@@ -3,6 +3,7 @@ import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extension
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
+  appServerMethods?: string[];
   cwd?: string;
   message?: string;
 };
@@ -429,6 +430,123 @@ export type SpeechTranscribeResult = {
   }>;
   providerResponseId?: string;
   metadata?: unknown;
+};
+
+export type HunkDiffLineKind = "context" | "added" | "removed";
+
+export type HunkDiffLine = {
+  kind: HunkDiffLineKind;
+  text: string;
+  oldLine?: number | null;
+  newLine?: number | null;
+};
+
+export type HunkRollbackState =
+  | "available"
+  | "applied"
+  | { unavailable: { reason: string } }
+  | { conflict: { reason: string } };
+
+export type HunkRecord = {
+  id: string;
+  threadId: string;
+  turnId: string;
+  path: string;
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  diff: HunkDiffLine[];
+  toolCallId: string;
+  toolName: string;
+  planReviewId?: string | null;
+  planStepId?: string | null;
+  timelineEventId?: string | null;
+  checkpointId?: string | null;
+  rollback: HunkRollbackState;
+  reversePatch?: string | null;
+  createdAt: string;
+};
+
+export type PagedHunkDiff = {
+  hunk: HunkRecord;
+  offset: number;
+  limit: number;
+  totalLines: number;
+  lines: HunkDiffLine[];
+  nextOffset?: number | null;
+};
+
+export type HunkListResult = {
+  hunks: HunkRecord[];
+};
+
+export type HunkReadResult = {
+  page: PagedHunkDiff | null;
+};
+
+export type GitChangeStatus = "modified" | "added" | "deleted" | "renamed" | "untracked";
+
+export type WorkspaceChangeSource = "gitReconciled";
+
+export type WorkspaceChangeConfidence = "observedAfterTool";
+
+export type WorkspaceObservedFile = {
+  path: string;
+  oldPath?: string | null;
+  status: GitChangeStatus;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+};
+
+export type WorkspaceChangeObservation = {
+  id: string;
+  threadId: string;
+  turnId: string;
+  toolCallId: string;
+  toolName: string;
+  source: WorkspaceChangeSource;
+  confidence: WorkspaceChangeConfidence;
+  files: WorkspaceObservedFile[];
+  createdAt: string;
+};
+
+export type WorkspaceChangesListResult = {
+  changes: WorkspaceChangeObservation[];
+};
+
+export type GitChangedFile = {
+  path: string;
+  oldPath?: string | null;
+  status: GitChangeStatus;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+};
+
+export type GitChangesListResult = {
+  repositoryRoot: string;
+  branch?: string | null;
+  baseRef?: string | null;
+  baseSha?: string | null;
+  headSha?: string | null;
+  files: GitChangedFile[];
+  totals: {
+    files: number;
+    additions: number;
+    deletions: number;
+  };
+  truncated?: boolean;
+};
+
+export type GitChangesReadResult = {
+  path: string;
+  patch: string;
+  offset: number;
+  limit: number;
+  totalLines: number;
+  nextOffset?: number | null;
 };
 
 export type AppCommand = {

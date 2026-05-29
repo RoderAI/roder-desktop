@@ -1,15 +1,23 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQueryStates } from "nuqs";
+import { useQueryStates, type SetValues } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AppShellContextValue } from "@/components/app-shell-context";
 import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { clamp, useHorizontalResize } from "@/hooks/use-horizontal-resize";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
+import { useThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { archiveRouteAfterThreadRemoval, defaultPluginsRoute, isPluginsRoutePath } from "@/lib/route-selection";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
-import { routeSearchParsers, sidebarWidthBounds, toolPanelWidthBounds, type RouteToolPanel } from "@/lib/route-search";
+import {
+  mergeRouteSearchUpdate,
+  routeSearchParsers,
+  sidebarWidthBounds,
+  toolPanelWidthBounds,
+  type RouteReviewScope,
+  type RouteToolPanel,
+} from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment } from "@/types/roder";
 
@@ -37,7 +45,11 @@ export function useAppShellController(): AppShellController {
   } = agent;
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const [routeSearch, setRouteSearch] = useQueryStates(routeSearchParsers);
+  const [routeSearch, setRawRouteSearch] = useQueryStates(routeSearchParsers);
+  const setRouteSearch = useCallback<SetValues<typeof routeSearchParsers>>(
+    (update, options) => setRawRouteSearch((current) => mergeRouteSearchUpdate(current, update), options),
+    [setRawRouteSearch],
+  );
   useExtensionThemes();
   useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
@@ -54,6 +66,7 @@ export function useAppShellController(): AppShellController {
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
   const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
+  const hunkSummary = useThreadHunkSummary(activeThreadId, agent.hunkRevision);
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
@@ -171,6 +184,44 @@ export function useAppShellController(): AppShellController {
     },
     [activeTool, setRouteSearch],
   );
+  const openReview = useCallback(
+    (scope: RouteReviewScope, turnId = "") => {
+      const retainedTurnId = turnId || routeSearch.reviewTurnId || hunkSummary.latestTurnId;
+      void setRouteSearch(
+        {
+          tool: "review",
+          reviewScope: scope,
+          reviewTurnId: retainedTurnId,
+          reviewPath: "",
+        },
+        { history: "replace" },
+      );
+    },
+    [hunkSummary.latestTurnId, routeSearch.reviewTurnId, setRouteSearch],
+  );
+  const toggleBranchReview = useCallback(() => {
+    if (activeTool === "review" && routeSearch.reviewScope === "branch") {
+      void setRouteSearch({ tool: null }, { history: "replace" });
+      return;
+    }
+    openReview("branch");
+  }, [activeTool, openReview, routeSearch.reviewScope, setRouteSearch]);
+  const changeReviewScope = useCallback(
+    (scope: RouteReviewScope, turnId = "") => {
+      openReview(scope, turnId);
+    },
+    [openReview],
+  );
+  useEffect(() => {
+    if (
+      activeTool === "review" &&
+      routeSearch.reviewScope === "turn" &&
+      !routeSearch.reviewTurnId &&
+      hunkSummary.latestTurnId
+    ) {
+      void setRouteSearch({ reviewTurnId: hunkSummary.latestTurnId }, { history: "replace" });
+    }
+  }, [activeTool, hunkSummary.latestTurnId, routeSearch.reviewScope, routeSearch.reviewTurnId, setRouteSearch]);
   const openPlugins = useCallback(() => {
     void navigate({ to: defaultPluginsRoute(), search: true });
   }, [navigate]);
@@ -211,6 +262,7 @@ export function useAppShellController(): AppShellController {
       composerFocusSignal,
       folderOptions,
       followSignal,
+      hunkSummary,
       routeSearch,
       selectedExtensionId,
       setCanScrollTranscriptToBottom,
@@ -220,6 +272,7 @@ export function useAppShellController(): AppShellController {
       threadOptions,
       attachToComposer,
       followBottom,
+      openReview,
       sendPrompt,
     }),
     [
@@ -234,6 +287,8 @@ export function useAppShellController(): AppShellController {
       folderOptions,
       followBottom,
       followSignal,
+      hunkSummary,
+      openReview,
       routeSearch,
       selectedExtensionId,
       sendPrompt,
@@ -253,6 +308,10 @@ export function useAppShellController(): AppShellController {
       folderOptions,
       isPluginsRoute,
       leftSidebarWidth,
+      hunkSummary,
+      reviewPath: routeSearch.reviewPath,
+      reviewScope: routeSearch.reviewScope,
+      reviewTurnId: routeSearch.reviewTurnId,
       selectedExtensionId,
       selectedExtensionPanelId: routeSearch.extensionPanel || null,
       sidebarOpen,
@@ -275,9 +334,12 @@ export function useAppShellController(): AppShellController {
       onSelectThread: selectThread,
       onSelectedExtensionPanelChange: (extensionPanel) =>
         void setRouteSearch({ extensionPanel }, { history: "replace" }),
+      onReviewPathChange: (reviewPath) => void setRouteSearch({ reviewPath }, { history: "replace" }),
+      onReviewScopeChange: changeReviewScope,
       onToggleBrowser: () => toggleToolPanel("browser"),
       onToggleCanvas: () => toggleToolPanel("canvas"),
       onToggleExtensions: toggleExtensionsPanel,
+      onToggleReview: toggleBranchReview,
       onToggleSidebar: () => void setRouteSearch({ sidebar: !sidebarOpen }, { history: "replace" }),
       onToggleTerminal: () => toggleToolPanel("terminal"),
     },

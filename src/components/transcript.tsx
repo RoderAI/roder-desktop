@@ -1,5 +1,7 @@
-import { useCallback, useMemo, useRef } from "react";
+import { Fragment, useCallback, useMemo, useRef } from "react";
+import { GitCompareArrows } from "lucide-react";
 import type { ConversationMessage } from "@/types/roder";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { cn } from "@/lib/utils";
@@ -18,7 +20,11 @@ type TranscriptProps = {
   followSignal: number;
   activeTurnId?: string;
   showWorkingIndicator?: boolean;
+  threadChangeCount?: number;
+  turnChangeCounts?: Record<string, number>;
   onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
+  onReviewThreadChanges?: () => void;
+  onReviewTurnChanges?: (turnId: string) => void;
 };
 
 const bottomThresholdPx = 48;
@@ -28,7 +34,11 @@ export function Transcript({
   messages,
   followSignal,
   showWorkingIndicator = false,
+  threadChangeCount = 0,
+  turnChangeCounts = {},
   onCanScrollToBottomChange,
+  onReviewThreadChanges,
+  onReviewTurnChanges,
 }: TranscriptProps): React.JSX.Element {
   const skills = useSkillsStore((state) => state.skills);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -52,6 +62,7 @@ export function Transcript({
     () => groupToolMessagesForTranscript(messages, { activeTurnId }),
     [activeTurnId, messages],
   );
+  const turnBoundaryIndexes = useMemo(() => findTurnBoundaryIndexes(transcriptEntries), [transcriptEntries]);
 
   const syncPinnedState = useCallback(
     (viewport: HTMLDivElement) => {
@@ -113,8 +124,20 @@ export function Transcript({
         onViewportScroll={(event) => syncPinnedState(event.currentTarget)}
       >
         <main className="mx-auto flex w-full max-w-[980px] flex-col px-8 pb-40 pt-2">
+          {threadChangeCount > 0 && onReviewThreadChanges && (
+            <div className="mb-2 flex justify-end">
+              <ChangesLink label="Changes" count={threadChangeCount} onClick={onReviewThreadChanges} />
+            </div>
+          )}
           {transcriptEntries.map((entry, index) => {
             const message = entry.kind === "message" ? entry.message : undefined;
+            const turnId = entryTurnId(entry);
+            const turnChangeCount = turnId ? (turnChangeCounts[turnId] ?? 0) : 0;
+            const showTurnChanges =
+              turnId !== undefined &&
+              turnChangeCount > 0 &&
+              onReviewTurnChanges &&
+              turnBoundaryIndexes.has(index);
             const previousIsTool = isToolEntry(transcriptEntries[index - 1]);
             const nextIsTool = isToolEntry(transcriptEntries[index + 1]);
             const entryIsTool = isToolEntry(entry);
@@ -122,46 +145,56 @@ export function Transcript({
               message?.role === "assistant" && Boolean(message.phase && message.phase !== "final_answer");
 
             return (
-              <article
-                key={entry.kind === "message" ? entry.message.id : entry.id}
-                className={cn(
-                  "text-foreground",
-                  !entryIsTool && "my-3",
-                  isPhaseMessage && "my-4",
-                  entryIsTool && "my-0",
-                  entryIsTool && !previousIsTool && "mt-2",
-                  entryIsTool && !nextIsTool && "mb-2",
-                  message?.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-base",
-                )}
-              >
-                {entry.kind === "activityGroup" ? (
-                  <ToolActivityGroup entries={entry.entries} summary={entry.summary} />
-                ) : entry.kind === "readFileGroup" ? (
-                  <CompactToolGroup kind="readFile" messages={entry.messages} />
-                ) : entry.kind === "readSkillGroup" ? (
-                  <CompactToolGroup kind="readSkill" messages={entry.messages} />
-                ) : entry.kind === "searchGroup" ? (
-                  <CompactToolGroup kind="search" messages={entry.messages} />
-                ) : message?.role === "tool" ? (
-                  <ToolTimelineItem message={message} />
-                ) : isPhaseMessage ? (
-                  <PhaseMessage
-                    isStreaming={message.status === "streaming"}
-                    skills={skills}
-                    text={message.text || (message.status === "streaming" ? " " : "")}
-                  />
-                ) : message?.role === "assistant" ? (
-                  <MessageContent
-                    isStreaming={message.status === "streaming"}
-                    skills={skills}
-                    text={message.text || (message.status === "streaming" ? " " : "")}
-                  />
-                ) : (
-                  <div className="font-medium text-base leading-[1.55]">
-                    {renderTextWithSkillTokens(message?.text ?? "", skills)}
+              <Fragment key={entry.kind === "message" ? entry.message.id : entry.id}>
+                <article
+                  className={cn(
+                    "text-foreground",
+                    !entryIsTool && "my-3",
+                    isPhaseMessage && "my-4",
+                    entryIsTool && "my-0",
+                    entryIsTool && !previousIsTool && "mt-2",
+                    entryIsTool && !nextIsTool && "mb-2",
+                    message?.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-base",
+                  )}
+                >
+                  {entry.kind === "activityGroup" ? (
+                    <ToolActivityGroup entries={entry.entries} summary={entry.summary} />
+                  ) : entry.kind === "readFileGroup" ? (
+                    <CompactToolGroup kind="readFile" messages={entry.messages} />
+                  ) : entry.kind === "readSkillGroup" ? (
+                    <CompactToolGroup kind="readSkill" messages={entry.messages} />
+                  ) : entry.kind === "searchGroup" ? (
+                    <CompactToolGroup kind="search" messages={entry.messages} />
+                  ) : message?.role === "tool" ? (
+                    <ToolTimelineItem message={message} />
+                  ) : isPhaseMessage ? (
+                    <PhaseMessage
+                      isStreaming={message.status === "streaming"}
+                      skills={skills}
+                      text={message.text || (message.status === "streaming" ? " " : "")}
+                    />
+                  ) : message?.role === "assistant" ? (
+                    <MessageContent
+                      isStreaming={message.status === "streaming"}
+                      skills={skills}
+                      text={message.text || (message.status === "streaming" ? " " : "")}
+                    />
+                  ) : (
+                    <div className="font-medium text-base leading-[1.55]">
+                      {renderTextWithSkillTokens(message?.text ?? "", skills)}
+                    </div>
+                  )}
+                </article>
+                {showTurnChanges && turnId && onReviewTurnChanges && (
+                  <div className="mb-3 flex justify-start">
+                    <ChangesLink
+                      label="Turn changes"
+                      count={turnChangeCount}
+                      onClick={() => onReviewTurnChanges(turnId)}
+                    />
                   </div>
                 )}
-              </article>
+              </Fragment>
             );
           })}
           {showWorkingIndicator && <ThreadWorkingIndicator />}
@@ -169,6 +202,24 @@ export function Transcript({
       </ScrollArea>
       <div className="transcript-fade pointer-events-none absolute inset-x-0 bottom-0 h-28" />
     </div>
+  );
+}
+
+function ChangesLink({
+  label,
+  count,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <Button variant="ghost" size="sm" className="h-8 rounded-md px-2.5 text-muted-foreground" onClick={onClick}>
+      <GitCompareArrows className="size-3.5" />
+      <span>{label}</span>
+      <span className="rounded-md bg-muted px-1.5 py-0.5 text-base text-muted-foreground">{count}</span>
+    </Button>
   );
 }
 
@@ -194,4 +245,45 @@ function isToolEntry(entry: ReturnType<typeof groupToolMessagesForTranscript>[nu
     entry?.kind === "searchGroup" ||
     entry?.message.role === "tool"
   );
+}
+
+function entryTurnId(entry: ReturnType<typeof groupToolMessagesForTranscript>[number]): string | undefined {
+  if (entry.kind === "message") {
+    return entry.message.turnId;
+  }
+  if (entry.kind === "activityGroup") {
+    return entry.entries.flatMap(entryMessages).find((message) => message.turnId)?.turnId;
+  }
+  return entry.messages.find((message) => message.turnId)?.turnId;
+}
+
+function findTurnBoundaryIndexes(entries: ReturnType<typeof groupToolMessagesForTranscript>): Set<number> {
+  const boundaries = new Set<number>();
+  let nextTurnId: string | undefined;
+
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const turnId = entryTurnId(entries[index]);
+    if (!turnId) {
+      continue;
+    }
+    if (!nextTurnId || nextTurnId !== turnId) {
+      boundaries.add(index);
+    }
+    nextTurnId = turnId;
+  }
+
+  return boundaries;
+}
+
+function entryMessages(entry: Parameters<typeof isToolEntry>[0]): ConversationMessage[] {
+  if (!entry) {
+    return [];
+  }
+  if (entry.kind === "message") {
+    return [entry.message];
+  }
+  if (entry.kind === "activityGroup") {
+    return entry.entries.flatMap(entryMessages);
+  }
+  return entry.messages;
 }

@@ -5,8 +5,11 @@ import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
 import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
+import { ReviewPanel } from "@/components/review-panel";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
+import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import type { RouteReviewScope } from "@/lib/route-search";
 import type { FolderOption } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment, RoderStatus, RoderThread } from "@/types/roder";
 
@@ -18,6 +21,10 @@ export type AppShellLayoutProps = {
   folderOptions: FolderOption[];
   isPluginsRoute: boolean;
   leftSidebarWidth: number;
+  hunkSummary: ThreadHunkSummary;
+  reviewPath: string;
+  reviewScope: RouteReviewScope;
+  reviewTurnId: string;
   selectedExtensionId: string | null;
   selectedExtensionPanelId: string | null;
   sidebarOpen: boolean;
@@ -39,9 +46,12 @@ export type AppShellLayoutProps = {
   onSelectFolder: (path: string) => void;
   onSelectThread: (threadId: string) => void;
   onSelectedExtensionPanelChange: (extensionPanel: string) => void;
+  onReviewPathChange: (path: string) => void;
+  onReviewScopeChange: (scope: RouteReviewScope, turnId?: string) => void;
   onToggleBrowser: () => void;
   onToggleCanvas: () => void;
   onToggleExtensions: () => void;
+  onToggleReview: () => void;
   onToggleSidebar: () => void;
   onToggleTerminal: () => void;
 };
@@ -54,6 +64,10 @@ export function AppShellLayout({
   folderOptions,
   isPluginsRoute,
   leftSidebarWidth,
+  hunkSummary,
+  reviewPath,
+  reviewScope,
+  reviewTurnId,
   selectedExtensionId,
   selectedExtensionPanelId,
   sidebarOpen,
@@ -75,9 +89,12 @@ export function AppShellLayout({
   onSelectFolder,
   onSelectThread,
   onSelectedExtensionPanelChange,
+  onReviewPathChange,
+  onReviewScopeChange,
   onToggleBrowser,
   onToggleCanvas,
   onToggleExtensions,
+  onToggleReview,
   onToggleSidebar,
   onToggleTerminal,
 }: AppShellLayoutProps): React.JSX.Element {
@@ -136,6 +153,7 @@ export function AppShellLayout({
               onToggleBrowser={onToggleBrowser}
               onToggleCanvas={onToggleCanvas}
               onToggleExtensions={onToggleExtensions}
+              onToggleReview={onToggleReview}
             />
             <div className="flex min-h-0 flex-1">
               <div className="flex min-w-0 flex-1 flex-col">
@@ -144,11 +162,20 @@ export function AppShellLayout({
               {activeTool && (
                 <ToolPanelHost
                   activeTool={activeTool}
+                  appServerMethods={status.appServerMethods ?? []}
+                  activeThreadId={activeThreadId}
+                  activeWorkspaceCwd={activeWorkspaceCwd}
+                  hunkSummary={hunkSummary}
+                  reviewPath={reviewPath}
+                  reviewScope={reviewScope}
+                  reviewTurnId={reviewTurnId}
                   selectedExtensionId={selectedExtensionId}
                   selectedExtensionPanelId={selectedExtensionPanelId}
                   width={toolPanelWidth}
                   onAttachToComposer={onAttachToComposer}
                   onBeginResize={onBeginToolPanelResize}
+                  onReviewPathChange={onReviewPathChange}
+                  onReviewScopeChange={onReviewScopeChange}
                   onSelectedExtensionPanelChange={onSelectedExtensionPanelChange}
                 />
               )}
@@ -168,19 +195,37 @@ export function AppShellLayout({
 
 function ToolPanelHost({
   activeTool,
+  appServerMethods,
+  activeThreadId,
+  activeWorkspaceCwd,
+  hunkSummary,
+  reviewPath,
+  reviewScope,
+  reviewTurnId,
   selectedExtensionId,
   selectedExtensionPanelId,
   width,
   onAttachToComposer,
   onBeginResize,
+  onReviewPathChange,
+  onReviewScopeChange,
   onSelectedExtensionPanelChange,
 }: {
   activeTool: NonNullable<ToolPanel>;
+  appServerMethods: string[];
+  activeThreadId: string;
+  activeWorkspaceCwd: string;
+  hunkSummary: ThreadHunkSummary;
+  reviewPath: string;
+  reviewScope: RouteReviewScope;
+  reviewTurnId: string;
   selectedExtensionId: string | null;
   selectedExtensionPanelId: string | null;
   width: number;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
   onBeginResize: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onReviewPathChange: (path: string) => void;
+  onReviewScopeChange: (scope: RouteReviewScope, turnId?: string) => void;
   onSelectedExtensionPanelChange: (extensionPanel: string) => void;
 }): React.JSX.Element {
   return (
@@ -194,6 +239,22 @@ function ToolPanelHost({
       {activeTool === "terminal" && <TerminalPanel />}
       {activeTool === "browser" && <BrowserPanel onAttach={onAttachToComposer} />}
       {activeTool === "canvas" && <CanvasPanel onAttach={onAttachToComposer} />}
+      {activeTool === "review" && (
+        <ReviewPanel
+          threadId={activeThreadId}
+          workspace={activeWorkspaceCwd}
+          threadHunks={hunkSummary.hunks}
+          threadObservedChanges={hunkSummary.observedChanges}
+          threadLatestTurnId={hunkSummary.latestTurnId}
+          scope={reviewScope}
+          turnId={reviewTurnId}
+          selectedPath={reviewPath}
+          width={width}
+          appServerMethods={appServerMethods}
+          onScopeChange={onReviewScopeChange}
+          onSelectedPathChange={onReviewPathChange}
+        />
+      )}
       {activeTool === "extensions" && (
         <ExtensionsPanel
           selectedExtensionId={selectedExtensionId}
