@@ -195,10 +195,10 @@ export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
       settingsOpen: false,
-      settingsSection: "appearance",
+      settingsSection: "general",
       settings: defaultThemeSettings,
       extensionThemePresets: [],
-      openSettings: (section = "appearance") => set({ settingsOpen: true, settingsSection: section }),
+      openSettings: (section = "general") => set({ settingsOpen: true, settingsSection: section }),
       closeSettings: () => set({ settingsOpen: false }),
       setSettingsSection: (settingsSection) => set({ settingsSection }),
       setExtensionThemePresets: (extensionThemePresets) =>

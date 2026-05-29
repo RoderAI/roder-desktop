@@ -1,14 +1,4 @@
-import {
-  ChevronDown,
-  ExternalLink,
-  Gauge,
-  Loader2,
-  LogIn,
-  LogOut,
-  Settings,
-  SlidersHorizontal,
-  UserCircle,
-} from "lucide-react";
+import { ChevronDown, Gauge, Loader2, LogIn, LogOut, Settings, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -17,33 +7,62 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { CodexAccountSnapshot, CodexRateWindow } from "@/types/roder";
 import { useThemeStore } from "@/stores/theme-store";
 
+/*
+ * RATE LIMIT PANEL STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to the disclosure toggle.
+ *
+ *   0ms   panel row starts at its current size
+ * 200ms   grid row opens/closes while content fades and slides 2px -> 0
+ */
+const RATE_LIMIT_PANEL_ANIMATION = {
+  durationClassName: "duration-200",
+  easingClassName: "ease-out",
+};
+
+const disconnectedAccount: CodexAccountSnapshot = {
+  signedIn: false,
+  codexSignedIn: false,
+  roderSignedIn: false,
+  displayName: null,
+  planType: null,
+  accountId: null,
+  limits: null,
+  loginPending: false,
+};
+
 export function SidebarAccountMenu(): React.JSX.Element {
-  const [account, setAccount] = useState<CodexAccountSnapshot | null>(null);
+  const [account, setAccount] = useState<CodexAccountSnapshot | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const [limitsOpen, setLimitsOpen] = useState(true);
   const [busy, setBusy] = useState<"login" | "logout" | null>(null);
   const openSettings = useThemeStore((state) => state.openSettings);
+  const accountLoading = account === undefined;
 
   useEffect(() => {
     let cancelled = false;
-    void window.roderDesktop.codexAccount().then((snapshot) => {
-      if (!cancelled) {
-        setAccount(snapshot);
-        setLimitsOpen(Boolean(snapshot.limits));
-      }
-    });
+    void window.roderDesktop
+      .codexAccount()
+      .catch(() => disconnectedAccount)
+      .then((snapshot) => {
+        if (!cancelled) {
+          setAccount(snapshot);
+          setLimitsOpen(Boolean(snapshot.limits));
+        }
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
   async function refresh(): Promise<void> {
-    setAccount(await window.roderDesktop.codexAccount());
+    setAccount(await window.roderDesktop.codexAccount().catch(() => disconnectedAccount));
   }
 
   async function login(): Promise<void> {
@@ -64,13 +83,6 @@ export function SidebarAccountMenu(): React.JSX.Element {
     }
   }
 
-  const label = account?.roderSignedIn ? (account?.displayName ?? "Codex account") : "Sign in to Codex";
-  const secondary = account?.roderSignedIn
-    ? "Roder connected"
-    : account?.codexSignedIn
-      ? "Codex CLI detected"
-      : "Connect provider";
-
   return (
     <div className="no-drag shrink-0 border-t border-border/70 p-3">
       <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -79,45 +91,22 @@ export function SidebarAccountMenu(): React.JSX.Element {
             buttonVariants({ variant: "ghost" }),
             "squircle-corners h-12 w-full justify-start gap-3 rounded-xl px-2.5 text-base text-sidebar-foreground hover:bg-sidebar-accent",
           )}
+          disabled={accountLoading}
           onClick={() => void refresh()}
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-active text-base text-sidebar-active-foreground">
-            {account?.displayName ? initials(account.displayName) : "G"}
-          </div>
-          <span className="min-w-0 flex-1 text-left">
-            <span className="block truncate text-sidebar-active-foreground">{label}</span>
-            <span className="block truncate text-base text-sidebar-muted">{secondary}</span>
-          </span>
-          <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted" />
+          <SidebarAccountTriggerContent account={account} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="top"
-          align="start"
-          sideOffset={10}
-          className="w-[306px] rounded-2xl border-border/80 bg-popover p-1.5 text-base shadow-2xl"
-        >
-          <DropdownMenuGroup className="space-y-1">
-            <MenuRow muted icon={<UserCircle className="size-4" />} label={label} />
-            <MenuRow
-              muted
-              icon={<Settings className="size-4" />}
-              label="Personal account"
-              detail={account?.planType ?? undefined}
-            />
-            <DropdownMenuItem
-              className="h-10 rounded-xl px-3 text-base focus:bg-accent"
-              onSelect={() => openSettings("appearance")}
-            >
+        <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-72">
+          <DropdownMenuGroup>
+            <DropdownMenuItem className="h-9 px-2" onSelect={() => openSettings()}>
               <Settings className="size-4" />
               Settings
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
-          <div className="my-2 h-px bg-border/70" />
-
           <button
             type="button"
-            className="flex h-10 w-full items-center gap-3 rounded-xl bg-accent/70 px-3 text-left text-base text-foreground outline-none hover:bg-accent"
+            className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent"
             onClick={() => setLimitsOpen((value) => !value)}
           >
             <Gauge className="size-4 shrink-0" />
@@ -127,27 +116,17 @@ export function SidebarAccountMenu(): React.JSX.Element {
             />
           </button>
 
-          {limitsOpen && (
-            <div className="space-y-2 px-5 py-3">
+          <AnimatedRateLimitPanel open={limitsOpen}>
+            <>
               <LimitLine window={account?.limits?.primary ?? null} fallback="5h" />
               <LimitLine window={account?.limits?.secondary ?? null} fallback="Weekly" />
-              <button
-                type="button"
-                className="mt-1 flex h-8 w-full items-center justify-between rounded-lg text-left text-base text-foreground hover:text-muted-foreground"
-                onClick={() => void window.roderDesktop.codexOpenRateLimitHelp()}
-              >
-                Learn more
-                <ExternalLink className="size-4 text-muted-foreground" />
-              </button>
-            </div>
-          )}
-
-          <div className="my-1 h-px bg-border/70" />
+            </>
+          </AnimatedRateLimitPanel>
 
           {account?.roderSignedIn ? (
             <button
               type="button"
-              className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-base text-foreground outline-none hover:bg-accent disabled:opacity-60"
+              className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent disabled:opacity-60"
               disabled={busy === "logout"}
               onClick={() => void logout()}
             >
@@ -157,7 +136,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
           ) : (
             <button
               type="button"
-              className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-base text-foreground outline-none hover:bg-accent disabled:opacity-60"
+              className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent disabled:opacity-60"
               disabled={busy === "login" || account?.loginPending}
               onClick={() => void login()}
             >
@@ -175,39 +154,86 @@ export function SidebarAccountMenu(): React.JSX.Element {
   );
 }
 
-function MenuRow({
-  icon,
-  label,
-  detail,
-  muted = false,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  detail?: string;
-  muted?: boolean;
-}): React.JSX.Element {
+function AnimatedRateLimitPanel({ children, open }: { children: React.ReactNode; open: boolean }): React.JSX.Element {
   return (
     <div
+      aria-hidden={!open}
       className={cn(
-        "flex h-10 items-center gap-3 rounded-xl px-3",
-        muted ? "text-muted-foreground" : "text-foreground",
+        "grid transition-[grid-template-rows] motion-reduce:transition-none",
+        RATE_LIMIT_PANEL_ANIMATION.durationClassName,
+        RATE_LIMIT_PANEL_ANIMATION.easingClassName,
+        open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
       )}
     >
-      {icon}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {detail && <span className="shrink-0 text-base uppercase tracking-normal">{detail}</span>}
+      <div
+        className={cn(
+          "min-h-0 overflow-hidden transition-[opacity,transform] motion-reduce:transition-none",
+          RATE_LIMIT_PANEL_ANIMATION.durationClassName,
+          RATE_LIMIT_PANEL_ANIMATION.easingClassName,
+          open ? "translate-y-0 opacity-100" : "-translate-y-0.5 opacity-0",
+        )}
+      >
+        <div className="space-y-2 px-2 py-3">{children}</div>
+      </div>
     </div>
+  );
+}
+
+export function SidebarAccountTriggerContent({
+  account,
+}: {
+  account: CodexAccountSnapshot | undefined;
+}): React.JSX.Element {
+  if (account === undefined) {
+    return (
+      <>
+        <div
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50"
+          aria-hidden="true"
+        >
+          <Skeleton className="size-4 rounded-full bg-sidebar-muted/30" />
+        </div>
+        <span className="flex min-w-0 flex-1 flex-col gap-1.5 text-left" aria-hidden="true">
+          <Skeleton className="h-3 w-28 rounded-full bg-sidebar-muted/25" />
+          <Skeleton className="h-3 w-20 rounded-full bg-sidebar-muted/20" />
+        </span>
+        <span className="sr-only">Loading Codex account</span>
+        <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted/60" aria-hidden="true" />
+      </>
+    );
+  }
+
+  const label = account.roderSignedIn ? (account.displayName ?? "Codex account") : "Sign in to Codex";
+  const secondary = account.roderSignedIn
+    ? undefined
+    : account.codexSignedIn
+      ? "Codex CLI detected"
+      : "Connect provider";
+
+  return (
+    <>
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50 text-sm text-sidebar-muted">
+        {account.displayName ? initials(account.displayName) : "G"}
+      </div>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block truncate text-sidebar-active-foreground">{label}</span>
+        {secondary ? <span className="block truncate text-base text-sidebar-muted">{secondary}</span> : null}
+      </span>
+      <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted" />
+    </>
   );
 }
 
 function LimitLine({ window, fallback }: { window: CodexRateWindow | null; fallback: string }): React.JSX.Element {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-base">
-      <span className="truncate text-foreground">{window?.label ?? fallback}</span>
-      <span className="font-mono text-muted-foreground">
+    <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_5rem] items-center gap-3 text-base">
+      <span className="truncate text-popover-foreground">{window?.label ?? fallback}</span>
+      <span className="text-right font-mono tabular-nums text-muted-foreground">
         {window ? `${Math.round(window.remainingPercent)}%` : "--"}
       </span>
-      <span className="w-14 text-right font-mono text-muted-foreground">{window?.resetLabel || "--"}</span>
+      <span className="whitespace-nowrap text-right font-mono tabular-nums text-muted-foreground">
+        {window?.resetLabel || "--"}
+      </span>
     </div>
   );
 }

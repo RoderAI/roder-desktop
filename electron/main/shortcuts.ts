@@ -1,6 +1,6 @@
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
-export type AppCommand = "newProject" | "newThread";
+export type AppCommand = "newProject" | "newThread" | "openSettings";
 
 export type ShortcutInput = {
   type: string;
@@ -20,6 +20,13 @@ export function isNewThreadShortcutInput(input: ShortcutInput, platform: NodeJS.
 
 export function isNewProjectShortcutInput(input: ShortcutInput, platform: NodeJS.Platform = process.platform): boolean {
   return isShortcutInputForKey(input, "o", "KeyO", platform);
+}
+
+export function isOpenSettingsShortcutInput(
+  input: ShortcutInput,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return isShortcutInputForKey(input, ",", "Comma", platform);
 }
 
 function isShortcutInputForKey(input: ShortcutInput, key: string, code: string, platform: NodeJS.Platform): boolean {
@@ -56,10 +63,26 @@ export function installNewProjectShortcut(webContents: WebContents, onNewProject
   });
 }
 
+export function installOpenSettingsShortcut(webContents: WebContents, onOpenSettings: () => void): void {
+  webContents.on("before-input-event", (event, input) => {
+    if (!isOpenSettingsShortcutInput(input)) {
+      return;
+    }
+    event.preventDefault();
+    onOpenSettings();
+  });
+}
+
 export function createApplicationMenuTemplate(
   onCommand: (command: AppCommand) => void,
   platform: NodeJS.Platform = process.platform,
 ): MenuItemConstructorOptions[] {
+  const settingsItem: MenuItemConstructorOptions = {
+    id: "settings",
+    label: "Settings...",
+    accelerator: "CommandOrControl+,",
+    click: () => onCommand("openSettings"),
+  };
   const fileMenu: MenuItemConstructorOptions = {
     label: "File",
     submenu: [
@@ -75,13 +98,33 @@ export function createApplicationMenuTemplate(
         accelerator: "CommandOrControl+N",
         click: () => onCommand("newThread"),
       },
+      ...(platform === "darwin" ? [] : [{ type: "separator" } as const, settingsItem]),
       { type: "separator" },
       platform === "darwin" ? { role: "close" } : { role: "quit" },
     ],
   };
 
   return [
-    ...(platform === "darwin" ? [{ role: "appMenu" } satisfies MenuItemConstructorOptions] : []),
+    ...(platform === "darwin"
+      ? [
+          {
+            role: "appMenu",
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              settingsItem,
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          } satisfies MenuItemConstructorOptions,
+        ]
+      : []),
     fileMenu,
     { role: "editMenu" },
     { role: "viewMenu" },

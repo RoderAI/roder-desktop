@@ -52,7 +52,7 @@ function themeVariables(
     "--color-secondary-foreground": fg,
     "--color-muted": muted,
     "--color-muted-foreground": mix(fg, bg, isDark ? 36 : 34),
-    "--color-accent": mix(bg, accent, isDark ? 20 + contrast * 0.12 : 12 + contrast * 0.08),
+    "--color-accent": mix(bg, accent, isDark ? 20 + contrast * 0.12 : 6 + contrast * 0.04),
     "--color-accent-foreground": fg,
     "--color-destructive": "#ef4444",
     "--color-destructive-foreground": "#fafafa",
