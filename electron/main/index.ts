@@ -16,6 +16,7 @@ import {
   createApplicationMenuTemplate,
   installNewProjectShortcut,
   installNewThreadShortcut,
+  installOpenSettingsShortcut,
   type AppCommand,
 } from "./shortcuts";
 
@@ -105,6 +106,7 @@ function createWindow(): void {
   });
   installNewProjectShortcut(mainWindow.webContents, () => sendAppCommand("newProject"));
   installNewThreadShortcut(mainWindow.webContents, () => sendAppCommand("newThread"));
+  installOpenSettingsShortcut(mainWindow.webContents, () => sendAppCommand("openSettings"));
 
   mainWindow.on("closed", () => {
     browser.destroy();

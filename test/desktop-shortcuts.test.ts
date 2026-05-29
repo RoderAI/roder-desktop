@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   createApplicationMenuTemplate,
+  isOpenSettingsShortcutInput,
   isNewProjectShortcutInput,
   isNewThreadShortcutInput,
 } from "../electron/main/shortcuts";
@@ -40,6 +41,16 @@ test("recognizes Control+O as the new project shortcut off macOS", () => {
   expect(isNewProjectShortcutInput(input({ key: "o", code: "KeyO", meta: true }), "linux")).toBe(false);
 });
 
+test("recognizes Command+Comma as the open settings shortcut on macOS", () => {
+  expect(isOpenSettingsShortcutInput(input({ key: ",", code: "Comma", meta: true }), "darwin")).toBe(true);
+  expect(isOpenSettingsShortcutInput(input({ key: ",", code: "Comma", control: true }), "darwin")).toBe(false);
+});
+
+test("recognizes Control+Comma as the open settings shortcut off macOS", () => {
+  expect(isOpenSettingsShortcutInput(input({ key: ",", code: "Comma", control: true }), "linux")).toBe(true);
+  expect(isOpenSettingsShortcutInput(input({ key: ",", code: "Comma", meta: true }), "linux")).toBe(false);
+});
+
 test("ignores repeat, composing, modified, and key-up shortcut events", () => {
   expect(isNewThreadShortcutInput(input({ meta: true, isAutoRepeat: true }), "darwin")).toBe(false);
   expect(isNewThreadShortcutInput(input({ meta: true, isComposing: true }), "darwin")).toBe(false);
@@ -74,4 +85,31 @@ test("application menu exposes CommandOrControl+O for new projects", () => {
   newProjectItem.click();
 
   expect(commands).toEqual(["newProject"]);
+});
+
+test("application menu exposes CommandOrControl+Comma for settings", () => {
+  const commands = [];
+  const template = createApplicationMenuTemplate((command) => commands.push(command), "darwin");
+  const appMenu = template.find((item) => item.role === "appMenu");
+  const settingsItem = appMenu.submenu.find((item) => item.id === "settings");
+
+  expect(settingsItem.label).toBe("Settings...");
+  expect(settingsItem.accelerator).toBe("CommandOrControl+,");
+
+  settingsItem.click();
+
+  expect(commands).toEqual(["openSettings"]);
+});
+
+test("macOS application menu preserves standard app roles", () => {
+  const template = createApplicationMenuTemplate(() => undefined, "darwin");
+  const appMenu = template.find((item) => item.role === "appMenu");
+  const roles = appMenu.submenu.map((item) => item.role);
+
+  expect(roles).toContain("about");
+  expect(roles).toContain("services");
+  expect(roles).toContain("hide");
+  expect(roles).toContain("hideOthers");
+  expect(roles).toContain("unhide");
+  expect(roles).toContain("quit");
 });

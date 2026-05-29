@@ -31,3 +31,15 @@ test("theme store persists the active settings page through reloads", async () =
   expect(persisted.state.settingsOpen).toBe(true);
   expect(persisted.state.settingsSection).toBe("components");
 });
+
+test("theme store opens settings to general by default", async () => {
+  installStorageMock();
+  const { useThemeStore } = await loadThemeStore();
+
+  useThemeStore.getState().openSettings("components");
+  useThemeStore.getState().closeSettings();
+  useThemeStore.getState().openSettings();
+
+  expect(useThemeStore.getState().settingsOpen).toBe(true);
+  expect(useThemeStore.getState().settingsSection).toBe("general");
+});

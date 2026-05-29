@@ -432,7 +432,7 @@ export type SpeechTranscribeResult = {
 };
 
 export type AppCommand = {
-  command: "newProject" | "newThread";
+  command: "newProject" | "newThread" | "openSettings";
 };
 
 declare global {
