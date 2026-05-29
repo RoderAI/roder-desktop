@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { CodexAccountSnapshot, CodexRateWindow } from "@/types/roder";
-import { useThemeStore } from "@/stores/theme-store";
 
 /*
  * RATE LIMIT PANEL STORYBOARD
@@ -37,12 +36,11 @@ const disconnectedAccount: CodexAccountSnapshot = {
   loginPending: false,
 };
 
-export function SidebarAccountMenu(): React.JSX.Element {
+export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => void }): React.JSX.Element {
   const [account, setAccount] = useState<CodexAccountSnapshot | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const [limitsOpen, setLimitsOpen] = useState(true);
   const [busy, setBusy] = useState<"login" | "logout" | null>(null);
-  const openSettings = useThemeStore((state) => state.openSettings);
   const accountLoading = account === undefined;
 
   useEffect(() => {
@@ -98,7 +96,7 @@ export function SidebarAccountMenu(): React.JSX.Element {
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-72">
           <DropdownMenuGroup>
-            <DropdownMenuItem className="h-9 px-2" onSelect={() => openSettings()}>
+            <DropdownMenuItem className="h-9 px-2" onSelect={onOpenSettings}>
               <Settings className="size-4" />
               Settings
             </DropdownMenuItem>

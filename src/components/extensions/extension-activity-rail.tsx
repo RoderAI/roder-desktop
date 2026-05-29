@@ -1,7 +1,6 @@
 import { Settings } from "lucide-react";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import { useExtensionsStore } from "@/stores/extensions-store";
-import { useThemeStore } from "@/stores/theme-store";
 import type { ExtensionCatalogRecord } from "@/types/extensions";
 import { cn } from "@/lib/utils";
 
@@ -9,15 +8,16 @@ type ExtensionActivityRailProps = {
   active: boolean;
   activeExtensionId?: string | null;
   onSelectExtension: (extensionId: string) => void;
+  onOpenSettings: () => void;
 };
 
 export function ExtensionActivityRail({
   active,
   activeExtensionId,
   onSelectExtension,
+  onOpenSettings,
 }: ExtensionActivityRailProps): React.JSX.Element | null {
   const extensions = useExtensionsStore((state) => state.extensions);
-  const openSettings = useThemeStore((state) => state.openSettings);
   const sidebarExtensions = getSidebarExtensions(extensions);
 
   if (sidebarExtensions.length === 0) {
@@ -70,7 +70,7 @@ export function ExtensionActivityRail({
         className="mt-2 grid size-9 place-items-center rounded-lg text-sidebar-muted outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Open extension settings"
         title="Extension settings"
-        onClick={() => openSettings("extensions")}
+        onClick={onOpenSettings}
       >
         <Settings className="size-4" />
       </button>

@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 
@@ -32,7 +33,7 @@ export default defineConfig({
         "@": resolve(root, "src"),
       },
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [TanStackRouterVite(), react(), tailwindcss()],
     build: {
       rollupOptions: {
         input: resolve(root, "index.html"),
