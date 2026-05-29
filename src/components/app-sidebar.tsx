@@ -21,6 +21,7 @@ type AppSidebarProps = {
   onNewThread: () => void;
   onNewThreadInFolder: (path: string) => void;
   onOpenPlugins: () => void;
+  onOpenSettings: () => void;
 };
 
 export function AppSidebar({
@@ -34,6 +35,7 @@ export function AppSidebar({
   onNewThread,
   onNewThreadInFolder,
   onOpenPlugins,
+  onOpenSettings,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
   const [projectOrder, setProjectOrder] = useState<string[]>(() => []);
@@ -171,7 +173,7 @@ export function AppSidebar({
           )}
         </div>
       </div>
-      <SidebarAccountMenu />
+      <SidebarAccountMenu onOpenSettings={onOpenSettings} />
     </aside>
   );
 }

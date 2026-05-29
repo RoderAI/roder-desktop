@@ -1,81 +1,65 @@
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryStates } from "nuqs";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
-import { AgentWaitCards } from "@/components/agent-wait-card";
+import { AppShellProvider } from "@/components/app-shell-context";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
-import { Composer } from "@/components/composer";
 import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
 import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
-import { PluginsMarketplacePanel } from "@/components/plugins/plugins-marketplace-panel";
-import { SettingsView } from "@/components/settings-view";
 import { TerminalPanel } from "@/components/terminal-panel";
 import { TopBar, type ToolPanel } from "@/components/top-bar";
-import { Transcript } from "@/components/transcript";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
+import { archiveRouteAfterThreadRemoval, defaultPluginsRoute, isPluginsRoutePath } from "@/lib/route-selection";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
+import { routeSearchParsers, sidebarWidthBounds, toolPanelWidthBounds } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import { useSkillsStore } from "@/stores/skills-store";
-import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
 
-type MainView = "chat" | "plugins";
-
 export function App(): React.JSX.Element {
+  const agent = useRoderAgent();
   const {
     activeThreadId,
-    activeTurnId,
     appearance,
     archiveThread: archiveAgentThread,
-    error,
     messages,
-    models,
     newProject: createProjectThread,
-    newThread: createAgentThread,
     restart,
-    selectedModel,
-    selectedPolicyMode,
-    selectedReasoning,
     selectedWorkspaceCwd,
     selectThread: selectAgentThread,
     sendPrompt: sendAgentPrompt,
-    setSelectedModel,
-    setSelectedPolicyMode,
-    setSelectedReasoning,
     setSelectedWorkspaceCwd,
     status,
-    stopTurn,
     threads,
     waitRequests,
-    resolveApproval,
-    resolveUserInput,
-    exitPlan,
-  } = useRoderAgent();
-  const settingsOpen = useThemeStore((state) => state.settingsOpen);
-  const openSettings = useThemeStore((state) => state.openSettings);
-  const closeSettings = useThemeStore((state) => state.closeSettings);
+  } = agent;
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [routeSearch, setRouteSearch] = useQueryStates(routeSearchParsers);
   useExtensionThemes();
   useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
   const [canScrollTranscriptToBottom, setCanScrollTranscriptToBottom] = useState(false);
-  const [mainView, setMainView] = useState<MainView>("chat");
-  const [activeTool, setActiveTool] = useState<ToolPanel>(null);
-  const [selectedExtensionId, setSelectedExtensionId] = useState<string | null>(null);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(274);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [toolPanelWidth, setToolPanelWidth] = useState(560);
   const [composerFocusSignal, setComposerFocusSignal] = useState(0);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const extensions = useExtensionsStore((state) => state.extensions);
-  const skills = useSkillsStore((state) => state.skills);
   const skillsLoaded = useSkillsStore((state) => state.loaded);
   const skillsLoading = useSkillsStore((state) => state.loading);
   const loadSkills = useSkillsStore((state) => state.load);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
+  const activeTool = routeSearch.tool;
+  const selectedExtensionId = routeSearch.extension || null;
   const selectedExtension =
     sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
+  const effectiveSelectedExtensionId = selectedExtension?.id ?? null;
+  const sidebarOpen = routeSearch.sidebar;
+  const leftSidebarWidth = routeSearch.leftWidth;
+  const toolPanelWidth = routeSearch.rightWidth;
+  const isPluginsRoute = isPluginsRoutePath(pathname);
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
@@ -88,25 +72,37 @@ export function App(): React.JSX.Element {
       .sort((left, right) => normalizedTimestamp(right.updatedAt) - normalizedTimestamp(left.updatedAt));
   }, [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
-  const showChat = useCallback(() => setMainView("chat"), []);
   const selectThread = useCallback(
     (threadId: string) => {
-      showChat();
       followBottom();
-      void selectAgentThread(threadId);
+      void navigate({ to: "/threads/$threadId", params: { threadId }, search: true });
+      void selectAgentThread(threadId, { pushHistory: false });
     },
-    [followBottom, selectAgentThread, showChat],
+    [followBottom, navigate, selectAgentThread],
   );
   const archiveThread = useCallback(
     (threadId: string) => {
-      showChat();
+      const target = archiveRouteAfterThreadRemoval({
+        activeThreadId,
+        archivedThreadId: threadId,
+        threads,
+      });
+      if (target?.route === "thread") {
+        void navigate({
+          to: "/threads/$threadId",
+          params: { threadId: target.threadId },
+          replace: true,
+          search: true,
+        });
+      } else if (target?.route === "new") {
+        void navigate({ to: "/new", replace: true, search: true });
+      }
       void archiveAgentThread(threadId);
     },
-    [archiveAgentThread, showChat],
+    [activeThreadId, archiveAgentThread, navigate, threads],
   );
   const selectFolder = useCallback(
     (path: string) => {
-      showChat();
       const normalizedPath = normalizePath(path);
       const latestThread = threads
         .filter((thread) => !thread.id.startsWith("demo-") && normalizePath(thread.cwd) === normalizedPath)
@@ -115,31 +111,34 @@ export function App(): React.JSX.Element {
       setSelectedWorkspaceCwd(path);
       if (latestThread) {
         selectThread(latestThread.id);
+        return;
       }
+      void navigate({ to: "/new", search: true });
+      void selectAgentThread("", { pushHistory: false });
     },
-    [selectThread, setSelectedWorkspaceCwd, showChat, threads],
+    [navigate, selectAgentThread, selectThread, setSelectedWorkspaceCwd, threads],
   );
   const newThread = useCallback(() => {
-    showChat();
     followBottom();
     setComposerFocusSignal((value) => value + 1);
-    void createAgentThread();
-  }, [createAgentThread, followBottom, showChat]);
+    void navigate({ to: "/new", search: true });
+    void selectAgentThread("", { pushHistory: false });
+  }, [followBottom, navigate, selectAgentThread]);
   const newThreadInFolder = useCallback(
     (path: string) => {
-      showChat();
       followBottom();
       setComposerFocusSignal((value) => value + 1);
       setSelectedWorkspaceCwd(path);
-      void createAgentThread();
+      void navigate({ to: "/new", search: true });
+      void selectAgentThread("", { pushHistory: false });
     },
-    [createAgentThread, followBottom, setSelectedWorkspaceCwd, showChat],
+    [followBottom, navigate, selectAgentThread, setSelectedWorkspaceCwd],
   );
   const newProject = useCallback(() => {
-    showChat();
     followBottom();
+    void navigate({ to: "/new", search: true });
     void createProjectThread();
-  }, [createProjectThread, followBottom, showChat]);
+  }, [createProjectThread, followBottom, navigate]);
   useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
       if (appCommand.command === "newProject") {
@@ -151,12 +150,10 @@ export function App(): React.JSX.Element {
         return;
       }
       if (appCommand.command === "openSettings") {
-        setMainView("chat");
-        setActiveTool(null);
-        openSettings("general");
+        void navigate({ to: "/settings/$section", params: { section: "general" }, search: true });
       }
     });
-  }, [newProject, newThread, openSettings]);
+  }, [navigate, newProject, newThread]);
   useEffect(() => {
     if (status.state === "ready" && !skillsLoaded && !skillsLoading) {
       void loadSkills();
@@ -178,187 +175,195 @@ export function App(): React.JSX.Element {
     },
     [followBottom, sendAgentPrompt],
   );
-  useEffect(() => {
-    if (sidebarExtensions.length === 0) {
-      setSelectedExtensionId(null);
-      return;
-    }
-    if (!selectedExtensionId || !sidebarExtensions.some((extension) => extension.id === selectedExtensionId)) {
-      setSelectedExtensionId(sidebarExtensions[0].id);
-    }
-  }, [sidebarExtensions, selectedExtensionId]);
   const toggleExtensionsPanel = useCallback(() => {
-    showChat();
     if (activeTool === "extensions") {
-      setActiveTool(null);
+      void setRouteSearch({ tool: null }, { history: "replace" });
       return;
     }
-    setSelectedExtensionId((extensionId) => extensionId ?? selectedExtension?.id ?? null);
-    setActiveTool("extensions");
-  }, [activeTool, selectedExtension, showChat]);
+    void setRouteSearch({ tool: "extensions", extension: selectedExtension?.id ?? "" }, { history: "replace" });
+  }, [activeTool, selectedExtension, setRouteSearch]);
   const selectExtensionFromRail = useCallback(
     (extensionId: string) => {
-      showChat();
-      setSelectedExtensionId(extensionId);
-      setActiveTool("extensions");
+      void setRouteSearch({ tool: "extensions", extension: extensionId }, { history: "replace" });
     },
-    [showChat],
+    [setRouteSearch],
   );
   const toggleToolPanel = useCallback(
     (toolName: NonNullable<ToolPanel>) => {
-      showChat();
-      setActiveTool((tool) => (tool === toolName ? null : toolName));
+      void setRouteSearch({ tool: activeTool === toolName ? null : toolName }, { history: "replace" });
     },
-    [showChat],
+    [activeTool, setRouteSearch],
   );
   const openPlugins = useCallback(() => {
-    closeSettings();
-    setActiveTool(null);
-    setMainView("plugins");
-  }, [closeSettings]);
+    void navigate({ to: defaultPluginsRoute(), search: true });
+  }, [navigate]);
   const beginSidebarResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       beginHorizontalResize(event, leftSidebarWidth, (startWidth, deltaX) => {
-        setLeftSidebarWidth(clamp(startWidth + deltaX, 220, 420));
+        void setRouteSearch(
+          { leftWidth: clamp(startWidth + deltaX, sidebarWidthBounds.min, sidebarWidthBounds.max) },
+          { history: "replace" },
+        );
       });
     },
-    [leftSidebarWidth],
+    [leftSidebarWidth, setRouteSearch],
   );
   const beginToolPanelResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       beginHorizontalResize(event, toolPanelWidth, (startWidth, deltaX) => {
-        setToolPanelWidth(clamp(startWidth - deltaX, 360, 820));
+        void setRouteSearch(
+          { rightWidth: clamp(startWidth - deltaX, toolPanelWidthBounds.min, toolPanelWidthBounds.max) },
+          { history: "replace" },
+        );
       });
     },
-    [toolPanelWidth],
+    [setRouteSearch, toolPanelWidth],
   );
   const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
+  const appShellContext = useMemo(
+    () => ({
+      agent,
+      activeThread,
+      activeThreadBusy,
+      activeWorkspaceCwd,
+      canScrollTranscriptToBottom,
+      composerAttachments,
+      composerFocusSignal,
+      folderOptions,
+      followSignal,
+      routeSearch,
+      selectedExtensionId: effectiveSelectedExtensionId,
+      setCanScrollTranscriptToBottom,
+      setComposerAttachments,
+      setRouteSearch,
+      showWorkingIndicator,
+      threadOptions,
+      attachToComposer,
+      followBottom,
+      sendPrompt,
+    }),
+    [
+      activeThread,
+      activeThreadBusy,
+      activeWorkspaceCwd,
+      agent,
+      attachToComposer,
+      canScrollTranscriptToBottom,
+      composerAttachments,
+      composerFocusSignal,
+      folderOptions,
+      followBottom,
+      followSignal,
+      routeSearch,
+      effectiveSelectedExtensionId,
+      sendPrompt,
+      setRouteSearch,
+      showWorkingIndicator,
+      threadOptions,
+    ],
+  );
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
-      {settingsOpen && <SettingsView />}
-      <div
-        className="sidebar-shell shrink-0"
-        data-open={sidebarOpen ? "true" : undefined}
-        style={sidebarRailStyle}
-        aria-hidden={!sidebarOpen}
-      >
-        <AppSidebar
-          threads={threads}
-          activeThreadId={activeThreadId}
-          activeView={mainView}
-          width={leftSidebarWidth}
-          onSelectThread={selectThread}
-          onArchiveThread={archiveThread}
-          onNewProject={newProject}
-          onNewThread={newThread}
-          onNewThreadInFolder={newThreadInFolder}
-          onOpenPlugins={openPlugins}
-        />
-      </div>
-      {sidebarOpen && (
-        <>
-          <div
-            className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
-            aria-label="Resize thread sidebar"
-            role="separator"
-            onPointerDown={beginSidebarResize}
+    <AppShellProvider value={appShellContext}>
+      <div className="relative flex h-screen w-screen overflow-hidden bg-background">
+        <div
+          className="sidebar-shell shrink-0"
+          data-open={sidebarOpen ? "true" : undefined}
+          style={sidebarRailStyle}
+          aria-hidden={!sidebarOpen}
+        >
+          <AppSidebar
+            threads={threads}
+            activeThreadId={activeThreadId}
+            activeView={isPluginsRoute ? "plugins" : "chat"}
+            width={leftSidebarWidth}
+            onSelectThread={selectThread}
+            onArchiveThread={archiveThread}
+            onNewProject={newProject}
+            onNewThread={newThread}
+            onNewThreadInFolder={newThreadInFolder}
+            onOpenPlugins={openPlugins}
+            onOpenSettings={() =>
+              void navigate({ to: "/settings/$section", params: { section: "general" }, search: true })
+            }
           />
-        </>
-      )}
-      <section className="flex min-w-0 flex-1 flex-col">
-        {mainView === "plugins" ? (
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <PluginsMarketplacePanel />
-          </div>
-        ) : (
+        </div>
+        {sidebarOpen && (
           <>
-            <TopBar
-              thread={activeThread}
-              threads={threadOptions}
-              folders={folderOptions}
-              activeFolderPath={activeWorkspaceCwd}
-              status={status}
-              activeTool={activeTool}
-              sidebarOpen={sidebarOpen}
-              onRestart={() => void restart()}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onSelectFolder={selectFolder}
-              onSelectThread={selectThread}
-              onToggleTerminal={() => toggleToolPanel("terminal")}
-              onToggleBrowser={() => toggleToolPanel("browser")}
-              onToggleCanvas={() => toggleToolPanel("canvas")}
-              onToggleExtensions={toggleExtensionsPanel}
+            <div
+              className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+              aria-label="Resize thread sidebar"
+              role="separator"
+              onPointerDown={beginSidebarResize}
             />
-            <div className="flex min-h-0 flex-1">
-              <div className="flex min-w-0 flex-1 flex-col">
-                <Transcript
-                  activeTurnId={activeTurnId}
-                  messages={messages}
-                  followSignal={followSignal}
-                  showWorkingIndicator={showWorkingIndicator}
-                  onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
-                />
-                <AgentWaitCards
-                  requests={waitRequests}
-                  onResolveApproval={resolveApproval}
-                  onResolveUserInput={resolveUserInput}
-                  onExitPlan={exitPlan}
-                />
-                {error && (
-                  <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{error}</div>
-                )}
-                <Composer
-                  busy={activeThreadBusy}
-                  models={models}
-                  skills={skills}
-                  selectedModel={selectedModel}
-                  selectedPolicyMode={selectedPolicyMode}
-                  selectedReasoning={selectedReasoning}
-                  attachments={composerAttachments}
-                  focusSignal={composerFocusSignal}
-                  showScrollToBottom={canScrollTranscriptToBottom}
-                  onSelectedModelChange={setSelectedModel}
-                  onSelectedPolicyModeChange={(mode) => void setSelectedPolicyMode(mode)}
-                  onSelectedReasoningChange={setSelectedReasoning}
-                  onScrollToBottom={followBottom}
-                  onAttachmentsChange={setComposerAttachments}
-                  onSend={sendPrompt}
-                  onStop={stopTurn}
-                />
-              </div>
-              {activeTool && (
-                <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
-                  <div
-                    className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
-                    aria-label="Resize tool panel"
-                    role="separator"
-                    onPointerDown={beginToolPanelResize}
-                  />
-                  {activeTool === "terminal" && <TerminalPanel />}
-                  {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
-                  {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
-                  {activeTool === "extensions" && (
-                    <ExtensionsPanel
-                      selectedExtensionId={selectedExtensionId}
-                      onSelectedExtensionChange={setSelectedExtensionId}
-                    />
-                  )}
-                </div>
-              )}
-              <ExtensionActivityRail
-                active={activeTool === "extensions"}
-                activeExtensionId={selectedExtensionId}
-                onSelectExtension={selectExtensionFromRail}
-              />
-            </div>
           </>
         )}
-      </section>
-    </div>
+        <section className="flex min-w-0 flex-1 flex-col">
+          {isPluginsRoute ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Outlet />
+            </div>
+          ) : (
+            <>
+              <TopBar
+                thread={activeThread}
+                threads={threadOptions}
+                folders={folderOptions}
+                activeFolderPath={activeWorkspaceCwd}
+                status={status}
+                activeTool={activeTool}
+                sidebarOpen={sidebarOpen}
+                onRestart={() => void restart()}
+                onToggleSidebar={() => void setRouteSearch({ sidebar: !sidebarOpen }, { history: "replace" })}
+                onSelectFolder={selectFolder}
+                onSelectThread={selectThread}
+                onToggleTerminal={() => toggleToolPanel("terminal")}
+                onToggleBrowser={() => toggleToolPanel("browser")}
+                onToggleCanvas={() => toggleToolPanel("canvas")}
+                onToggleExtensions={toggleExtensionsPanel}
+              />
+              <div className="flex min-h-0 flex-1">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <Outlet />
+                </div>
+                {activeTool && (
+                  <div className="relative h-full min-w-0 shrink-0" style={{ width: toolPanelWidth }}>
+                    <div
+                      className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
+                      aria-label="Resize tool panel"
+                      role="separator"
+                      onPointerDown={beginToolPanelResize}
+                    />
+                    {activeTool === "terminal" && <TerminalPanel />}
+                    {activeTool === "browser" && <BrowserPanel onAttach={attachToComposer} />}
+                    {activeTool === "canvas" && <CanvasPanel onAttach={attachToComposer} />}
+                    {activeTool === "extensions" && (
+                      <ExtensionsPanel
+                        selectedExtensionId={effectiveSelectedExtensionId}
+                        selectedPanelId={routeSearch.extensionPanel || null}
+                        onSelectedPanelChange={(extensionPanel) =>
+                          void setRouteSearch({ extensionPanel }, { history: "replace" })
+                        }
+                      />
+                    )}
+                  </div>
+                )}
+                <ExtensionActivityRail
+                  active={activeTool === "extensions"}
+                  activeExtensionId={effectiveSelectedExtensionId}
+                  onSelectExtension={selectExtensionFromRail}
+                  onOpenSettings={() =>
+                    void navigate({ to: "/settings/$section", params: { section: "extensions" }, search: true })
+                  }
+                />
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </AppShellProvider>
   );
 }
-
 type SidebarRailStyle = CSSProperties & {
   "--sidebar-width": string;
 };

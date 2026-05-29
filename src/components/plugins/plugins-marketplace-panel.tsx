@@ -1,5 +1,7 @@
 import * as React from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Compass, PackageCheck, Search, Store } from "lucide-react";
+import { useQueryStates } from "nuqs";
 import {
   CategoryFilterDropdown,
   InstalledPluginsTab,
@@ -22,31 +24,34 @@ import {
   visibleInstalledPlugins,
 } from "@/lib/plugins-marketplace";
 import type { MarketplaceProviderSelection, PluginInstallStatus } from "@/lib/plugins-marketplace";
+import { pluginsRouteForSection } from "@/lib/route-selection";
+import type { PluginSection } from "@/lib/route-selection";
+import { routeSearchParsers } from "@/lib/route-search";
 import { cn } from "@/lib/utils";
 import { usePluginsStore } from "@/stores/plugins-store";
 import type { DedupedMarketplacePlugin } from "@/types/plugins";
 
-export function PluginsMarketplacePanel(): React.JSX.Element {
+export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSection }): React.JSX.Element {
+  const navigate = useNavigate();
   const marketplaces = usePluginsStore((state) => state.marketplaces);
   const plugins = usePluginsStore((state) => state.plugins);
   const installedPlugins = usePluginsStore((state) => state.installedPlugins);
   const previewsByVariant = usePluginsStore((state) => state.previewsByVariant);
-  const query = usePluginsStore((state) => state.query);
   const loading = usePluginsStore((state) => state.loading);
   const error = usePluginsStore((state) => state.error);
   const initializeMarketplaces = usePluginsStore((state) => state.initializeMarketplaces);
-  const setQuery = usePluginsStore((state) => state.setQuery);
   const search = usePluginsStore((state) => state.search);
   const ensureDefaultMarketplaces = usePluginsStore((state) => state.ensureDefaultMarketplaces);
   const addLocalMarketplace = usePluginsStore((state) => state.addLocalMarketplace);
   const previewPlugin = usePluginsStore((state) => state.previewPlugin);
   const installPlugin = usePluginsStore((state) => state.installPlugin);
   const uninstallPlugin = usePluginsStore((state) => state.uninstallPlugin);
-  const [activeTab, setActiveTab] = React.useState<"installed" | "explore">("installed");
-  const [provider, setProvider] = React.useState<MarketplaceProviderSelection>("all");
-  const [selectedCategories, setSelectedCategories] = React.useState<string[]>([]);
+  const [routeSearch, setRouteSearch] = useQueryStates(routeSearchParsers);
   const [installingVariants, setInstallingVariants] = React.useState<Set<string>>(() => new Set());
   const [uninstallingVariants, setUninstallingVariants] = React.useState<Set<string>>(() => new Set());
+  const provider = routeSearch.provider;
+  const query = routeSearch.q;
+  const initialQueryRef = React.useRef(query);
 
   const visibleInstalled = React.useMemo(() => visibleInstalledPlugins(installedPlugins), [installedPlugins]);
   const lookups = React.useMemo(
@@ -61,6 +66,10 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
     [marketplaces, plugins, provider],
   );
   const categoryOptions = React.useMemo(() => categoryOptionsForPlugins(providerPlugins), [providerPlugins]);
+  const selectedCategories = React.useMemo(
+    () => routeSearch.categories.filter((category) => categoryOptions.includes(category)),
+    [categoryOptions, routeSearch.categories],
+  );
   const visiblePlugins = React.useMemo(
     () => providerPlugins.filter((plugin) => pluginMatchesCategories(plugin, selectedCategories)),
     [providerPlugins, selectedCategories],
@@ -69,14 +78,21 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
     () => buildRecommendedInstallStatuses(providerPlugins, lookups),
     [lookups, providerPlugins],
   );
+  const ensureProvider = React.useCallback(
+    async (nextProvider: MarketplaceProviderSelection): Promise<boolean> => {
+      const selection = defaultSelectionForProvider(nextProvider);
+      return selection ? ensureDefaultMarketplaces(selection) : false;
+    },
+    [ensureDefaultMarketplaces],
+  );
 
   React.useEffect(() => {
-    void initializeMarketplaces("all");
+    void initializeMarketplaces("all", initialQueryRef.current);
   }, [initializeMarketplaces]);
 
   React.useEffect(() => {
-    setSelectedCategories((current) => current.filter((category) => categoryOptions.includes(category)));
-  }, [categoryOptions]);
+    void ensureProvider(provider);
+  }, [ensureProvider, provider]);
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -88,13 +104,11 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
   }
 
   function changeProvider(nextProvider: MarketplaceProviderSelection): void {
-    setProvider(nextProvider);
-    void ensureProvider(nextProvider);
+    void setRouteSearch({ provider: nextProvider }, { history: "replace" });
   }
 
-  async function ensureProvider(nextProvider: MarketplaceProviderSelection): Promise<boolean> {
-    const selection = defaultSelectionForProvider(nextProvider);
-    return selection ? ensureDefaultMarketplaces(selection) : false;
+  function openTab(nextTab: PluginSection): void {
+    void navigate({ to: pluginsRouteForSection(nextTab), search: true });
   }
 
   function openSourceCode(url: string): void {
@@ -102,7 +116,7 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
   }
 
   async function refreshProvider(): Promise<void> {
-    await initializeMarketplaces(defaultSelectionForProvider(provider) ?? "none");
+    await initializeMarketplaces(defaultSelectionForProvider(provider) ?? "none", query);
   }
 
   async function installPluginWithPending(marketplaceId: string, pluginId: string): Promise<void> {
@@ -143,12 +157,12 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
         </div>
         <div className="no-drag flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-1" role="tablist" aria-label="Plugins sections">
-            <PluginsTabButton active={activeTab === "installed"} onClick={() => setActiveTab("installed")}>
+            <PluginsTabButton active={activeTab === "installed"} onClick={() => openTab("installed")}>
               <PackageCheck className="size-3.5" />
               Installed
               <span className="text-muted-foreground">{visibleInstalled.length}</span>
             </PluginsTabButton>
-            <PluginsTabButton active={activeTab === "explore"} onClick={() => setActiveTab("explore")}>
+            <PluginsTabButton active={activeTab === "explore"} onClick={() => openTab("explore")}>
               <Compass className="size-3.5" />
               Explore
             </PluginsTabButton>
@@ -169,7 +183,7 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
           previewsByVariant={previewsByVariant}
           loading={loading}
           uninstallingVariants={uninstallingVariants}
-          onExplore={() => setActiveTab("explore")}
+          onExplore={() => openTab("explore")}
           onPreview={previewPlugin}
           onUninstall={uninstallPluginWithPending}
           onOpenSource={openSourceCode}
@@ -188,7 +202,10 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
                     className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
                     value={query}
                     placeholder="Search plugins"
-                    onChange={(event) => setQuery(event.currentTarget.value)}
+                    onChange={(event) => {
+                      const nextQuery = event.currentTarget.value;
+                      void setRouteSearch({ q: nextQuery }, { history: "replace" });
+                    }}
                   />
                 </label>
                 <Button type="submit" size="compact" disabled={loading}>
@@ -211,7 +228,7 @@ export function PluginsMarketplacePanel(): React.JSX.Element {
                 <CategoryFilterDropdown
                   categories={categoryOptions}
                   selectedCategories={selectedCategories}
-                  onChange={setSelectedCategories}
+                  onChange={(categories) => void setRouteSearch({ categories }, { history: "replace" })}
                 />
               </div>
             </form>

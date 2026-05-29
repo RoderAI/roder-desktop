@@ -21,25 +21,16 @@ function installStorageMock() {
   return values;
 }
 
-test("theme store persists the active settings page through reloads", async () => {
+test("theme store does not persist route-owned settings navigation", async () => {
   const storage = installStorageMock();
   const { useThemeStore } = await loadThemeStore();
 
-  useThemeStore.getState().openSettings("components");
+  useThemeStore.getState().setMode("dark");
 
   const persisted = JSON.parse(storage.get("roder-desktop-theme"));
-  expect(persisted.state.settingsOpen).toBe(true);
-  expect(persisted.state.settingsSection).toBe("components");
-});
-
-test("theme store opens settings to general by default", async () => {
-  installStorageMock();
-  const { useThemeStore } = await loadThemeStore();
-
-  useThemeStore.getState().openSettings("components");
-  useThemeStore.getState().closeSettings();
-  useThemeStore.getState().openSettings();
-
-  expect(useThemeStore.getState().settingsOpen).toBe(true);
-  expect(useThemeStore.getState().settingsSection).toBe("general");
+  expect(persisted.state).not.toHaveProperty("settingsOpen");
+  expect(persisted.state).not.toHaveProperty("settingsSection");
+  expect(useThemeStore.getState()).not.toHaveProperty("openSettings");
+  expect(useThemeStore.getState()).not.toHaveProperty("closeSettings");
+  expect(useThemeStore.getState()).not.toHaveProperty("setSettingsSection");
 });

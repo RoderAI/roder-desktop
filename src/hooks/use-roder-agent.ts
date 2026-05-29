@@ -14,10 +14,13 @@ export function useRoderAgent() {
     [state.allModels, state.visibleModelIds],
   );
 
-  return {
-    ...state,
-    models,
-  };
+  return useMemo(
+    () => ({
+      ...state,
+      models,
+    }),
+    [models, state],
+  );
 }
 
 function useRoderStoreBootstrap(): void {

@@ -1,22 +1,25 @@
 import { CircleAlert, PanelRight, Puzzle, RefreshCw, TerminalSquare } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo } from "react";
 import { ExtensionWebviewPanel } from "@/components/extensions/extension-webview-panel";
 import { Button } from "@/components/ui/button";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import { useExtensionsStore } from "@/stores/extensions-store";
-import { useThemeStore } from "@/stores/theme-store";
 import type { ExtensionCatalogRecord } from "@/types/extensions";
 import { cn } from "@/lib/utils";
 
 type ExtensionsPanelProps = {
   selectedExtensionId?: string | null;
-  onSelectedExtensionChange?: (extensionId: string) => void;
+  selectedPanelId?: string | null;
+  onSelectedPanelChange?: (panelId: string) => void;
 };
 
 export function ExtensionsPanel({
   selectedExtensionId,
-  onSelectedExtensionChange,
+  selectedPanelId,
+  onSelectedPanelChange,
 }: ExtensionsPanelProps): React.JSX.Element {
+  const navigate = useNavigate();
   const extensions = useExtensionsStore((state) => state.extensions);
   const loading = useExtensionsStore((state) => state.loading);
   const error = useExtensionsStore((state) => state.error);
@@ -25,7 +28,6 @@ export function ExtensionsPanel({
   const selectAndInstallArchive = useExtensionsStore((state) => state.selectAndInstallArchive);
   const executeCommand = useExtensionsStore((state) => state.executeCommand);
   const executeTool = useExtensionsStore((state) => state.executeTool);
-  const openSettings = useThemeStore((state) => state.openSettings);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
   const selectedExtension =
     sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
@@ -33,27 +35,11 @@ export function ExtensionsPanel({
     () => selectedExtension?.manifest.contributes.views.panels.filter((panel) => panel.html) ?? [],
     [selectedExtension],
   );
-  const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const selectedPanel = panels.find((panel) => panel.id === selectedPanelId) ?? panels[0];
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    if (selectedExtension && selectedExtension.id !== selectedExtensionId) {
-      onSelectedExtensionChange?.(selectedExtension.id);
-    }
-  }, [onSelectedExtensionChange, selectedExtension, selectedExtensionId]);
-
-  useEffect(() => {
-    setSelectedPanelId((currentPanelId) => {
-      if (currentPanelId && panels.some((panel) => panel.id === currentPanelId)) {
-        return currentPanelId;
-      }
-      return panels[0]?.id ?? null;
-    });
-  }, [panels]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-sidebar text-sidebar-foreground">
@@ -84,7 +70,7 @@ export function ExtensionsPanel({
                     "flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2 text-base text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
                     selectedPanel?.id === panel.id && "bg-sidebar-active text-sidebar-active-foreground",
                   )}
-                  onClick={() => setSelectedPanelId(panel.id)}
+                  onClick={() => onSelectedPanelChange?.(panel.id)}
                 >
                   <PanelRight className="size-3.5" />
                   <span>{panel.title}</span>
@@ -110,7 +96,9 @@ export function ExtensionsPanel({
           onRefresh={() => void load()}
           onInstallFolder={() => void selectAndInstallFolder()}
           onInstallArchive={() => void selectAndInstallArchive()}
-          onSettings={() => openSettings("extensions")}
+          onSettings={() =>
+            void navigate({ to: "/settings/$section", params: { section: "extensions" }, search: true })
+          }
         />
       )}
     </div>
