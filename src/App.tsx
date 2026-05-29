@@ -175,14 +175,6 @@ export function App(): React.JSX.Element {
     },
     [followBottom, sendAgentPrompt],
   );
-  useEffect(() => {
-    if (activeTool !== "extensions" || sidebarExtensions.length === 0) {
-      return;
-    }
-    if (selectedExtension && selectedExtension.id !== selectedExtensionId) {
-      void setRouteSearch({ extension: selectedExtension.id }, { history: "replace" });
-    }
-  }, [activeTool, selectedExtension, selectedExtensionId, setRouteSearch, sidebarExtensions.length]);
   const toggleExtensionsPanel = useCallback(() => {
     if (activeTool === "extensions") {
       void setRouteSearch({ tool: null }, { history: "replace" });
@@ -349,9 +341,6 @@ export function App(): React.JSX.Element {
                       <ExtensionsPanel
                         selectedExtensionId={effectiveSelectedExtensionId}
                         selectedPanelId={routeSearch.extensionPanel || null}
-                        onSelectedExtensionChange={(extensionId) =>
-                          void setRouteSearch({ extension: extensionId }, { history: "replace" })
-                        }
                         onSelectedPanelChange={(extensionPanel) =>
                           void setRouteSearch({ extensionPanel }, { history: "replace" })
                         }

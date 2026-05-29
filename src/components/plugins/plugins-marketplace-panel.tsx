@@ -37,11 +37,9 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
   const plugins = usePluginsStore((state) => state.plugins);
   const installedPlugins = usePluginsStore((state) => state.installedPlugins);
   const previewsByVariant = usePluginsStore((state) => state.previewsByVariant);
-  const storeQuery = usePluginsStore((state) => state.query);
   const loading = usePluginsStore((state) => state.loading);
   const error = usePluginsStore((state) => state.error);
   const initializeMarketplaces = usePluginsStore((state) => state.initializeMarketplaces);
-  const setQuery = usePluginsStore((state) => state.setQuery);
   const search = usePluginsStore((state) => state.search);
   const ensureDefaultMarketplaces = usePluginsStore((state) => state.ensureDefaultMarketplaces);
   const addLocalMarketplace = usePluginsStore((state) => state.addLocalMarketplace);
@@ -53,7 +51,7 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
   const [uninstallingVariants, setUninstallingVariants] = React.useState<Set<string>>(() => new Set());
   const provider = routeSearch.provider;
   const query = routeSearch.q;
-  const selectedCategories = routeSearch.categories;
+  const initialQueryRef = React.useRef(query);
 
   const visibleInstalled = React.useMemo(() => visibleInstalledPlugins(installedPlugins), [installedPlugins]);
   const lookups = React.useMemo(
@@ -68,6 +66,10 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
     [marketplaces, plugins, provider],
   );
   const categoryOptions = React.useMemo(() => categoryOptionsForPlugins(providerPlugins), [providerPlugins]);
+  const selectedCategories = React.useMemo(
+    () => routeSearch.categories.filter((category) => categoryOptions.includes(category)),
+    [categoryOptions, routeSearch.categories],
+  );
   const visiblePlugins = React.useMemo(
     () => providerPlugins.filter((plugin) => pluginMatchesCategories(plugin, selectedCategories)),
     [providerPlugins, selectedCategories],
@@ -85,25 +87,12 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
   );
 
   React.useEffect(() => {
-    if (storeQuery !== query) {
-      setQuery(query);
-    }
-  }, [query, setQuery, storeQuery]);
-
-  React.useEffect(() => {
-    void initializeMarketplaces("all");
+    void initializeMarketplaces("all", initialQueryRef.current);
   }, [initializeMarketplaces]);
 
   React.useEffect(() => {
     void ensureProvider(provider);
   }, [ensureProvider, provider]);
-
-  React.useEffect(() => {
-    const nextCategories = selectedCategories.filter((category) => categoryOptions.includes(category));
-    if (nextCategories.length !== selectedCategories.length) {
-      void setRouteSearch({ categories: nextCategories }, { history: "replace" });
-    }
-  }, [categoryOptions, selectedCategories, setRouteSearch]);
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -116,7 +105,6 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
 
   function changeProvider(nextProvider: MarketplaceProviderSelection): void {
     void setRouteSearch({ provider: nextProvider }, { history: "replace" });
-    void ensureProvider(nextProvider);
   }
 
   function openTab(nextTab: PluginSection): void {
@@ -128,7 +116,7 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
   }
 
   async function refreshProvider(): Promise<void> {
-    await initializeMarketplaces(defaultSelectionForProvider(provider) ?? "none");
+    await initializeMarketplaces(defaultSelectionForProvider(provider) ?? "none", query);
   }
 
   async function installPluginWithPending(marketplaceId: string, pluginId: string): Promise<void> {
@@ -216,7 +204,6 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
                     placeholder="Search plugins"
                     onChange={(event) => {
                       const nextQuery = event.currentTarget.value;
-                      setQuery(nextQuery);
                       void setRouteSearch({ q: nextQuery }, { history: "replace" });
                     }}
                   />

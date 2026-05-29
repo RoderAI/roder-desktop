@@ -23,8 +23,8 @@ type PluginsStore = {
   loading: boolean;
   error: string | null;
   lastResult: string | null;
-  load: () => Promise<void>;
-  initializeMarketplaces: (selection: DefaultMarketplaceSelection) => Promise<void>;
+  load: (query?: string) => Promise<void>;
+  initializeMarketplaces: (selection: DefaultMarketplaceSelection, query?: string) => Promise<void>;
   setQuery: (query: string) => void;
   search: (query?: string) => Promise<void>;
   installDefaults: (selection: DefaultMarketplaceSelection) => Promise<void>;
@@ -58,8 +58,8 @@ export const usePluginsStore = create<PluginsStore>()((set, get) => ({
   loading: false,
   error: null,
   lastResult: null,
-  load: () => reloadSnapshot(set, get),
-  initializeMarketplaces: (selection) => initializeMarketplaceSnapshot(set, get, selection),
+  load: (query) => reloadSnapshot(set, get, true, query),
+  initializeMarketplaces: (selection, query) => initializeMarketplaceSnapshot(set, get, selection, query),
   setQuery: (query) => set({ query }),
   search: async (query) => {
     const nextQuery = query ?? get().query;
@@ -154,11 +154,11 @@ export const usePluginsStore = create<PluginsStore>()((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-async function reloadSnapshot(set: StoreSet, get: StoreGet, markLoading = true): Promise<void> {
+async function reloadSnapshot(set: StoreSet, get: StoreGet, markLoading = true, query?: string): Promise<void> {
   await withAction(
     set,
     async () => {
-      set(await readSnapshot(get));
+      set(await readSnapshot(get, query));
     },
     markLoading,
   );
@@ -168,9 +168,10 @@ async function initializeMarketplaceSnapshot(
   set: StoreSet,
   get: StoreGet,
   selection: DefaultMarketplaceSelection,
+  query?: string,
 ): Promise<void> {
   await withAction(set, async () => {
-    const snapshot = await readSnapshot(get);
+    const snapshot = await readSnapshot(get, query);
     set(snapshot);
 
     if (defaultMarketplacesNeedEnablement(snapshot.marketplaces, selection)) {
@@ -207,16 +208,18 @@ async function ensureDefaultMarketplaceSnapshot(
 
 async function readSnapshot(
   get: StoreGet,
-): Promise<Pick<PluginsStore, "marketplaces" | "plugins" | "installedPlugins">> {
+  query = get().query,
+): Promise<Pick<PluginsStore, "marketplaces" | "plugins" | "installedPlugins" | "query">> {
   const [marketplacesResult, searchResult, installedResult] = await Promise.all([
     pluginsIpc.listMarketplaces(),
-    pluginsIpc.searchMarketplacePlugins(get().query),
+    pluginsIpc.searchMarketplacePlugins(query),
     pluginsIpc.listInstalledPlugins(),
   ]);
   return {
     marketplaces: marketplacesResult.marketplaces,
     plugins: searchResult.plugins,
     installedPlugins: installedResult.plugins,
+    query,
   };
 }
 
