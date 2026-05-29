@@ -1,5 +1,9 @@
 import type {
   DesktopAttachment,
+  GitChangesListResult,
+  GitChangesReadResult,
+  HunkListResult,
+  HunkReadResult,
   PolicyMode,
   RoderModel,
   RoderStatus,
@@ -11,6 +15,7 @@ import type {
   TurnInputItem,
   SpeechProviderDescriptor,
   SpeechTranscribeResult,
+  WorkspaceChangesListResult,
 } from "@/types/roder";
 
 export type ThreadListResult = {
@@ -97,6 +102,29 @@ export type TurnInterruptResult = {
   turnId: string | null;
 };
 
+export type HunkListOptions = {
+  turnId?: string;
+  reviewId?: string;
+};
+
+export type HunkReadOptions = {
+  offset?: number;
+  limit?: number;
+};
+
+export type WorkspaceChangesListOptions = {
+  turnId?: string;
+};
+
+export type GitChangesListOptions = {
+  limit?: number;
+};
+
+export type GitChangesReadOptions = {
+  offset?: number;
+  limit?: number;
+};
+
 export const roderIpc = {
   start: () => window.roderDesktop.start(),
   restart: () => window.roderDesktop.restart(),
@@ -108,7 +136,13 @@ export const roderIpc = {
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
   archiveThread: (threadId: string) =>
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
-  startThread: (model: string, cwd: string, modelProvider?: string, reasoning?: string, options: ThreadStartOptions = {}) =>
+  startThread: (
+    model: string,
+    cwd: string,
+    modelProvider?: string,
+    reasoning?: string,
+    options: ThreadStartOptions = {},
+  ) =>
     window.roderDesktop.request("thread/start", {
       model,
       cwd,
@@ -141,6 +175,36 @@ export const roderIpc = {
       threadId,
       turnId: turnId || undefined,
     }) as Promise<TurnInterruptResult>,
+  listHunks: (threadId: string, options: HunkListOptions = {}) =>
+    window.roderDesktop.request("hunk/list", {
+      threadId,
+      turnId: options.turnId || undefined,
+      reviewId: options.reviewId || undefined,
+    }) as Promise<HunkListResult>,
+  readHunk: (threadId: string, hunkId: string, options: HunkReadOptions = {}) =>
+    window.roderDesktop.request("hunk/read", {
+      threadId,
+      hunkId,
+      offset: options.offset,
+      limit: options.limit,
+    }) as Promise<HunkReadResult>,
+  listWorkspaceChanges: (threadId: string, options: WorkspaceChangesListOptions = {}) =>
+    window.roderDesktop.request("workspace/changes/list", {
+      threadId,
+      turnId: options.turnId || undefined,
+    }) as Promise<WorkspaceChangesListResult>,
+  listGitChanges: (workspace: string, options: GitChangesListOptions = {}) =>
+    window.roderDesktop.request("git/changes/list", {
+      workspace,
+      limit: options.limit,
+    }) as Promise<GitChangesListResult>,
+  readGitChange: (workspace: string, path: string, options: GitChangesReadOptions = {}) =>
+    window.roderDesktop.request("git/changes/read", {
+      workspace,
+      path,
+      offset: options.offset,
+      limit: options.limit,
+    }) as Promise<GitChangesReadResult>,
   threadState: () => window.roderDesktop.request("thread/state", {}) as Promise<ThreadStateResult>,
   resolveApproval: (params: { approvalId: string; approved: boolean }) =>
     window.roderDesktop.request("thread/resolve_approval", {

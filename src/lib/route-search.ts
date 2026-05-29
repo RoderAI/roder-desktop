@@ -11,11 +11,13 @@ import {
   type inferParserType,
 } from "nuqs";
 
-export const toolPanelValues = ["terminal", "browser", "canvas", "extensions"] as const;
+export const toolPanelValues = ["terminal", "browser", "canvas", "extensions", "review"] as const;
 export const pluginProviderValues = ["all", "anthropic", "cursor", "codex", "local"] as const;
+export const reviewScopeValues = ["thread", "turn", "branch"] as const;
 
 export type RouteToolPanel = (typeof toolPanelValues)[number];
 export type RoutePluginProvider = (typeof pluginProviderValues)[number];
+export type RouteReviewScope = (typeof reviewScopeValues)[number];
 
 export const sidebarWidthBounds = {
   min: 220,
@@ -31,6 +33,9 @@ export const toolPanelWidthBounds = {
 
 export const routeSearchParsers = {
   tool: parseAsStringLiteral(toolPanelValues),
+  reviewScope: parseAsStringLiteral(reviewScopeValues).withDefault("thread"),
+  reviewTurnId: parseAsString.withDefault(""),
+  reviewPath: parseAsString.withDefault(""),
   extension: parseAsString.withDefault(""),
   extensionPanel: parseAsString.withDefault(""),
   sidebar: parseAsBoolean.withDefault(true),
@@ -47,6 +52,17 @@ export const routeSearchParsers = {
 
 export type RouteSearchState = inferParserType<typeof routeSearchParsers>;
 export const validateRouteSearch = createStandardSchemaV1(routeSearchParsers, { partialOutput: true });
+
+type RouteSearchPatch = Partial<{ [Key in keyof RouteSearchState]: RouteSearchState[Key] | null }>;
+export type RouteSearchUpdate = RouteSearchPatch | ((current: RouteSearchState) => RouteSearchPatch | null) | null;
+
+export function mergeRouteSearchUpdate(current: RouteSearchState, update: RouteSearchUpdate): RouteSearchPatch | null {
+  if (update === null) {
+    return null;
+  }
+  const patch = typeof update === "function" ? update(current) : update;
+  return patch === null ? null : { ...current, ...patch };
+}
 
 const loadRouteSearch = createLoader(routeSearchParsers);
 

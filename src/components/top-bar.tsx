@@ -1,6 +1,16 @@
 import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Check, ChevronDown, Folder, Globe2, MessageSquare, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Folder,
+  GitCompareArrows,
+  Globe2,
+  MessageSquare,
+  Paintbrush,
+  Puzzle,
+  TerminalSquare,
+} from "lucide-react";
 import type { RoderStatus, RoderThread } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +28,7 @@ import {
   type FolderOption,
 } from "@/lib/workspace-thread-options";
 
-export type ToolPanel = "terminal" | "browser" | "canvas" | "extensions" | null;
+export type ToolPanel = "terminal" | "browser" | "canvas" | "extensions" | "review" | null;
 
 type TopBarProps = {
   thread?: RoderThread;
@@ -36,6 +46,7 @@ type TopBarProps = {
   onToggleBrowser: () => void;
   onToggleCanvas: () => void;
   onToggleExtensions: () => void;
+  onToggleReview: () => void;
 };
 
 export function TopBar({
@@ -54,6 +65,7 @@ export function TopBar({
   onToggleBrowser,
   onToggleCanvas,
   onToggleExtensions,
+  onToggleReview,
 }: TopBarProps): React.JSX.Element {
   const activeFolder = folders.find(
     (folder) => normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(activeFolderPath),
@@ -129,6 +141,15 @@ export function TopBar({
           onClick={onToggleCanvas}
         >
           <Paintbrush className="size-5" />
+        </Button>
+        <Button
+          variant={activeTool === "review" ? "secondary" : "ghost"}
+          size="icon"
+          aria-label="Review branch changes"
+          title="Review branch changes"
+          onClick={onToggleReview}
+        >
+          <GitCompareArrows className="size-5" />
         </Button>
         <Button
           variant={activeTool === "extensions" ? "secondary" : "ghost"}

@@ -2,12 +2,13 @@ import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
 import { app } from "electron";
 
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
+  appServerMethods?: string[];
   cwd?: string;
   message?: string;
 };
@@ -76,7 +77,8 @@ export class RoderAppServerClient extends EventEmitter {
 
   async #startProcess(): Promise<RoderStatus> {
     const target = this.#resolveSpawnTarget();
-    this.#setStatus({ state: "starting", binary: target.label, cwd: target.cwd });
+    const appServerMethods = readAppServerMethods(target);
+    this.#setStatus({ state: "starting", binary: target.label, appServerMethods, cwd: target.cwd });
 
     this.#child = spawn(target.command, target.args, {
       cwd: target.cwd,
@@ -103,12 +105,18 @@ export class RoderAppServerClient extends EventEmitter {
       const message = signal ? `roder exited with signal ${signal}` : `roder exited with code ${code ?? 0}`;
       this.#rejectAll(new Error(message));
       this.#child = null;
-      this.#setStatus({ state: "stopped", binary: target.label, cwd: target.cwd, message });
+      this.#setStatus({ state: "stopped", binary: target.label, appServerMethods, cwd: target.cwd, message });
     });
     this.#child.once("error", (error) => {
       this.#rejectAll(error);
       this.#child = null;
-      this.#setStatus({ state: "error", binary: target.label, cwd: target.cwd, message: error.message });
+      this.#setStatus({
+        state: "error",
+        binary: target.label,
+        appServerMethods,
+        cwd: target.cwd,
+        message: error.message,
+      });
     });
 
     await this.#rawRequest("initialize", {
@@ -122,7 +130,7 @@ export class RoderAppServerClient extends EventEmitter {
       },
     });
 
-    this.#setStatus({ state: "ready", binary: target.label, cwd: target.cwd });
+    this.#setStatus({ state: "ready", binary: target.label, appServerMethods, cwd: target.cwd });
     return this.#status;
   }
 
@@ -134,7 +142,12 @@ export class RoderAppServerClient extends EventEmitter {
     this.#child = null;
     child.kill();
     this.#rejectAll(new Error("roder app-server stopped"));
-    this.#setStatus({ state: "stopped", binary: this.#status.binary, cwd: this.#status.cwd });
+    this.#setStatus({
+      state: "stopped",
+      binary: this.#status.binary,
+      appServerMethods: this.#status.appServerMethods,
+      cwd: this.#status.cwd,
+    });
   }
 
   async restart(): Promise<RoderStatus> {
@@ -258,4 +271,29 @@ function desktopNotificationsFromMessage(method: string, params: unknown): Deskt
     return [];
   }
   return [{ method, params: params ?? {} }];
+}
+
+function readAppServerMethods(target: SpawnTarget): string[] {
+  const result = spawnSync(target.command, ["app-server", "schema", "--format", "manifest"], {
+    cwd: target.cwd,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      RODER_DESKTOP: "1",
+    },
+  });
+  if (result.status !== 0 || !result.stdout) {
+    return [];
+  }
+
+  try {
+    const manifest = JSON.parse(result.stdout) as {
+      methods?: Array<{ method?: unknown }>;
+    };
+    return (manifest.methods ?? [])
+      .map((method) => method.method)
+      .filter((method): method is string => typeof method === "string");
+  } catch {
+    return [];
+  }
 }

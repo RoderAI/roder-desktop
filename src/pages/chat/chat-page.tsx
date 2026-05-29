@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { useAppShell } from "@/components/app-shell-context";
@@ -17,6 +17,8 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     composerAttachments,
     composerFocusSignal,
     followSignal,
+    hunkSummary,
+    openReview,
     setCanScrollTranscriptToBottom,
     setComposerAttachments,
     showWorkingIndicator,
@@ -30,6 +32,15 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const { activeThreadId, selectThread } = agent;
   const newRouteReadyForCreatedThreadRef = useRef(false);
   const clearingActiveThreadForNewRouteRef = useRef(false);
+  const openThreadChanges = useCallback(() => {
+    openReview("thread");
+  }, [openReview]);
+  const openTurnChanges = useCallback(
+    (turnId: string) => {
+      openReview("turn", turnId);
+    },
+    [openReview],
+  );
 
   useEffect(() => {
     if (agent.status.state === "ready" && !skillsLoaded && !skillsLoading) {
@@ -83,7 +94,11 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         messages={agent.messages}
         followSignal={followSignal}
         showWorkingIndicator={showWorkingIndicator}
+        threadChangeCount={hunkSummary.fileCount}
+        turnChangeCounts={hunkSummary.turnChangeCounts}
         onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
+        onReviewThreadChanges={openThreadChanges}
+        onReviewTurnChanges={openTurnChanges}
       />
       <AgentWaitCards
         requests={agent.waitRequests}
