@@ -54,6 +54,7 @@ export function App(): React.JSX.Element {
     exitPlan,
   } = useRoderAgent();
   const settingsOpen = useThemeStore((state) => state.settingsOpen);
+  const openSettings = useThemeStore((state) => state.openSettings);
   const closeSettings = useThemeStore((state) => state.closeSettings);
   useExtensionThemes();
   useThemeApplication(appearance);
@@ -147,9 +148,15 @@ export function App(): React.JSX.Element {
       }
       if (appCommand.command === "newThread") {
         newThread();
+        return;
+      }
+      if (appCommand.command === "openSettings") {
+        setMainView("chat");
+        setActiveTool(null);
+        openSettings("general");
       }
     });
-  }, [newProject, newThread]);
+  }, [newProject, newThread, openSettings]);
   useEffect(() => {
     if (status.state === "ready" && !skillsLoaded && !skillsLoading) {
       void loadSkills();

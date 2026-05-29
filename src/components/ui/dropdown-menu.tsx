@@ -9,7 +9,7 @@ export const DropdownMenuGroup = Menu.Group;
 export const DropdownMenuCheckboxItem = Menu.CheckboxItem;
 export const DropdownMenuCheckboxItemIndicator = Menu.CheckboxItemIndicator;
 export const dropdownMenuContentClassName =
-  "dropdown-menu-popup min-w-40 overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-md outline-none";
+  "dropdown-menu-popup min-w-40 overflow-hidden rounded-xl border border-border bg-white p-1.5 text-popover-foreground shadow-md outline-none dark:bg-popover";
 export const dropdownMenuItemClassName =
   "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-base outline-none data-[highlighted]:bg-accent";
 
