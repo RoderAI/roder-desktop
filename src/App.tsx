@@ -17,6 +17,7 @@ import { useThemeApplication } from "@/hooks/use-theme-application";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
 import { useExtensionsStore } from "@/stores/extensions-store";
+import { useSkillsStore } from "@/stores/skills-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
 
@@ -67,6 +68,10 @@ export function App(): React.JSX.Element {
   const [composerFocusSignal, setComposerFocusSignal] = useState(0);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const extensions = useExtensionsStore((state) => state.extensions);
+  const skills = useSkillsStore((state) => state.skills);
+  const skillsLoaded = useSkillsStore((state) => state.loaded);
+  const skillsLoading = useSkillsStore((state) => state.loading);
+  const loadSkills = useSkillsStore((state) => state.load);
   const sidebarExtensions = useMemo(() => getSidebarExtensions(extensions), [extensions]);
   const selectedExtension =
     sidebarExtensions.find((extension) => extension.id === selectedExtensionId) ?? sidebarExtensions[0];
@@ -145,6 +150,11 @@ export function App(): React.JSX.Element {
       }
     });
   }, [newProject, newThread]);
+  useEffect(() => {
+    if (status.state === "ready" && !skillsLoaded && !skillsLoading) {
+      void loadSkills();
+    }
+  }, [loadSkills, skillsLoaded, skillsLoading, status.state]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>
@@ -294,6 +304,7 @@ export function App(): React.JSX.Element {
                 <Composer
                   busy={activeThreadBusy}
                   models={models}
+                  skills={skills}
                   selectedModel={selectedModel}
                   selectedPolicyMode={selectedPolicyMode}
                   selectedReasoning={selectedReasoning}

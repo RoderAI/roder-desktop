@@ -12,6 +12,7 @@ import {
   Puzzle,
   RotateCcw,
   Server,
+  Sparkles,
   Sun,
   UserRound,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-sett
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
+import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
 import {
   presetsForScheme,
   selectedPresetLabel,
@@ -80,6 +82,13 @@ export function SettingsView(): React.JSX.Element {
             onClick={setSettingsSection}
           />
           <SettingsNavItem
+            id="skills"
+            active={settingsSection === "skills"}
+            icon={<Sparkles className="size-4" />}
+            label="Skills"
+            onClick={setSettingsSection}
+          />
+          <SettingsNavItem
             id="extensions"
             active={settingsSection === "extensions"}
             icon={<Puzzle className="size-4" />}
@@ -133,6 +142,8 @@ export function SettingsView(): React.JSX.Element {
             <ComponentsSettingsPanel />
           ) : settingsSection === "models" ? (
             <ModelsSettingsPanel />
+          ) : settingsSection === "skills" ? (
+            <SkillsSettingsPanel />
           ) : settingsSection === "extensions" ? (
             <ExtensionsSettingsPanel />
           ) : (

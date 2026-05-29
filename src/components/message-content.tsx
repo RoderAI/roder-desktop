@@ -1,18 +1,22 @@
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, useMemo, type ReactNode } from "react";
 import { harden } from "rehype-harden";
 import { defaultRehypePlugins, Streamdown, type Components, type StreamdownProps } from "streamdown";
+import { createSkillTokenRehypePlugin, SkillTokenPill, skillNameFromExactToken } from "@/components/skill-token-pill";
 import { cn } from "@/lib/utils";
+import type { SkillDescriptor } from "@/types/roder";
 
 type MessageContentProps = {
   isStreaming?: boolean;
+  skills?: SkillDescriptor[];
   text: string;
 };
 
-const safeRehypePlugins: StreamdownProps["rehypePlugins"] = [
+const safeRehypePlugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
   defaultRehypePlugins.sanitize,
   [
     harden,
     {
+      defaultOrigin: "https://roder.local",
       allowedProtocols: ["http", "https", "mailto"],
       allowedLinkPrefixes: ["http://", "https://", "mailto:"],
       allowedImagePrefixes: [],
@@ -21,75 +25,86 @@ const safeRehypePlugins: StreamdownProps["rehypePlugins"] = [
   ],
 ];
 
-const markdownComponents: Components = {
-  p({ children, className, ...props }) {
-    const isCodeLabel = isInlineCodeOnly(children);
-    return (
-      <p className={cn(className, isCodeLabel && "message-code-label")} {...props}>
-        {children}
-      </p>
-    );
-  },
-  blockquote({ children, ...props }) {
-    return (
-      <blockquote className="border-l-2 border-border pl-4 text-muted-foreground" {...props}>
-        {children}
-      </blockquote>
-    );
-  },
-  inlineCode({ children, className, ...props }) {
-    return (
-      <code
-        className={cn(className, "message-inline-code rounded-md px-1.5 py-0.5 text-[1em] text-foreground")}
-        {...props}
-      >
-        {children}
-      </code>
-    );
-  },
-  h1({ children, className, ...props }) {
-    return (
-      <h1 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
-        {children}
-      </h1>
-    );
-  },
-  h2({ children, className, ...props }) {
-    return (
-      <h2 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
-        {children}
-      </h2>
-    );
-  },
-  h3({ children, className, ...props }) {
-    return (
-      <h3 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
-        {children}
-      </h3>
-    );
-  },
-  h4({ children, className, ...props }) {
-    return (
-      <h4 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
-        {children}
-      </h4>
-    );
-  },
-  h5({ children, className, ...props }) {
-    return (
-      <h5 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
-        {children}
-      </h5>
-    );
-  },
-  h6({ children, className, ...props }) {
-    return (
-      <h6 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
-        {children}
-      </h6>
-    );
-  },
-};
+function createMarkdownComponents(skills: SkillDescriptor[]): Components {
+  return {
+    p({ children, className, ...props }) {
+      const isCodeLabel = isInlineCodeOnly(children);
+      return (
+        <p className={cn(className, isCodeLabel && "message-code-label")} {...props}>
+          {children}
+        </p>
+      );
+    },
+    blockquote({ children, ...props }) {
+      return (
+        <blockquote className="border-l-2 border-border pl-4 text-muted-foreground" {...props}>
+          {children}
+        </blockquote>
+      );
+    },
+    inlineCode({ children, className, ...props }) {
+      // Rehype handles bare $skill text; this branch handles backticked `$skill`.
+      const skillName = typeof children === "string" ? skillNameFromExactToken(children, skills) : null;
+      if (skillName) {
+        return <SkillTokenPill name={skillName} />;
+      }
+
+      return (
+        <code
+          className={cn(className, "message-inline-code rounded-md px-1.5 py-0.5 text-[1em] text-foreground")}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    },
+    h1({ children, className, ...props }) {
+      return (
+        <h1 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
+          {children}
+        </h1>
+      );
+    },
+    h2({ children, className, ...props }) {
+      return (
+        <h2 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
+          {children}
+        </h2>
+      );
+    },
+    h3({ children, className, ...props }) {
+      return (
+        <h3 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
+          {children}
+        </h3>
+      );
+    },
+    h4({ children, className, ...props }) {
+      return (
+        <h4 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
+          {children}
+        </h4>
+      );
+    },
+    h5({ children, className, ...props }) {
+      return (
+        <h5 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
+          {children}
+        </h5>
+      );
+    },
+    h6({ children, className, ...props }) {
+      return (
+        <h6 className={cn(className, "message-heading text-[1em] font-semibold leading-[inherit]")} {...props}>
+          {children}
+        </h6>
+      );
+    },
+    "skill-token"({ name }) {
+      return <SkillTokenPill name={typeof name === "string" ? name : ""} />;
+    },
+  };
+}
 
 function isInlineCodeOnly(children: ReactNode): boolean {
   const meaningfulChildren = Array.isArray(children)
@@ -103,17 +118,23 @@ function isInlineCodeOnly(children: ReactNode): boolean {
   );
 }
 
-export function MessageContent({ isStreaming = false, text }: MessageContentProps): React.JSX.Element {
+export function MessageContent({ isStreaming = false, skills = [], text }: MessageContentProps): React.JSX.Element {
+  const rehypePlugins = useMemo<StreamdownProps["rehypePlugins"]>(
+    () => (skills.length > 0 ? [...safeRehypePlugins, createSkillTokenRehypePlugin(skills)] : safeRehypePlugins),
+    [skills],
+  );
+  const components = useMemo(() => createMarkdownComponents(skills), [skills]);
+
   return (
     <Streamdown
       caret="block"
       className="message-markdown font-medium text-base leading-[1.55]"
-      components={markdownComponents}
+      components={components}
       controls={{ code: { copy: true, download: false }, table: { copy: true, download: false, fullscreen: false } }}
       isAnimating={isStreaming}
       lineNumbers={false}
       mode={isStreaming ? "streaming" : "static"}
-      rehypePlugins={safeRehypePlugins}
+      rehypePlugins={rehypePlugins}
     >
       {text}
     </Streamdown>

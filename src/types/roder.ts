@@ -253,6 +253,50 @@ export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
 export type PolicyMode = "default" | "accept_all" | "plan" | "bypass";
 
+export type SkillSource =
+  | "builtIn"
+  | "workspace"
+  | "user"
+  | "system"
+  | { plugin: { pluginId: string } }
+  | { pluginId: string }
+  | { imported: { importId: string } }
+  | { importId: string };
+
+export type SkillExposure = "global" | "direct_only";
+
+export type SkillActivationState = "enabled" | "disabled" | "experimental";
+
+export type SkillSelector = { path: string } | { name: string };
+
+export type SkillAgentMetadata = {
+  interface?: string;
+  dependencies?: string[];
+  policies?: string[];
+  raw?: unknown;
+};
+
+export type SkillDescriptor = {
+  id: string;
+  name: string;
+  canonicalPath: string;
+  source: SkillSource;
+  exposure: SkillExposure;
+  activation: SkillActivationState;
+  description: string;
+  shortDescription?: string | null;
+  experimental: boolean;
+  diagnostics: string[];
+  agentMetadata?: SkillAgentMetadata | null;
+};
+
+export type SkillsListResult = {
+  skills: SkillDescriptor[];
+  diagnostics: string[];
+};
+
+export type SkillsUpdateResult = SkillsListResult;
+
 export type ConversationMessage = {
   id: string;
   threadId?: string;
