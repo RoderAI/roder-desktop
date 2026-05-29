@@ -40,13 +40,8 @@ export type SettingsSection =
   | "usage";
 
 type ThemeStore = {
-  settingsOpen: boolean;
-  settingsSection: SettingsSection;
   settings: ThemeSettings;
   extensionThemePresets: ThemePreset[];
-  openSettings: (section?: SettingsSection) => void;
-  closeSettings: () => void;
-  setSettingsSection: (section: SettingsSection) => void;
   setExtensionThemePresets: (presets: ThemePreset[]) => void;
   setMode: (mode: ThemeMode) => void;
   applyPreset: (scheme: ThemeScheme, presetId: string) => void;
@@ -175,32 +170,13 @@ export const defaultThemeSettings: ThemeSettings = {
   codeFontSize: 13,
 };
 
-const validSettingsSections = new Set<SettingsSection>([
-  "general",
-  "appearance",
-  "components",
-  "models",
-  "skills",
-  "extensions",
-  "configuration",
-  "personalization",
-  "mcp",
-  "git",
-  "usage",
-]);
-
 const themeStorageVersion = 1;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
-      settingsOpen: false,
-      settingsSection: "general",
       settings: defaultThemeSettings,
       extensionThemePresets: [],
-      openSettings: (section = "general") => set({ settingsOpen: true, settingsSection: section }),
-      closeSettings: () => set({ settingsOpen: false }),
-      setSettingsSection: (settingsSection) => set({ settingsSection }),
       setExtensionThemePresets: (extensionThemePresets) =>
         set((state) => ({
           extensionThemePresets,
@@ -234,16 +210,12 @@ export const useThemeStore = create<ThemeStore>()(
       version: themeStorageVersion,
       migrate: (persisted, version) => migratePersistedTheme(persisted, version),
       partialize: (state) => ({
-        settingsOpen: state.settingsOpen,
-        settingsSection: state.settingsSection,
         settings: state.settings,
       }),
       merge: (persisted, current) => {
         const value = persisted as Partial<ThemeStore> | undefined;
         return {
           ...current,
-          settingsOpen: value?.settingsOpen ?? current.settingsOpen,
-          settingsSection: normalizeSettingsSection(value?.settingsSection, current.settingsSection),
           settings: mergeThemeSettings(current.settings, value?.settings),
           extensionThemePresets: [],
         };
@@ -264,13 +236,6 @@ function migratePersistedTheme(persisted: unknown, version: number): unknown {
       uiFontSize: value.settings.uiFontSize === 14 ? defaultThemeSettings.uiFontSize : value.settings.uiFontSize,
     },
   };
-}
-
-function normalizeSettingsSection(section: unknown, fallback: SettingsSection): SettingsSection {
-  if (typeof section === "string" && validSettingsSections.has(section as SettingsSection)) {
-    return section as SettingsSection;
-  }
-  return fallback;
 }
 
 function mergeThemeSettings(current: ThemeSettings, persisted: Partial<ThemeSettings> | undefined): ThemeSettings {

@@ -35,10 +35,15 @@ import {
 } from "@/stores/theme-store";
 import { cn } from "@/lib/utils";
 
-export function SettingsView(): React.JSX.Element {
-  const closeSettings = useThemeStore((state) => state.closeSettings);
-  const settingsSection = useThemeStore((state) => state.settingsSection);
-  const setSettingsSection = useThemeStore((state) => state.setSettingsSection);
+export function SettingsView({
+  section,
+  onClose,
+  onSectionChange,
+}: {
+  section: SettingsSection;
+  onClose: () => void;
+  onSectionChange: (section: SettingsSection) => void;
+}): React.JSX.Element {
   const resetTheme = useThemeStore((state) => state.resetTheme);
 
   return (
@@ -47,7 +52,7 @@ export function SettingsView(): React.JSX.Element {
         <button
           type="button"
           className="squircle-corners no-drag mb-8 flex h-9 w-full items-center gap-3 rounded-xl px-2 text-left text-base text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          onClick={closeSettings}
+          onClick={onClose}
         >
           <ArrowLeft className="size-4" />
           Back to app
@@ -55,99 +60,99 @@ export function SettingsView(): React.JSX.Element {
         <nav className="no-drag flex flex-col gap-1">
           <SettingsNavItem
             id="general"
-            active={settingsSection === "general"}
+            active={section === "general"}
             icon={<Cog className="size-4" />}
             label="General"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="appearance"
-            active={settingsSection === "appearance"}
+            active={section === "appearance"}
             icon={<Paintbrush className="size-4" />}
             label="Appearance"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="components"
-            active={settingsSection === "components"}
+            active={section === "components"}
             icon={<Component className="size-4" />}
             label="Components"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="models"
-            active={settingsSection === "models"}
+            active={section === "models"}
             icon={<Bot className="size-4" />}
             label="Models"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="skills"
-            active={settingsSection === "skills"}
+            active={section === "skills"}
             icon={<Sparkles className="size-4" />}
             label="Skills"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="extensions"
-            active={settingsSection === "extensions"}
+            active={section === "extensions"}
             icon={<Puzzle className="size-4" />}
             label="Extensions"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="configuration"
-            active={settingsSection === "configuration"}
+            active={section === "configuration"}
             icon={<Braces className="size-4" />}
             label="Configuration"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="personalization"
-            active={settingsSection === "personalization"}
+            active={section === "personalization"}
             icon={<UserRound className="size-4" />}
             label="Personalization"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="mcp"
-            active={settingsSection === "mcp"}
+            active={section === "mcp"}
             icon={<Server className="size-4" />}
             label="MCP servers"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="git"
-            active={settingsSection === "git"}
+            active={section === "git"}
             icon={<GitBranch className="size-4" />}
             label="Git"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
           <SettingsNavItem
             id="usage"
-            active={settingsSection === "usage"}
+            active={section === "usage"}
             icon={<Database className="size-4" />}
             label="Usage"
-            onClick={setSettingsSection}
+            onClick={onSectionChange}
           />
         </nav>
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto px-10 py-12">
         <div className="mx-auto w-full max-w-[860px]">
-          {settingsSection === "general" ? (
+          {section === "general" ? (
             <GeneralSettingsPanel />
-          ) : settingsSection === "appearance" ? (
+          ) : section === "appearance" ? (
             <AppearancePanel onReset={resetTheme} />
-          ) : settingsSection === "components" ? (
+          ) : section === "components" ? (
             <ComponentsSettingsPanel />
-          ) : settingsSection === "models" ? (
+          ) : section === "models" ? (
             <ModelsSettingsPanel />
-          ) : settingsSection === "skills" ? (
+          ) : section === "skills" ? (
             <SkillsSettingsPanel />
-          ) : settingsSection === "extensions" ? (
+          ) : section === "extensions" ? (
             <ExtensionsSettingsPanel />
           ) : (
-            <SettingsPlaceholder section={settingsSection} />
+            <SettingsPlaceholder section={section} />
           )}
         </div>
       </main>
