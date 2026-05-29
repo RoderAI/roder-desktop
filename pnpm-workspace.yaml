@@ -6,3 +6,5 @@ allowBuilds:
   electron-winstaller: true
   esbuild: false
   node-pty: true
+
+minimumReleaseAge: 1440

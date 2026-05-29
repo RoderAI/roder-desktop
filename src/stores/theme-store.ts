@@ -31,6 +31,7 @@ export type SettingsSection =
   | "appearance"
   | "components"
   | "models"
+  | "skills"
   | "extensions"
   | "configuration"
   | "personalization"
@@ -179,6 +180,7 @@ const validSettingsSections = new Set<SettingsSection>([
   "appearance",
   "components",
   "models",
+  "skills",
   "extensions",
   "configuration",
   "personalization",

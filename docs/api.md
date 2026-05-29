@@ -182,22 +182,25 @@ Threads and turns:
 
 Tools, commands, files, agents, and tasks:
 
-| Method             | Purpose                                                |
-| ------------------ | ------------------------------------------------------ |
-| `tools/list`       | List runtime tool specs.                               |
-| `tools/call`       | Directly call allowed workflow tools.                  |
-| `commands/list`    | List configured slash commands.                        |
-| `commands/expand`  | Expand a command to a model prompt and context blocks. |
-| `commands/run`     | Expand a command and start a turn.                     |
-| `fs/readFile`      | Read an absolute host file as base64.                  |
-| `fs/readDirectory` | List direct children of an absolute host directory.    |
-| `command/exec`     | Run a non-PTY command subject to policy checks.        |
-| `agents/list`      | List subagent definitions visible to the runtime.      |
-| `tasks/submit`     | Submit a background task.                              |
-| `tasks/list`       | List task handles.                                     |
-| `tasks/get`        | Read task handle plus logs.                            |
-| `tasks/cancel`     | Cancel a task.                                         |
-| `tasks/subscribe`  | Return supported task event kinds.                     |
+| Method               | Purpose                                                |
+| -------------------- | ------------------------------------------------------ |
+| `tools/list`         | List runtime tool specs.                               |
+| `tools/call`         | Directly call allowed workflow tools.                  |
+| `commands/list`      | List configured slash commands.                        |
+| `commands/expand`    | Expand a command to a model prompt and context blocks. |
+| `commands/run`       | Expand a command and start a turn.                     |
+| `skills/list`        | List runtime skills and diagnostics.                   |
+| `skills/setEnabled`  | Enable or disable a skill by selector.                 |
+| `skills/setExposure` | Set a skill's runtime exposure by selector.            |
+| `fs/readFile`        | Read an absolute host file as base64.                  |
+| `fs/readDirectory`   | List direct children of an absolute host directory.    |
+| `command/exec`       | Run a non-PTY command subject to policy checks.        |
+| `agents/list`        | List subagent definitions visible to the runtime.      |
+| `tasks/submit`       | Submit a background task.                              |
+| `tasks/list`         | List task handles.                                     |
+| `tasks/get`          | Read task handle plus logs.                            |
+| `tasks/cancel`       | Cancel a task.                                         |
+| `tasks/subscribe`    | Return supported task event kinds.                     |
 
 Teams and panes:
 
@@ -1160,6 +1163,74 @@ Response:
   }
 }
 ```
+
+### Skills methods
+
+Purpose: Inspect and update runtime skills available to the model and direct
+`$skill` activation.
+
+List request:
+
+```json
+{
+  "method": "skills/list",
+  "params": {}
+}
+```
+
+List response:
+
+```json
+{
+  "skills": [
+    {
+      "id": "builtin:commit",
+      "name": "commit",
+      "canonicalPath": "builtin://skills/commit/SKILL.md",
+      "source": "builtIn",
+      "exposure": "direct_only",
+      "activation": "enabled",
+      "description": "Create a scoped git commit.",
+      "shortDescription": "Commit workflow",
+      "experimental": false,
+      "diagnostics": [],
+      "agentMetadata": null
+    }
+  ],
+  "diagnostics": []
+}
+```
+
+Mutation examples:
+
+```json
+{
+  "method": "skills/setEnabled",
+  "params": {
+    "selector": { "path": "builtin://skills/commit/SKILL.md" },
+    "enabled": false
+  }
+}
+```
+
+```json
+{
+  "method": "skills/setExposure",
+  "params": {
+    "selector": { "path": "builtin://skills/commit/SKILL.md" },
+    "exposure": "global"
+  }
+}
+```
+
+Behavior:
+
+- `skills/list`, `skills/setEnabled`, and `skills/setExposure` return
+  `{ "skills": [], "diagnostics": [] }`.
+- `selector` accepts a skill `name` or canonical `path`. Desktop callers should
+  prefer `{ "path": canonicalPath }` to avoid ambiguous skill-name errors.
+- `activation` is `enabled`, `disabled`, or `experimental`.
+- `exposure` is `global` or `direct_only`.
 
 ### `tasks/submit`
 
