@@ -11,14 +11,12 @@ import { cn } from "@/lib/utils";
 type ExtensionsPanelProps = {
   selectedExtensionId?: string | null;
   selectedPanelId?: string | null;
-  onSelectedExtensionChange?: (extensionId: string) => void;
   onSelectedPanelChange?: (panelId: string) => void;
 };
 
 export function ExtensionsPanel({
   selectedExtensionId,
   selectedPanelId,
-  onSelectedExtensionChange,
   onSelectedPanelChange,
 }: ExtensionsPanelProps): React.JSX.Element {
   const navigate = useNavigate();
@@ -42,18 +40,6 @@ export function ExtensionsPanel({
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    if (selectedExtension && selectedExtension.id !== selectedExtensionId) {
-      onSelectedExtensionChange?.(selectedExtension.id);
-    }
-  }, [onSelectedExtensionChange, selectedExtension, selectedExtensionId]);
-
-  useEffect(() => {
-    if (selectedPanel && selectedPanel.id !== selectedPanelId) {
-      onSelectedPanelChange?.(selectedPanel.id);
-    }
-  }, [onSelectedPanelChange, selectedPanel, selectedPanelId]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-sidebar text-sidebar-foreground">
