@@ -11,15 +11,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import {
+  normalizeWorkspacePath,
+  normalizedTimestamp,
+  workspaceName,
+  type FolderOption,
+} from "@/lib/workspace-thread-options";
 
 export type ToolPanel = "terminal" | "browser" | "canvas" | "extensions" | null;
-
-type FolderOption = {
-  path: string;
-  name: string;
-  updatedAt: number;
-  threadCount: number;
-};
 
 type TopBarProps = {
   thread?: RoderThread;
@@ -56,8 +55,10 @@ export function TopBar({
   onToggleCanvas,
   onToggleExtensions,
 }: TopBarProps): React.JSX.Element {
-  const activeFolder = folders.find((folder) => normalizePath(folder.path) === normalizePath(activeFolderPath));
-  const activeFolderLabel = activeFolder?.name ?? folderName(activeFolderPath);
+  const activeFolder = folders.find(
+    (folder) => normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(activeFolderPath),
+  );
+  const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
   return (
     <header
       className={cn(
@@ -160,8 +161,8 @@ function CollapsedBreadcrumb({
   onSelectFolder: (path: string) => void;
   onSelectThread: (threadId: string) => void;
 }): React.JSX.Element {
-  const activeFolderLabel = activeFolder?.name ?? folderName(activeFolderPath);
-  const activeFolderKey = normalizePath(activeFolder?.path ?? activeFolderPath);
+  const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
+  const activeFolderKey = normalizeWorkspacePath(activeFolder?.path ?? activeFolderPath);
   return (
     <div className="no-drag flex min-w-0 items-center gap-1.5 rounded-full bg-card/70 p-1 text-base shadow-sm ring-1 ring-border">
       <DropdownMenu>
@@ -179,7 +180,7 @@ function CollapsedBreadcrumb({
             <div className="px-2 pb-1 pt-1 text-base font-medium text-muted-foreground">Folders</div>
             {folders.length > 0 ? (
               folders.map((folder) => {
-                const selected = normalizePath(folder.path) === activeFolderKey;
+                const selected = normalizeWorkspacePath(folder.path) === activeFolderKey;
                 return (
                   <DropdownMenuItem
                     key={folder.path}
@@ -250,19 +251,11 @@ function threadTitle(thread: RoderThread | undefined): string {
   return thread.name ?? (thread.preview || "Untitled agent");
 }
 
-function folderName(path: string): string {
-  return path?.split("/").filter(Boolean).pop() || "workspace";
-}
-
-function normalizePath(path: string | undefined): string {
-  return (path || "").replace(/\/+$/, "") || path || "";
-}
-
 function relativeAge(timestamp: number): string {
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+  const normalized = normalizedTimestamp(timestamp);
+  if (normalized <= 0) {
     return "";
   }
-  const normalized = timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
   const diffMs = Math.max(0, Date.now() - normalized);
   const minute = 60_000;
   const hour = 60 * minute;

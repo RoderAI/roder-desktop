@@ -4,6 +4,16 @@ export function getSidebarExtensions(extensions: ExtensionCatalogRecord[]): Exte
   return extensions.filter(hasSidebarRelevantContribution);
 }
 
+export function selectedSidebarExtensionId(
+  extensions: ExtensionCatalogRecord[],
+  requestedExtensionId: string | null | undefined,
+): string | null {
+  const sidebarExtensions = getSidebarExtensions(extensions);
+  return (
+    sidebarExtensions.find((extension) => extension.id === requestedExtensionId)?.id ?? sidebarExtensions[0]?.id ?? null
+  );
+}
+
 export function hasSidebarRelevantContribution(extension: ExtensionCatalogRecord): boolean {
   const contributions = extension.manifest.contributes;
   return (

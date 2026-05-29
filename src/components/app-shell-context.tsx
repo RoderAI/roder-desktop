@@ -2,14 +2,8 @@ import { createContext, useContext } from "react";
 import type { SetValues } from "nuqs";
 import type { useRoderAgent } from "@/hooks/use-roder-agent";
 import type { routeSearchParsers, RouteSearchState } from "@/lib/route-search";
+import type { FolderOption } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
-
-export type FolderOption = {
-  path: string;
-  name: string;
-  updatedAt: number;
-  threadCount: number;
-};
 
 export type AppShellContextValue = {
   agent: ReturnType<typeof useRoderAgent>;
