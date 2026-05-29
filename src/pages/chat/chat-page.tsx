@@ -24,9 +24,18 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     sendPrompt,
   } = shell;
   const skills = useSkillsStore((state) => state.skills);
+  const skillsLoaded = useSkillsStore((state) => state.loaded);
+  const skillsLoading = useSkillsStore((state) => state.loading);
+  const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
   const newRouteReadyForCreatedThreadRef = useRef(false);
   const clearingActiveThreadForNewRouteRef = useRef(false);
+
+  useEffect(() => {
+    if (agent.status.state === "ready" && !skillsLoaded && !skillsLoading) {
+      void loadSkills();
+    }
+  }, [agent.status.state, loadSkills, skillsLoaded, skillsLoading]);
 
   useEffect(() => {
     if (route === "new") {
