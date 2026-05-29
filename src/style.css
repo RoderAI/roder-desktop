@@ -156,6 +156,33 @@ code {
   font-size: var(--font-size-code);
 }
 
+.skill-prompt-token {
+  display: inline-grid;
+  max-inline-size: 100%;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-inline: 0.125rem;
+  vertical-align: baseline;
+  color: var(--color-primary);
+  font-weight: 600;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.skill-prompt-token-icon {
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  align-self: center;
+}
+
+.skill-prompt-token-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .message-inline-code,
 code[data-streamdown="inline-code"] {
   background-color: color-mix(in oklab, var(--color-foreground) 5%, var(--color-background));
@@ -617,6 +644,30 @@ code[data-streamdown="inline-code"] {
     opacity 120ms ease-out;
 }
 
+/*
+ * COMPOSER SKILL MENU ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to a $skill token becoming active.
+ *
+ *   0ms   menu appears 4px below its anchored resting position
+ * 120ms   menu reaches full opacity and position
+ */
+.composer-skill-menu {
+  animation: composer-skill-menu-enter 120ms ease-out;
+}
+
+@keyframes composer-skill-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dropdown-menu-popup {
     transition: none;
@@ -668,6 +719,10 @@ code[data-streamdown="inline-code"] {
 
   .composer-submit-button {
     transition: none;
+  }
+
+  .composer-skill-menu {
+    animation: none;
   }
 }
 

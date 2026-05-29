@@ -9,12 +9,13 @@
 
 ## Dependency Security
 
-Never bypass, disable, or weaken package-manager supply-chain protections such
-as pnpm's `minimumReleaseAge`. Do not use override flags or config such as
-`--config.minimumReleaseAge=0`, do not add package exceptions to get around the
-policy, and do not otherwise force installation of dependencies that the policy
-blocks. If a dependency is too new, choose a version that satisfies the policy or
-wait for the configured release-age window to pass.
+Use pnpm's default `minimumReleaseAge` of 1 day for dependency installs in this
+project. Do not bypass or disable package-manager supply-chain protections with
+override flags or config such as `--config.minimumReleaseAge=0`, do not add
+package exceptions to get around the policy, and do not otherwise force
+installation of dependencies that the policy blocks. If a dependency is too new,
+choose a version that satisfies the policy or wait for the configured
+release-age window to pass.
 
 ## Project Terminology
 

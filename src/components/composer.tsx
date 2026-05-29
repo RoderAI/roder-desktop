@@ -1,11 +1,22 @@
+import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Plus, Square } from "lucide-react";
-import { useCallback, useRef, useState, type CSSProperties } from "react";
-import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort } from "@/types/roder";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort, SkillDescriptor } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import { AttachmentChip, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
-import { Textarea } from "@/components/ui/textarea";
+import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
+import { useSkillCompletion } from "@/hooks/use-skill-completion";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
+import {
+  createSkillPromptEditor,
+  readSkillPromptEditorSelectionOffset,
+  readSkillPromptEditorText,
+  registerSkillPromptPlainText,
+  writeSkillPromptEditorText,
+} from "@/lib/lexical-skill-prompt";
+import { isComposerSubmitKey } from "@/lib/composer-keyboard";
 import { cn } from "@/lib/utils";
+import type { LexicalEditor } from "lexical";
 
 /*
  * SCROLL BUTTON ANIMATION STORYBOARD
@@ -30,6 +41,7 @@ const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
 type ComposerProps = {
   busy: boolean;
   models: RoderModel[];
+  skills: SkillDescriptor[];
   selectedModel: string;
   selectedPolicyMode: PolicyMode;
   selectedReasoning: ReasoningEffort;
@@ -48,6 +60,7 @@ type ComposerProps = {
 export function Composer({
   busy,
   models,
+  skills,
   selectedModel,
   selectedPolicyMode,
   selectedReasoning,
@@ -64,47 +77,40 @@ export function Composer({
 }: ComposerProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [caretPosition, setCaretPosition] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const focusedSignalRef = useRef(0);
+  const skillPromptEditor = useMemo(() => createSkillPromptEditor(), []);
+  const skillCompletionListboxId = useId();
+  const skillsRef = useRef(skills);
+  const skillNamesKey = useMemo(() => skills.map((skill) => skill.name).sort().join("|"), [skills]);
+  skillsRef.current = skills;
 
-  const resizeTextarea = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      return;
+  useEffect(() => {
+    if (focusSignal > 0) {
+      skillPromptEditor.focus();
     }
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }, []);
+  }, [focusSignal, skillPromptEditor]);
 
-  const scheduleTextareaResize = useCallback(() => {
-    requestAnimationFrame(resizeTextarea);
-  }, [resizeTextarea]);
-
-  const setTextareaNode = useCallback(
-    (node: HTMLTextAreaElement | null) => {
-      textareaRef.current = node;
-      if (!node) {
-        return;
-      }
-      resizeTextarea();
-      if (focusSignal > 0 && focusedSignalRef.current !== focusSignal) {
-        focusedSignalRef.current = focusSignal;
-        node.focus();
-      }
-    },
-    [focusSignal, resizeTextarea],
-  );
+  useEffect(() => {
+    const selectionOffset = readSkillPromptEditorSelectionOffset(skillPromptEditor);
+    writeSkillPromptEditorText(
+      skillPromptEditor,
+      readSkillPromptEditorText(skillPromptEditor),
+      skillsRef.current,
+      selectionOffset,
+    );
+  }, [skillPromptEditor, skillNamesKey]);
 
   const appendTranscribedText = useCallback(
     (text: string) => {
-      setPrompt((previous) => {
-        const trimmed = previous.trim();
-        return trimmed ? `${trimmed} ${text}` : text;
-      });
-      scheduleTextareaResize();
+      const currentPrompt = readSkillPromptEditorText(skillPromptEditor);
+      const trimmed = currentPrompt.trim();
+      const nextPrompt = trimmed ? `${trimmed} ${text}` : text;
+      writeSkillPromptEditorText(skillPromptEditor, nextPrompt, skills, nextPrompt.length);
+      setPrompt(nextPrompt);
+      setCaretPosition(nextPrompt.length);
     },
-    [scheduleTextareaResize],
+    [skillPromptEditor, skills],
   );
   const {
     isRecording,
@@ -114,7 +120,24 @@ export function Composer({
     lifecycleRef: speechLifecycleRef,
     toggleRecording,
   } = useSpeechTranscription({ onTranscriptionText: appendTranscribedText });
+  const handlePromptEditorChange = useCallback(
+    (nextPrompt: string, nextCaret: number) => {
+      setPrompt(nextPrompt);
+      setCaretPosition(nextCaret);
+      if (recordingError) {
+        clearRecordingError();
+      }
+    },
+    [clearRecordingError, recordingError],
+  );
   const canSubmit = prompt.trim().length > 0 || attachments.length > 0;
+  const skillCompletion = useSkillCompletion({
+    editor: skillPromptEditor,
+    prompt,
+    caretPosition,
+    skills,
+    onPromptChange: handlePromptEditorChange,
+  });
 
   async function submit(): Promise<void> {
     const value = prompt.trim();
@@ -123,9 +146,22 @@ export function Composer({
     }
     const submittedAttachments = attachments;
     setPrompt("");
-    scheduleTextareaResize();
+    setCaretPosition(0);
+    writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
     onAttachmentsChange([]);
     await onSend(value, submittedAttachments);
+  }
+
+  function handlePromptEditorKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (skillCompletion.handleSkillCompletionKeyDown(event)) {
+      return;
+    }
+
+    if (isComposerSubmitKey(event)) {
+      event.preventDefault();
+      void submit();
+      return;
+    }
   }
 
   function addAttachments(nextAttachments: DesktopAttachment[]): void {
@@ -200,6 +236,14 @@ export function Composer({
             ))}
           </div>
         )}
+        <SkillCompletionPopup
+          visible={skillCompletion.showSkillCompletionMenu}
+          listboxId={skillCompletionListboxId}
+          skills={skillCompletion.skillCompletions}
+          highlightedSkillIndex={skillCompletion.highlightedSkillIndex}
+          onHighlight={skillCompletion.setHighlightedSkillIndex}
+          onSelect={skillCompletion.insertSkillCompletion}
+        />
         <div className="px-3 py-2">
           <input
             ref={fileInputRef}
@@ -213,24 +257,20 @@ export function Composer({
               event.currentTarget.value = "";
             }}
           />
-          <Textarea
-            ref={setTextareaNode}
+          <SkillPromptEditor
+            editor={skillPromptEditor}
+            skills={skills}
             value={prompt}
             placeholder={busy ? "Queue a follow-up or steer the current run" : "Send follow-up"}
-            className="min-h-16 overflow-hidden border-0 bg-transparent px-1 py-2 text-[var(--font-size-composer)] leading-6 shadow-none focus-visible:border-transparent focus-visible:ring-0"
-            onChange={(event) => {
-              setPrompt(event.target.value);
-              resizeTextarea();
-              if (recordingError) {
-                clearRecordingError();
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void submit();
-              }
-            }}
+            completionOpen={skillCompletion.showSkillCompletionMenu}
+            completionListboxId={skillCompletionListboxId}
+            activeCompletionId={
+              skillCompletion.showSkillCompletionMenu
+                ? skillCompletionOptionId(skillCompletionListboxId, skillCompletion.highlightedSkillIndex)
+                : undefined
+            }
+            onChange={handlePromptEditorChange}
+            onKeyDownCapture={handlePromptEditorKeyDownCapture}
           />
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
           <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
@@ -279,6 +319,84 @@ export function Composer({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+type SkillPromptEditorProps = {
+  editor: LexicalEditor;
+  skills: SkillDescriptor[];
+  value: string;
+  placeholder: string;
+  completionOpen: boolean;
+  completionListboxId: string;
+  activeCompletionId: string | undefined;
+  onChange: (value: string, caret: number) => void;
+  onKeyDownCapture: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+};
+
+function SkillPromptEditor({
+  editor,
+  skills,
+  value,
+  placeholder,
+  completionOpen,
+  completionListboxId,
+  activeCompletionId,
+  onChange,
+  onKeyDownCapture,
+}: SkillPromptEditorProps): React.JSX.Element {
+  const editorRootRef = useRef<HTMLDivElement | null>(null);
+  const historyState = useMemo(() => createEmptyHistoryState(), []);
+  const skillsRef = useRef(skills);
+  // Registered Lexical commands read the latest skills without re-registering on every store update.
+  skillsRef.current = skills;
+
+  useEffect(() => {
+    const rootElement = editorRootRef.current;
+    if (!rootElement) {
+      return;
+    }
+    editor.setRootElement(rootElement);
+    return () => {
+      editor.setRootElement(null);
+    };
+  }, [editor]);
+
+  useEffect(() => registerSkillPromptPlainText(editor, () => skillsRef.current), [editor]);
+
+  useEffect(() => registerHistory(editor, historyState, 300), [editor, historyState]);
+
+  useEffect(
+    () =>
+      editor.registerUpdateListener(() => {
+        onChange(readSkillPromptEditorText(editor), readSkillPromptEditorSelectionOffset(editor));
+      }),
+    [editor, onChange],
+  );
+
+  return (
+    <div className="relative">
+      {value.length === 0 && (
+        <div className="pointer-events-none absolute left-1 top-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-7 text-muted-foreground">
+          {placeholder}
+        </div>
+      )}
+      <div
+        ref={editorRootRef}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={placeholder}
+        aria-autocomplete="list"
+        aria-controls={completionOpen ? completionListboxId : undefined}
+        aria-activedescendant={completionOpen ? activeCompletionId : undefined}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        tabIndex={0}
+        className="skill-prompt-editor relative min-h-16 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-7 text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-7"
+        onKeyDownCapture={onKeyDownCapture}
+      />
     </div>
   );
 }

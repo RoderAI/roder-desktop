@@ -10,6 +10,8 @@ import { PhaseMessage } from "./phase-message";
 import { ToolActivityGroup } from "./tool-activity-group";
 import { ToolTimelineItem } from "./tool-timeline-item";
 import { ShimmerText } from "./tool-timeline-shared";
+import { renderTextWithSkillTokens } from "@/components/skill-token-pill";
+import { useSkillsStore } from "@/stores/skills-store";
 
 type TranscriptProps = {
   messages: ConversationMessage[];
@@ -28,6 +30,7 @@ export function Transcript({
   showWorkingIndicator = false,
   onCanScrollToBottomChange,
 }: TranscriptProps): React.JSX.Element {
+  const skills = useSkillsStore((state) => state.skills);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const pinnedToBottomRef = useRef(true);
   const lastFollowSignalRef = useRef(followSignal);
@@ -144,15 +147,19 @@ export function Transcript({
                 ) : isPhaseMessage ? (
                   <PhaseMessage
                     isStreaming={message.status === "streaming"}
+                    skills={skills}
                     text={message.text || (message.status === "streaming" ? " " : "")}
                   />
                 ) : message?.role === "assistant" ? (
                   <MessageContent
                     isStreaming={message.status === "streaming"}
+                    skills={skills}
                     text={message.text || (message.status === "streaming" ? " " : "")}
                   />
                 ) : (
-                  <div className="font-medium text-base leading-[1.55]">{message?.text}</div>
+                  <div className="font-medium text-base leading-[1.55]">
+                    {renderTextWithSkillTokens(message?.text ?? "", skills)}
+                  </div>
                 )}
               </article>
             );

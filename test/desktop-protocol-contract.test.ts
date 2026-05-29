@@ -17,6 +17,9 @@ const documentedDesktopMethods = [
   "turn/steer",
   "turn/interrupt",
   "model/list",
+  "skills/list",
+  "skills/setEnabled",
+  "skills/setExposure",
   "speech/providers/list",
   "speech/transcribe",
 ];

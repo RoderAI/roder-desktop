@@ -4,6 +4,9 @@ import type {
   RoderModel,
   RoderStatus,
   RoderThread,
+  SkillExposure,
+  SkillsListResult,
+  SkillsUpdateResult,
   SystemAppearance,
   TurnInputItem,
   SpeechProviderDescriptor,
@@ -149,6 +152,17 @@ export const roderIpc = {
     window.roderDesktop.request("settings/set_default_mode", { mode }) as Promise<SettingsSetDefaultModeResult>,
   settings: () => window.roderDesktop.request("settings/get", {}) as Promise<SettingsGetResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
+  listSkills: () => window.roderDesktop.request("skills/list", {}) as Promise<SkillsListResult>,
+  setSkillEnabled: (canonicalPath: string, enabled: boolean) =>
+    window.roderDesktop.request("skills/setEnabled", {
+      selector: { path: canonicalPath },
+      enabled,
+    }) as Promise<SkillsUpdateResult>,
+  setSkillExposure: (canonicalPath: string, exposure: SkillExposure) =>
+    window.roderDesktop.request("skills/setExposure", {
+      selector: { path: canonicalPath },
+      exposure,
+    }) as Promise<SkillsUpdateResult>,
   listSpeechProviders: () =>
     window.roderDesktop.request("speech/providers/list", {}) as Promise<{ providers: SpeechProviderDescriptor[] }>,
   transcribeSpeech: (params: {
