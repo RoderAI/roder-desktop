@@ -164,6 +164,50 @@ test("groupHunksByFile derives changed file summaries and statuses from recorded
   ]);
 });
 
+test("one-sided hunks in existing files stay modified instead of becoming file adds or deletes", () => {
+  const insertion = makeHunk({
+    id: "hunk-insert",
+    oldStart: 3,
+    oldLines: 1,
+    newStart: 3,
+    newLines: 2,
+    diff: [
+      { kind: "context", text: "same", oldLine: 3, newLine: 3 },
+      { kind: "added", text: "inserted", newLine: 4 },
+    ],
+  });
+  const deletion = makeHunk({
+    id: "hunk-delete",
+    oldStart: 8,
+    oldLines: 2,
+    newStart: 8,
+    newLines: 1,
+    diff: [
+      { kind: "context", text: "same", oldLine: 8, newLine: 8 },
+      { kind: "removed", text: "removed", oldLine: 9 },
+    ],
+  });
+
+  expect(groupHunksByFile([insertion, deletion])).toEqual([
+    expect.objectContaining({
+      path: "src/app.ts",
+      status: "modified",
+      additions: 1,
+      deletions: 1,
+    }),
+  ]);
+  expect(hunkPagesToReviewPatch([{ hunk: insertion, offset: 0, limit: 2, totalLines: 2, lines: insertion.diff }])).toEqual(
+    expect.objectContaining({
+      patch: expect.stringContaining("--- a/src/app.ts\n+++ b/src/app.ts"),
+    }),
+  );
+  expect(hunkPagesToReviewPatch([{ hunk: deletion, offset: 0, limit: 2, totalLines: 2, lines: deletion.diff }])).toEqual(
+    expect.objectContaining({
+      patch: expect.stringContaining("--- a/src/app.ts\n+++ b/src/app.ts"),
+    }),
+  );
+});
+
 test("changeCountsByTurn counts files changed per turn rather than raw hunks", () => {
   expect(
     changeCountsByTurn([

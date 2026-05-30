@@ -16,7 +16,7 @@ type SpawnMock = (
 type SpawnSyncMock = (
   command: string,
   args: string[],
-  options: { env?: Record<string, string | undefined> },
+  options: { env?: Record<string, string | undefined>; timeout?: number },
 ) => { status: number; stdout: string };
 
 const mockState = vi.hoisted(() => ({
@@ -33,7 +33,7 @@ const mockState = vi.hoisted(() => ({
   spawnSyncCalls: [] as Array<{
     command: string;
     args: string[];
-    options: { env?: Record<string, string | undefined> };
+    options: { env?: Record<string, string | undefined>; timeout?: number };
   }>,
   schemaManifest: {
     methods: [
@@ -133,6 +133,7 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
     expect.objectContaining({
       args: ["app-server", "schema", "--format", "manifest"],
       options: expect.objectContaining({
+        timeout: 5000,
         env: expect.objectContaining({
           RODER_DESKTOP: "1",
         }),

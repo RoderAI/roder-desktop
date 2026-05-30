@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { roderIpc } from "@/lib/roder-ipc";
 import { summarizeReviewChanges } from "@/lib/review-changes";
 import type { HunkRecord, WorkspaceChangeObservation } from "@/types/roder";
@@ -25,15 +25,23 @@ const emptySummary: ThreadHunkSummary = {
 
 export function useThreadHunkSummary(threadId: string, hunkRevision = 0): ThreadHunkSummary {
   const [summary, setSummary] = useState<ThreadHunkSummary>(emptySummary);
+  const lastThreadIdRef = useRef("");
 
   useEffect(() => {
     if (!threadId) {
+      lastThreadIdRef.current = "";
       setSummary(emptySummary);
       return;
     }
 
     let disposed = false;
-    setSummary((current) => ({ ...current, loading: true, error: null }));
+    const threadChanged = lastThreadIdRef.current !== threadId;
+    lastThreadIdRef.current = threadId;
+    setSummary((current) => ({
+      ...(threadChanged ? emptySummary : current),
+      loading: true,
+      error: null,
+    }));
     void Promise.all([roderIpc.listHunks(threadId), listObservedChanges(threadId)])
       .then(([hunkResult, observedResult]) => {
         if (disposed) {
