@@ -186,6 +186,19 @@ code[data-streamdown="inline-code"] {
   font-size: inherit;
 }
 
+[data-streamdown="code-block"] {
+  position: relative;
+}
+
+[data-streamdown="code-block"] > div:has(> [data-streamdown="code-block-actions"]) {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 10;
+  margin-top: 0;
+  width: auto;
+}
+
 [data-streamdown="code-block-body"] pre > code > span {
   display: block;
   min-height: 1lh;
@@ -851,6 +864,37 @@ code[data-streamdown="inline-code"] {
 .workspace-scrollbar::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: var(--color-muted-foreground);
+}
+
+.transcript-viewport {
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.transcript-viewport-auto-following {
+  scrollbar-color: transparent transparent;
+}
+
+.transcript-viewport-auto-following::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.transcript-viewport-auto-following::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.transcript-search-mirror {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  opacity: 0;
+  user-select: text;
 }
 
 .chat-composer-guard {

@@ -1,21 +1,22 @@
 import type { ConversationMessage } from "@/types/roder";
 import { isShellToolName } from "@/lib/tool-display";
 import { cn } from "@/lib/utils";
+import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 import { ToolShellItem } from "./tool-shell-item";
 import { ShimmerText, toolStatus, toolTextClass, toolTitle } from "./tool-timeline-shared";
 
-type ToolTimelineItemProps = {
+type ToolTimelineItemProps = ToolDisclosureControlProps & {
   message: ConversationMessage;
 };
 
-export function ToolTimelineItem({ message }: ToolTimelineItemProps): React.JSX.Element {
+export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineItemProps): React.JSX.Element {
   const status = toolStatus(message);
   const summary = message.toolSummary || message.text;
   const title = toolTitle(message, summary);
   const Title = status === "running" ? ShimmerText : "span";
 
   if (isShellToolName(message.toolName) && (message.toolInput || message.toolOutput)) {
-    return <ToolShellItem message={message} status={status} summary={summary} />;
+    return <ToolShellItem message={message} onOpenChange={onOpenChange} open={open} status={status} summary={summary} />;
   }
 
   return (
