@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useMemo, useRef } from "react";
+import { Fragment, useCallback, useMemo, useRef, type CSSProperties } from "react";
 import { GitCompareArrows } from "lucide-react";
 import type { ConversationMessage } from "@/types/roder";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { useSkillsStore } from "@/stores/skills-store";
 type TranscriptProps = {
   messages: ConversationMessage[];
   followSignal: number;
+  bottomInsetPx?: number;
   activeTurnId?: string;
   showWorkingIndicator?: boolean;
   threadChangeCount?: number;
@@ -27,10 +28,11 @@ type TranscriptProps = {
   onReviewTurnChanges?: (turnId: string) => void;
 };
 
-const bottomThresholdPx = 48;
+const bottomThresholdPx = 4;
 
 export function Transcript({
   activeTurnId,
+  bottomInsetPx = 0,
   messages,
   followSignal,
   showWorkingIndicator = false,
@@ -46,6 +48,9 @@ export function Transcript({
   const lastFollowSignalRef = useRef(followSignal);
   const lastMessageVersionRef = useRef("");
 
+  const contentStyle: CSSProperties = {
+    paddingBottom: bottomInsetPx,
+  };
   const messageVersion = useMemo(() => {
     const lastMessage = messages.at(-1);
     return [
@@ -56,8 +61,9 @@ export function Transcript({
       lastMessage?.toolSummary?.length ?? 0,
       lastMessage?.status ?? "",
       showWorkingIndicator ? "working" : "idle",
+      bottomInsetPx,
     ].join(":");
-  }, [messages, showWorkingIndicator]);
+  }, [bottomInsetPx, messages, showWorkingIndicator]);
   const transcriptEntries = useMemo(
     () => groupToolMessagesForTranscript(messages, { activeTurnId }),
     [activeTurnId, messages],
@@ -71,7 +77,8 @@ export function Transcript({
       const wasPinned = pinnedToBottomRef.current;
       pinnedToBottomRef.current = nextPinned;
       if (wasPinned !== nextPinned) {
-        onCanScrollToBottomChange?.(!nextPinned);
+        const canScrollToBottom = !nextPinned;
+        onCanScrollToBottomChange?.(canScrollToBottom);
       }
     },
     [onCanScrollToBottomChange],
@@ -119,11 +126,14 @@ export function Transcript({
     <div className="relative min-h-0 flex-1">
       <ScrollArea
         className="h-full"
-        viewportClassName="transcript-viewport"
+        viewportClassName="workspace-scrollbar transcript-viewport"
         viewportRef={setViewportNode}
         onViewportScroll={(event) => syncPinnedState(event.currentTarget)}
       >
-        <main className="mx-auto flex w-full max-w-[980px] flex-col px-8 pb-40 pt-2">
+        <main
+          className="mx-auto flex w-full max-w-[980px] flex-col px-8 pt-2"
+          style={contentStyle}
+        >
           {threadChangeCount > 0 && onReviewThreadChanges && (
             <div className="mb-2 flex justify-end">
               <ChangesLink label="Changes" count={threadChangeCount} onClick={onReviewThreadChanges} />
@@ -200,7 +210,6 @@ export function Transcript({
           {showWorkingIndicator && <ThreadWorkingIndicator />}
         </main>
       </ScrollArea>
-      <div className="transcript-fade pointer-events-none absolute inset-x-0 bottom-0 h-28" />
     </div>
   );
 }
