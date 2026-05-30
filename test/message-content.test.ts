@@ -52,6 +52,15 @@ test("leaves unknown dollar tokens as text in messages", () => {
   expect(html).not.toContain("data-skill-token");
 });
 
+test("does not render Streamdown's streaming caret marker", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MessageContent, { text: "Streaming response", isStreaming: true }),
+  );
+
+  expect(html).not.toContain("--streamdown-caret");
+  expect(html).not.toContain("▋");
+});
+
 function skill(patch: Partial<SkillDescriptor> = {}): SkillDescriptor {
   return {
     id: patch.id ?? `user:${patch.name ?? "interface-craft"}`,

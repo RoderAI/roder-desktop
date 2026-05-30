@@ -3,20 +3,23 @@ import type { ToolGroupKind } from "@/lib/tool-display";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
 import { DisclosureChevron, groupStatus, groupStatusLabel, ShimmerText, toolTextClass } from "./tool-timeline-shared";
+import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 
 export function CompactToolGroup({
   kind,
   messages,
+  onOpenChange,
+  open,
 }: {
   kind: ToolGroupKind;
   messages: ConversationMessage[];
-}): React.JSX.Element {
+} & ToolDisclosureControlProps): React.JSX.Element {
   const status = groupStatus(messages);
   const title = groupTitle(kind, messages);
   const Title = status === "running" ? ShimmerText : "span";
 
   return (
-    <Collapsible.Root className="group/tool-group text-base leading-7">
+    <Collapsible.Root className="group/tool-group text-base leading-7" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
         className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"

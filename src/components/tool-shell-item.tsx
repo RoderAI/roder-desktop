@@ -1,20 +1,21 @@
 import type { ConversationMessage } from "@/types/roder";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
+import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 import { DisclosureChevron, ShimmerText, toolTextClass, toolTitle } from "./tool-timeline-shared";
 
-type ToolShellItemProps = {
+type ToolShellItemProps = ToolDisclosureControlProps & {
   message: ConversationMessage;
   status: "running" | "complete" | "failed";
   summary: string;
 };
 
-export function ToolShellItem({ message, status, summary }: ToolShellItemProps): React.JSX.Element {
+export function ToolShellItem({ message, onOpenChange, open, status, summary }: ToolShellItemProps): React.JSX.Element {
   const title = toolTitle(message, summary);
   const Title = status === "running" ? ShimmerText : "span";
 
   return (
-    <Collapsible.Root className="group/shell-tool text-base leading-7">
+    <Collapsible.Root className="group/shell-tool text-base leading-7" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
         className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"

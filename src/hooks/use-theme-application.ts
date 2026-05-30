@@ -67,7 +67,6 @@ function themeVariables(
     "--color-sidebar-active": activeSidebar,
     "--color-sidebar-active-foreground": fg,
     "--color-sidebar-dot": mix(fg, sidebar, 58),
-    "--transcript-fade-clear": transparent(bg),
     "--font-ui": palette.uiFont,
     "--font-code": palette.codeFont,
     "--font-size-ui": `${clamp(uiFontSize, 11, 24)}px`,
@@ -83,14 +82,6 @@ function readableOn(hex: string): string {
   }
   const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
   return luminance > 0.56 ? "#151515" : "#ffffff";
-}
-
-function transparent(hex: string): string {
-  const rgb = hexToRgb(hex);
-  if (!rgb) {
-    return "transparent";
-  }
-  return `rgb(${rgb.r} ${rgb.g} ${rgb.b} / 0)`;
 }
 
 function mix(left: string, right: string, weight: number): string {
