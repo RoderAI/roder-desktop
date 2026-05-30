@@ -5,6 +5,7 @@ import {
   nextTranscriptPinnedToEnd,
   shouldShowTranscriptScrollAffordance,
   transcriptFollowAction,
+  transcriptScrollRestorationStateFromViewport,
   transcriptScrollRestorationAction,
   transcriptScrollAffordanceThresholdPx,
 } from "../src/lib/transcript-scroll";
@@ -227,6 +228,45 @@ test("opens first-visit empty transcripts at the scroll start", () => {
   ).toEqual({
     kind: "offset",
     pinnedToEnd: true,
+    scrollOffset: 0,
+  });
+});
+
+test("captures a scrolled-away viewport as unpinned", () => {
+  expect(
+    transcriptScrollRestorationStateFromViewport({
+      clientHeight: 600,
+      scrollHeight: 2_000,
+      scrollTop: 480,
+    }),
+  ).toEqual({
+    pinnedToEnd: false,
+    scrollOffset: 480,
+  });
+});
+
+test("captures a viewport near the end as pinned", () => {
+  expect(
+    transcriptScrollRestorationStateFromViewport({
+      clientHeight: 600,
+      scrollHeight: 2_000,
+      scrollTop: 1_398,
+    }),
+  ).toEqual({
+    pinnedToEnd: true,
+    scrollOffset: 1_398,
+  });
+});
+
+test("clamps captured viewport scroll offsets to the scroll start", () => {
+  expect(
+    transcriptScrollRestorationStateFromViewport({
+      clientHeight: 600,
+      scrollHeight: 2_000,
+      scrollTop: -12,
+    }),
+  ).toEqual({
+    pinnedToEnd: false,
     scrollOffset: 0,
   });
 });
