@@ -5,6 +5,7 @@ import {
   nextTranscriptPinnedToEnd,
   shouldShowTranscriptScrollAffordance,
   transcriptFollowAction,
+  transcriptScrollRestorationAction,
   transcriptScrollAffordanceThresholdPx,
 } from "../src/lib/transcript-scroll";
 
@@ -158,4 +159,74 @@ test("shows the scroll affordance only after the user is away from the end", () 
       rowCount: 3,
     }),
   ).toBe(true);
+});
+
+test("restores a saved unpinned transcript to its stored offset", () => {
+  expect(
+    transcriptScrollRestorationAction({
+      restoredState: {
+        pinnedToEnd: false,
+        scrollOffset: 420,
+      },
+      rowCount: 24,
+    }),
+  ).toEqual({
+    kind: "offset",
+    pinnedToEnd: false,
+    scrollOffset: 420,
+  });
+});
+
+test("clamps restored transcript offsets to the scroll start", () => {
+  expect(
+    transcriptScrollRestorationAction({
+      restoredState: {
+        pinnedToEnd: false,
+        scrollOffset: -12,
+      },
+      rowCount: 24,
+    }),
+  ).toEqual({
+    kind: "offset",
+    pinnedToEnd: false,
+    scrollOffset: 0,
+  });
+});
+
+test("restores saved pinned transcripts to the end", () => {
+  expect(
+    transcriptScrollRestorationAction({
+      restoredState: {
+        pinnedToEnd: true,
+        scrollOffset: 420,
+      },
+      rowCount: 24,
+    }),
+  ).toEqual({
+    kind: "end",
+    pinnedToEnd: true,
+  });
+});
+
+test("opens first-visit non-empty transcripts at the end", () => {
+  expect(
+    transcriptScrollRestorationAction({
+      rowCount: 24,
+    }),
+  ).toEqual({
+    kind: "end",
+    pinnedToEnd: true,
+  });
+});
+
+test("opens first-visit empty transcripts at the scroll start", () => {
+  expect(
+    transcriptScrollRestorationAction({
+      rowCount: 0,
+    }),
+  ).toEqual({
+    kind: "offset",
+    pinnedToEnd: true,
+    scrollOffset: 0,
+  });
 });

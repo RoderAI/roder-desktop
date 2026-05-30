@@ -119,6 +119,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         messages={agent.messages}
         followSignal={followSignal}
         bottomInsetPx={transcriptBottomInsetPx}
+        scrollStateKey={activeThreadId || "new-thread"}
         showWorkingIndicator={showWorkingIndicator}
         threadChangeCount={hunkSummary.fileCount}
         turnChangeCounts={hunkSummary.turnChangeCounts}

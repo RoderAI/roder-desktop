@@ -25,7 +25,9 @@ import {
   nextTranscriptPinnedToEnd,
   shouldShowTranscriptScrollAffordance,
   transcriptFollowAction,
+  transcriptScrollRestorationAction,
   transcriptScrollAffordanceThresholdPx,
+  type TranscriptScrollRestorationState,
 } from "@/lib/transcript-scroll";
 import {
   buildTranscriptRows,
@@ -49,6 +51,7 @@ type TranscriptProps = {
   followSignal: number;
   bottomInsetPx?: number;
   activeTurnId?: string;
+  scrollStateKey?: string;
   showWorkingIndicator?: boolean;
   threadChangeCount?: number;
   turnChangeCounts?: Record<string, number>;
@@ -57,11 +60,15 @@ type TranscriptProps = {
   onReviewTurnChanges?: (turnId: string) => void;
 };
 
+const defaultTranscriptScrollStateKey = "default";
+const transcriptScrollStateByKey = new Map<string, TranscriptScrollRestorationState>();
+
 export function Transcript({
   activeTurnId,
   bottomInsetPx = 0,
   messages,
   followSignal,
+  scrollStateKey = defaultTranscriptScrollStateKey,
   showWorkingIndicator = false,
   threadChangeCount = 0,
   turnChangeCounts = {},
@@ -78,6 +85,8 @@ export function Transcript({
   const pinnedToEndRef = useRef(true);
   const previousScrollTopRef = useRef(0);
   const scrollObservationVersionRef = useRef(0);
+  const restoredScrollStateKeyRef = useRef<string | null>(null);
+  const scrollStateKeyRef = useRef(scrollStateKey);
   const transcriptRowsRef = useRef<TranscriptRow[]>([]);
   const transcriptRowKeysRef = useRef<Array<string | number>>([]);
   const userScrollIntentRef = useRef(false);
@@ -126,6 +135,7 @@ export function Transcript({
       messages.some((message) => message.status === "streaming" || message.toolStatus === "running"),
     [messages, showWorkingIndicator],
   );
+  scrollStateKeyRef.current = scrollStateKey;
   transcriptRowsRef.current = transcriptRows;
   transcriptRowKeysRef.current = transcriptRowKeys;
 
@@ -147,6 +157,16 @@ export function Transcript({
     setPinnedToEnd((currentPinnedToEnd) =>
       currentPinnedToEnd === nextPinnedToEnd ? currentPinnedToEnd : nextPinnedToEnd,
     );
+  }, []);
+  const rememberTranscriptScrollState = useCallback((key: string) => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+    transcriptScrollStateByKey.set(key, {
+      pinnedToEnd: pinnedToEndRef.current,
+      scrollOffset: viewport.scrollTop,
+    });
   }, []);
 
   useEffect(() => {
@@ -194,13 +214,14 @@ export function Transcript({
         source: virtualizer,
         userScrollIntent: userScrollIntentRef.current,
       });
+      rememberTranscriptScrollState(scrollStateKeyRef.current);
       userScrollIntentRef.current = false;
       if (userScrollIntentTimeoutRef.current !== null) {
         window.clearTimeout(userScrollIntentTimeoutRef.current);
         userScrollIntentTimeoutRef.current = null;
       }
     },
-    [syncTranscriptScrollState],
+    [rememberTranscriptScrollState, syncTranscriptScrollState],
   );
   const cancelPendingScrollFrame = useCallback(() => {
     if (pendingScrollFrameRef.current === null) {
@@ -231,12 +252,13 @@ export function Transcript({
       source: rowVirtualizer,
       userScrollIntent: userScrollIntentRef.current || userScrolledTowardStart,
     });
+    rememberTranscriptScrollState(scrollStateKeyRef.current);
     userScrollIntentRef.current = false;
     if (userScrollIntentTimeoutRef.current !== null) {
       window.clearTimeout(userScrollIntentTimeoutRef.current);
       userScrollIntentTimeoutRef.current = null;
     }
-  }, [rowVirtualizer, syncTranscriptScrollState]);
+  }, [rememberTranscriptScrollState, rowVirtualizer, syncTranscriptScrollState]);
 
   const scheduleScrollToEnd = useCallback(
     (behavior: ScrollBehavior, expectedScrollObservationVersion?: number) => {
@@ -249,12 +271,29 @@ export function Transcript({
         ) {
           return;
         }
+        previousScrollTopRef.current = 0;
         rowVirtualizer.scrollToEnd({ behavior });
       };
       scrollToEnd();
       pendingScrollFrameRef.current = requestAnimationFrame(() => {
         pendingScrollFrameRef.current = null;
         scrollToEnd();
+      });
+    },
+    [cancelPendingScrollFrame, rowVirtualizer],
+  );
+  const scheduleScrollToOffset = useCallback(
+    (offset: number) => {
+      cancelPendingScrollFrame();
+      const scrollOffset = Math.max(0, offset);
+      const scrollToOffset = () => {
+        previousScrollTopRef.current = scrollOffset;
+        rowVirtualizer.scrollToOffset(scrollOffset, { behavior: "auto" });
+      };
+      scrollToOffset();
+      pendingScrollFrameRef.current = requestAnimationFrame(() => {
+        pendingScrollFrameRef.current = null;
+        scrollToOffset();
       });
     },
     [cancelPendingScrollFrame, rowVirtualizer],
@@ -302,6 +341,47 @@ export function Transcript({
     },
     [cancelPendingScrollFrame],
   );
+
+  useLayoutEffect(() => {
+    return () => rememberTranscriptScrollState(scrollStateKey);
+  }, [rememberTranscriptScrollState, scrollStateKey]);
+
+  useLayoutEffect(() => {
+    if (restoredScrollStateKeyRef.current === scrollStateKey) {
+      return;
+    }
+    restoredScrollStateKeyRef.current = scrollStateKey;
+    lastFollowSignalRef.current = followSignal;
+    lastTranscriptVersionRef.current = transcriptVersion;
+    userScrollIntentRef.current = false;
+    if (userScrollIntentTimeoutRef.current !== null) {
+      window.clearTimeout(userScrollIntentTimeoutRef.current);
+      userScrollIntentTimeoutRef.current = null;
+    }
+
+    const restorationAction = transcriptScrollRestorationAction({
+      restoredState: transcriptScrollStateByKey.get(scrollStateKey),
+      rowCount: transcriptRowsRef.current.length,
+    });
+
+    setPinnedToEndState(restorationAction.pinnedToEnd);
+    reportCanScrollToBottom(
+      restorationAction.kind === "offset" && !restorationAction.pinnedToEnd && transcriptRowsRef.current.length > 0,
+    );
+    if (restorationAction.kind === "end") {
+      scheduleScrollToEnd("auto");
+      return;
+    }
+    scheduleScrollToOffset(restorationAction.scrollOffset);
+  }, [
+    followSignal,
+    reportCanScrollToBottom,
+    scheduleScrollToEnd,
+    scheduleScrollToOffset,
+    scrollStateKey,
+    setPinnedToEndState,
+    transcriptVersion,
+  ]);
 
   useLayoutEffect(() => {
     if (transcriptRows.length > 0) {

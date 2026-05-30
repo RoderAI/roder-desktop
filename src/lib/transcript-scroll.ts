@@ -43,6 +43,22 @@ export type TranscriptScrollAffordanceVisibilityInput = {
   rowCount: number;
 };
 
+export type TranscriptScrollRestorationState = {
+  pinnedToEnd: boolean;
+  scrollOffset: number;
+};
+
+export type TranscriptScrollRestorationAction =
+  | {
+      kind: "end";
+      pinnedToEnd: true;
+    }
+  | {
+      kind: "offset";
+      pinnedToEnd: boolean;
+      scrollOffset: number;
+    };
+
 export function canScrollTranscriptToBottom(
   source: TranscriptEndStateSource,
   threshold = transcriptScrollAffordanceThresholdPx,
@@ -103,4 +119,29 @@ export function shouldShowTranscriptScrollAffordance({
   rowCount,
 }: TranscriptScrollAffordanceVisibilityInput): boolean {
   return rowCount > 0 && observedCanScrollToBottom && !pinnedToEnd;
+}
+
+export function transcriptScrollRestorationAction({
+  restoredState,
+  rowCount,
+}: {
+  restoredState?: TranscriptScrollRestorationState;
+  rowCount: number;
+}): TranscriptScrollRestorationAction {
+  if (restoredState) {
+    if (restoredState.pinnedToEnd) {
+      return { kind: "end", pinnedToEnd: true };
+    }
+    return {
+      kind: "offset",
+      pinnedToEnd: false,
+      scrollOffset: Math.max(0, restoredState.scrollOffset),
+    };
+  }
+
+  if (rowCount > 0) {
+    return { kind: "end", pinnedToEnd: true };
+  }
+
+  return { kind: "offset", pinnedToEnd: true, scrollOffset: 0 };
 }
