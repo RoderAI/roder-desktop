@@ -1,55 +1,107 @@
 import { ArrowLeft, ArrowRight, Camera, ExternalLink, Highlighter, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopAttachment, BrowserSnapshot } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { NativeOverlayOcclusion } from "@/components/right-workspace-panel-shell";
 
 type BrowserPanelProps = {
+  active?: boolean;
+  nativeOverlayOcclusion?: NativeOverlayOcclusion | null;
   onAttach: (attachment: DesktopAttachment) => void;
 };
 
-export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element {
+export function BrowserPanel({
+  active = true,
+  nativeOverlayOcclusion = null,
+  onAttach,
+}: BrowserPanelProps): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const nativeOverlayOcclusionRef = useRef<NativeOverlayOcclusion | null>(nativeOverlayOcclusion);
   const [location, setLocation] = useState("https://www.google.com/search?q=roder");
   const [snapshot, setSnapshot] = useState<BrowserSnapshot | null>(null);
   const [capturing, setCapturing] = useState(false);
 
+  nativeOverlayOcclusionRef.current = nativeOverlayOcclusion;
+
+  const syncBrowserBounds = useCallback(async (mode: "show" | "set"): Promise<BrowserSnapshot | null> => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return null;
+    }
+    const rect = viewport.getBoundingClientRect();
+    const bounds = browserBoundsForOcclusion(
+      {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      },
+      nativeOverlayOcclusionRef.current,
+    );
+    return mode === "show" ? window.roderDesktop.browserShow(bounds) : window.roderDesktop.browserSetBounds(bounds);
+  }, []);
+
   useEffect(() => {
+    if (!active) {
+      void window.roderDesktop.browserHide().then(setSnapshot).catch(reportBrowserError);
+      return;
+    }
+
     const viewport = viewportRef.current;
     if (!viewport) {
       return;
     }
 
     let disposed = false;
-    const syncBounds = async (): Promise<void> => {
+    const syncBounds = async (mode: "show" | "set"): Promise<void> => {
       if (disposed || !viewport.isConnected) {
         return;
       }
-      const rect = viewport.getBoundingClientRect();
-      const bounds = {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-      };
-      const next = await window.roderDesktop.browserShow(bounds);
-      if (!disposed) {
-        setSnapshot(next);
+      try {
+        const next = await syncBrowserBounds(mode);
+        if (!disposed && next) {
+          setSnapshot(next);
+        }
+      } catch (error) {
+        reportBrowserError(error);
       }
     };
 
-    const resizeObserver = new ResizeObserver(() => void syncBounds());
+    const resizeObserver = new ResizeObserver(() => void syncBounds("set"));
     resizeObserver.observe(viewport);
-    window.addEventListener("resize", syncBounds);
-    requestAnimationFrame(() => void syncBounds());
+    const handleResize = () => void syncBounds("set");
+    window.addEventListener("resize", handleResize);
+    requestAnimationFrame(() => void syncBounds("show"));
 
     return () => {
       disposed = true;
       resizeObserver.disconnect();
-      window.removeEventListener("resize", syncBounds);
-      void window.roderDesktop.browserHide();
+      window.removeEventListener("resize", handleResize);
+      void window.roderDesktop.browserHide().catch(reportBrowserError);
     };
-  }, []);
+  }, [active, syncBrowserBounds]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    let disposed = false;
+    const syncBounds = async (): Promise<void> => {
+      try {
+        const next = await syncBrowserBounds("set");
+        if (!disposed && next) {
+          setSnapshot(next);
+        }
+      } catch (error) {
+        reportBrowserError(error);
+      }
+    };
+    void syncBounds();
+    return () => {
+      disposed = true;
+    };
+  }, [active, nativeOverlayOcclusion, syncBrowserBounds]);
 
   async function navigate(): Promise<void> {
     const next = await window.roderDesktop.browserNavigate(location);
@@ -139,6 +191,37 @@ export function BrowserPanel({ onAttach }: BrowserPanelProps): React.JSX.Element
       </div>
     </div>
   );
+}
+
+function browserBoundsForOcclusion(
+  bounds: { x: number; y: number; width: number; height: number },
+  occlusion: NativeOverlayOcclusion | null,
+): { x: number; y: number; width: number; height: number } {
+  if (!occlusion || !rectsOverlap(bounds, occlusion)) {
+    return bounds;
+  }
+
+  const boundsBottom = bounds.y + bounds.height;
+  const occlusionBottom = occlusion.y + occlusion.height;
+  const nextY = Math.min(boundsBottom, Math.max(bounds.y, occlusionBottom));
+
+  return {
+    x: bounds.x,
+    y: nextY,
+    width: bounds.width,
+    height: Math.max(0, boundsBottom - nextY),
+  };
+}
+
+function rectsOverlap(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+function reportBrowserError(error: unknown): void {
+  console.error("Browser panel IPC failed:", error);
 }
 
 function ToolbarButton({
