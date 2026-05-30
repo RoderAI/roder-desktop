@@ -1,7 +1,8 @@
 import { createContext, useContext } from "react";
 import type { SetValues } from "nuqs";
 import type { useRoderAgent } from "@/hooks/use-roder-agent";
-import type { routeSearchParsers, RouteSearchState } from "@/lib/route-search";
+import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import type { routeSearchParsers, RouteReviewScope, RouteSearchState } from "@/lib/route-search";
 import type { FolderOption } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment, RoderThread } from "@/types/roder";
 
@@ -15,6 +16,7 @@ export type AppShellContextValue = {
   composerFocusSignal: number;
   folderOptions: FolderOption[];
   followSignal: number;
+  hunkSummary: ThreadHunkSummary;
   routeSearch: RouteSearchState;
   selectedExtensionId: string | null;
   setCanScrollTranscriptToBottom: (canScroll: boolean) => void;
@@ -24,6 +26,7 @@ export type AppShellContextValue = {
   threadOptions: RoderThread[];
   attachToComposer: (attachment: DesktopAttachment) => void;
   followBottom: () => void;
+  openReview: (scope: RouteReviewScope, turnId?: string) => void;
   sendPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
 };
 

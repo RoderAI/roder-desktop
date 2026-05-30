@@ -1,0 +1,88 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { expect, test } from "vitest";
+import { RightWorkspacePanelShell, type RightWorkspacePanelEntry } from "../src/components/right-workspace-panel-shell";
+
+const entries: RightWorkspacePanelEntry[] = [
+  {
+    id: "terminal",
+    title: "Terminal",
+    description: "Command output",
+    icon: React.createElement("span", null, "T"),
+    shortcutLabel: "Cmd+`",
+  },
+  {
+    id: "browser",
+    title: "Browser",
+    description: "Local preview",
+    icon: React.createElement("span", null, "B"),
+  },
+  {
+    id: "review",
+    title: "Review",
+    description: "Changed files",
+    icon: React.createElement("span", null, "R"),
+  },
+];
+
+test("right workspace panel shell renders an empty selection state", () => {
+  const html = renderShell({ tabs: [], activePanel: null });
+
+  expect(html).toContain("Workspace panels");
+  expect(html).toContain("Terminal");
+  expect(html).toContain("Browser");
+  expect(html).toContain("Review");
+  expect(html).toContain("Add workspace panel");
+});
+
+test("right workspace panel shell renders opened panel tabs and makes inactive panel content inert", () => {
+  const html = renderShell({ tabs: ["terminal", "browser"], activePanel: "browser" });
+
+  expect(html).toContain('role="tablist"');
+  expect(html).toContain('aria-selected="true"');
+  expect(html).toContain("Close Terminal");
+  expect(html).toContain('aria-hidden="true"');
+  expect(html).toContain("inert=");
+  expect(html).toContain("Panel content: terminal");
+  expect(html).toContain("Panel content: browser");
+});
+
+test("right workspace panel shell does not pre-render unopened choices as tabs", () => {
+  const html = renderShell({ tabs: ["browser"], activePanel: "browser" });
+
+  expect(html).not.toContain('aria-label="Terminal"');
+  expect(html).toContain('aria-label="Browser"');
+  expect(html).not.toContain('aria-label="Review"');
+});
+
+test("right workspace panel shell stays mounted but inert when closed", () => {
+  const html = renderShell({ open: false, tabs: ["terminal"], activePanel: "terminal" });
+
+  expect(html).toContain('aria-hidden="true"');
+  expect(html).toContain("inert=");
+  expect(html).not.toContain('data-open="true"');
+  expect(html).toContain("--right-workspace-panel-width:560px");
+});
+
+function renderShell({
+  open = true,
+  tabs,
+  activePanel,
+}: Pick<React.ComponentProps<typeof RightWorkspacePanelShell>, "tabs" | "activePanel"> & {
+  open?: boolean;
+}): string {
+  return renderToStaticMarkup(
+    React.createElement(RightWorkspacePanelShell, {
+      open,
+      tabs,
+      activePanel,
+      entries,
+      width: 560,
+      onAddPanel: () => {},
+      onBeginResize: () => {},
+      onClosePanel: () => {},
+      onSelectPanel: () => {},
+      renderPanel: (entry) => React.createElement("div", null, `Panel content: ${entry.id}`),
+    }),
+  );
+}

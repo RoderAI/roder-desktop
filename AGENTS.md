@@ -48,6 +48,11 @@ expanding, collapsing, or otherwise changing visibility, use the web animation
 / Interface Craft skills to design and implement the motion. Keep animations
 short, purposeful, and consistent with `docs/design.md`.
 
+For desktop UI visual verification, do not rely on the in-app browser or other
+plain browser automation against the Vite renderer URL. The renderer depends on
+Electron preload APIs and may appear blank or misleading outside the desktop
+shell. Ask the user to test UI changes in the running desktop app instead.
+
 ## TDD
 
 Use TDD when the change affects behavior that can be proven with a meaningful

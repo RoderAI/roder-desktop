@@ -1,9 +1,23 @@
 import { expect, test } from "vitest";
-import { normalizeRouteSearch } from "../src/lib/route-search";
+import {
+  closeWorkspacePanelTab,
+  closeWorkspacePanelShell,
+  mergeRouteSearchUpdate,
+  normalizeRouteSearch,
+  openWorkspacePanelShell,
+  openWorkspacePanelTab,
+  routeSearchParsers,
+  selectWorkspacePanelTab,
+} from "../src/lib/route-search";
 
 test("route search defaults preserve practical app layout state", () => {
   expect(normalizeRouteSearch({})).toEqual({
-    tool: null,
+    panelTabs: [],
+    panelActive: null,
+    panelOpen: false,
+    reviewScope: "thread",
+    reviewTurnId: "",
+    reviewPath: "",
     extension: "",
     extensionPanel: "",
     sidebar: true,
@@ -18,7 +32,11 @@ test("route search defaults preserve practical app layout state", () => {
 test("route search rejects unknown literals and clamps layout widths", () => {
   expect(
     normalizeRouteSearch({
-      tool: "debugger",
+      panelTabs: "browser,debugger,review,browser",
+      panelActive: "debugger",
+      reviewScope: "file",
+      reviewTurnId: "turn-1",
+      reviewPath: "src/app.ts",
       sidebar: "false",
       leftWidth: "120",
       rightWidth: "1200",
@@ -26,12 +44,17 @@ test("route search rejects unknown literals and clamps layout widths", () => {
       categories: "codex,local",
     }),
   ).toEqual({
-    tool: null,
+    panelTabs: ["browser", "review"],
+    panelActive: "browser",
+    panelOpen: false,
+    reviewScope: "thread",
+    reviewTurnId: "turn-1",
+    reviewPath: "src/app.ts",
     extension: "",
     extensionPanel: "",
     sidebar: false,
     leftWidth: 220,
-    rightWidth: 820,
+    rightWidth: 1200,
     provider: "all",
     q: "",
     categories: ["codex", "local"],
@@ -41,7 +64,11 @@ test("route search rejects unknown literals and clamps layout widths", () => {
 test("route search accepts supported practical URL state values", () => {
   expect(
     normalizeRouteSearch({
-      tool: "extensions",
+      panelTabs: "terminal,browser,extensions",
+      panelActive: "extensions",
+      panelOpen: "true",
+      reviewScope: "branch",
+      reviewPath: "src/review-panel.tsx",
       extension: "github",
       extensionPanel: "settings",
       sidebar: "false",
@@ -52,7 +79,12 @@ test("route search accepts supported practical URL state values", () => {
       categories: "developer-tools,automation",
     }),
   ).toEqual({
-    tool: "extensions",
+    panelTabs: ["terminal", "browser", "extensions"],
+    panelActive: "extensions",
+    panelOpen: true,
+    reviewScope: "branch",
+    reviewTurnId: "",
+    reviewPath: "src/review-panel.tsx",
     extension: "github",
     extensionPanel: "settings",
     sidebar: false,
@@ -61,5 +93,116 @@ test("route search accepts supported practical URL state values", () => {
     provider: "codex",
     q: "lint",
     categories: ["developer-tools", "automation"],
+  });
+});
+
+test("route search updates merge with current state for hash-history URL writes", () => {
+  const current = normalizeRouteSearch({
+    panelTabs: "review",
+    panelActive: "review",
+    reviewScope: "branch",
+    rightWidth: "640",
+  });
+
+  expect(mergeRouteSearchUpdate(current, { reviewPath: "src/review-panel.tsx" })).toEqual({
+    ...current,
+    reviewPath: "src/review-panel.tsx",
+  });
+  expect(mergeRouteSearchUpdate(current, (state) => ({ rightWidth: state.rightWidth + 20 }))).toEqual({
+    ...current,
+    rightWidth: 660,
+  });
+  expect(mergeRouteSearchUpdate(current, null)).toBeNull();
+});
+
+test("route search updates keep workspace panel fields normalized", () => {
+  const current = normalizeRouteSearch({
+    panelTabs: "browser",
+    panelActive: "browser",
+    panelOpen: "true",
+  });
+
+  expect(mergeRouteSearchUpdate(current, { panelActive: "review" })).toEqual({
+    ...current,
+    panelActive: "browser",
+    panelOpen: true,
+  });
+  expect(mergeRouteSearchUpdate(current, { panelTabs: [] })).toEqual({
+    ...current,
+    panelTabs: [],
+    panelActive: null,
+    panelOpen: true,
+  });
+  expect(mergeRouteSearchUpdate(current, closeWorkspacePanelShell())).toEqual({
+    ...current,
+    panelOpen: false,
+  });
+});
+
+test("workspace panel open action appends and focuses without duplicating tabs", () => {
+  const current = normalizeRouteSearch({
+    panelTabs: "terminal,browser",
+    panelActive: "terminal",
+    panelOpen: "true",
+  });
+
+  expect(openWorkspacePanelTab(current, "review")).toEqual({
+    panelTabs: ["terminal", "browser", "review"],
+    panelActive: "review",
+    panelOpen: true,
+  });
+  expect(openWorkspacePanelTab(current, "browser")).toEqual({
+    panelTabs: ["terminal", "browser"],
+    panelActive: "browser",
+    panelOpen: true,
+  });
+});
+
+test("workspace panel tab serializer tolerates already serialized tab values", () => {
+  expect(routeSearchParsers.panelTabs.serialize("terminal,browser" as never)).toBe("terminal,browser");
+});
+
+test("workspace panel close action selects the nearest remaining tab", () => {
+  const current = normalizeRouteSearch({
+    panelTabs: "terminal,browser,review,extensions",
+    panelActive: "review",
+    panelOpen: "true",
+  });
+
+  expect(closeWorkspacePanelTab(current, "review")).toEqual({
+    panelTabs: ["terminal", "browser", "extensions"],
+    panelActive: "extensions",
+    panelOpen: true,
+  });
+  expect(closeWorkspacePanelTab({ ...current, panelActive: "terminal" }, "terminal")).toEqual({
+    panelTabs: ["browser", "review", "extensions"],
+    panelActive: "browser",
+    panelOpen: true,
+  });
+  expect(
+    closeWorkspacePanelTab(normalizeRouteSearch({ panelTabs: "browser", panelActive: "browser" }), "browser"),
+  ).toEqual({
+    panelTabs: [],
+    panelActive: null,
+    panelOpen: false,
+  });
+});
+
+test("workspace panel select action only activates open tabs", () => {
+  const current = normalizeRouteSearch({
+    panelTabs: "terminal,browser",
+    panelActive: "terminal",
+  });
+
+  expect(selectWorkspacePanelTab(current, "browser")).toEqual({ panelActive: "browser" });
+  expect(selectWorkspacePanelTab(current, "review")).toEqual(null);
+});
+
+test("workspace panel shell can open without tabs for the add state", () => {
+  expect(openWorkspacePanelShell()).toEqual({
+    panelOpen: true,
+  });
+  expect(closeWorkspacePanelShell()).toEqual({
+    panelOpen: false,
   });
 });

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Compass, PackageCheck, Search, Store } from "lucide-react";
-import { useQueryStates } from "nuqs";
+import { useQueryStates, type SetValues } from "nuqs";
 import {
   CategoryFilterDropdown,
   InstalledPluginsTab,
@@ -26,7 +26,7 @@ import {
 import type { MarketplaceProviderSelection, PluginInstallStatus } from "@/lib/plugins-marketplace";
 import { pluginsRouteForSection } from "@/lib/route-selection";
 import type { PluginSection } from "@/lib/route-selection";
-import { routeSearchParsers } from "@/lib/route-search";
+import { mergeRouteSearchUpdate, routeSearchParsers } from "@/lib/route-search";
 import { cn } from "@/lib/utils";
 import { usePluginsStore } from "@/stores/plugins-store";
 import type { DedupedMarketplacePlugin } from "@/types/plugins";
@@ -46,7 +46,11 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
   const previewPlugin = usePluginsStore((state) => state.previewPlugin);
   const installPlugin = usePluginsStore((state) => state.installPlugin);
   const uninstallPlugin = usePluginsStore((state) => state.uninstallPlugin);
-  const [routeSearch, setRouteSearch] = useQueryStates(routeSearchParsers);
+  const [routeSearch, setRawRouteSearch] = useQueryStates(routeSearchParsers);
+  const setRouteSearch = React.useCallback<SetValues<typeof routeSearchParsers>>(
+    (update, options) => setRawRouteSearch((current) => mergeRouteSearchUpdate(current, update), options),
+    [setRawRouteSearch],
+  );
   const [installingVariants, setInstallingVariants] = React.useState<Set<string>>(() => new Set());
   const [uninstallingVariants, setUninstallingVariants] = React.useState<Set<string>>(() => new Set());
   const provider = routeSearch.provider;
