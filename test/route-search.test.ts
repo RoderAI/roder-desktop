@@ -40,7 +40,7 @@ test("route search rejects unknown literals and clamps layout widths", () => {
     extensionPanel: "",
     sidebar: false,
     leftWidth: 220,
-    rightWidth: 820,
+    rightWidth: 1200,
     provider: "all",
     q: "",
     categories: ["codex", "local"],

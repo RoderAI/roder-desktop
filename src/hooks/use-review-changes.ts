@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { RouteReviewScope } from "@/lib/route-search";
 import {
@@ -52,6 +52,10 @@ export type ReviewDiffState =
   | { status: "ready"; patch: string; truncated: boolean; totalLines: number }
   | { status: "error"; patch: string; error: string };
 
+type LoadDiffOptions = {
+  force?: boolean;
+};
+
 type UseReviewChangesParams = {
   threadId: string;
   workspace: string;
@@ -78,16 +82,16 @@ export function useReviewChanges({
   onSelectedPathChange,
 }: UseReviewChangesParams) {
   const [listState, setListState] = useState<ReviewListState>({ status: "idle", files: [] });
-  const [diffState, setDiffState] = useState<ReviewDiffState>({ status: "idle", patch: "" });
-  const [diffLimit, setDiffLimit] = useState(initialDiffLimit);
+  const [diffStatesByPath, setDiffStatesByPath] = useState<Record<string, ReviewDiffState>>({});
+  const [diffLimitsByPath, setDiffLimitsByPath] = useState<Record<string, number>>({});
   const listRequestSeq = useRef(0);
   const diffRequestSeq = useRef(0);
+  const diffRequestSeqByPath = useRef(new Map<string, number>());
   const files = listState.files;
   const branchReviewAvailable =
     appServerMethods.includes("git/changes/list") && appServerMethods.includes("git/changes/read");
   const scopedLatestTurnId = listState.latestTurnId ?? "";
   const effectiveTurnId = reviewTurnIdCandidate(turnId, scopedLatestTurnId, threadLatestTurnId);
-  const selectedFile = useMemo(() => files.find((file) => file.path === selectedPath) ?? null, [files, selectedPath]);
 
   const loadFiles = useCallback(async () => {
     const requestSeq = (listRequestSeq.current += 1);
@@ -144,7 +148,10 @@ export function useReviewChanges({
       }
       setListState({
         status: "ready",
-        files: mergeReviewChangedFiles(groupHunksByFile(scopedHunks), groupObservedChangesByFile(scopedObservedChanges)),
+        files: mergeReviewChangedFiles(
+          groupHunksByFile(scopedHunks),
+          groupObservedChangesByFile(scopedObservedChanges),
+        ),
         latestTurnId: latestChangedTurnId(scopedHunks, scopedObservedChanges),
       });
     } catch (error) {
@@ -169,74 +176,88 @@ export function useReviewChanges({
     workspace,
   ]);
 
-  const loadDiff = useCallback(async () => {
-    const requestSeq = (diffRequestSeq.current += 1);
-    const isCurrentRequest = () => diffRequestSeq.current === requestSeq;
-    if (!selectedFile) {
-      setDiffState({ status: "idle", patch: "" });
-      return;
-    }
-
-    setDiffState((state) => ({ status: "loading", patch: state.patch }));
-    try {
-      if (scope === "branch" || selectedFile.source === "observed" || selectedFile.source === "mixed") {
+  const readDiffForFile = useCallback(
+    async (file: ReviewFile, limit: number): Promise<ReviewDiffState> => {
+      if (scope === "branch" || file.source === "observed" || file.source === "mixed") {
         if (!branchReviewAvailable) {
           if (scope === "branch") {
-            if (!isCurrentRequest()) {
-              return;
-            }
-            setDiffState({ status: "idle", patch: "" });
-            return;
+            return { status: "idle", patch: "" };
           }
           throw new Error("Observed workspace changes need git/changes/read support from the app-server.");
         }
         if (!workspace) {
-          if (selectedFile.source === "hunk") {
+          if (file.source === "hunk") {
             throw new Error("No workspace is selected.");
           }
           throw new Error("Observed workspace changes need a selected workspace.");
         }
-        if (scope === "branch" || selectedFile.observedFiles?.length) {
-          const result = await roderIpc.readGitChange(workspace, selectedFile.path, { limit: diffLimit });
-          if (!isCurrentRequest()) {
-            return;
-          }
-          setDiffState({
+        if (scope === "branch" || file.observedFiles?.length) {
+          const result = await roderIpc.readGitChange(workspace, file.path, { limit });
+          return {
             status: "ready",
             patch: result.patch,
             truncated: result.nextOffset != null,
             totalLines: result.totalLines,
-          });
-          return;
+          };
         }
       }
 
       if (!threadId) {
-        if (!isCurrentRequest()) {
-          return;
-        }
-        setDiffState({ status: "ready", patch: "", truncated: false, totalLines: 0 });
-        return;
+        return { status: "ready", patch: "", truncated: false, totalLines: 0 };
       }
 
       const pages = await Promise.all(
-        (selectedFile.hunks ?? []).map(async (hunk) => {
-          const result = await roderIpc.readHunk(threadId, hunk.id, { limit: diffLimit });
+        (file.hunks ?? []).map(async (hunk) => {
+          const result = await roderIpc.readHunk(threadId, hunk.id, { limit });
           return result.page ?? pageFromHunk(hunk);
         }),
       );
-      const reviewPatch = hunkPagesToReviewPatch(pages);
-      if (!isCurrentRequest()) {
+      return { status: "ready", ...hunkPagesToReviewPatch(pages) };
+    },
+    [branchReviewAvailable, scope, threadId, workspace],
+  );
+
+  const loadDiffForFile = useCallback(
+    async (file: ReviewFile, limit: number) => {
+      const requestSeq = (diffRequestSeq.current += 1);
+      diffRequestSeqByPath.current.set(file.path, requestSeq);
+      setDiffStatesByPath((state) => ({
+        ...state,
+        [file.path]: { status: "loading", patch: state[file.path]?.patch ?? "" },
+      }));
+      try {
+        const diffState = await readDiffForFile(file, limit);
+        if (diffRequestSeqByPath.current.get(file.path) !== requestSeq) {
+          return;
+        }
+        setDiffStatesByPath((state) => ({ ...state, [file.path]: diffState }));
+      } catch (error) {
+        if (diffRequestSeqByPath.current.get(file.path) !== requestSeq) {
+          return;
+        }
+        setDiffStatesByPath((state) => ({
+          ...state,
+          [file.path]: { status: "error", patch: state[file.path]?.patch ?? "", error: errorMessage(error) },
+        }));
+      }
+    },
+    [readDiffForFile],
+  );
+
+  const loadDiff = useCallback(
+    (path = selectedPath, options: LoadDiffOptions = {}) => {
+      const file = files.find((candidate) => candidate.path === path);
+      if (!file) {
         return;
       }
-      setDiffState({ status: "ready", ...reviewPatch });
-    } catch (error) {
-      if (!isCurrentRequest()) {
+      const currentState = diffStatesByPath[path];
+      if (!options.force && currentState && currentState.status !== "idle") {
         return;
       }
-      setDiffState((state) => ({ status: "error", patch: state.patch, error: errorMessage(error) }));
-    }
-  }, [branchReviewAvailable, diffLimit, scope, selectedFile, threadId, workspace]);
+      void loadDiffForFile(file, diffLimitsByPath[path] ?? initialDiffLimit);
+    },
+    [diffLimitsByPath, diffStatesByPath, files, loadDiffForFile, selectedPath],
+  );
 
   useEffect(() => {
     void loadFiles();
@@ -254,29 +275,37 @@ export function useReviewChanges({
   }, [files, listState.status, onSelectedPathChange, selectedPath]);
 
   useEffect(() => {
-    void loadDiff();
-  }, [loadDiff]);
-
-  useEffect(() => {
-    setDiffLimit(initialDiffLimit);
-  }, [scope, selectedFile?.path]);
-
-  const loadFullDiff = useCallback(() => {
-    if (diffState.status === "ready") {
-      setDiffLimit(Math.max(diffState.totalLines, initialDiffLimit));
+    if (listState.status !== "ready") {
+      return;
     }
-  }, [diffState]);
+    diffRequestSeqByPath.current.clear();
+    setDiffLimitsByPath(Object.fromEntries(files.map((file) => [file.path, initialDiffLimit])));
+    setDiffStatesByPath(Object.fromEntries(files.map((file) => [file.path, { status: "idle", patch: "" }])));
+  }, [files, listState.status, scope]);
+
+  const loadFullDiff = useCallback(
+    (path = selectedPath) => {
+      const file = files.find((candidate) => candidate.path === path);
+      const diffState = diffStatesByPath[path];
+      if (!file || diffState?.status !== "ready") {
+        return;
+      }
+      const limit = Math.max(diffState.totalLines, initialDiffLimit);
+      setDiffLimitsByPath((state) => ({ ...state, [path]: limit }));
+      void loadDiffForFile(file, limit);
+    },
+    [diffStatesByPath, files, loadDiffForFile, selectedPath],
+  );
 
   return {
     branchReviewAvailable,
-    diffState,
+    diffStatesByPath,
     effectiveTurnId,
     files,
     listState,
     loadDiff,
     loadFiles,
     loadFullDiff,
-    selectedFile,
   };
 }
 

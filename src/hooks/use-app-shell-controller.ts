@@ -1,6 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryStates, type SetValues } from "nuqs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppShellContextValue } from "@/components/app-shell-context";
 import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
@@ -25,6 +25,9 @@ type AppShellController = {
   appShellContext: AppShellContextValue;
   layoutProps: AppShellLayoutProps;
 };
+
+const mainPanelMinWidth = 500;
+const sidebarResizeHandleWidth = 8;
 
 export function useAppShellController(): AppShellController {
   const agent = useRoderAgent();
@@ -56,11 +59,15 @@ export function useAppShellController(): AppShellController {
   const [canScrollTranscriptToBottom, setCanScrollTranscriptToBottom] = useState(false);
   const [composerFocusSignal, setComposerFocusSignal] = useState(0);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
+  const toolPanelElementRef = useRef<HTMLElement | null>(null);
   const activeTool = routeSearch.tool;
   const selectedExtensionId = routeSearch.extension || null;
   const sidebarOpen = routeSearch.sidebar;
   const leftSidebarWidth = routeSearch.leftWidth;
-  const toolPanelWidth = routeSearch.rightWidth;
+  const toolPanelMaxWidth = toolPanelMaxWidthForViewport(viewportWidth, sidebarOpen, leftSidebarWidth);
+  const routeToolPanelWidth = clamp(routeSearch.rightWidth, toolPanelWidthBounds.min, toolPanelMaxWidth);
+  const toolPanelWidth = routeToolPanelWidth;
   const isPluginsRoute = isPluginsRoutePath(pathname);
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
@@ -134,6 +141,15 @@ export function useAppShellController(): AppShellController {
     void navigate({ to: "/new", search: true });
     void createProjectThread();
   }, [createProjectThread, followBottom, navigate]);
+  useEffect(() => {
+    function syncViewportWidth(): void {
+      setViewportWidth(window.innerWidth);
+    }
+
+    syncViewportWidth();
+    window.addEventListener("resize", syncViewportWidth);
+    return () => window.removeEventListener("resize", syncViewportWidth);
+  }, []);
   useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
       if (appCommand.command === "newProject") {
@@ -242,15 +258,41 @@ export function useAppShellController(): AppShellController {
   );
   const resizeToolPanel = useCallback(
     (startWidth: number, deltaX: number) => {
-      void setRouteSearch(
-        { rightWidth: clamp(startWidth - deltaX, toolPanelWidthBounds.min, toolPanelWidthBounds.max) },
-        { history: "replace" },
-      );
+      const nextWidth = toolPanelWidthFromDrag(startWidth, deltaX, toolPanelMaxWidth);
+      if (toolPanelElementRef.current) {
+        toolPanelElementRef.current.style.width = `${nextWidth}px`;
+      }
     },
-    [setRouteSearch],
+    [toolPanelMaxWidth],
+  );
+  const commitToolPanelResize = useCallback(
+    (startWidth: number, deltaX: number) => {
+      const nextWidth = toolPanelWidthFromDrag(startWidth, deltaX, toolPanelMaxWidth);
+      if (toolPanelElementRef.current) {
+        toolPanelElementRef.current.style.width = `${nextWidth}px`;
+        toolPanelElementRef.current.style.willChange = "";
+        toolPanelElementRef.current = null;
+      }
+      void setRouteSearch({ rightWidth: nextWidth }, { history: "replace" });
+    },
+    [setRouteSearch, toolPanelMaxWidth],
   );
   const beginSidebarResize = useHorizontalResize(leftSidebarWidth, resizeSidebar);
-  const beginToolPanelResize = useHorizontalResize(toolPanelWidth, resizeToolPanel);
+  const beginToolPanelElementResize = useHorizontalResize(toolPanelWidth, resizeToolPanel, {
+    onCommit: commitToolPanelResize,
+  });
+  const beginToolPanelResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const toolPanelElement = event.currentTarget.parentElement;
+      if (toolPanelElement instanceof HTMLElement) {
+        toolPanelElementRef.current = toolPanelElement;
+        toolPanelElement.style.width = `${toolPanelWidth}px`;
+        toolPanelElement.style.willChange = "width";
+      }
+      beginToolPanelElementResize(event);
+    },
+    [beginToolPanelElementResize, toolPanelWidth],
+  );
   const appShellContext = useMemo(
     () => ({
       agent,
@@ -344,4 +386,14 @@ export function useAppShellController(): AppShellController {
       onToggleTerminal: () => toggleToolPanel("terminal"),
     },
   };
+}
+
+function toolPanelWidthFromDrag(startWidth: number, deltaX: number, maxWidth: number): number {
+  return clamp(startWidth - deltaX, toolPanelWidthBounds.min, maxWidth);
+}
+
+function toolPanelMaxWidthForViewport(viewportWidth: number, sidebarOpen: boolean, leftSidebarWidth: number): number {
+  const leftChromeWidth = sidebarOpen ? leftSidebarWidth + sidebarResizeHandleWidth : 0;
+  const availableWidth = viewportWidth - leftChromeWidth - mainPanelMinWidth;
+  return clamp(availableWidth, toolPanelWidthBounds.min, toolPanelWidthBounds.max);
 }

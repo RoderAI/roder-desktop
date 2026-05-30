@@ -28,7 +28,7 @@ export const sidebarWidthBounds = {
 export const toolPanelWidthBounds = {
   min: 360,
   defaultValue: 560,
-  max: 820,
+  max: 1200,
 } as const;
 
 export const routeSearchParsers = {

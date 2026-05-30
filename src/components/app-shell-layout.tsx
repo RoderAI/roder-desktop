@@ -156,7 +156,7 @@ export function AppShellLayout({
               onToggleReview={onToggleReview}
             />
             <div className="flex min-h-0 flex-1">
-              <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-[500px] flex-1 flex-col">
                 <Outlet />
               </div>
               {activeTool && (
