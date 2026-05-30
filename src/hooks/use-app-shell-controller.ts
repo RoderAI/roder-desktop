@@ -85,11 +85,10 @@ export function useAppShellController(): AppShellController {
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
     (threadId: string) => {
-      followBottom();
       void navigate({ to: "/threads/$threadId", params: { threadId }, search: true });
       void selectAgentThread(threadId, { pushHistory: false });
     },
-    [followBottom, navigate, selectAgentThread],
+    [navigate, selectAgentThread],
   );
   const archiveThread = useCallback(
     (threadId: string) => {
