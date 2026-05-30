@@ -369,7 +369,11 @@ function DiffVirtualizerScrollArea({
 
   return (
     <VirtualizerContext.Provider value={virtualizer}>
-      <section ref={setRoot} className="min-h-0 min-w-0 flex-1 overflow-auto bg-background" onScroll={onScroll}>
+      <section
+        ref={setRoot}
+        className="workspace-scrollbar min-h-0 min-w-0 flex-1 overflow-auto bg-background"
+        onScroll={onScroll}
+      >
         {children}
       </section>
     </VirtualizerContext.Provider>

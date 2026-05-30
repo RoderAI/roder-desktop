@@ -199,7 +199,7 @@ export function Composer({
   return (
     <div
       ref={speechLifecycleRef}
-      className="mx-auto w-full max-w-[980px] px-8 pb-5 pt-2"
+      className="mx-auto w-full max-w-[980px] px-8 pb-5 pt-0"
       onDragEnter={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
           setDragActive(true);
@@ -442,7 +442,7 @@ function SubmitOrStopButton({
 function ScrollToBottomButton({ visible, onClick }: { visible: boolean; onClick: () => void }): React.JSX.Element {
   return (
     <div
-      className="composer-scroll-button-region absolute -top-11 left-0 flex items-center"
+      className="composer-scroll-button-region absolute -top-14 left-0 right-0 flex h-14 items-center"
       aria-hidden={!visible}
       data-visible={visible ? "true" : undefined}
       style={scrollButtonAnimationStyle}
