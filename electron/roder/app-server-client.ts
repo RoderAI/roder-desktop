@@ -43,6 +43,7 @@ type DesktopNotification = {
 };
 
 const thisDir = dirname(fileURLToPath(import.meta.url));
+const schemaProbeTimeoutMs = 5_000;
 
 export class RoderAppServerClient extends EventEmitter {
   #child: ChildProcessWithoutNullStreams | null = null;
@@ -281,8 +282,9 @@ function readAppServerMethods(target: SpawnTarget): string[] {
       ...process.env,
       RODER_DESKTOP: "1",
     },
+    timeout: schemaProbeTimeoutMs,
   });
-  if (result.status !== 0 || !result.stdout) {
+  if (result.error || result.status !== 0 || !result.stdout) {
     return [];
   }
 

@@ -10,6 +10,7 @@ export type RoderNotification = {
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
   binary: string;
+  appServerMethods?: string[];
   cwd?: string;
   message?: string;
 };
