@@ -2,20 +2,25 @@ import type { ActivitySummary, TranscriptToolEntry } from "@/lib/tool-message-gr
 import { Collapsible } from "@base-ui/react/collapsible";
 import { Search, TerminalSquare } from "lucide-react";
 import { CompactToolGroup } from "./compact-tool-group";
+import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 import { ToolTimelineItem } from "./tool-timeline-item";
 import { DisclosureChevron } from "./tool-timeline-shared";
 
 export function ToolActivityGroup({
+  getEntryDisclosureControl,
+  onOpenChange,
+  open,
   entries,
   summary,
 }: {
   entries: TranscriptToolEntry[];
+  getEntryDisclosureControl?: (entry: TranscriptToolEntry) => ToolDisclosureControlProps;
   summary: ActivitySummary;
-}): React.JSX.Element {
+} & ToolDisclosureControlProps): React.JSX.Element {
   const Icon = summary.commands > 0 ? TerminalSquare : Search;
 
   return (
-    <Collapsible.Root className="group/tool-activity text-base leading-7">
+    <Collapsible.Root className="group/tool-activity text-base leading-7" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
         className="flex min-h-8 w-full min-w-0 items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
@@ -27,7 +32,11 @@ export function ToolActivityGroup({
       <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-8 text-base leading-7 text-muted-foreground">
         <div className="py-1">
           {entries.map((entry) => (
-            <ToolEntryDetail entry={entry} key={toolEntryKey(entry)} />
+            <ToolEntryDetail
+              disclosureControl={getEntryDisclosureControl?.(entry)}
+              entry={entry}
+              key={toolEntryKey(entry)}
+            />
           ))}
         </div>
       </Collapsible.Panel>
@@ -35,18 +44,24 @@ export function ToolActivityGroup({
   );
 }
 
-function ToolEntryDetail({ entry }: { entry: TranscriptToolEntry }): React.JSX.Element {
+function ToolEntryDetail({
+  disclosureControl = {},
+  entry,
+}: {
+  disclosureControl?: ToolDisclosureControlProps;
+  entry: TranscriptToolEntry;
+}): React.JSX.Element {
   if (entry.kind === "readFileGroup") {
-    return <CompactToolGroup kind="readFile" messages={entry.messages} />;
+    return <CompactToolGroup kind="readFile" messages={entry.messages} {...disclosureControl} />;
   }
   if (entry.kind === "readSkillGroup") {
-    return <CompactToolGroup kind="readSkill" messages={entry.messages} />;
+    return <CompactToolGroup kind="readSkill" messages={entry.messages} {...disclosureControl} />;
   }
   if (entry.kind === "searchGroup") {
-    return <CompactToolGroup kind="search" messages={entry.messages} />;
+    return <CompactToolGroup kind="search" messages={entry.messages} {...disclosureControl} />;
   }
   if (entry.message.role === "tool") {
-    return <ToolTimelineItem message={entry.message} />;
+    return <ToolTimelineItem message={entry.message} {...disclosureControl} />;
   }
   return <div className="min-w-0 truncate">{entry.message.text}</div>;
 }
