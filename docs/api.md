@@ -219,40 +219,43 @@ Teams and panes:
 
 Review, hunks, workflow imports, media, memory, and speech:
 
-| Method                     | Purpose                                            |
-| -------------------------- | -------------------------------------------------- |
-| `turn/subagentTraces/list` | List subagent traces for a turn.                   |
-| `turn/subagentTrace/read`  | Read paged subagent trace deltas.                  |
-| `plan/review/read`         | Read a plan review.                                |
-| `plan/review/comment`      | Add a review comment and steer the turn.           |
-| `plan/review/rewrite`      | Request a plan rewrite and steer the turn.         |
-| `plan/review/approve`      | Approve a plan review.                             |
-| `plan/review/reject`       | Reject a plan review.                              |
-| `hunk/list`                | List recorded hunks, optionally by turn/review.    |
-| `hunk/read`                | Read a paged hunk diff.                            |
-| `hunk/rollback`            | Confirm and apply a hunk reverse patch.            |
-| `workflow/scan`            | Scan workflow imports.                             |
-| `workflow/preview`         | Preview workflow import items.                     |
-| `workflow/enable`          | Enable a workflow import.                          |
-| `workflow/ignore`          | Ignore a workflow import.                          |
-| `workflow/refresh`         | Re-scan and detect stale enabled imports.          |
-| `workflow/remove`          | Remove an enabled workflow import decision.        |
-| `media/list`               | List media artifacts.                              |
-| `media/read`               | Read artifact bytes as base64.                     |
-| `media/thumbnail`          | Read an artifact preview.                          |
-| `media/delete`             | Delete an artifact.                                |
-| `media/attachToTurn`       | Convert an artifact to a turn attachment/image.    |
-| `memory/list`              | List memory records.                               |
-| `memory/read`              | Read one memory.                                   |
-| `memory/save`              | Save a memory.                                     |
-| `memory/update`            | Update a memory.                                   |
-| `memory/delete`            | Delete a memory.                                   |
-| `memory/query`             | Search memories.                                   |
-| `memory/provider/list`     | List embedding providers and selected provider.    |
-| `memory/provider/set`      | Persist the embedding provider/model.              |
-| `memory/recall/preview`    | Preview recall citations/results for a turn.       |
-| `speech/providers/list`    | Discover available speech transcription providers. |
-| `speech/transcribe`        | Transcribe an audio recording to text.             |
+| Method                     | Purpose                                                 |
+| -------------------------- | ------------------------------------------------------- |
+| `turn/subagentTraces/list` | List subagent traces for a turn.                        |
+| `turn/subagentTrace/read`  | Read paged subagent trace deltas.                       |
+| `plan/review/read`         | Read a plan review.                                     |
+| `plan/review/comment`      | Add a review comment and steer the turn.                |
+| `plan/review/rewrite`      | Request a plan rewrite and steer the turn.              |
+| `plan/review/approve`      | Approve a plan review.                                  |
+| `plan/review/reject`       | Reject a plan review.                                   |
+| `git/changes/list`         | List live branch changes against the resolved base.     |
+| `git/changes/read`         | Read paged unified patch text for one live branch file. |
+| `hunk/list`                | List recorded hunks, optionally by turn/review.         |
+| `hunk/read`                | Read a paged hunk diff.                                 |
+| `hunk/rollback`            | Confirm and apply a hunk reverse patch.                 |
+| `workspace/changes/list`   | List observed git-reconciled shell/exec changes.        |
+| `workflow/scan`            | Scan workflow imports.                                  |
+| `workflow/preview`         | Preview workflow import items.                          |
+| `workflow/enable`          | Enable a workflow import.                               |
+| `workflow/ignore`          | Ignore a workflow import.                               |
+| `workflow/refresh`         | Re-scan and detect stale enabled imports.               |
+| `workflow/remove`          | Remove an enabled workflow import decision.             |
+| `media/list`               | List media artifacts.                                   |
+| `media/read`               | Read artifact bytes as base64.                          |
+| `media/thumbnail`          | Read an artifact preview.                               |
+| `media/delete`             | Delete an artifact.                                     |
+| `media/attachToTurn`       | Convert an artifact to a turn attachment/image.         |
+| `memory/list`              | List memory records.                                    |
+| `memory/read`              | Read one memory.                                        |
+| `memory/save`              | Save a memory.                                          |
+| `memory/update`            | Update a memory.                                        |
+| `memory/delete`            | Delete a memory.                                        |
+| `memory/query`             | Search memories.                                        |
+| `memory/provider/list`     | List embedding providers and selected provider.         |
+| `memory/provider/set`      | Persist the embedding provider/model.                   |
+| `memory/recall/preview`    | Preview recall citations/results for a turn.            |
+| `speech/providers/list`    | Discover available speech transcription providers.      |
+| `speech/transcribe`        | Transcribe an audio recording to text.                  |
 
 ## Detailed Method Reference
 
@@ -1547,6 +1550,68 @@ Behavior:
 - Rollback requires `confirmed: true` and a recorded reverse patch.
 - A successful rollback returns `{ "rolledBack": true }`; failures return
   `{ "rolledBack": false, "error": "..." }`.
+
+### Workspace observed change methods
+
+Purpose: List file-level workspace changes observed after shell/exec tools.
+
+Examples:
+
+```json
+{
+  "method": "workspace/changes/list",
+  "params": {
+    "threadId": "thread-123",
+    "turnId": "turn-123"
+  }
+}
+```
+
+Behavior:
+
+- `workspace/changes/list` can filter by `turnId`.
+- Observed changes are git-reconciled file summaries, not exact structured
+  hunks. The review panel can read current patch text through `git/changes/read`.
+- New observed changes emit `workspace/changeObserved`.
+
+### Git change review methods
+
+Purpose: Inspect the live branch delta without mutating files.
+
+Examples:
+
+```json
+{
+  "method": "git/changes/list",
+  "params": {
+    "workspace": "/Users/pz/w/gode",
+    "limit": 500
+  }
+}
+```
+
+```json
+{
+  "method": "git/changes/read",
+  "params": {
+    "workspace": "/Users/pz/w/gode",
+    "path": "src/app.rs",
+    "offset": 0,
+    "limit": 400
+  }
+}
+```
+
+Behavior:
+
+- `git/changes/list` returns repository root, branch, base ref/sha, changed
+  files, totals, and whether the file list was truncated.
+- Branch scope compares the merge-base of the resolved base with the current
+  working tree, including committed, staged, unstaged, and untracked changes.
+- Base resolution tries upstream, origin default branch, `origin/master`,
+  `origin/main`, `master`, then `main`.
+- `git/changes/read` validates repository-relative paths and returns paged
+  unified patch text for one changed file.
 
 ### Workflow import methods
 

@@ -1,15 +1,28 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useQueryStates } from "nuqs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryStates, type SetValues } from "nuqs";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppShellContextValue } from "@/components/app-shell-context";
 import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { clamp, useHorizontalResize } from "@/hooks/use-horizontal-resize";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
+import { useThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { archiveRouteAfterThreadRemoval, defaultPluginsRoute, isPluginsRoutePath } from "@/lib/route-selection";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
-import { routeSearchParsers, sidebarWidthBounds, toolPanelWidthBounds, type RouteToolPanel } from "@/lib/route-search";
+import {
+  closeWorkspacePanelShell,
+  closeWorkspacePanelTab,
+  mergeRouteSearchUpdate,
+  openWorkspacePanelShell,
+  openWorkspacePanelTab,
+  routeSearchParsers,
+  selectWorkspacePanelTab,
+  sidebarWidthBounds,
+  toolPanelWidthBounds,
+  type RouteReviewScope,
+  type RouteWorkspacePanel,
+} from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment } from "@/types/roder";
 
@@ -17,6 +30,9 @@ type AppShellController = {
   appShellContext: AppShellContextValue;
   layoutProps: AppShellLayoutProps;
 };
+
+const mainPanelMinWidth = 500;
+const sidebarResizeHandleWidth = 8;
 
 export function useAppShellController(): AppShellController {
   const agent = useRoderAgent();
@@ -37,23 +53,33 @@ export function useAppShellController(): AppShellController {
   } = agent;
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const [routeSearch, setRouteSearch] = useQueryStates(routeSearchParsers);
+  const [routeSearch, setRawRouteSearch] = useQueryStates(routeSearchParsers);
+  const setRouteSearch = useCallback<SetValues<typeof routeSearchParsers>>(
+    (update, options) => setRawRouteSearch((current) => mergeRouteSearchUpdate(current, update), options),
+    [setRawRouteSearch],
+  );
   useExtensionThemes();
   useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
   const [canScrollTranscriptToBottom, setCanScrollTranscriptToBottom] = useState(false);
   const [composerFocusSignal, setComposerFocusSignal] = useState(0);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
-  const activeTool = routeSearch.tool;
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
+  const toolPanelElementRef = useRef<HTMLElement | null>(null);
+  const activePanel = routeSearch.panelActive;
+  const workspacePanelOpen = routeSearch.panelOpen;
   const selectedExtensionId = routeSearch.extension || null;
   const sidebarOpen = routeSearch.sidebar;
   const leftSidebarWidth = routeSearch.leftWidth;
-  const toolPanelWidth = routeSearch.rightWidth;
+  const toolPanelMaxWidth = toolPanelMaxWidthForViewport(viewportWidth, sidebarOpen, leftSidebarWidth);
+  const routeToolPanelWidth = clamp(routeSearch.rightWidth, toolPanelWidthBounds.min, toolPanelMaxWidth);
+  const toolPanelWidth = routeToolPanelWidth;
   const isPluginsRoute = isPluginsRoutePath(pathname);
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
   const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
+  const hunkSummary = useThreadHunkSummary(activeThreadId, agent.hunkRevision);
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
@@ -122,6 +148,15 @@ export function useAppShellController(): AppShellController {
     void createProjectThread();
   }, [createProjectThread, followBottom, navigate]);
   useEffect(() => {
+    function syncViewportWidth(): void {
+      setViewportWidth(window.innerWidth);
+    }
+
+    syncViewportWidth();
+    window.addEventListener("resize", syncViewportWidth);
+    return () => window.removeEventListener("resize", syncViewportWidth);
+  }, []);
+  useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
       if (appCommand.command === "newProject") {
         newProject();
@@ -152,25 +187,69 @@ export function useAppShellController(): AppShellController {
     },
     [followBottom, sendAgentPrompt],
   );
-  const toggleExtensionsPanel = useCallback(() => {
-    if (activeTool === "extensions") {
-      void setRouteSearch({ tool: null }, { history: "replace" });
-      return;
-    }
-    void setRouteSearch({ tool: "extensions" }, { history: "replace" });
-  }, [activeTool, setRouteSearch]);
   const selectExtensionFromRail = useCallback(
     (extensionId: string) => {
-      void setRouteSearch({ tool: "extensions", extension: extensionId }, { history: "replace" });
+      void setRouteSearch((current) => ({ ...openWorkspacePanelTab(current, "extensions"), extension: extensionId }), {
+        history: "replace",
+      });
     },
     [setRouteSearch],
   );
-  const toggleToolPanel = useCallback(
-    (toolName: RouteToolPanel) => {
-      void setRouteSearch({ tool: activeTool === toolName ? null : toolName }, { history: "replace" });
+  const selectWorkspacePanel = useCallback(
+    (panel: RouteWorkspacePanel) => {
+      void setRouteSearch((current) => selectWorkspacePanelTab(current, panel), { history: "replace" });
     },
-    [activeTool, setRouteSearch],
+    [setRouteSearch],
   );
+  const openWorkspacePanel = useCallback(
+    (panel: RouteWorkspacePanel) => {
+      void setRouteSearch((current) => openWorkspacePanelTab(current, panel), { history: "replace" });
+    },
+    [setRouteSearch],
+  );
+  const openWorkspacePanelShellOnly = useCallback(() => {
+    void setRouteSearch(openWorkspacePanelShell(), { history: "replace" });
+  }, [setRouteSearch]);
+  const closeWorkspacePanelShellOnly = useCallback(() => {
+    void setRouteSearch(closeWorkspacePanelShell(), { history: "replace" });
+  }, [setRouteSearch]);
+  const closeWorkspacePanel = useCallback(
+    (panel: RouteWorkspacePanel) => {
+      void setRouteSearch((current) => closeWorkspacePanelTab(current, panel), { history: "replace" });
+    },
+    [setRouteSearch],
+  );
+  const openReview = useCallback(
+    (scope: RouteReviewScope, turnId = "") => {
+      const retainedTurnId = turnId || routeSearch.reviewTurnId || hunkSummary.latestTurnId;
+      void setRouteSearch(
+        (current) => ({
+          ...openWorkspacePanelTab(current, "review"),
+          reviewScope: scope,
+          reviewTurnId: retainedTurnId,
+          reviewPath: "",
+        }),
+        { history: "replace" },
+      );
+    },
+    [hunkSummary.latestTurnId, routeSearch.reviewTurnId, setRouteSearch],
+  );
+  const changeReviewScope = useCallback(
+    (scope: RouteReviewScope, turnId = "") => {
+      openReview(scope, turnId);
+    },
+    [openReview],
+  );
+  useEffect(() => {
+    if (
+      activePanel === "review" &&
+      routeSearch.reviewScope === "turn" &&
+      !routeSearch.reviewTurnId &&
+      hunkSummary.latestTurnId
+    ) {
+      void setRouteSearch({ reviewTurnId: hunkSummary.latestTurnId }, { history: "replace" });
+    }
+  }, [activePanel, hunkSummary.latestTurnId, routeSearch.reviewScope, routeSearch.reviewTurnId, setRouteSearch]);
   const openPlugins = useCallback(() => {
     void navigate({ to: defaultPluginsRoute(), search: true });
   }, [navigate]);
@@ -191,15 +270,41 @@ export function useAppShellController(): AppShellController {
   );
   const resizeToolPanel = useCallback(
     (startWidth: number, deltaX: number) => {
-      void setRouteSearch(
-        { rightWidth: clamp(startWidth - deltaX, toolPanelWidthBounds.min, toolPanelWidthBounds.max) },
-        { history: "replace" },
-      );
+      const nextWidth = toolPanelWidthFromDrag(startWidth, deltaX, toolPanelMaxWidth);
+      if (toolPanelElementRef.current) {
+        toolPanelElementRef.current.style.setProperty("--right-workspace-panel-width", `${nextWidth}px`);
+      }
     },
-    [setRouteSearch],
+    [toolPanelMaxWidth],
+  );
+  const commitToolPanelResize = useCallback(
+    (startWidth: number, deltaX: number) => {
+      const nextWidth = toolPanelWidthFromDrag(startWidth, deltaX, toolPanelMaxWidth);
+      if (toolPanelElementRef.current) {
+        toolPanelElementRef.current.style.setProperty("--right-workspace-panel-width", `${nextWidth}px`);
+        toolPanelElementRef.current.style.willChange = "";
+        toolPanelElementRef.current = null;
+      }
+      void setRouteSearch({ rightWidth: nextWidth }, { history: "replace" });
+    },
+    [setRouteSearch, toolPanelMaxWidth],
   );
   const beginSidebarResize = useHorizontalResize(leftSidebarWidth, resizeSidebar);
-  const beginToolPanelResize = useHorizontalResize(toolPanelWidth, resizeToolPanel);
+  const beginToolPanelElementResize = useHorizontalResize(toolPanelWidth, resizeToolPanel, {
+    onCommit: commitToolPanelResize,
+  });
+  const beginToolPanelResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const toolPanelElement = event.currentTarget.parentElement;
+      if (toolPanelElement instanceof HTMLElement) {
+        toolPanelElementRef.current = toolPanelElement;
+        toolPanelElement.style.setProperty("--right-workspace-panel-width", `${toolPanelWidth}px`);
+        toolPanelElement.style.willChange = "width";
+      }
+      beginToolPanelElementResize(event);
+    },
+    [beginToolPanelElementResize, toolPanelWidth],
+  );
   const appShellContext = useMemo(
     () => ({
       agent,
@@ -211,6 +316,7 @@ export function useAppShellController(): AppShellController {
       composerFocusSignal,
       folderOptions,
       followSignal,
+      hunkSummary,
       routeSearch,
       selectedExtensionId,
       setCanScrollTranscriptToBottom,
@@ -220,6 +326,7 @@ export function useAppShellController(): AppShellController {
       threadOptions,
       attachToComposer,
       followBottom,
+      openReview,
       sendPrompt,
     }),
     [
@@ -234,6 +341,8 @@ export function useAppShellController(): AppShellController {
       folderOptions,
       followBottom,
       followSignal,
+      hunkSummary,
+      openReview,
       routeSearch,
       selectedExtensionId,
       sendPrompt,
@@ -248,11 +357,16 @@ export function useAppShellController(): AppShellController {
     layoutProps: {
       activeThread,
       activeThreadId,
-      activeTool,
+      activePanel,
       activeWorkspaceCwd,
       folderOptions,
       isPluginsRoute,
       leftSidebarWidth,
+      hunkSummary,
+      reviewPath: routeSearch.reviewPath,
+      reviewScope: routeSearch.reviewScope,
+      reviewTurnId: routeSearch.reviewTurnId,
+      panelTabs: routeSearch.panelTabs,
       selectedExtensionId,
       selectedExtensionPanelId: routeSearch.extensionPanel || null,
       sidebarOpen,
@@ -260,6 +374,7 @@ export function useAppShellController(): AppShellController {
       threadOptions,
       threads,
       toolPanelWidth,
+      workspacePanelOpen,
       onArchiveThread: archiveThread,
       onAttachToComposer: attachToComposer,
       onBeginSidebarResize: beginSidebarResize,
@@ -268,6 +383,10 @@ export function useAppShellController(): AppShellController {
       onNewThread: newThread,
       onNewThreadInFolder: newThreadInFolder,
       onOpenPlugins: openPlugins,
+      onOpenWorkspacePanel: openWorkspacePanel,
+      onOpenWorkspacePanelShell: openWorkspacePanelShellOnly,
+      onCloseWorkspacePanel: closeWorkspacePanel,
+      onCloseWorkspacePanelShell: closeWorkspacePanelShellOnly,
       onOpenSettings: openSettings,
       onRestart: () => void restart(),
       onSelectExtension: selectExtensionFromRail,
@@ -275,11 +394,20 @@ export function useAppShellController(): AppShellController {
       onSelectThread: selectThread,
       onSelectedExtensionPanelChange: (extensionPanel) =>
         void setRouteSearch({ extensionPanel }, { history: "replace" }),
-      onToggleBrowser: () => toggleToolPanel("browser"),
-      onToggleCanvas: () => toggleToolPanel("canvas"),
-      onToggleExtensions: toggleExtensionsPanel,
+      onReviewPathChange: (reviewPath) => void setRouteSearch({ reviewPath }, { history: "replace" }),
+      onReviewScopeChange: changeReviewScope,
+      onSelectWorkspacePanel: selectWorkspacePanel,
       onToggleSidebar: () => void setRouteSearch({ sidebar: !sidebarOpen }, { history: "replace" }),
-      onToggleTerminal: () => toggleToolPanel("terminal"),
     },
   };
+}
+
+function toolPanelWidthFromDrag(startWidth: number, deltaX: number, maxWidth: number): number {
+  return clamp(startWidth - deltaX, toolPanelWidthBounds.min, maxWidth);
+}
+
+function toolPanelMaxWidthForViewport(viewportWidth: number, sidebarOpen: boolean, leftSidebarWidth: number): number {
+  const leftChromeWidth = sidebarOpen ? leftSidebarWidth + sidebarResizeHandleWidth : 0;
+  const availableWidth = viewportWidth - leftChromeWidth - mainPanelMinWidth;
+  return clamp(availableWidth, toolPanelWidthBounds.min, toolPanelWidthBounds.max);
 }

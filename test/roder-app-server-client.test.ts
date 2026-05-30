@@ -13,6 +13,11 @@ type SpawnMock = (
   args: string[],
   options: { env?: Record<string, string | undefined> },
 ) => MockChildProcess;
+type SpawnSyncMock = (
+  command: string,
+  args: string[],
+  options: { env?: Record<string, string | undefined>; timeout?: number },
+) => { status: number; stdout: string };
 
 const mockState = vi.hoisted(() => ({
   app: {
@@ -25,6 +30,20 @@ const mockState = vi.hoisted(() => ({
     args: string[];
     options: { env?: Record<string, string | undefined> };
   }>,
+  spawnSyncCalls: [] as Array<{
+    command: string;
+    args: string[];
+    options: { env?: Record<string, string | undefined>; timeout?: number };
+  }>,
+  schemaManifest: {
+    methods: [
+      { method: "initialize" },
+      { method: "thread/list" },
+      { method: "git/changes/list" },
+      { method: "git/changes/read" },
+      { method: "workspace/changes/list" },
+    ],
+  },
   requests: [] as Array<{
     id: number;
     method: string;
@@ -75,6 +94,10 @@ vi.mock("node:child_process", async (importOriginal) => {
       mockState.spawned.push({ command, args, options });
       return child;
     }),
+    spawnSync: vi.fn<SpawnSyncMock>((command, args, options) => {
+      mockState.spawnSyncCalls.push({ command, args, options });
+      return { status: 0, stdout: JSON.stringify(mockState.schemaManifest) };
+    }),
   };
 });
 
@@ -84,6 +107,7 @@ beforeEach(() => {
   mockState.app.getVersion.mockReturnValue("9.8.7");
   mockState.existsSync.mockReturnValue(true);
   mockState.spawned.length = 0;
+  mockState.spawnSyncCalls.length = 0;
   mockState.requests.length = 0;
   Object.defineProperty(process, "resourcesPath", {
     value: "/tmp/roder-test-resources",
@@ -98,6 +122,24 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
   const status = await client.start();
 
   expect(status.state).toBe("ready");
+  expect(status.appServerMethods).toEqual([
+    "initialize",
+    "thread/list",
+    "git/changes/list",
+    "git/changes/read",
+    "workspace/changes/list",
+  ]);
+  expect(mockState.spawnSyncCalls).toEqual([
+    expect.objectContaining({
+      args: ["app-server", "schema", "--format", "manifest"],
+      options: expect.objectContaining({
+        timeout: 5000,
+        env: expect.objectContaining({
+          RODER_DESKTOP: "1",
+        }),
+      }),
+    }),
+  ]);
   expect(mockState.spawned).toEqual([
     expect.objectContaining({
       args: ["app-server", "--listen", "stdio://"],

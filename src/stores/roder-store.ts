@@ -48,6 +48,7 @@ type RoderStore = {
   threads: RoderThread[];
   threadDetails: Record<string, RoderThread>;
   threadControlsByThread: Record<string, ThreadControlState>;
+  hunkRevisionByThread: Record<string, number>;
   activeThreadId: string;
   backStack: NavigationEntry[];
   forwardStack: NavigationEntry[];
@@ -268,6 +269,7 @@ export const useRoderStore = create<RoderStore>()(
       threads: [],
       threadDetails: {},
       threadControlsByThread: {},
+      hunkRevisionByThread: {},
       activeThreadId: "",
       backStack: [],
       forwardStack: [],
@@ -410,10 +412,12 @@ export const useRoderStore = create<RoderStore>()(
             current.activeThreadId === threadId ? firstThreadId(nextThreads, "") : current.activeThreadId;
           set((state) => {
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
+            const { [threadId]: _archivedHunkRevision, ...hunkRevisionByThread } = state.hunkRevisionByThread;
             return {
               threads: state.threads.filter((thread) => thread.id !== threadId),
               threadDetails,
               threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
+              hunkRevisionByThread,
               activeThreadId: nextActiveThreadId,
               backStack: state.backStack.filter((entry) => entry.threadId !== threadId),
               forwardStack: state.forwardStack.filter((entry) => entry.threadId !== threadId),
@@ -881,6 +885,28 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     return {
       ...waitPatch,
       threadDetails: { ...state.threadDetails, [itemEvent.threadId]: thread },
+    };
+  }
+
+  if (notification.method === "hunk/recorded" || notification.method === "workspace/changeObserved") {
+    const payload =
+      notification.method === "hunk/recorded"
+        ? isRecord(params.hunk)
+          ? params.hunk
+          : {}
+        : isRecord(params.change)
+          ? params.change
+          : {};
+    const threadId = typeof payload.threadId === "string" ? payload.threadId : "";
+    if (!threadId) {
+      return waitPatch;
+    }
+    return {
+      ...waitPatch,
+      hunkRevisionByThread: {
+        ...state.hunkRevisionByThread,
+        [threadId]: (state.hunkRevisionByThread[threadId] ?? 0) + 1,
+      },
     };
   }
 

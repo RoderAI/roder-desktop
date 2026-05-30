@@ -41,7 +41,7 @@
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-size-ui: 18px;
   --font-size-composer: 17px;
-  --font-size-code: 13px;
+  --font-size-code: 14px;
   --tool-running: hsl(38 96% 43%);
   --tool-success: hsl(260 60% 56%);
   --tool-error: hsl(0 72% 48%);
@@ -236,6 +236,42 @@ code[data-streamdown="inline-code"] {
   -webkit-app-region: no-drag;
 }
 
+/*
+ * RIGHT WORKSPACE PANEL ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Each value is relative to the open/close trigger.
+ *
+ *   0ms   shell width begins 0px ↔ saved right panel width
+ *   0ms   panel content slides 12px ↔ 0px with the width change
+ * 120ms   panel opacity settles 0 ↔ 1
+ * 220ms   layout finishes resizing around the workspace panel
+ */
+.right-workspace-panel {
+  --right-workspace-panel-duration: 220ms;
+  --right-workspace-panel-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(12px);
+  border-left-color: transparent;
+  transition:
+    width var(--right-workspace-panel-duration) var(--right-workspace-panel-ease),
+    transform var(--right-workspace-panel-duration) var(--right-workspace-panel-ease),
+    opacity 120ms ease-out,
+    border-color 120ms ease-out;
+  will-change: width, opacity, transform;
+}
+
+.right-workspace-panel[data-open="true"] {
+  width: var(--right-workspace-panel-width);
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  border-left-color: var(--color-border);
+}
+
 .dotmatrix-spinner {
   display: grid;
   grid-template-columns: repeat(3, 0.1875rem);
@@ -350,6 +386,43 @@ code[data-streamdown="inline-code"] {
   contain-intrinsic-size: 8rem;
 }
 
+/*
+ * REVIEW FILE TREE ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to the changed-file toggle or resize handle.
+ *
+ *   0ms   toggle starts from current width; drag starts with transitions disabled
+ * 120ms   toggled tree content opacity reaches 0 ↔ 1
+ * 160ms   toggled tree column settles between 0rem and the chosen width
+ */
+.review-panel-content {
+  grid-template-columns: 0rem minmax(0, 1fr);
+  transition: grid-template-columns 160ms ease-out;
+}
+
+.review-panel-content[data-file-tree-resizing="true"] {
+  transition: none;
+}
+
+.review-panel-content[data-file-tree-visible="true"] {
+  grid-template-columns: var(--review-file-tree-width, 15rem) minmax(0, 1fr);
+}
+
+.review-file-tree-region {
+  border-right: 0 solid var(--color-border);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    border-right-width 160ms ease-out,
+    opacity 120ms ease-out;
+}
+
+.review-panel-content[data-file-tree-visible="true"] .review-file-tree-region {
+  border-right-width: 1px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dotmatrix-spinner-dot {
     animation: none;
@@ -364,6 +437,11 @@ code[data-streamdown="inline-code"] {
   }
 
   .tool-disclosure-panel {
+    transition: none;
+  }
+
+  .review-panel-content,
+  .review-file-tree-region {
     transition: none;
   }
 
@@ -699,6 +777,11 @@ code[data-streamdown="inline-code"] {
   }
 
   .thread-overflow-region {
+    transition: none;
+    transform: none;
+  }
+
+  .right-workspace-panel {
     transition: none;
     transform: none;
   }

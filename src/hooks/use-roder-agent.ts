@@ -70,6 +70,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     appearance: state.appearance,
     busy: state.busy,
     activeTurnId: activeTurnIdForThread(activeThread),
+    hunkRevision: state.hunkRevisionByThread[state.activeThreadId] ?? 0,
     hydrated: state.hydrated,
     error: state.error,
     canGoBack: state.backStack.length > 0,
