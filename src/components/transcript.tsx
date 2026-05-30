@@ -26,6 +26,7 @@ import {
   shouldShowTranscriptScrollAffordance,
   transcriptFollowAction,
   transcriptScrollRestorationAction,
+  transcriptScrollRestorationStateFromViewport,
   transcriptScrollAffordanceThresholdPx,
   type TranscriptScrollRestorationState,
 } from "@/lib/transcript-scroll";
@@ -163,10 +164,14 @@ export function Transcript({
     if (!viewport) {
       return;
     }
-    transcriptScrollStateByKey.set(key, {
-      pinnedToEnd: pinnedToEndRef.current,
-      scrollOffset: viewport.scrollTop,
-    });
+    transcriptScrollStateByKey.set(
+      key,
+      transcriptScrollRestorationStateFromViewport({
+        clientHeight: viewport.clientHeight,
+        scrollHeight: viewport.scrollHeight,
+        scrollTop: viewport.scrollTop,
+      }),
+    );
   }, []);
 
   useEffect(() => {
@@ -271,8 +276,8 @@ export function Transcript({
         ) {
           return;
         }
-        previousScrollTopRef.current = 0;
         rowVirtualizer.scrollToEnd({ behavior });
+        previousScrollTopRef.current = viewportRef.current?.scrollTop ?? previousScrollTopRef.current;
       };
       scrollToEnd();
       pendingScrollFrameRef.current = requestAnimationFrame(() => {
@@ -287,8 +292,8 @@ export function Transcript({
       cancelPendingScrollFrame();
       const scrollOffset = Math.max(0, offset);
       const scrollToOffset = () => {
-        previousScrollTopRef.current = scrollOffset;
         rowVirtualizer.scrollToOffset(scrollOffset, { behavior: "auto" });
+        previousScrollTopRef.current = viewportRef.current?.scrollTop ?? scrollOffset;
       };
       scrollToOffset();
       pendingScrollFrameRef.current = requestAnimationFrame(() => {
@@ -343,8 +348,8 @@ export function Transcript({
   );
 
   useLayoutEffect(() => {
-    return () => rememberTranscriptScrollState(scrollStateKey);
-  }, [rememberTranscriptScrollState, scrollStateKey]);
+    return () => rememberTranscriptScrollState(scrollStateKeyRef.current);
+  }, [rememberTranscriptScrollState]);
 
   useLayoutEffect(() => {
     if (restoredScrollStateKeyRef.current === scrollStateKey) {

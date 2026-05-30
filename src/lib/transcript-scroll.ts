@@ -48,6 +48,12 @@ export type TranscriptScrollRestorationState = {
   scrollOffset: number;
 };
 
+export type TranscriptViewportScrollMetrics = {
+  clientHeight: number;
+  scrollHeight: number;
+  scrollTop: number;
+};
+
 export type TranscriptScrollRestorationAction =
   | {
       kind: "end";
@@ -119,6 +125,22 @@ export function shouldShowTranscriptScrollAffordance({
   rowCount,
 }: TranscriptScrollAffordanceVisibilityInput): boolean {
   return rowCount > 0 && observedCanScrollToBottom && !pinnedToEnd;
+}
+
+export function canScrollTranscriptViewportToBottom(
+  { clientHeight, scrollHeight, scrollTop }: TranscriptViewportScrollMetrics,
+  threshold = transcriptScrollAffordanceThresholdPx,
+): boolean {
+  return Math.max(0, scrollHeight - clientHeight - scrollTop) > threshold;
+}
+
+export function transcriptScrollRestorationStateFromViewport(
+  metrics: TranscriptViewportScrollMetrics,
+): TranscriptScrollRestorationState {
+  return {
+    pinnedToEnd: !canScrollTranscriptViewportToBottom(metrics),
+    scrollOffset: Math.max(0, metrics.scrollTop),
+  };
 }
 
 export function transcriptScrollRestorationAction({
