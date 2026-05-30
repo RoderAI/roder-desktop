@@ -36,7 +36,6 @@
 
 :root {
   color-scheme: light;
-  --transcript-fade-clear: hsl(0 0% 100% / 0);
   --font-ui: Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-size-ui: 18px;
@@ -77,7 +76,6 @@
   --color-sidebar-active: hsl(0 0% 21%);
   --color-sidebar-active-foreground: hsl(0 0% 90%);
   --color-sidebar-dot: hsl(0 0% 38%);
-  --transcript-fade-clear: hsl(0 0% 8% / 0);
   --tool-running: hsl(40 100% 53%);
   --tool-success: hsl(258 100% 82%);
   --tool-error: hsl(0 84% 64%);
@@ -114,7 +112,6 @@
     --color-sidebar-active: hsl(0 0% 21%);
     --color-sidebar-active-foreground: hsl(0 0% 90%);
     --color-sidebar-dot: hsl(0 0% 38%);
-    --transcript-fade-clear: hsl(0 0% 8% / 0);
     --tool-running: hsl(40 100% 53%);
     --tool-success: hsl(258 100% 82%);
     --tool-error: hsl(0 84% 64%);
@@ -187,6 +184,19 @@ code {
 code[data-streamdown="inline-code"] {
   background-color: color-mix(in oklab, var(--color-foreground) 5%, var(--color-background));
   font-size: inherit;
+}
+
+[data-streamdown="code-block"] {
+  position: relative;
+}
+
+[data-streamdown="code-block"] > div:has(> [data-streamdown="code-block-actions"]) {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 10;
+  margin-top: 0;
+  width: auto;
 }
 
 [data-streamdown="code-block-body"] pre > code > span {
@@ -707,11 +717,21 @@ code[data-streamdown="inline-code"] {
 .composer-scroll-button-region {
   opacity: 0;
   pointer-events: none;
+  z-index: 10;
   transition: opacity var(--composer-scroll-button-fade-duration, 120ms) ease-out;
 }
 
 .composer-scroll-button-region[data-visible="true"] {
   opacity: 1;
+}
+
+.composer-scroll-button-region > button {
+  position: relative;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.composer-scroll-button-region[data-visible="true"] > button {
   pointer-events: auto;
 }
 
@@ -827,6 +847,60 @@ code[data-streamdown="inline-code"] {
   background: var(--color-sidebar-dot);
 }
 
-.transcript-fade {
-  background: linear-gradient(to top, var(--color-background) 20%, var(--transcript-fade-clear));
+.workspace-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-muted-foreground) transparent;
+}
+
+.workspace-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.workspace-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--color-muted-foreground);
+}
+
+.transcript-viewport {
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.transcript-viewport-auto-following {
+  scrollbar-color: transparent transparent;
+}
+
+.transcript-viewport-auto-following::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.transcript-viewport-auto-following::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.transcript-search-mirror {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  opacity: 0;
+  user-select: text;
+}
+
+.chat-composer-guard {
+  background: var(--color-background);
+}
+
+.chat-composer-guard[data-fade="true"] {
+  background: linear-gradient(to top, var(--color-background) 0, var(--color-background) calc(100% - 5.5rem), transparent);
 }

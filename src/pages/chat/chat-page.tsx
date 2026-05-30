@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { useAppShell } from "@/components/app-shell-context";
@@ -6,6 +6,10 @@ import { Composer } from "@/components/composer";
 import { Transcript } from "@/components/transcript";
 import { threadSelectionForRoute } from "@/lib/route-selection";
 import { useSkillsStore } from "@/stores/skills-store";
+
+const transcriptComposerGapPx = 24;
+const composerGuardFadeHeightPx = 88;
+const initialComposerStackHeightPx = 160;
 
 export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadId?: string }): React.JSX.Element {
   const shell = useAppShell();
@@ -30,8 +34,14 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const skillsLoading = useSkillsStore((state) => state.loading);
   const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
+  const composerStackRef = useRef<HTMLDivElement | null>(null);
+  const [composerStackHeight, setComposerStackHeight] = useState(initialComposerStackHeightPx);
   const newRouteReadyForCreatedThreadRef = useRef(false);
   const clearingActiveThreadForNewRouteRef = useRef(false);
+  const transcriptBottomInsetPx = composerStackHeight + transcriptComposerGapPx;
+  const composerGuardStyle = {
+    height: composerStackHeight + (canScrollTranscriptToBottom ? composerGuardFadeHeightPx : 0),
+  };
   const openThreadChanges = useCallback(() => {
     openReview("thread");
   }, [openReview]);
@@ -47,6 +57,21 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
       void loadSkills();
     }
   }, [agent.status.state, loadSkills, skillsLoaded, skillsLoading]);
+
+  useLayoutEffect(() => {
+    const node = composerStackRef.current;
+    if (!node) {
+      return;
+    }
+
+    const syncHeight = () => {
+      setComposerStackHeight(Math.ceil(node.getBoundingClientRect().height));
+    };
+    const resizeObserver = new ResizeObserver(syncHeight);
+    syncHeight();
+    resizeObserver.observe(node);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     if (route === "new") {
@@ -88,11 +113,13 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   }, [activeThreadId, navigate, route]);
 
   return (
-    <>
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <Transcript
         activeTurnId={agent.activeTurnId}
         messages={agent.messages}
         followSignal={followSignal}
+        bottomInsetPx={transcriptBottomInsetPx}
+        scrollStateKey={activeThreadId || "new-thread"}
         showWorkingIndicator={showWorkingIndicator}
         threadChangeCount={hunkSummary.fileCount}
         turnChangeCounts={hunkSummary.turnChangeCounts}
@@ -100,33 +127,46 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         onReviewThreadChanges={openThreadChanges}
         onReviewTurnChanges={openTurnChanges}
       />
-      <AgentWaitCards
-        requests={agent.waitRequests}
-        onResolveApproval={agent.resolveApproval}
-        onResolveUserInput={agent.resolveUserInput}
-        onExitPlan={agent.exitPlan}
-      />
-      {agent.error && (
-        <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{agent.error}</div>
-      )}
-      <Composer
-        busy={activeThreadBusy}
-        models={agent.models}
-        skills={skills}
-        selectedModel={agent.selectedModel}
-        selectedPolicyMode={agent.selectedPolicyMode}
-        selectedReasoning={agent.selectedReasoning}
-        attachments={composerAttachments}
-        focusSignal={composerFocusSignal}
-        showScrollToBottom={canScrollTranscriptToBottom}
-        onSelectedModelChange={agent.setSelectedModel}
-        onSelectedPolicyModeChange={(mode) => void agent.setSelectedPolicyMode(mode)}
-        onSelectedReasoningChange={agent.setSelectedReasoning}
-        onScrollToBottom={followBottom}
-        onAttachmentsChange={setComposerAttachments}
-        onSend={sendPrompt}
-        onStop={agent.stopTurn}
-      />
-    </>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+        <div className="mx-auto w-full max-w-[980px] px-8">
+          <div
+            className="chat-composer-guard"
+            data-fade={canScrollTranscriptToBottom ? "true" : undefined}
+            style={composerGuardStyle}
+          />
+        </div>
+      </div>
+      <div ref={composerStackRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
+        <div className="pointer-events-auto">
+          <AgentWaitCards
+            requests={agent.waitRequests}
+            onResolveApproval={agent.resolveApproval}
+            onResolveUserInput={agent.resolveUserInput}
+            onExitPlan={agent.exitPlan}
+          />
+          {agent.error && (
+            <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{agent.error}</div>
+          )}
+          <Composer
+            busy={activeThreadBusy}
+            models={agent.models}
+            skills={skills}
+            selectedModel={agent.selectedModel}
+            selectedPolicyMode={agent.selectedPolicyMode}
+            selectedReasoning={agent.selectedReasoning}
+            attachments={composerAttachments}
+            focusSignal={composerFocusSignal}
+            showScrollToBottom={canScrollTranscriptToBottom}
+            onSelectedModelChange={agent.setSelectedModel}
+            onSelectedPolicyModeChange={(mode) => void agent.setSelectedPolicyMode(mode)}
+            onSelectedReasoningChange={agent.setSelectedReasoning}
+            onScrollToBottom={followBottom}
+            onAttachmentsChange={setComposerAttachments}
+            onSend={sendPrompt}
+            onStop={agent.stopTurn}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
