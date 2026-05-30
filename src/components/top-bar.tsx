@@ -1,18 +1,9 @@
 import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  Check,
-  ChevronDown,
-  Folder,
-  GitCompareArrows,
-  Globe2,
-  MessageSquare,
-  Paintbrush,
-  Puzzle,
-  TerminalSquare,
-} from "lucide-react";
+import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
 import type { RoderStatus, RoderThread } from "@/types/roder";
 import { Button } from "@/components/ui/button";
+import { chromeIconButtonClassNameForState } from "@/components/ui/chrome-icon-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import type { RouteWorkspacePanel } from "@/lib/route-search";
 import {
   normalizeWorkspacePath,
   normalizedTimestamp,
@@ -28,7 +20,7 @@ import {
   type FolderOption,
 } from "@/lib/workspace-thread-options";
 
-export type ToolPanel = "terminal" | "browser" | "canvas" | "extensions" | "review" | null;
+export type WorkspacePanel = RouteWorkspacePanel | null;
 
 type TopBarProps = {
   thread?: RoderThread;
@@ -36,17 +28,14 @@ type TopBarProps = {
   folders: FolderOption[];
   activeFolderPath: string;
   status: RoderStatus;
-  activeTool: ToolPanel;
+  workspacePanelOpen: boolean;
   sidebarOpen: boolean;
   onRestart: () => void;
   onToggleSidebar: () => void;
   onSelectFolder: (path: string) => void;
   onSelectThread: (threadId: string) => void;
-  onToggleTerminal: () => void;
-  onToggleBrowser: () => void;
-  onToggleCanvas: () => void;
-  onToggleExtensions: () => void;
-  onToggleReview: () => void;
+  onCloseWorkspacePanelShell: () => void;
+  onOpenWorkspacePanelShell: () => void;
 };
 
 export function TopBar({
@@ -55,17 +44,14 @@ export function TopBar({
   folders,
   activeFolderPath,
   status,
-  activeTool,
+  workspacePanelOpen,
   sidebarOpen,
   onRestart,
   onToggleSidebar,
   onSelectFolder,
   onSelectThread,
-  onToggleTerminal,
-  onToggleBrowser,
-  onToggleCanvas,
-  onToggleExtensions,
-  onToggleReview,
+  onCloseWorkspacePanelShell,
+  onOpenWorkspacePanelShell,
 }: TopBarProps): React.JSX.Element {
   const activeFolder = folders.find(
     (folder) => normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(activeFolderPath),
@@ -81,12 +67,12 @@ export function TopBar({
       <Button
         variant="ghost"
         size="icon"
-        className="squircle-corners no-drag fixed left-[104px] top-3.5 z-40 size-8 rounded-xl text-muted-foreground/85 hover:bg-accent/60 hover:text-foreground active:scale-95"
+        className={chromeIconButtonClassNameForState(false, "fixed left-[104px] top-3.5 z-40")}
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         onClick={onToggleSidebar}
       >
-        <HugeiconsIcon icon={LayoutAlignLeftIcon} className="size-5" strokeWidth={1.7} />
+        <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
       </Button>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {sidebarOpen ? (
@@ -116,49 +102,14 @@ export function TopBar({
           </Button>
         )}
         <Button
-          variant={activeTool === "terminal" ? "secondary" : "ghost"}
+          variant="ghost"
           size="icon"
-          aria-label="Toggle terminal"
-          title="Toggle terminal"
-          onClick={onToggleTerminal}
+          className={chromeIconButtonClassNameForState(workspacePanelOpen, "fixed right-5 top-3.5 z-40")}
+          aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+          title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+          onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
         >
-          <TerminalSquare className="size-5" />
-        </Button>
-        <Button
-          variant={activeTool === "browser" ? "secondary" : "ghost"}
-          size="icon"
-          aria-label="Toggle browser"
-          title="Toggle browser"
-          onClick={onToggleBrowser}
-        >
-          <Globe2 className="size-5" />
-        </Button>
-        <Button
-          variant={activeTool === "canvas" ? "secondary" : "ghost"}
-          size="icon"
-          aria-label="Toggle canvas"
-          title="Toggle canvas"
-          onClick={onToggleCanvas}
-        >
-          <Paintbrush className="size-5" />
-        </Button>
-        <Button
-          variant={activeTool === "review" ? "secondary" : "ghost"}
-          size="icon"
-          aria-label="Review branch changes"
-          title="Review branch changes"
-          onClick={onToggleReview}
-        >
-          <GitCompareArrows className="size-5" />
-        </Button>
-        <Button
-          variant={activeTool === "extensions" ? "secondary" : "ghost"}
-          size="icon"
-          aria-label="Toggle extensions"
-          title="Toggle extensions"
-          onClick={onToggleExtensions}
-        >
-          <Puzzle className="size-5" />
+          <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
         </Button>
       </div>
     </header>

@@ -297,10 +297,10 @@ function deriveHunkStatus(hunk: HunkRecord): GitChangeStatus {
   const additions = countLines(hunk.diff, "added");
   const deletions = countLines(hunk.diff, "removed");
 
-  if ((hunk.oldLines === 0 || deletions === 0) && additions > 0) {
+  if (hunk.oldLines === 0 && additions > 0 && deletions === 0) {
     return "added";
   }
-  if ((hunk.newLines === 0 || additions === 0) && deletions > 0) {
+  if (hunk.newLines === 0 && deletions > 0 && additions === 0) {
     return "deleted";
   }
   return "modified";
