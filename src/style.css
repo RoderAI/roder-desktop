@@ -41,7 +41,7 @@
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-size-ui: 18px;
   --font-size-composer: 17px;
-  --font-size-code: 13px;
+  --font-size-code: 14px;
   --tool-running: hsl(38 96% 43%);
   --tool-success: hsl(260 60% 56%);
   --tool-error: hsl(0 72% 48%);
@@ -350,6 +350,43 @@ code[data-streamdown="inline-code"] {
   contain-intrinsic-size: 8rem;
 }
 
+/*
+ * REVIEW FILE TREE ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Values are relative to the changed-file toggle or resize handle.
+ *
+ *   0ms   toggle starts from current width; drag starts with transitions disabled
+ * 120ms   toggled tree content opacity reaches 0 ↔ 1
+ * 160ms   toggled tree column settles between 0rem and the chosen width
+ */
+.review-panel-content {
+  grid-template-columns: 0rem minmax(0, 1fr);
+  transition: grid-template-columns 160ms ease-out;
+}
+
+.review-panel-content[data-file-tree-resizing="true"] {
+  transition: none;
+}
+
+.review-panel-content[data-file-tree-visible="true"] {
+  grid-template-columns: var(--review-file-tree-width, 15rem) minmax(0, 1fr);
+}
+
+.review-file-tree-region {
+  border-right: 0 solid var(--color-border);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    border-right-width 160ms ease-out,
+    opacity 120ms ease-out;
+}
+
+.review-panel-content[data-file-tree-visible="true"] .review-file-tree-region {
+  border-right-width: 1px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dotmatrix-spinner-dot {
     animation: none;
@@ -364,6 +401,11 @@ code[data-streamdown="inline-code"] {
   }
 
   .tool-disclosure-panel {
+    transition: none;
+  }
+
+  .review-panel-content,
+  .review-file-tree-region {
     transition: none;
   }
 

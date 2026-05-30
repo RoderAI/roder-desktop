@@ -34,3 +34,43 @@ test("theme store does not persist route-owned settings navigation", async () =>
   expect(useThemeStore.getState()).not.toHaveProperty("closeSettings");
   expect(useThemeStore.getState()).not.toHaveProperty("setSettingsSection");
 });
+
+test("theme store migrates the old default code font size", async () => {
+  const storage = installStorageMock();
+  storage.set(
+    "roder-desktop-theme",
+    JSON.stringify({
+      state: { settings: legacyThemeSettings(13) },
+      version: 1,
+    }),
+  );
+
+  const { defaultThemeSettings, useThemeStore } = await loadThemeStore();
+
+  expect(useThemeStore.getState().settings.codeFontSize).toBe(defaultThemeSettings.codeFontSize);
+});
+
+function legacyThemeSettings(codeFontSize: number) {
+  return {
+    mode: "system",
+    light: legacyPalette("roder-light", "#ffffff", "#242424", "#fbfbfb"),
+    dark: legacyPalette("roder-dark", "#141414", "#e0e0e0", "#202020"),
+    pointerCursors: false,
+    uiFontSize: 18,
+    codeFontSize,
+  };
+}
+
+function legacyPalette(presetId: string, background: string, foreground: string, sidebar: string) {
+  return {
+    presetId,
+    accent: foreground,
+    background,
+    foreground,
+    sidebar,
+    translucentSidebar: false,
+    contrast: 48,
+    uiFont: "Geist, sans-serif",
+    codeFont: "Menlo, monospace",
+  };
+}

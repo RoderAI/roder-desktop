@@ -269,7 +269,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         <SettingsRow label="UI font size" description="Adjust the base size used for the Roder UI">
           <NumberStepper value={settings.uiFontSize} min={11} max={24} suffix="px" onChange={setUiFontSize} />
         </SettingsRow>
-        <SettingsRow label="Code font size" description="Adjust inline code and transcript code text">
+        <SettingsRow label="Code font size" description="Adjust inline, transcript, and diff code text">
           <NumberStepper value={settings.codeFontSize} min={11} max={18} suffix="px" onChange={setCodeFontSize} />
         </SettingsRow>
       </div>

@@ -167,10 +167,10 @@ export const defaultThemeSettings: ThemeSettings = {
   dark: themePresets.find((preset) => preset.id === "roder-dark")!.palette,
   pointerCursors: false,
   uiFontSize: 18,
-  codeFontSize: 13,
+  codeFontSize: 14,
 };
 
-const themeStorageVersion = 1;
+const themeStorageVersion = 2;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -229,11 +229,16 @@ function migratePersistedTheme(persisted: unknown, version: number): unknown {
   if (version >= themeStorageVersion || !value?.settings) {
     return persisted;
   }
+  const settings = value.settings;
   return {
     ...value,
     settings: {
-      ...value.settings,
-      uiFontSize: value.settings.uiFontSize === 14 ? defaultThemeSettings.uiFontSize : value.settings.uiFontSize,
+      ...settings,
+      uiFontSize: settings.uiFontSize === 14 ? defaultThemeSettings.uiFontSize : settings.uiFontSize,
+      codeFontSize:
+        version < 2 && (settings.codeFontSize == null || settings.codeFontSize === 13)
+          ? defaultThemeSettings.codeFontSize
+          : settings.codeFontSize,
     },
   };
 }
