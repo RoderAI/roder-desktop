@@ -69,7 +69,7 @@ export function TopBar({
 
   if (isWindowTopBar) {
     return (
-      <header className="drag-region grid h-14 shrink-0 select-none grid-cols-3 items-center gap-3 border-b border-border/70 bg-background/95 pl-2 pr-48 text-muted-foreground">
+      <header className="drag-region grid h-12 shrink-0 select-none grid-cols-3 items-center gap-3 border-b border-border/70 bg-background/95 pl-2 pr-44 text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
           <Button
             variant="ghost"
