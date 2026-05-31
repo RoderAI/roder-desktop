@@ -556,6 +556,7 @@ export type AppCommand = {
 declare global {
   interface Window {
     roderDesktop: {
+      platform: NodeJS.Platform;
       request: (method: string, params?: unknown) => Promise<unknown>;
       start: () => Promise<RoderStatus>;
       restart: () => Promise<RoderStatus>;

@@ -100,106 +100,221 @@ export function AppShellLayout({
   onToggleSidebar,
 }: AppShellLayoutProps): React.JSX.Element {
   const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
+  const useWindowTopBar = window.roderDesktop.platform !== "darwin";
+
+  if (!useWindowTopBar) {
+    return (
+      <div className="relative flex h-screen w-screen overflow-hidden bg-background">
+        <div
+          className="sidebar-shell shrink-0"
+          data-open={sidebarOpen ? "true" : undefined}
+          style={sidebarRailStyle}
+          aria-hidden={!sidebarOpen}
+        >
+          <AppSidebar
+            threads={threads}
+            activeThreadId={activeThreadId}
+            activeView={isPluginsRoute ? "plugins" : "chat"}
+            width={leftSidebarWidth}
+            reserveTitlebarSpace
+            onSelectThread={onSelectThread}
+            onArchiveThread={onArchiveThread}
+            onNewProject={onNewProject}
+            onNewThread={onNewThread}
+            onNewThreadInFolder={onNewThreadInFolder}
+            onOpenPlugins={onOpenPlugins}
+            onOpenSettings={() => onOpenSettings("general")}
+          />
+        </div>
+        {sidebarOpen && (
+          <div
+            className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+            aria-label="Resize thread sidebar"
+            role="separator"
+            onPointerDown={onBeginSidebarResize}
+          />
+        )}
+        <section className="flex min-w-0 flex-1 flex-col">
+          {isPluginsRoute ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Outlet />
+            </div>
+          ) : (
+            <>
+              <TopBar
+                thread={activeThread}
+                threads={threadOptions}
+                folders={folderOptions}
+                activeFolderPath={activeWorkspaceCwd}
+                status={status}
+                workspacePanelOpen={workspacePanelOpen}
+                sidebarOpen={sidebarOpen}
+                placement="content"
+                onNewProject={onNewProject}
+                onNewThread={onNewThread}
+                onOpenSettings={() => onOpenSettings("general")}
+                onRestart={onRestart}
+                onToggleSidebar={onToggleSidebar}
+                onSelectFolder={onSelectFolder}
+                onSelectThread={onSelectThread}
+                onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
+                onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
+              />
+              <div className="flex min-h-0 min-w-[500px] flex-1 flex-col">
+                <Outlet />
+              </div>
+            </>
+          )}
+        </section>
+        {!isPluginsRoute && (
+          <>
+            <RightWorkspacePanelShell
+              open={workspacePanelOpen}
+              tabs={panelTabs}
+              activePanel={activePanel}
+              entries={rightWorkspacePanelEntries}
+              width={toolPanelWidth}
+              onAddPanel={onOpenWorkspacePanel}
+              onBeginResize={onBeginToolPanelResize}
+              onClosePanel={onCloseWorkspacePanel}
+              onSelectPanel={onSelectWorkspacePanel}
+              renderPanel={(entry, state) =>
+                renderRightWorkspacePanel(entry.id, {
+                  active: state.active,
+                  appServerMethods: status.appServerMethods ?? [],
+                  activeThreadId,
+                  activeWorkspaceCwd,
+                  hunkSummary,
+                  reviewPath,
+                  reviewScope,
+                  reviewTurnId,
+                  selectedExtensionId,
+                  selectedExtensionPanelId,
+                  nativeOverlayOcclusion: state.nativeOverlayOcclusion,
+                  width: toolPanelWidth,
+                  onAttachToComposer,
+                  onReviewPathChange,
+                  onReviewScopeChange,
+                  onSelectedExtensionPanelChange,
+                })
+              }
+            />
+            <ExtensionActivityRail
+              active={activePanel === "extensions"}
+              activeExtensionId={selectedExtensionId}
+              onSelectExtension={onSelectExtension}
+              onOpenSettings={() => onOpenSettings("extensions")}
+            />
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
-      <div
-        className="sidebar-shell shrink-0"
-        data-open={sidebarOpen ? "true" : undefined}
-        style={sidebarRailStyle}
-        aria-hidden={!sidebarOpen}
-      >
-        <AppSidebar
-          threads={threads}
-          activeThreadId={activeThreadId}
-          activeView={isPluginsRoute ? "plugins" : "chat"}
-          width={leftSidebarWidth}
-          onSelectThread={onSelectThread}
-          onArchiveThread={onArchiveThread}
-          onNewProject={onNewProject}
-          onNewThread={onNewThread}
-          onNewThreadInFolder={onNewThreadInFolder}
-          onOpenPlugins={onOpenPlugins}
-          onOpenSettings={() => onOpenSettings("general")}
-        />
-      </div>
-      {sidebarOpen && (
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
+      <TopBar
+        thread={activeThread}
+        threads={threadOptions}
+        folders={folderOptions}
+        activeFolderPath={activeWorkspaceCwd}
+        status={status}
+        workspacePanelOpen={workspacePanelOpen}
+        sidebarOpen={sidebarOpen}
+        placement="window"
+        onNewProject={onNewProject}
+        onNewThread={onNewThread}
+        onOpenSettings={() => onOpenSettings("general")}
+        onRestart={onRestart}
+        onToggleSidebar={onToggleSidebar}
+        onSelectFolder={onSelectFolder}
+        onSelectThread={onSelectThread}
+        onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
+        onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
+      />
+      <div className="flex min-h-0 flex-1">
         <div
-          className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
-          aria-label="Resize thread sidebar"
-          role="separator"
-          onPointerDown={onBeginSidebarResize}
-        />
-      )}
-      <section className="flex min-w-0 flex-1 flex-col">
-        {isPluginsRoute ? (
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <Outlet />
-          </div>
-        ) : (
-          <>
-            <TopBar
-              thread={activeThread}
-              threads={threadOptions}
-              folders={folderOptions}
-              activeFolderPath={activeWorkspaceCwd}
-              status={status}
-              workspacePanelOpen={workspacePanelOpen}
-              sidebarOpen={sidebarOpen}
-              onRestart={onRestart}
-              onToggleSidebar={onToggleSidebar}
-              onSelectFolder={onSelectFolder}
-              onSelectThread={onSelectThread}
-              onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
-              onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
-            />
+          className="sidebar-shell shrink-0"
+          data-open={sidebarOpen ? "true" : undefined}
+          style={sidebarRailStyle}
+          aria-hidden={!sidebarOpen}
+        >
+          <AppSidebar
+            threads={threads}
+            activeThreadId={activeThreadId}
+            activeView={isPluginsRoute ? "plugins" : "chat"}
+            width={leftSidebarWidth}
+            reserveTitlebarSpace={false}
+            onSelectThread={onSelectThread}
+            onArchiveThread={onArchiveThread}
+            onNewProject={onNewProject}
+            onNewThread={onNewThread}
+            onNewThreadInFolder={onNewThreadInFolder}
+            onOpenPlugins={onOpenPlugins}
+            onOpenSettings={() => onOpenSettings("general")}
+          />
+        </div>
+        {sidebarOpen && (
+          <div
+            className="no-drag relative z-30 -ml-1 -mr-1 h-full w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+            aria-label="Resize thread sidebar"
+            role="separator"
+            onPointerDown={onBeginSidebarResize}
+          />
+        )}
+        <section className="flex min-w-0 flex-1 flex-col">
+          {isPluginsRoute ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Outlet />
+            </div>
+          ) : (
             <div className="flex min-h-0 min-w-[500px] flex-1 flex-col">
               <Outlet />
             </div>
+          )}
+        </section>
+        {!isPluginsRoute && (
+          <>
+            <RightWorkspacePanelShell
+              open={workspacePanelOpen}
+              tabs={panelTabs}
+              activePanel={activePanel}
+              entries={rightWorkspacePanelEntries}
+              width={toolPanelWidth}
+              onAddPanel={onOpenWorkspacePanel}
+              onBeginResize={onBeginToolPanelResize}
+              onClosePanel={onCloseWorkspacePanel}
+              onSelectPanel={onSelectWorkspacePanel}
+              renderPanel={(entry, state) =>
+                renderRightWorkspacePanel(entry.id, {
+                  active: state.active,
+                  appServerMethods: status.appServerMethods ?? [],
+                  activeThreadId,
+                  activeWorkspaceCwd,
+                  hunkSummary,
+                  reviewPath,
+                  reviewScope,
+                  reviewTurnId,
+                  selectedExtensionId,
+                  selectedExtensionPanelId,
+                  nativeOverlayOcclusion: state.nativeOverlayOcclusion,
+                  width: toolPanelWidth,
+                  onAttachToComposer,
+                  onReviewPathChange,
+                  onReviewScopeChange,
+                  onSelectedExtensionPanelChange,
+                })
+              }
+            />
+            <ExtensionActivityRail
+              active={activePanel === "extensions"}
+              activeExtensionId={selectedExtensionId}
+              onSelectExtension={onSelectExtension}
+              onOpenSettings={() => onOpenSettings("extensions")}
+            />
           </>
         )}
-      </section>
-      {!isPluginsRoute && (
-        <>
-          <RightWorkspacePanelShell
-            open={workspacePanelOpen}
-            tabs={panelTabs}
-            activePanel={activePanel}
-            entries={rightWorkspacePanelEntries}
-            width={toolPanelWidth}
-            onAddPanel={onOpenWorkspacePanel}
-            onBeginResize={onBeginToolPanelResize}
-            onClosePanel={onCloseWorkspacePanel}
-            onSelectPanel={onSelectWorkspacePanel}
-            renderPanel={(entry, state) =>
-              renderRightWorkspacePanel(entry.id, {
-                active: state.active,
-                appServerMethods: status.appServerMethods ?? [],
-                activeThreadId,
-                activeWorkspaceCwd,
-                hunkSummary,
-                reviewPath,
-                reviewScope,
-                reviewTurnId,
-                selectedExtensionId,
-                selectedExtensionPanelId,
-                nativeOverlayOcclusion: state.nativeOverlayOcclusion,
-                width: toolPanelWidth,
-                onAttachToComposer,
-                onReviewPathChange,
-                onReviewScopeChange,
-                onSelectedExtensionPanelChange,
-              })
-            }
-          />
-          <ExtensionActivityRail
-            active={activePanel === "extensions"}
-            activeExtensionId={selectedExtensionId}
-            onSelectExtension={onSelectExtension}
-            onOpenSettings={() => onOpenSettings("extensions")}
-          />
-        </>
-      )}
+      </div>
     </div>
   );
 }

@@ -61,7 +61,7 @@ export function normalizeWorkspacePath(path: string | undefined): string {
 }
 
 export function workspaceName(path: string): string {
-  return path.split("/").filter(Boolean).pop() || "workspace";
+  return path.split(/[\\/]/).filter(Boolean).pop() || "workspace";
 }
 
 export function normalizedTimestamp(timestamp: number): number {

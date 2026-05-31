@@ -1,5 +1,10 @@
 import { expect, test } from "vitest";
-import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "../src/lib/workspace-thread-options";
+import {
+  buildFolderOptions,
+  buildThreadOptions,
+  latestThreadInFolder,
+  workspaceName,
+} from "../src/lib/workspace-thread-options";
 import type { RoderThread } from "../src/types/roder";
 
 test("folder options include the active workspace first and summarize non-demo threads", () => {
@@ -34,6 +39,11 @@ test("thread options and latest thread selection are scoped to the selected fold
   expect(buildThreadOptions(threads, "/work/api").map((item) => item.id)).toEqual(["api-new", "api-old"]);
   expect(latestThreadInFolder(threads, "/work/api")?.id).toBe("api-new");
   expect(latestThreadInFolder(threads, "/work/missing")).toBeUndefined();
+});
+
+test("workspaceName handles Windows paths", () => {
+  expect(workspaceName("C:\\Users\\example\\gode-desktop")).toBe("gode-desktop");
+  expect(workspaceName("\\\\server\\share\\project")).toBe("project");
 });
 
 function thread(overrides: Pick<RoderThread, "id" | "cwd" | "updatedAt">): RoderThread {

@@ -60,5 +60,5 @@ function normalizeFolderKey(path: string): string {
 }
 
 function folderName(path: string): string {
-  return path?.split("/").filter(Boolean).pop() || "workspace";
+  return path?.split(/[\\/]/).filter(Boolean).pop() || "workspace";
 }

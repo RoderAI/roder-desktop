@@ -15,6 +15,7 @@ type AppSidebarProps = {
   activeThreadId: string;
   activeView: "chat" | "plugins";
   width: number;
+  reserveTitlebarSpace: boolean;
   onSelectThread: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
   onNewProject: () => void;
@@ -29,6 +30,7 @@ export function AppSidebar({
   activeThreadId,
   activeView,
   width,
+  reserveTitlebarSpace,
   onSelectThread,
   onArchiveThread,
   onNewProject,
@@ -66,11 +68,14 @@ export function AppSidebar({
 
   return (
     <aside
-      className="drag-region relative z-20 flex h-screen shrink-0 flex-col overflow-visible border-r border-border bg-sidebar text-sidebar-foreground"
+      className={cn(
+        "relative z-20 flex shrink-0 flex-col overflow-visible border-r border-border bg-sidebar text-sidebar-foreground",
+        reserveTitlebarSpace && "drag-region",
+        reserveTitlebarSpace ? "h-screen" : "h-full",
+      )}
       style={{ width }}
     >
-      <div className="h-[60px]" />
-
+      {reserveTitlebarSpace && <div className="h-[60px]" />}
       <div className="no-drag flex flex-col gap-1 px-2">
         <SidebarRowButton onClick={onNewProject}>
           <FolderPlus className="size-4.5" />
