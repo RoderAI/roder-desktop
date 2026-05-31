@@ -67,7 +67,7 @@ export function RightWorkspacePanelShell({
 
   return (
     <aside
-      className="right-workspace-panel relative flex h-full min-w-0 shrink-0 flex-col border-l border-border bg-white text-card-foreground"
+      className="right-workspace-panel relative flex h-full min-w-0 shrink-0 flex-col border-l border-border bg-background text-foreground"
       data-open={open ? "true" : undefined}
       style={panelStyle}
       aria-label="Workspace panel"

@@ -11,3 +11,8 @@ test("requireAbsoluteCwd resolves root aliases through the status cwd", () => {
   expect(requireAbsoluteCwd(".", "/Users/example/project")).toBe("/Users/example/project");
   expect(requireAbsoluteCwd("", "/Users/example/project")).toBe("/Users/example/project");
 });
+
+test("requireAbsoluteCwd accepts Windows absolute workspaces", () => {
+  expect(requireAbsoluteCwd("C:\\Users\\example\\project", undefined)).toBe("C:\\Users\\example\\project");
+  expect(requireAbsoluteCwd("\\\\server\\share\\project", undefined)).toBe("\\\\server\\share\\project");
+});

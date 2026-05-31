@@ -30,6 +30,10 @@ type TopBarProps = {
   status: RoderStatus;
   workspacePanelOpen: boolean;
   sidebarOpen: boolean;
+  placement: "content" | "window";
+  onNewProject: () => void;
+  onNewThread: () => void;
+  onOpenSettings: () => void;
   onRestart: () => void;
   onToggleSidebar: () => void;
   onSelectFolder: (path: string) => void;
@@ -46,6 +50,10 @@ export function TopBar({
   status,
   workspacePanelOpen,
   sidebarOpen,
+  placement,
+  onNewProject,
+  onNewThread,
+  onOpenSettings,
   onRestart,
   onToggleSidebar,
   onSelectFolder,
@@ -57,17 +65,95 @@ export function TopBar({
     (folder) => normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(activeFolderPath),
   );
   const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
+  const isWindowTopBar = placement === "window";
+
+  if (isWindowTopBar) {
+    return (
+      <header className="drag-region grid h-14 shrink-0 select-none grid-cols-3 items-center gap-3 border-b border-border/70 bg-background/95 pl-2 pr-48 text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(chromeIconButtonClassNameForState(false), "size-7 rounded-lg [&_svg]:size-4")}
+            aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            onClick={onToggleSidebar}
+          >
+            <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
+          </Button>
+          <nav className="no-drag flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
+            <WindowMenuButton
+              label="File"
+              items={[
+                { label: "New project", onSelect: onNewProject },
+                { label: "New thread", onSelect: onNewThread },
+                { label: "Settings", onSelect: onOpenSettings },
+              ]}
+            />
+            <WindowMenuButton label="Edit" items={[{ label: "No edit actions available", disabled: true }]} />
+            <WindowMenuButton
+              label="View"
+              items={[
+                { label: sidebarOpen ? "Hide sidebar" : "Show sidebar", onSelect: onToggleSidebar },
+                {
+                  label: workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel",
+                  onSelect: workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell,
+                },
+              ]}
+            />
+            <WindowMenuButton
+              label="Window"
+              items={[{ label: "Window controls use the system buttons", disabled: true }]}
+            />
+            <WindowMenuButton label="Help" items={[{ label: "Settings", onSelect: onOpenSettings }]} />
+          </nav>
+        </div>
+        <h1
+          className="drag-region flex min-w-0 items-center justify-center gap-1.5 text-sm"
+          title={`${activeFolderPath} / ${threadTitle(thread)}`}
+        >
+          <span className="min-w-0 truncate font-medium text-muted-foreground">{activeFolderLabel}</span>
+          <span className="shrink-0 text-muted-foreground/55" aria-hidden="true">
+            /
+          </span>
+          <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
+        </h1>
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          {status.state === "error" && (
+            <Button variant="outline" size="sm" onClick={onRestart}>
+              Restart
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(chromeIconButtonClassNameForState(workspacePanelOpen), "size-7 rounded-lg [&_svg]:size-4")}
+            aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+            title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+            onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
+          >
+            <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
+          </Button>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header
       className={cn(
-        "drag-region flex h-[60px] shrink-0 items-center border-b border-transparent pr-5 text-muted-foreground",
+        "drag-region flex shrink-0 items-center border-b text-muted-foreground",
+        "h-[60px] border-transparent pr-5",
         sidebarOpen ? "pl-5" : "pl-[148px]",
       )}
     >
       <Button
         variant="ghost"
         size="icon"
-        className={chromeIconButtonClassNameForState(false, "fixed left-[104px] top-3.5 z-40")}
+        className={cn(
+          chromeIconButtonClassNameForState(false),
+          "fixed left-[104px] top-3.5 z-40",
+        )}
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         onClick={onToggleSidebar}
@@ -104,7 +190,10 @@ export function TopBar({
         <Button
           variant="ghost"
           size="icon"
-          className={chromeIconButtonClassNameForState(workspacePanelOpen, "fixed right-5 top-3.5 z-40")}
+          className={cn(
+            chromeIconButtonClassNameForState(workspacePanelOpen),
+            "fixed right-5 top-3.5 z-40",
+          )}
           aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
           title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
           onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
@@ -113,6 +202,36 @@ export function TopBar({
         </Button>
       </div>
     </header>
+  );
+}
+
+type WindowMenuItem = {
+  label: string;
+  disabled?: boolean;
+  onSelect?: () => void;
+};
+
+function WindowMenuButton({ label, items }: { label: string; items: WindowMenuItem[] }): React.JSX.Element {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="no-drag rounded-md px-2 py-1 outline-none hover:bg-accent hover:text-foreground data-[popup-open]:bg-accent data-[popup-open]:text-foreground">
+        {label}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="bottom" sideOffset={4} className="w-56 rounded-lg p-1">
+        <DropdownMenuGroup>
+          {items.map((item) => (
+            <DropdownMenuItem
+              key={item.label}
+              disabled={item.disabled}
+              className="h-8 rounded-md text-sm disabled:opacity-50"
+              onSelect={() => item.onSelect?.()}
+            >
+              {item.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -21,10 +21,14 @@ export function normalizeCwd(cwd: string, baseCwd?: string): string {
 
 export function requireAbsoluteCwd(cwd: string | undefined, baseCwd?: string): string {
   const normalized = normalizeCwd(cwd?.trim() ?? "", baseCwd).trim();
-  if (!normalized || normalized === "." || !normalized.startsWith("/")) {
+  if (!normalized || normalized === "." || !isAbsoluteCwd(normalized)) {
     throw new Error("Select a workspace before starting a thread");
   }
   return normalized;
+}
+
+function isAbsoluteCwd(cwd: string): boolean {
+  return cwd.startsWith("/") || /^[A-Za-z]:[\\/]/.test(cwd) || cwd.startsWith("\\\\");
 }
 
 export function upsertWorkspaceRecent(recents: WorkspaceFolder[], path: string): WorkspaceFolder[] {

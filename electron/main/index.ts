@@ -84,7 +84,16 @@ function createWindow(): void {
     minHeight: 680,
     title: appName,
     icon: appIcon,
-    titleBarStyle: "hiddenInset",
+    autoHideMenuBar: process.platform !== "darwin",
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
+    titleBarOverlay:
+      process.platform === "win32"
+        ? {
+            color: "#171717",
+            symbolColor: "#e5e5e5",
+            height: 46,
+          }
+        : undefined,
     trafficLightPosition: { x: 18, y: 18 },
     backgroundColor: currentAppearance() === "dark" ? "#171717" : "#f5f5f4",
     webPreferences: {

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,12 +31,7 @@ if (result.status !== 0) {
 }
 
 const builtBinary = resolve(roderSource, "target", "debug", process.platform === "win32" ? "roder.exe" : "roder");
-const copied = spawnSync("cp", [builtBinary, output], {
-  stdio: "inherit",
-});
-if (copied.status !== 0) {
-  process.exit(copied.status ?? 1);
-}
+copyFileSync(builtBinary, output);
 
 if (process.platform === "darwin") {
   const signed = spawnSync("codesign", ["--force", "--sign", "-", output], {

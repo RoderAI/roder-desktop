@@ -40,3 +40,15 @@ test("sidebar project groups follow the stable project order", () => {
   expect(Array.from(groups, (group) => group.key)).toEqual(["/workspace/project-a", "/workspace/project-b"]);
   expect(Array.from(groups[1].threads, (item) => item.id)).toEqual(["thread-b-new", "thread-b-old"]);
 });
+
+test("sidebar project groups display Windows folder names", () => {
+  const groups = groupThreadsByFolder(
+    [
+      thread("local", "C:\\Users\\pz\\w\\gode"),
+      thread("unc", "\\\\server\\share\\project"),
+    ],
+    [],
+  );
+
+  expect(Array.from(groups, (group) => group.title)).toEqual(["gode", "project"]);
+});
