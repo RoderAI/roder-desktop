@@ -91,7 +91,7 @@ function createWindow(): void {
         ? {
             color: "#171717",
             symbolColor: "#e5e5e5",
-            height: 46,
+            height: 38,
           }
         : undefined,
     trafficLightPosition: { x: 18, y: 18 },
