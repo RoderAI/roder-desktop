@@ -5,6 +5,7 @@ import {
   applyThreadItemEvent,
   activeTurnIdForThread,
   markThreadStatus,
+  patchThread,
   sortThreadsByUpdatedAt,
   upsertThread,
 } from "@/lib/roder-thread";
@@ -259,6 +260,18 @@ function markThreadDetailStatus(
     return threadDetails;
   }
   return { ...threadDetails, [threadId]: { ...thread, status } };
+}
+
+function patchThreadDetails(
+  threadDetails: Record<string, RoderThread>,
+  threadId: string,
+  patch: Partial<RoderThread>,
+): Record<string, RoderThread> {
+  const thread = threadDetails[threadId];
+  if (!thread) {
+    return threadDetails;
+  }
+  return { ...threadDetails, [threadId]: { ...thread, ...patch } };
 }
 
 export const useRoderStore = create<RoderStore>()(
@@ -843,6 +856,39 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       activeThreadId: state.activeThreadId || thread.id,
       selectedWorkspaceCwd: thread.cwd,
       workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+    };
+  }
+
+  if ((notification.method === "thread/updated" || notification.method === "thread/renamed") && isRecord(params.thread)) {
+    const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
+    return {
+      ...waitPatch,
+      threads: upsertThread(state.threads, thread),
+      threadDetails: { ...state.threadDetails, [thread.id]: thread },
+      selectedWorkspaceCwd: thread.id === state.activeThreadId ? thread.cwd : state.selectedWorkspaceCwd,
+      workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+    };
+  }
+
+  if (notification.method === "thread/updated" || notification.method === "thread/renamed") {
+    const threadId = String(params.threadId ?? "");
+    const patch: Partial<RoderThread> = {};
+    if ("name" in params && (typeof params.name === "string" || params.name === null)) {
+      patch.name = params.name;
+    }
+    if (typeof params.preview === "string") {
+      patch.preview = params.preview;
+    }
+    if (typeof params.updatedAt === "number") {
+      patch.updatedAt = params.updatedAt;
+    }
+    if (!threadId || Object.keys(patch).length === 0) {
+      return waitPatch;
+    }
+    return {
+      ...waitPatch,
+      threads: patchThread(state.threads, threadId, patch),
+      threadDetails: patchThreadDetails(state.threadDetails, threadId, patch),
     };
   }
 

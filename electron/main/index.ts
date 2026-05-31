@@ -181,7 +181,10 @@ ipcMain.handle("browser:captureScreenshot", () => browser.captureScreenshot());
 ipcMain.handle("browser:toggleAnnotation", () => browser.toggleAnnotation());
 ipcMain.handle("browser:setBounds", (_event, bounds: Rectangle) => browser.setBounds(scaleRendererBounds(bounds)));
 ipcMain.handle("browser:snapshot", () => browser.snapshot());
-ipcMain.handle("canvas:savePng", (_event, dataUrl: string) => saveCanvasPng(dataUrl));
+ipcMain.handle("canvas:savePng", (_event, dataUrl: string) => savePngDataUrl(dataUrl, "canvas", "roder-desktop-canvas"));
+ipcMain.handle("clipboard:saveImage", (_event, dataUrl: string) =>
+  savePngDataUrl(dataUrl, "clipboard", "roder-desktop-clipboard"),
+);
 ipcMain.handle("codex:account", () => getCodexAccountSnapshot());
 ipcMain.handle("codex:login", () => startCodexLogin());
 ipcMain.handle("codex:logout", () => logoutCodex());
@@ -325,15 +328,19 @@ function scaleRendererBounds(bounds?: Rectangle): Rectangle {
   };
 }
 
-async function saveCanvasPng(dataUrl: string): Promise<{ name: string; path: string; type: string; size: number }> {
+async function savePngDataUrl(
+  dataUrl: string,
+  filePrefix: string,
+  tempDirName: string,
+): Promise<{ name: string; path: string; type: string; size: number }> {
   const prefix = "data:image/png;base64,";
   if (!dataUrl.startsWith(prefix)) {
-    throw new Error("Canvas capture must be a PNG data URL");
+    throw new Error("Image attachment must be a PNG data URL");
   }
   const data = Buffer.from(dataUrl.slice(prefix.length), "base64");
-  const dir = join(tmpdir(), "roder-desktop-canvas");
+  const dir = join(tmpdir(), tempDirName);
   await mkdir(dir, { recursive: true });
-  const name = `canvas-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
+  const name = `${filePrefix}-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
   const path = join(dir, name);
   await writeFile(path, data);
   return {

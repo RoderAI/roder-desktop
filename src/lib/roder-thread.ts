@@ -28,6 +28,13 @@ export function upsertThread(threads: RoderThread[], incoming: RoderThread): Rod
   return nextThreads;
 }
 
+export function patchThread(threads: RoderThread[], threadId: string, patch: Partial<RoderThread>): RoderThread[] {
+  if (!threadId) {
+    return threads;
+  }
+  return threads.map((thread) => (thread.id === threadId ? { ...thread, ...patch } : thread));
+}
+
 export function markThreadStatus(
   threads: RoderThread[],
   threadId: string,

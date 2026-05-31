@@ -57,6 +57,23 @@ type ComposerProps = {
   onStop: () => Promise<void>;
 };
 
+async function imageFileToPngDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Could not prepare pasted image");
+    }
+    context.drawImage(bitmap, 0, 0);
+    return canvas.toDataURL("image/png");
+  } finally {
+    bitmap.close();
+  }
+}
+
 export function Composer({
   busy,
   models,
@@ -188,6 +205,30 @@ export function Composer({
     addAttachments(resolved);
   }
 
+  async function attachPastedImages(files: File[]): Promise<void> {
+    const resolved = await Promise.all(
+      files.map(async (file) => {
+        const dataUrl = await imageFileToPngDataUrl(file);
+        const saved = await window.roderDesktop.clipboardSaveImage(dataUrl);
+        return {
+          ...saved,
+          name: file.name || saved.name,
+          id: crypto.randomUUID(),
+        };
+      }),
+    );
+    addAttachments(resolved);
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLDivElement>): void {
+    const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    void attachPastedImages(imageFiles);
+  }
+
   function handleDrop(event: React.DragEvent<HTMLDivElement>): void {
     event.preventDefault();
     setDragActive(false);
@@ -271,6 +312,7 @@ export function Composer({
             }
             onChange={handlePromptEditorChange}
             onKeyDownCapture={handlePromptEditorKeyDownCapture}
+            onPaste={handlePaste}
           />
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
           <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
@@ -333,6 +375,7 @@ type SkillPromptEditorProps = {
   activeCompletionId: string | undefined;
   onChange: (value: string, caret: number) => void;
   onKeyDownCapture: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onPaste: (event: React.ClipboardEvent<HTMLDivElement>) => void;
 };
 
 function SkillPromptEditor({
@@ -345,6 +388,7 @@ function SkillPromptEditor({
   activeCompletionId,
   onChange,
   onKeyDownCapture,
+  onPaste,
 }: SkillPromptEditorProps): React.JSX.Element {
   const editorRootRef = useRef<HTMLDivElement | null>(null);
   const historyState = useMemo(() => createEmptyHistoryState(), []);
@@ -396,6 +440,7 @@ function SkillPromptEditor({
         tabIndex={0}
         className="skill-prompt-editor relative min-h-16 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-7 text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-7"
         onKeyDownCapture={onKeyDownCapture}
+        onPaste={onPaste}
       />
     </div>
   );

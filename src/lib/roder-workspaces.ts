@@ -13,7 +13,7 @@ export function normalizeCwd(cwd: string, baseCwd?: string): string {
   if (!cwd || cwd === ".") {
     return baseCwd || cwd || "";
   }
-  if (cwd.startsWith("/") || !baseCwd) {
+  if (isAbsoluteCwd(cwd) || !baseCwd) {
     return cwd;
   }
   return `${baseCwd.replace(/\/+$/, "")}/${cwd.replace(/^\/+/, "")}`;
@@ -50,6 +50,6 @@ function workspaceName(path: string): string {
   if (!path || path === ".") {
     return "workspace";
   }
-  const trimmed = path.replace(/\/+$/, "");
-  return trimmed.split("/").filter(Boolean).pop() || "Home";
+  const trimmed = path.replace(/[\\/]+$/, "");
+  return trimmed.split(/[\\/]/).filter(Boolean).pop() || "Home";
 }
