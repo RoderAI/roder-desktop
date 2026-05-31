@@ -110,6 +110,7 @@ const api = {
     ipcRenderer.invoke("browser:setBounds", bounds) as Promise<BrowserSnapshot>,
   browserSnapshot: () => ipcRenderer.invoke("browser:snapshot") as Promise<BrowserSnapshot>,
   canvasSavePng: (dataUrl: string) => ipcRenderer.invoke("canvas:savePng", dataUrl) as Promise<DroppedFile>,
+  clipboardSaveImage: (dataUrl: string) => ipcRenderer.invoke("clipboard:saveImage", dataUrl) as Promise<DroppedFile>,
   codexAccount: () => ipcRenderer.invoke("codex:account") as Promise<CodexAccountSnapshot>,
   codexLogin: () => ipcRenderer.invoke("codex:login") as Promise<CodexAccountSnapshot>,
   codexLogout: () => ipcRenderer.invoke("codex:logout") as Promise<CodexAccountSnapshot>,

@@ -4,6 +4,7 @@ import {
   isThreadRunning,
   markThreadStatus,
   messagesFromThread,
+  patchThread,
   shouldShowThreadWorkingIndicator,
   upsertThread,
 } from "../src/lib/roder-thread";
@@ -55,6 +56,17 @@ test("explicit status changes update thread activity", () => {
   const idle = markThreadStatus(running, "thread-b", { type: "idle", activeTurnId: null, activeFlags: [] });
   expect(isThreadRunning(idle[1])).toBe(false);
   expect(idle[1].status.activeTurnId).toBe(null);
+});
+
+test("thread title patches update in place without waiting for a list refresh", () => {
+  const threads = [thread("thread-a", 100), thread("thread-b", 90)];
+
+  const result = patchThread(threads, "thread-b", { name: "Named thread", preview: "Fallback title", updatedAt: 120 });
+
+  expect(Array.from(result, (item) => item.id)).toEqual(["thread-a", "thread-b"]);
+  expect(result[1].name).toBe("Named thread");
+  expect(result[1].preview).toBe("Fallback title");
+  expect(result[1].updatedAt).toBe(120);
 });
 
 test("working indicator follows active thread work without covering waits", () => {
