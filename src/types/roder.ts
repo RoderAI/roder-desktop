@@ -333,6 +333,18 @@ export type TerminalSnapshot = {
   pid: number;
 };
 
+export type ChromeBridgeStatus = {
+  state: "stopped" | "starting" | "running" | "error";
+  url: string | null;
+  token: string | null;
+  tokenPreview: string | null;
+  pairingUrl: string | null;
+  pid: number | null;
+  clientCount: number;
+  lastEvent?: string;
+  message?: string;
+};
+
 export type BrowserBounds = {
   x: number;
   y: number;
@@ -579,6 +591,11 @@ declare global {
       browserToggleAnnotation: () => Promise<BrowserSnapshot>;
       browserSetBounds: (bounds: BrowserBounds) => Promise<BrowserSnapshot>;
       browserSnapshot: () => Promise<BrowserSnapshot>;
+      chromeBridgeStatus: () => Promise<ChromeBridgeStatus>;
+      chromeBridgeStart: () => Promise<ChromeBridgeStatus>;
+      chromeBridgeStop: () => Promise<ChromeBridgeStatus>;
+      chromeBridgeRestart: () => Promise<ChromeBridgeStatus>;
+      chromeBridgeOpenExtensionOptions: () => Promise<void>;
       canvasSavePng: (dataUrl: string) => Promise<ResolvedDesktopFile>;
       clipboardSaveImage: (dataUrl: string) => Promise<ResolvedDesktopFile>;
       codexAccount: () => Promise<CodexAccountSnapshot>;
@@ -614,7 +631,9 @@ declare global {
       onAppServerEvent: (callback: (event: AppServerEvent) => void) => () => void;
       onAppCommand: (callback: (command: AppCommand) => void) => () => void;
       onTerminalData: (callback: (payload: { id: string; data: string }) => void) => () => void;
+      onChromeBridgeStatus: (callback: (status: ChromeBridgeStatus) => void) => () => void;
       onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => () => void;
     };
   }
 }
+

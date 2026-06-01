@@ -26,6 +26,9 @@
     "mac": {
       "icon": "resources/icon.icns"
     },
+    "win": {
+      "icon": "resources/icon.ico"
+    },
     "files": [
       "out/**",
       "package.json",

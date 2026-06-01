@@ -31,6 +31,18 @@ export type BrowserSnapshot = {
   annotating: boolean;
 };
 
+export type ChromeBridgeStatus = {
+  state: "stopped" | "starting" | "running" | "error";
+  url: string | null;
+  token: string | null;
+  tokenPreview: string | null;
+  pairingUrl: string | null;
+  pid: number | null;
+  clientCount: number;
+  lastEvent?: string;
+  message?: string;
+};
+
 export type BrowserBounds = {
   x: number;
   y: number;
@@ -109,6 +121,11 @@ const api = {
   browserSetBounds: (bounds: BrowserBounds) =>
     ipcRenderer.invoke("browser:setBounds", bounds) as Promise<BrowserSnapshot>,
   browserSnapshot: () => ipcRenderer.invoke("browser:snapshot") as Promise<BrowserSnapshot>,
+  chromeBridgeStatus: () => ipcRenderer.invoke("chromeBridge:status") as Promise<ChromeBridgeStatus>,
+  chromeBridgeStart: () => ipcRenderer.invoke("chromeBridge:start") as Promise<ChromeBridgeStatus>,
+  chromeBridgeStop: () => ipcRenderer.invoke("chromeBridge:stop") as Promise<ChromeBridgeStatus>,
+  chromeBridgeRestart: () => ipcRenderer.invoke("chromeBridge:restart") as Promise<ChromeBridgeStatus>,
+  chromeBridgeOpenExtensionOptions: () => ipcRenderer.invoke("chromeBridge:openExtensionOptions") as Promise<void>,
   canvasSavePng: (dataUrl: string) => ipcRenderer.invoke("canvas:savePng", dataUrl) as Promise<DroppedFile>,
   clipboardSaveImage: (dataUrl: string) => ipcRenderer.invoke("clipboard:saveImage", dataUrl) as Promise<DroppedFile>,
   codexAccount: () => ipcRenderer.invoke("codex:account") as Promise<CodexAccountSnapshot>,
@@ -187,6 +204,11 @@ const api = {
     ipcRenderer.on("terminal:data", listener);
     return () => ipcRenderer.removeListener("terminal:data", listener);
   },
+  onChromeBridgeStatus: (callback: (status: ChromeBridgeStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: ChromeBridgeStatus) => callback(status);
+    ipcRenderer.on("chromeBridge:status", listener);
+    return () => ipcRenderer.removeListener("chromeBridge:status", listener);
+  },
   onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; exitCode: number; signal?: number }) =>
       callback(payload);
@@ -196,3 +218,4 @@ const api = {
 };
 
 contextBridge.exposeInMainWorld("roderDesktop", api);
+
