@@ -6,7 +6,9 @@ import { renderRightWorkspacePanel, rightWorkspacePanelEntries } from "@/compone
 import { RightWorkspacePanelShell } from "@/components/right-workspace-panel-shell";
 import { TopBar, type WorkspacePanel } from "@/components/top-bar";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import type { RouteReviewScope, RouteWorkspacePanel } from "@/lib/route-search";
+import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment, RoderStatus, RoderThread } from "@/types/roder";
 
@@ -101,7 +103,8 @@ export function AppShellLayout({
 }: AppShellLayoutProps): React.JSX.Element {
   const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
-  const extensionSidebarVisible = !isPluginsRoute;
+  const extensions = useExtensionsStore((state) => state.extensions);
+  const extensionSidebarVisible = !isPluginsRoute && getSidebarExtensions(extensions).length > 0;
 
   if (!useWindowTopBar) {
     return (
