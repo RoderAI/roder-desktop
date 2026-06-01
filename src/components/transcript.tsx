@@ -44,7 +44,7 @@ import { PhaseMessage } from "./phase-message";
 import { ToolActivityGroup } from "./tool-activity-group";
 import { ToolTimelineItem } from "./tool-timeline-item";
 import { ShimmerText } from "./tool-timeline-shared";
-import { renderTextWithSkillTokens } from "@/components/skill-token-pill";
+import { UserMessageContent } from "@/components/user-message-content";
 import { useSkillsStore } from "@/stores/skills-store";
 
 type TranscriptProps = {
@@ -317,24 +317,30 @@ export function Transcript({
       userScrollIntentTimeoutRef.current = null;
     }, 200);
   }, []);
-  const handleViewportWheelCapture = useCallback((event: WheelEvent<HTMLDivElement>) => {
-    if (event.deltaY < 0 || !pinnedToEndRef.current) {
-      markUserScrollIntent();
-    }
-  }, [markUserScrollIntent]);
-  const handleViewportKeyDownCapture = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (
-      event.key === "ArrowUp" ||
-      event.key === "PageUp" ||
-      event.key === "Home" ||
-      event.key === "ArrowDown" ||
-      event.key === "PageDown" ||
-      event.key === "End" ||
-      event.key === " "
-    ) {
-      markUserScrollIntent();
-    }
-  }, [markUserScrollIntent]);
+  const handleViewportWheelCapture = useCallback(
+    (event: WheelEvent<HTMLDivElement>) => {
+      if (event.deltaY < 0 || !pinnedToEndRef.current) {
+        markUserScrollIntent();
+      }
+    },
+    [markUserScrollIntent],
+  );
+  const handleViewportKeyDownCapture = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (
+        event.key === "ArrowUp" ||
+        event.key === "PageUp" ||
+        event.key === "Home" ||
+        event.key === "ArrowDown" ||
+        event.key === "PageDown" ||
+        event.key === "End" ||
+        event.key === " "
+      ) {
+        markUserScrollIntent();
+      }
+    },
+    [markUserScrollIntent],
+  );
 
   useEffect(
     () => () => {
@@ -422,13 +428,7 @@ export function Transcript({
       reportCanScrollToBottom(false);
       scheduleScrollToEnd(followAction.behavior, followAction.scrollObservationVersion);
     }
-  }, [
-    followSignal,
-    reportCanScrollToBottom,
-    scheduleScrollToEnd,
-    setPinnedToEndState,
-    transcriptVersion,
-  ]);
+  }, [followSignal, reportCanScrollToBottom, scheduleScrollToEnd, setPinnedToEndState, transcriptVersion]);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
   const transcriptSearchText = useMemo(() => {
@@ -585,10 +585,7 @@ function TranscriptEntryView({
 
   return (
     <article
-      className={cn(
-        "text-foreground",
-        message?.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-base",
-      )}
+      className={cn("text-foreground", message?.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-base")}
     >
       {entry.kind === "activityGroup" ? (
         <ToolActivityGroup
@@ -618,9 +615,7 @@ function TranscriptEntryView({
           text={message.text || (message.status === "streaming" ? " " : "")}
         />
       ) : (
-        <div className="font-medium text-base leading-[1.55]">
-          {renderTextWithSkillTokens(message?.text ?? "", skills)}
-        </div>
+        <UserMessageContent images={message?.images} skills={skills} text={message?.text ?? ""} />
       )}
     </article>
   );

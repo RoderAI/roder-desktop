@@ -50,6 +50,21 @@ test("theme store migrates the old default code font size", async () => {
   expect(useThemeStore.getState().settings.codeFontSize).toBe(defaultThemeSettings.codeFontSize);
 });
 
+test("theme store adds the default terminal theme to older persisted settings", async () => {
+  const storage = installStorageMock();
+  storage.set(
+    "roder-desktop-theme",
+    JSON.stringify({
+      state: { settings: legacyThemeSettings(14) },
+      version: 2,
+    }),
+  );
+
+  const { defaultThemeSettings, useThemeStore } = await loadThemeStore();
+
+  expect(useThemeStore.getState().settings.terminalTheme).toEqual(defaultThemeSettings.terminalTheme);
+});
+
 function legacyThemeSettings(codeFontSize: number) {
   return {
     mode: "system",

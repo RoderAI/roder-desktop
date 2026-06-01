@@ -2,12 +2,18 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useCallback, useEffect, useRef } from "react";
+import { terminalThemeForSettings } from "@/lib/terminal-theme";
+import { useThemeStore } from "@/stores/theme-store";
 
 type TerminalPanelProps = {
   active?: boolean;
+  cwd: string;
 };
 
-export function TerminalPanel({ active = true }: TerminalPanelProps): React.JSX.Element {
+export function TerminalPanel({ active = true, cwd }: TerminalPanelProps): React.JSX.Element {
+  const terminalThemeSettings = useThemeStore((state) => state.settings.terminalTheme);
+  const codeFont = useThemeStore((state) => state.settings.dark.codeFont);
+  const codeFontSize = useThemeStore((state) => state.settings.codeFontSize);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -28,7 +34,7 @@ export function TerminalPanel({ active = true }: TerminalPanelProps): React.JSX.
       void window.roderDesktop.terminalResize(terminal.cols, terminal.rows);
     } else {
       startedRef.current = true;
-      void window.roderDesktop.terminalStart({ cols: terminal.cols, rows: terminal.rows });
+      void window.roderDesktop.terminalStart({ cols: terminal.cols, rows: terminal.rows, cwd });
     }
     if (focus) {
       terminal.focus();
@@ -51,15 +57,12 @@ export function TerminalPanel({ active = true }: TerminalPanelProps): React.JSX.
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontFamily: '"SFMono-Regular", "SF Mono", Consolas, monospace',
-      fontSize: 13,
-      lineHeight: 1.35,
-      theme: {
-        background: "#111111",
-        foreground: "#d6d6d6",
-        cursor: "#f0f0f0",
-        selectionBackground: "#4a4a4a",
-      },
+      drawBoldTextInBrightColors: true,
+      fontFamily: codeFont,
+      fontSize: codeFontSize,
+      lineHeight: 1,
+      minimumContrastRatio: 1,
+      theme: terminalThemeForSettings(terminalThemeSettings),
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -90,10 +93,21 @@ export function TerminalPanel({ active = true }: TerminalPanelProps): React.JSX.
       fitRef.current = null;
       startedRef.current = false;
     };
-  }, [fitAndResize]);
+  }, [codeFont, codeFontSize, fitAndResize, terminalThemeSettings]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) {
+      return;
+    }
+    terminal.options.fontFamily = codeFont;
+    terminal.options.fontSize = codeFontSize;
+    terminal.options.theme = terminalThemeForSettings(terminalThemeSettings);
+    requestAnimationFrame(() => fitAndResize());
+  }, [codeFont, codeFontSize, fitAndResize, terminalThemeSettings]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col border-l border-border bg-[#111]">
+    <div className="flex h-full min-h-0 flex-col border-l border-border bg-[var(--terminal-background,#1e1e2e)]">
       <div className="flex h-10 shrink-0 items-center border-b border-border px-3 text-base text-muted-foreground">
         Terminal
       </div>

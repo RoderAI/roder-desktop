@@ -21,9 +21,15 @@ export type ThemeSettings = {
   mode: ThemeMode;
   light: ThemePalette;
   dark: ThemePalette;
+  terminalTheme: TerminalThemeSettings;
   pointerCursors: boolean;
   uiFontSize: number;
   codeFontSize: number;
+};
+
+export type TerminalThemeSettings = {
+  presetId: string;
+  customJson: string;
 };
 
 export type SettingsSection =
@@ -34,6 +40,7 @@ export type SettingsSection =
   | "skills"
   | "extensions"
   | "browser"
+  | "terminal"
   | "configuration"
   | "personalization"
   | "mcp"
@@ -50,6 +57,8 @@ type ThemeStore = {
   setPointerCursors: (enabled: boolean) => void;
   setUiFontSize: (size: number) => void;
   setCodeFontSize: (size: number) => void;
+  setTerminalThemePreset: (presetId: string) => void;
+  setTerminalThemeCustomJson: (customJson: string) => void;
   resetTheme: () => void;
 };
 
@@ -166,12 +175,16 @@ export const defaultThemeSettings: ThemeSettings = {
   mode: "system",
   light: themePresets.find((preset) => preset.id === "roder-light")!.palette,
   dark: themePresets.find((preset) => preset.id === "roder-dark")!.palette,
+  terminalTheme: {
+    presetId: "catppuccin-mocha",
+    customJson: "",
+  },
   pointerCursors: false,
   uiFontSize: 18,
   codeFontSize: 14,
 };
 
-const themeStorageVersion = 2;
+const themeStorageVersion = 3;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -204,6 +217,20 @@ export const useThemeStore = create<ThemeStore>()(
       setPointerCursors: (pointerCursors) => set((state) => ({ settings: { ...state.settings, pointerCursors } })),
       setUiFontSize: (uiFontSize) => set((state) => ({ settings: { ...state.settings, uiFontSize } })),
       setCodeFontSize: (codeFontSize) => set((state) => ({ settings: { ...state.settings, codeFontSize } })),
+      setTerminalThemePreset: (presetId) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            terminalTheme: { ...state.settings.terminalTheme, presetId },
+          },
+        })),
+      setTerminalThemeCustomJson: (customJson) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            terminalTheme: { ...state.settings.terminalTheme, customJson },
+          },
+        })),
       resetTheme: () => set({ settings: defaultThemeSettings }),
     }),
     {
@@ -240,6 +267,7 @@ function migratePersistedTheme(persisted: unknown, version: number): unknown {
         version < 2 && (settings.codeFontSize == null || settings.codeFontSize === 13)
           ? defaultThemeSettings.codeFontSize
           : settings.codeFontSize,
+      terminalTheme: settings.terminalTheme ?? defaultThemeSettings.terminalTheme,
     },
   };
 }
@@ -250,6 +278,10 @@ function mergeThemeSettings(current: ThemeSettings, persisted: Partial<ThemeSett
     ...persisted,
     light: mergePalette(current.light, persisted?.light),
     dark: mergePalette(current.dark, persisted?.dark),
+    terminalTheme: {
+      ...current.terminalTheme,
+      ...persisted?.terminalTheme,
+    },
   };
 }
 

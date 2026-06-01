@@ -3,8 +3,15 @@ import { ArrowDown, ArrowUp, Loader2, Mic, Plus, Square } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort, SkillDescriptor } from "@/types/roder";
 import { Button } from "@/components/ui/button";
-import { AttachmentChip, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
+import { AttachmentChip, ComposerAttachMenuItems, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
+import { ComposerSketchPad } from "@/components/composer-sketch-pad";
 import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSkillCompletion } from "@/hooks/use-skill-completion";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import {
@@ -94,12 +101,20 @@ export function Composer({
 }: ComposerProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [sketchOpen, setSketchOpen] = useState(false);
   const [caretPosition, setCaretPosition] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const skillPromptEditor = useMemo(() => createSkillPromptEditor(), []);
   const skillCompletionListboxId = useId();
   const skillsRef = useRef(skills);
-  const skillNamesKey = useMemo(() => skills.map((skill) => skill.name).sort().join("|"), [skills]);
+  const skillNamesKey = useMemo(
+    () =>
+      skills
+        .map((skill) => skill.name)
+        .sort()
+        .join("|"),
+    [skills],
+  );
   skillsRef.current = skills;
 
   useEffect(() => {
@@ -198,10 +213,15 @@ export function Composer({
     onAttachmentsChange(attachments.filter((attachment) => attachment.id !== id));
   }
 
+  function attachSketch(attachment: DesktopAttachment): void {
+    addAttachments([attachment]);
+    skillPromptEditor.focus();
+  }
+
   function attachFiles(files: FileList | File[]): void {
     const resolved = window.roderDesktop
       .resolveDroppedFiles(Array.from(files))
-      .map((file) => ({ ...file, id: crypto.randomUUID() }));
+      .map((file) => ({ ...file, id: crypto.randomUUID(), source: "file" as const }));
     addAttachments(resolved);
   }
 
@@ -214,6 +234,8 @@ export function Composer({
           ...saved,
           name: file.name || saved.name,
           id: crypto.randomUUID(),
+          imageUrl: dataUrl,
+          source: "clipboard" as const,
         };
       }),
     );
@@ -277,6 +299,7 @@ export function Composer({
             ))}
           </div>
         )}
+        {sketchOpen && <ComposerSketchPad onAttach={attachSketch} onClose={() => setSketchOpen(false)} />}
         <SkillCompletionPopup
           visible={skillCompletion.showSkillCompletionMenu}
           listboxId={skillCompletionListboxId}
@@ -317,15 +340,24 @@ export function Composer({
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
           <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-9 shrink-0 rounded-full text-muted-foreground"
-                aria-label="Attach files"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Plus className="size-5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  variant="unstyled"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-accent data-[popup-open]:text-foreground"
+                  aria-label="Add input"
+                  title="Add input"
+                >
+                  <Plus className="size-5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-44">
+                  <DropdownMenuGroup>
+                    <ComposerAttachMenuItems
+                      onOpenSketch={() => setSketchOpen(true)}
+                      onUploadFile={() => fileInputRef.current?.click()}
+                    />
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <PolicyModePicker selectedMode={selectedPolicyMode} onChange={onSelectedPolicyModeChange} />
             </div>
             <div className="flex items-center gap-2">

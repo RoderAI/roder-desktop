@@ -298,7 +298,18 @@ export function messagesFromRoderItem(
   }
 
   if (item.type === "userMessage") {
-    return [{ id: item.id, threadId, turnId, role: "user", text, status: "complete" }];
+    const images = userMessageImages(item);
+    return [
+      {
+        id: item.id,
+        threadId,
+        turnId,
+        role: "user",
+        text,
+        ...(images.length > 0 ? { images } : {}),
+        status: "complete",
+      },
+    ];
   }
   if (item.type === "agentMessage") {
     const phase = normalizeAssistantPhase(item.phase);
@@ -400,6 +411,16 @@ function extractItemText(item: RoderItem): string {
     return item.summary;
   }
   return "";
+}
+
+function userMessageImages(item: RoderItem): Array<{ imageUrl: string }> {
+  if (item.type !== "userMessage") {
+    return [];
+  }
+  return (item.images ?? [])
+    .map((image) => image.imageUrl ?? image.image_url ?? "")
+    .filter((imageUrl) => imageUrl.trim().length > 0)
+    .map((imageUrl) => ({ imageUrl }));
 }
 
 function reasoningBlocksText(blocks: string[] | undefined): string {

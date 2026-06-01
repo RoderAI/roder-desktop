@@ -1,12 +1,13 @@
-import { Camera, Circle, Eraser, Minus, MousePointer2, Pencil, RotateCcw, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CanvasStage } from "@/components/canvas/canvas-stage";
+import { CanvasToolbar, canvasDefaultPencilColor } from "@/components/canvas/canvas-toolbar";
 import type { DesktopAttachment } from "@/types/roder";
-import { CanvasToolbarButton as ToolbarButton } from "@/components/canvas-toolbar-button";
 import {
   canvasBackground,
   drawImageSelection,
   drawShape,
   drawStroke,
+  hasCanvasContent,
   hitResizeHandle,
   imageAtPoint,
   imageRect,
@@ -22,14 +23,10 @@ import {
   type Point,
   type Stroke,
 } from "@/lib/canvas-surface";
-import { cn } from "@/lib/utils";
 
 type CanvasPanelProps = {
   onAttach: (attachment: DesktopAttachment) => void;
 };
-
-const defaultPencilColor = "#18181b";
-const swatches = [defaultPencilColor, "#f8f8f2", "#f97316", "#facc15", "#22c55e", "#38bdf8", "#a78bfa", "#f472b6"];
 
 export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -46,7 +43,7 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
   const [shapes, setShapes] = useState<CanvasShape[]>([]);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  const [color, setColor] = useState(defaultPencilColor);
+  const [color, setColor] = useState(canvasDefaultPencilColor);
   const [width, setWidth] = useState(5);
   const [mode, setMode] = useState<CanvasTool>("draw");
   const [dragActive, setDragActive] = useState(false);
@@ -281,6 +278,7 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     for (const image of imagesRef.current) {
       URL.revokeObjectURL(image.objectUrl);
     }
+    orderRef.current = 0;
     imagesRef.current = [];
     shapesRef.current = [];
     strokesRef.current = [];
@@ -337,16 +335,20 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
     return orderRef.current;
   }
 
-  async function attachCanvas(): Promise<void> {
+  const canvasHasContent = hasCanvasContent({ images, shapes, strokes });
+  const canUndo = strokes.length > 0 || shapes.length > 0;
+
+  async function useSketch(): Promise<void> {
     const canvas = canvasRef.current;
-    if (!canvas) {
+    if (!canvas || !canvasHasContent) {
       return;
     }
     setCapturing(true);
     try {
       redraw({ includeSelection: false });
-      const file = await window.roderDesktop.canvasSavePng(canvas.toDataURL("image/png"));
-      onAttach({ ...file, id: crypto.randomUUID() });
+      const imageUrl = canvas.toDataURL("image/png");
+      const file = await window.roderDesktop.canvasSavePng(imageUrl);
+      onAttach({ ...file, id: crypto.randomUUID(), imageUrl, source: "canvas" });
     } finally {
       redraw();
       setCapturing(false);
@@ -354,144 +356,39 @@ export function CanvasPanel({ onAttach }: CanvasPanelProps): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col border-l border-border bg-card">
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
-        <ToolbarButton label="Draw" active={mode === "draw"} onClick={() => setMode("draw")}>
-          <Pencil className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton label="Select and resize images" active={mode === "select"} onClick={() => setMode("select")}>
-          <MousePointer2 className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton label="Erase" active={mode === "erase"} onClick={() => setMode("erase")}>
-          <Eraser className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton label="Rectangle" active={mode === "rectangle"} onClick={() => setMode("rectangle")}>
-          <Square className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton label="Ellipse" active={mode === "ellipse"} onClick={() => setMode("ellipse")}>
-          <Circle className="size-4" />
-        </ToolbarButton>
-        <ToolbarButton label="Line" active={mode === "line"} onClick={() => setMode("line")}>
-          <Minus className="size-4" />
-        </ToolbarButton>
-        <div className="mx-1 h-5 w-px bg-border" />
-        <div className="flex items-center gap-1">
-          {swatches.map((swatch) => (
-            <button
-              key={swatch}
-              type="button"
-              className={cn(
-                "size-5 rounded-full border border-border ring-offset-2 ring-offset-card",
-                color === swatch && "ring-2 ring-ring",
-              )}
-              style={{ backgroundColor: swatch }}
-              aria-label={`Use color ${swatch}`}
-              title={swatch}
-              onClick={() => {
-                setColor(swatch);
-                setMode("draw");
-              }}
-            />
-          ))}
-          <input
-            value={color}
-            type="color"
-            className="ml-1 size-7 rounded border border-border bg-transparent p-0.5"
-            aria-label="Choose drawing color"
-            title="Choose drawing color"
-            onChange={(event) => {
-              setColor(event.target.value);
-              setMode("draw");
-            }}
+    <div className="flex h-full min-h-0 w-full flex-col bg-card">
+      <CanvasStage
+        canvasRef={canvasRef}
+        dragActive={dragActive}
+        mode={mode}
+        wrapperRef={wrapperRef}
+        onBeginStroke={beginStroke}
+        onDropImages={(files, point) => void addDroppedImages(files, point)}
+        onEndStroke={endStroke}
+        onMoveStroke={moveStroke}
+        onPointerLeave={(event) => {
+          if (activeStrokeRef.current) {
+            endStroke(event);
+          }
+        }}
+        onSetDragActive={setDragActive}
+        toolbar={
+          <CanvasToolbar
+            canUndo={canUndo}
+            capturing={capturing}
+            color={color}
+            hasContent={canvasHasContent}
+            mode={mode}
+            width={width}
+            onClear={clear}
+            onColorChange={setColor}
+            onModeChange={setMode}
+            onUndo={undo}
+            onUseSketch={useSketch}
+            onWidthChange={setWidth}
           />
-        </div>
-        <label className="ml-2 flex items-center gap-2 text-base text-muted-foreground">
-          Size
-          <input
-            value={width}
-            type="range"
-            min={2}
-            max={18}
-            className="w-24 accent-primary"
-            onChange={(event) => setWidth(Number(event.target.value))}
-          />
-        </label>
-        <div className="ml-auto flex items-center gap-1">
-          <ToolbarButton label="Undo mark" disabled={strokes.length === 0 && shapes.length === 0} onClick={undo}>
-            <RotateCcw className="size-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            label="Clear canvas"
-            disabled={strokes.length === 0 && shapes.length === 0 && images.length === 0}
-            onClick={clear}
-          >
-            <Trash2 className="size-4" />
-          </ToolbarButton>
-          <ToolbarButton label="Attach canvas screenshot" disabled={capturing} onClick={attachCanvas}>
-            <Camera className="size-4" />
-          </ToolbarButton>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 p-3">
-        <div
-          ref={wrapperRef}
-          className={cn(
-            "relative h-full overflow-hidden rounded-xl border border-border bg-background shadow-inner",
-            dragActive && "ring-2 ring-ring",
-          )}
-          onDragEnter={(event) => {
-            if (event.dataTransfer.types.includes("Files")) {
-              setDragActive(true);
-            }
-          }}
-          onDragLeave={(event) => {
-            const nextTarget = event.relatedTarget;
-            if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
-              setDragActive(false);
-            }
-          }}
-          onDragOver={(event) => {
-            if (event.dataTransfer.types.includes("Files")) {
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "copy";
-            }
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-            void addDroppedImages(
-              event.dataTransfer.files,
-              pointFromClient(event.clientX, event.clientY, event.currentTarget),
-            );
-          }}
-        >
-          <canvas
-            ref={canvasRef}
-            className={cn("block size-full touch-none", mode === "select" ? "cursor-move" : "cursor-crosshair")}
-            aria-label="Idea canvas"
-            onPointerDown={beginStroke}
-            onPointerMove={moveStroke}
-            onPointerUp={endStroke}
-            onPointerCancel={endStroke}
-            onPointerLeave={(event) => {
-              if (activeStrokeRef.current) {
-                endStroke(event);
-              }
-            }}
-          />
-          {dragActive && (
-            <div className="pointer-events-none absolute inset-3 grid place-items-center rounded-lg border border-dashed border-ring bg-background/70 text-base text-muted-foreground backdrop-blur-sm">
-              Drop images to annotate
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="flex h-9 shrink-0 items-center gap-2 border-t border-border px-3 text-base text-muted-foreground">
-        <span>Canvas</span>
-        <span className="truncate">
-          Drop images, resize them, add shapes or pencil notes, then attach the PNG to the prompt.
-        </span>
-      </div>
+        }
+      />
     </div>
   );
 }

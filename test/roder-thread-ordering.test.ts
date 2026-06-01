@@ -110,6 +110,39 @@ test("message snapshots are reused for unchanged thread objects", () => {
   expect(first).toBe(second);
 });
 
+test("user message images are projected into transcript messages", () => {
+  const current = {
+    ...thread("thread-a", 100),
+    turns: [
+      {
+        id: "turn-a",
+        itemsView: "default",
+        status: "completed",
+        items: [
+          {
+            id: "message-a",
+            type: "userMessage",
+            text: "clean this sketch up",
+            images: [{ imageUrl: "data:image/png;base64,YWJj" }],
+          },
+        ],
+      },
+    ],
+  };
+
+  expect(messagesFromThread(current)).toEqual([
+    {
+      id: "message-a",
+      threadId: "thread-a",
+      turnId: "turn-a",
+      role: "user",
+      text: "clean this sketch up",
+      images: [{ imageUrl: "data:image/png;base64,YWJj" }],
+      status: "complete",
+    },
+  ]);
+});
+
 test("typed item events project into stable reasoning and final message items", () => {
   let current = {
     ...thread("thread-a", 100),

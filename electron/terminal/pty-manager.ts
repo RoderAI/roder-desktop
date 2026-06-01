@@ -33,6 +33,7 @@ export class TerminalManager extends EventEmitter {
       env: {
         ...process.env,
         TERM_PROGRAM: "roder-desktop",
+        COLORTERM: "truecolor",
       },
     });
     const id = "primary";

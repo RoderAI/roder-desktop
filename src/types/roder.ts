@@ -304,6 +304,7 @@ export type ConversationMessage = {
   turnId?: string;
   role: "user" | "assistant" | "system" | "tool";
   text: string;
+  images?: { imageUrl: string }[];
   status?: "streaming" | "complete" | "failed";
   phase?: string;
   toolName?: string;
@@ -392,12 +393,15 @@ export type DesktopAttachment = {
   path: string;
   type: string;
   size: number;
+  imageUrl?: string;
+  source?: "browser" | "canvas" | "clipboard" | "file";
 };
 
 export type ResolvedDesktopFile = Omit<DesktopAttachment, "id">;
 
 export type TurnInputItem = {
-  type: "text" | "local_file";
+  type: "image" | "local_file" | "text";
+  imageUrl?: string;
   text?: string;
   path?: string;
 };
@@ -576,7 +580,7 @@ declare global {
       appearance: () => Promise<SystemAppearance>;
       openExternal: (url: string) => Promise<void>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
-      terminalStart: (options?: { cols?: number; rows?: number }) => Promise<TerminalSnapshot>;
+      terminalStart: (options?: { cols?: number; rows?: number; cwd?: string }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string) => Promise<void>;
       terminalResize: (cols: number, rows: number) => Promise<void>;
       terminalStop: () => Promise<void>;
@@ -636,4 +640,3 @@ declare global {
     };
   }
 }
-

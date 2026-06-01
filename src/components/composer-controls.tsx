@@ -1,4 +1,4 @@
-import { Check, FileText, ImageIcon, Search, ShieldCheck, X } from "lucide-react";
+import { Check, FileText, FileUp, ImageIcon, PencilLine, Search, ShieldCheck, X } from "lucide-react";
 import { Combobox } from "@base-ui/react/combobox";
 import type { DesktopAttachment, PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
 import {
@@ -90,9 +90,20 @@ export function AttachmentChip({
   onRemove: () => void;
 }): React.JSX.Element {
   const isImage = attachment.type.startsWith("image/");
+  const canPreviewImage = isImage && Boolean(attachment.imageUrl);
   return (
-    <span className="flex max-w-[220px] items-center gap-2 rounded-full bg-muted px-3 py-1 text-base text-muted-foreground">
-      {isImage ? <ImageIcon className="size-4 shrink-0" /> : <FileText className="size-4 shrink-0" />}
+    <span className="flex max-w-56 items-center gap-2 rounded-xl bg-muted px-2.5 py-1.5 text-base text-muted-foreground">
+      {canPreviewImage ? (
+        <img
+          src={attachment.imageUrl}
+          alt={attachment.name}
+          className="size-9 shrink-0 rounded-md border border-border bg-background object-cover"
+        />
+      ) : isImage ? (
+        <ImageIcon className="size-4 shrink-0" />
+      ) : (
+        <FileText className="size-4 shrink-0" />
+      )}
       <span className="truncate">{attachment.name}</span>
       <button
         type="button"
@@ -103,6 +114,27 @@ export function AttachmentChip({
         <X className="size-3.5" />
       </button>
     </span>
+  );
+}
+
+export function ComposerAttachMenuItems({
+  onOpenSketch,
+  onUploadFile,
+}: {
+  onOpenSketch: () => void;
+  onUploadFile: () => void;
+}): React.JSX.Element {
+  return (
+    <>
+      <DropdownMenuItem className="h-9" onSelect={onUploadFile}>
+        <FileUp className="size-4 shrink-0" />
+        <span>Upload file</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem className="h-9" onSelect={onOpenSketch}>
+        <PencilLine className="size-4 shrink-0" />
+        <span>Sketch</span>
+      </DropdownMenuItem>
+    </>
   );
 }
 

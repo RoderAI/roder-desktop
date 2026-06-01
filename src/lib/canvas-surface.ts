@@ -46,6 +46,44 @@ export type ImageInteraction = {
 
 export const resizeHandleSize = 10;
 
+export function fitCanvasImageRect({
+  imageHeight,
+  imageWidth,
+  surfaceHeight,
+  surfaceWidth,
+  offset = 0,
+}: {
+  imageHeight: number;
+  imageWidth: number;
+  surfaceHeight: number;
+  surfaceWidth: number;
+  offset?: number;
+}): { x: number; y: number; width: number; height: number } {
+  const maxWidth = Math.max(80, surfaceWidth * 0.88);
+  const maxHeight = Math.max(80, surfaceHeight * 0.8);
+  const ratio = Math.min(1, maxWidth / imageWidth, maxHeight / imageHeight);
+  const width = Math.max(64, imageWidth * ratio);
+  const height = Math.max(64, imageHeight * ratio);
+  return {
+    x: Math.max(12, (surfaceWidth - width) / 2 + offset),
+    y: Math.max(12, (surfaceHeight - height) / 2 + offset),
+    width,
+    height,
+  };
+}
+
+export function hasCanvasContent({
+  images,
+  shapes,
+  strokes,
+}: {
+  images: readonly unknown[];
+  shapes: readonly CanvasShape[];
+  strokes: readonly Stroke[];
+}): boolean {
+  return images.length > 0 || shapes.length > 0 || strokes.some((stroke) => stroke.points.length > 0);
+}
+
 export function pointFromClient(clientX: number, clientY: number, element: Element): Point {
   const rect = element.getBoundingClientRect();
   return {
@@ -110,8 +148,7 @@ export function drawShape(context: CanvasRenderingContext2D, shape: CanvasShape)
 }
 
 export function canvasBackground(): string {
-  const style = getComputedStyle(document.documentElement);
-  return style.getPropertyValue("--color-background").trim() || "#141414";
+  return "#ffffff";
 }
 
 export function strokeNearPoint(stroke: Stroke, point: Point, radius: number): boolean {
