@@ -7,6 +7,7 @@ import {
   Database,
   GitBranch,
   Laptop,
+  Monitor,
   Moon,
   Paintbrush,
   Puzzle,
@@ -20,6 +21,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
+import { SettingsBrowserPanel } from "@/components/settings-browser-panel";
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
@@ -101,6 +103,13 @@ export function SettingsView({
             onClick={onSectionChange}
           />
           <SettingsNavItem
+            id="browser"
+            active={section === "browser"}
+            icon={<Monitor className="size-4" />}
+            label="Browser"
+            onClick={onSectionChange}
+          />
+          <SettingsNavItem
             id="configuration"
             active={section === "configuration"}
             icon={<Braces className="size-4" />}
@@ -151,6 +160,8 @@ export function SettingsView({
             <SkillsSettingsPanel />
           ) : section === "extensions" ? (
             <ExtensionsSettingsPanel />
+          ) : section === "browser" ? (
+            <SettingsBrowserPanel />
           ) : (
             <SettingsPlaceholder section={section} />
           )}
@@ -557,3 +568,5 @@ function sectionLabel(section: SettingsSection): string {
       return section.slice(0, 1).toUpperCase() + section.slice(1);
   }
 }
+
+

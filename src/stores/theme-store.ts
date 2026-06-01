@@ -33,6 +33,7 @@ export type SettingsSection =
   | "models"
   | "skills"
   | "extensions"
+  | "browser"
   | "configuration"
   | "personalization"
   | "mcp"
@@ -323,3 +324,4 @@ export function selectedPresetLabel(
     palette.presetId
   );
 }
+

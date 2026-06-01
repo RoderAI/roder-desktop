@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
+import { ChromeBridgeManager } from "../browser/chrome-bridge-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
 import { ExtensionHost } from "../extensions/extension-host";
@@ -24,6 +25,7 @@ const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
 const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort, () => sendAppCommand("newThread"));
+const chromeBridge = new ChromeBridgeManager();
 let mainWindow: BrowserWindow | null = null;
 let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
@@ -146,6 +148,7 @@ roder.on("stderr", (payload) => {
 });
 terminal.on("data", (payload) => sendToRenderer("terminal:data", payload));
 terminal.on("exit", (payload) => sendToRenderer("terminal:exit", payload));
+chromeBridge.on("status", (payload) => sendToRenderer("chromeBridge:status", payload));
 
 ipcMain.handle("roder:status", () => roder.status());
 ipcMain.handle("roder:start", () => roder.start());
@@ -181,6 +184,11 @@ ipcMain.handle("browser:captureScreenshot", () => browser.captureScreenshot());
 ipcMain.handle("browser:toggleAnnotation", () => browser.toggleAnnotation());
 ipcMain.handle("browser:setBounds", (_event, bounds: Rectangle) => browser.setBounds(scaleRendererBounds(bounds)));
 ipcMain.handle("browser:snapshot", () => browser.snapshot());
+ipcMain.handle("chromeBridge:status", () => chromeBridge.status());
+ipcMain.handle("chromeBridge:start", () => chromeBridge.start());
+ipcMain.handle("chromeBridge:stop", () => chromeBridge.stop());
+ipcMain.handle("chromeBridge:restart", () => chromeBridge.restart());
+ipcMain.handle("chromeBridge:openExtensionOptions", () => chromeBridge.openExtensionOptions());
 ipcMain.handle("canvas:savePng", (_event, dataUrl: string) => savePngDataUrl(dataUrl, "canvas", "roder-desktop-canvas"));
 ipcMain.handle("clipboard:saveImage", (_event, dataUrl: string) =>
   savePngDataUrl(dataUrl, "clipboard", "roder-desktop-clipboard"),
@@ -307,6 +315,7 @@ app.whenReady().then(async () => {
 app.on("before-quit", () => {
   void extensionHost?.stopAll();
   void roder.stop();
+  void chromeBridge.stop();
   terminal.stop();
   browser.destroy();
 });
@@ -415,3 +424,5 @@ function recordAppServerEvent(kind: AppServerEvent["kind"], method: string | und
   }
   sendToRenderer("appserver:event", event);
 }
+
+
