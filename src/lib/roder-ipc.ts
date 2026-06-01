@@ -259,7 +259,9 @@ function turnInput(prompt: string, attachments: DesktopAttachment[]): TurnInputI
     input.push({ type: "text", text });
   }
   for (const attachment of attachments) {
-    if (attachment.path) {
+    if (attachment.imageUrl && attachment.type.startsWith("image/")) {
+      input.push({ type: "image", imageUrl: attachment.imageUrl });
+    } else if (attachment.path) {
       input.push({ type: "local_file", path: attachment.path });
     }
   }

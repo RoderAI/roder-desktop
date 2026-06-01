@@ -175,6 +175,7 @@ export function useAppShellController(): AppShellController {
       setComposerAttachments((attachments) =>
         attachments.some((existing) => existing.path === attachment.path) ? attachments : [...attachments, attachment],
       );
+      setComposerFocusSignal((value) => value + 1);
       followBottom();
     },
     [followBottom],

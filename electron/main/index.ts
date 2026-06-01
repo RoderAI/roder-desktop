@@ -167,8 +167,8 @@ ipcMain.handle("workspace:openFolder", async (_event, defaultPath?: string) => {
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });
-ipcMain.handle("terminal:start", (_event, options: { cols?: number; rows?: number }) =>
-  terminal.start({ ...options, cwd: process.cwd() }),
+ipcMain.handle("terminal:start", (_event, options: { cols?: number; rows?: number; cwd?: string }) =>
+  terminal.start({ ...options, cwd: options.cwd || process.cwd() }),
 );
 ipcMain.handle("terminal:write", (_event, data: string) => terminal.write(data));
 ipcMain.handle("terminal:resize", (_event, cols: number, rows: number) => terminal.resize(cols, rows));

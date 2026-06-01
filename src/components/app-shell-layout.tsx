@@ -101,6 +101,7 @@ export function AppShellLayout({
 }: AppShellLayoutProps): React.JSX.Element {
   const sidebarRailStyle = { "--sidebar-width": `${leftSidebarWidth}px` } as SidebarRailStyle;
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
+  const extensionSidebarVisible = !isPluginsRoute;
 
   if (!useWindowTopBar) {
     return (
@@ -148,6 +149,7 @@ export function AppShellLayout({
                 activeFolderPath={activeWorkspaceCwd}
                 status={status}
                 workspacePanelOpen={workspacePanelOpen}
+                extensionSidebarVisible={extensionSidebarVisible}
                 sidebarOpen={sidebarOpen}
                 placement="content"
                 onNewProject={onNewProject}
@@ -220,6 +222,7 @@ export function AppShellLayout({
         activeFolderPath={activeWorkspaceCwd}
         status={status}
         workspacePanelOpen={workspacePanelOpen}
+        extensionSidebarVisible={extensionSidebarVisible}
         sidebarOpen={sidebarOpen}
         placement="window"
         onNewProject={onNewProject}

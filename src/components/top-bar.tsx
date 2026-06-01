@@ -29,6 +29,7 @@ type TopBarProps = {
   activeFolderPath: string;
   status: RoderStatus;
   workspacePanelOpen: boolean;
+  extensionSidebarVisible?: boolean;
   sidebarOpen: boolean;
   placement: "content" | "window";
   onNewProject: () => void;
@@ -49,6 +50,7 @@ export function TopBar({
   activeFolderPath,
   status,
   workspacePanelOpen,
+  extensionSidebarVisible = false,
   sidebarOpen,
   placement,
   onNewProject,
@@ -127,7 +129,11 @@ export function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className={cn(chromeIconButtonClassNameForState(workspacePanelOpen), "size-7 rounded-lg [&_svg]:size-4")}
+            className={cn(
+              chromeIconButtonClassNameForState(workspacePanelOpen),
+              "size-7 rounded-lg [&_svg]:size-4",
+              extensionSidebarVisible && "mr-12",
+            )}
             aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
             title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
             onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
@@ -192,7 +198,8 @@ export function TopBar({
           size="icon"
           className={cn(
             chromeIconButtonClassNameForState(workspacePanelOpen),
-            "fixed right-5 top-3.5 z-40",
+            "fixed top-3.5 z-40",
+            extensionSidebarVisible ? "right-17" : "right-5",
           )}
           aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
           title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}

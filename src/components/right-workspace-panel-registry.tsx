@@ -67,7 +67,7 @@ export function renderRightWorkspacePanel(
   context: RightWorkspacePanelRenderContext,
 ): React.ReactNode {
   if (panel === "terminal") {
-    return <TerminalPanel active={context.active} />;
+    return <TerminalPanel active={context.active} cwd={context.activeWorkspaceCwd} />;
   }
   if (panel === "browser") {
     return (

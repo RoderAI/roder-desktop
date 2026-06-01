@@ -15,16 +15,20 @@ import {
   Server,
   Sparkles,
   Sun,
+  TerminalSquare,
   UserRound,
 } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { SettingsBrowserPanel } from "@/components/settings-browser-panel";
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
+import { parseTerminalThemeJson, terminalThemeForSettings, terminalThemePresets } from "@/lib/terminal-theme";
 import {
   presetsForScheme,
   selectedPresetLabel,
@@ -110,6 +114,13 @@ export function SettingsView({
             onClick={onSectionChange}
           />
           <SettingsNavItem
+            id="terminal"
+            active={section === "terminal"}
+            icon={<TerminalSquare className="size-4" />}
+            label="Terminal"
+            onClick={onSectionChange}
+          />
+          <SettingsNavItem
             id="configuration"
             active={section === "configuration"}
             icon={<Braces className="size-4" />}
@@ -162,6 +173,8 @@ export function SettingsView({
             <ExtensionsSettingsPanel />
           ) : section === "browser" ? (
             <SettingsBrowserPanel />
+          ) : section === "terminal" ? (
+            <TerminalSettingsPanel />
           ) : (
             <SettingsPlaceholder section={section} />
           )}
@@ -518,6 +531,114 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: b
         )}
       />
     </button>
+  );
+}
+
+function TerminalSettingsPanel(): React.JSX.Element {
+  const terminalTheme = useThemeStore((state) => state.settings.terminalTheme);
+  const setTerminalThemePreset = useThemeStore((state) => state.setTerminalThemePreset);
+  const setTerminalThemeCustomJson = useThemeStore((state) => state.setTerminalThemeCustomJson);
+  const effectiveTheme = terminalThemeForSettings(terminalTheme);
+  const customParseResult = parseTerminalThemeJson(terminalTheme.customJson);
+
+  return (
+    <section className="rounded-xl border border-border bg-card shadow-sm">
+      <header className="border-b border-border px-5 py-4">
+        <h1 className="text-base font-medium">Terminal</h1>
+        <p className="mt-1 text-base text-muted-foreground">
+          Choose a truecolour xterm theme or paste custom xterm.js theme JSON.
+        </p>
+      </header>
+
+      <TerminalThemePreview theme={effectiveTheme} />
+
+      <div className="divide-y divide-border border-t border-border px-5">
+        <SettingsRow label="Theme" description="Applies to the embedded workspace terminal">
+          <Select
+            items={Object.fromEntries(terminalThemePresets.map((preset) => [preset.id, preset.name]))}
+            value={terminalTheme.presetId}
+            onValueChange={(value) => setTerminalThemePreset(value ?? "catppuccin-mocha")}
+          >
+            <SelectTrigger className="w-[240px] border border-border bg-card">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {terminalThemePresets.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+
+        {terminalTheme.presetId === "custom" && (
+          <div className="py-4">
+            <div className="mb-2 flex items-baseline justify-between gap-4">
+              <div>
+                <div className="text-base text-foreground">Custom theme JSON</div>
+                <div className="mt-0.5 text-base text-muted-foreground">
+                  Supports xterm.js ITheme keys, including the 16 ANSI colours and extendedAnsi.
+                </div>
+              </div>
+              {customParseResult.error && <div className="text-base text-destructive">{customParseResult.error}</div>}
+            </div>
+            <Textarea
+              value={terminalTheme.customJson}
+              spellCheck={false}
+              className="min-h-72 resize-y font-[var(--font-code)] text-[var(--font-size-code)]"
+              placeholder={JSON.stringify(effectiveTheme, null, 2)}
+              onChange={(event) => setTerminalThemeCustomJson(event.currentTarget.value)}
+            />
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TerminalThemePreview({ theme }: { theme: ReturnType<typeof terminalThemeForSettings> }): React.JSX.Element {
+  return (
+    <div className="p-5" style={{ background: theme.background, color: theme.foreground }}>
+      <div className="rounded-lg border border-white/10 bg-black/10 p-4 font-mono text-sm shadow-inner">
+        <div className="mb-3 flex items-center gap-2 text-xs opacity-75">
+          <span className="size-2 rounded-full" style={{ background: theme.red }} />
+          <span className="size-2 rounded-full" style={{ background: theme.yellow }} />
+          <span className="size-2 rounded-full" style={{ background: theme.green }} />
+          <span className="ml-2">roder — truecolour terminal</span>
+        </div>
+        <div>
+          <span style={{ color: theme.green }}>$</span> pnpm test
+        </div>
+        <div>
+          <span style={{ color: theme.blue }}>✓</span> 232 tests passed <span style={{ color: theme.brightBlack }}>in 1.45s</span>
+        </div>
+        <div className="mt-3 grid grid-cols-8 gap-1">
+          {[
+            theme.black,
+            theme.red,
+            theme.green,
+            theme.yellow,
+            theme.blue,
+            theme.magenta,
+            theme.cyan,
+            theme.white,
+            theme.brightBlack,
+            theme.brightRed,
+            theme.brightGreen,
+            theme.brightYellow,
+            theme.brightBlue,
+            theme.brightMagenta,
+            theme.brightCyan,
+            theme.brightWhite,
+          ].map((color, index) => (
+            <span key={`${color}-${index}`} className="h-5 rounded" style={{ background: color }} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

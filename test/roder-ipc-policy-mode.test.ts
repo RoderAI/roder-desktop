@@ -112,6 +112,87 @@ test("startTurn sends selected controls with the next turn", async () => {
   ]);
 });
 
+test("startTurn sends canvas image attachments as image input", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { turnId: "turn-1" };
+  });
+
+  await roderIpc.startTurn(
+    "thread-1",
+    "clean this sketch up",
+    [
+      {
+        id: "attachment-1",
+        name: "canvas.png",
+        path: "/tmp/roder-desktop-canvas/canvas.png",
+        type: "image/png",
+        size: 12,
+        imageUrl: "data:image/png;base64,YWJj",
+        source: "canvas",
+      },
+    ],
+    {
+      modelProvider: "mock",
+      model: "gpt-5.5",
+      reasoning: "high",
+      policyMode: "plan",
+    },
+  );
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "turn/start",
+      params: {
+        threadId: "thread-1",
+        input: [
+          { type: "text", text: "clean this sketch up" },
+          { type: "image", imageUrl: "data:image/png;base64,YWJj" },
+        ],
+        modelProvider: "mock",
+        model: "gpt-5.5",
+        reasoning: "high",
+        policyMode: "plan",
+      },
+    },
+  ]);
+});
+
+test("steerTurn sends canvas image attachments as image input", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { turnId: "turn-1" };
+  });
+
+  await roderIpc.steerTurn("thread-1", "turn-1", "also use this sketch", [
+    {
+      id: "attachment-1",
+      name: "canvas.png",
+      path: "/tmp/roder-desktop-canvas/canvas.png",
+      type: "image/png",
+      size: 12,
+      imageUrl: "data:image/png;base64,YWJj",
+      source: "canvas",
+    },
+  ]);
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "turn/steer",
+      params: {
+        threadId: "thread-1",
+        expectedTurnId: "turn-1",
+        input: [
+          { type: "text", text: "also use this sketch" },
+          { type: "image", imageUrl: "data:image/png;base64,YWJj" },
+        ],
+      },
+    },
+  ]);
+});
+
 test("startThread sends the first prompt so the app-server can name immediately", async () => {
   const calls = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {

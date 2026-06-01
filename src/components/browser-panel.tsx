@@ -113,7 +113,7 @@ export function BrowserPanel({
     setCapturing(true);
     try {
       const file = await window.roderDesktop.browserCaptureScreenshot();
-      onAttach({ ...file, id: crypto.randomUUID() });
+      onAttach({ ...file, id: crypto.randomUUID(), source: "browser" });
     } finally {
       setCapturing(false);
     }
