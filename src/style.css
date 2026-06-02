@@ -38,7 +38,7 @@
   color-scheme: light;
   --font-ui: Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
-  --font-size-ui: 18px;
+  --font-size-ui: 14px;
   --font-size-composer: 17px;
   --font-size-code: 14px;
   --tool-running: hsl(38 96% 43%);
@@ -902,5 +902,10 @@ code[data-streamdown="inline-code"] {
 }
 
 .chat-composer-guard[data-fade="true"] {
-  background: linear-gradient(to top, var(--color-background) 0, var(--color-background) calc(100% - 5.5rem), transparent);
+  background: linear-gradient(
+    to top,
+    var(--color-background) 0,
+    var(--color-background) calc(100% - 5.5rem),
+    transparent
+  );
 }

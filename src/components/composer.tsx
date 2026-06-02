@@ -2,7 +2,7 @@ import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Plus, Square } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort, SkillDescriptor } from "@/types/roder";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { AttachmentChip, ComposerAttachMenuItems, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
 import { ComposerSketchPad } from "@/components/composer-sketch-pad";
 import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
@@ -262,7 +262,7 @@ export function Composer({
   return (
     <div
       ref={speechLifecycleRef}
-      className="mx-auto w-full max-w-[980px] px-8 pb-5 pt-0"
+      className="mx-auto w-full max-w-3xl px-8 pb-5 pt-0"
       onDragEnter={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
           setDragActive(true);
@@ -338,16 +338,19 @@ export function Composer({
             onPaste={handlePaste}
           />
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
-          <div className="mt-1 flex min-h-10 items-center justify-between gap-2">
+          <div className="mt-1 flex min-h-9 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   variant="unstyled"
-                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-accent data-[popup-open]:text-foreground"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "icon" }),
+                    "shrink-0 rounded-full text-muted-foreground data-[popup-open]:bg-accent data-[popup-open]:text-foreground",
+                  )}
                   aria-label="Add input"
                   title="Add input"
                 >
-                  <Plus className="size-5" />
+                  <Plus className="size-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-44">
                   <DropdownMenuGroup>
@@ -365,7 +368,7 @@ export function Composer({
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "size-9 shrink-0 rounded-full",
+                  "shrink-0 rounded-full",
                   isRecording
                     ? "bg-destructive/10 text-destructive animate-pulse hover:bg-destructive/20 hover:text-destructive"
                     : "text-muted-foreground",
@@ -374,7 +377,7 @@ export function Composer({
                 onClick={toggleRecording}
                 disabled={isTranscribing}
               >
-                {isTranscribing ? <Loader2 className="size-5 animate-spin" /> : <Mic className="size-5" />}
+                {isTranscribing ? <Loader2 className="size-4 animate-spin" /> : <Mic className="size-4" />}
               </Button>
               <ModelPicker
                 models={models}
@@ -504,14 +507,14 @@ function SubmitOrStopButton({
       variant="ghost"
       size="icon"
       className={cn(
-        "composer-submit-button size-9 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+        "composer-submit-button shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
       )}
       aria-label={busy ? "Stop inference" : "Send message"}
       disabled={disabled}
       data-state={busy ? "stop" : "send"}
       onClick={busy ? onStop : onSubmit}
     >
-      {busy ? <Square className="size-4 fill-current" /> : <ArrowUp className="size-5" />}
+      {busy ? <Square className="size-3.5 fill-current" /> : <ArrowUp className="size-4" />}
     </Button>
   );
 }
@@ -527,7 +530,7 @@ function ScrollToBottomButton({ visible, onClick }: { visible: boolean; onClick:
       <Button
         variant="outline"
         size="icon"
-        className="size-8 rounded-full text-muted-foreground shadow-sm"
+        className="rounded-full text-muted-foreground shadow-sm"
         aria-label="Scroll to bottom"
         tabIndex={visible ? 0 : -1}
         onClick={onClick}

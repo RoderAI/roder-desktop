@@ -128,7 +128,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         onReviewTurnChanges={openTurnChanges}
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-        <div className="mx-auto w-full max-w-[980px] px-8">
+        <div className="mx-auto w-full max-w-3xl px-8">
           <div
             className="chat-composer-guard"
             data-fade={canScrollTranscriptToBottom ? "true" : undefined}
@@ -145,7 +145,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onExitPlan={agent.exitPlan}
           />
           {agent.error && (
-            <div className="mx-auto mb-3 w-full max-w-[980px] px-8 text-base text-destructive">{agent.error}</div>
+            <div className="mx-auto mb-3 w-full max-w-3xl px-8 text-base text-destructive">{agent.error}</div>
           )}
           <Composer
             busy={activeThreadBusy}

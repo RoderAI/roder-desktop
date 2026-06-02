@@ -158,7 +158,7 @@ export function TopBar({
         size="icon"
         className={cn(
           chromeIconButtonClassNameForState(false),
-          "fixed left-[104px] top-3.5 z-40",
+          "fixed left-20 top-[11px] z-40 size-7 translate-x-2 rounded-lg [&_svg]:size-4",
         )}
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -166,7 +166,7 @@ export function TopBar({
       >
         <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
       </Button>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 -translate-y-1 items-center gap-3">
         {sidebarOpen ? (
           <h1 className="flex min-w-0 items-baseline gap-1.5 text-base">
             <span className="max-w-48 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>
@@ -198,8 +198,7 @@ export function TopBar({
           size="icon"
           className={cn(
             chromeIconButtonClassNameForState(workspacePanelOpen),
-            "fixed top-3.5 z-40",
-            extensionSidebarVisible ? "right-17" : "right-5",
+            "fixed right-2 top-[11px] z-40 size-7 rounded-lg [&_svg]:size-4",
           )}
           aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
           title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
