@@ -75,7 +75,7 @@ export function AppSidebar({
       )}
       style={{ width }}
     >
-      {reserveTitlebarSpace && <div className="h-[60px]" />}
+      {reserveTitlebarSpace && <div className="h-(--desktop-header-height)" />}
       <div className="no-drag flex flex-col gap-0.5 px-2">
         <SidebarRowButton onClick={onNewProject}>
           <FolderPlus className="size-4" />

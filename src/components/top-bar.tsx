@@ -149,7 +149,7 @@ export function TopBar({
     <header
       className={cn(
         "drag-region flex shrink-0 items-center border-b text-muted-foreground",
-        "h-[60px] border-transparent pr-5",
+        "h-(--desktop-header-height) border-border pr-5",
         sidebarOpen ? "pl-5" : "pl-[148px]",
       )}
     >
@@ -166,7 +166,7 @@ export function TopBar({
       >
         <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
       </Button>
-      <div className="flex min-w-0 flex-1 -translate-y-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {sidebarOpen ? (
           <h1 className="flex min-w-0 items-baseline gap-1.5 text-base">
             <span className="max-w-48 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>

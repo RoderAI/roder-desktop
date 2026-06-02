@@ -20,7 +20,7 @@
   --color-accent-foreground: hsl(0 0% 17%);
   --color-destructive: hsl(0 84% 60%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(0 0% 89%);
+  --color-border: hsl(0 0% 94%);
   --color-input: hsl(0 0% 84%);
   --color-ring: hsl(0 0% 54%);
   --color-sidebar: hsl(0 0% 98.5%);
@@ -41,6 +41,7 @@
   --font-size-ui: 14px;
   --font-size-composer: 17px;
   --font-size-code: 14px;
+  --desktop-header-height: 52px;
   --tool-running: hsl(38 96% 43%);
   --tool-success: hsl(260 60% 56%);
   --tool-error: hsl(0 72% 48%);

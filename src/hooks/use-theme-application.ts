@@ -21,7 +21,7 @@ export function useThemeApplication(systemAppearance: SystemAppearance): void {
   }, [settings, systemAppearance]);
 }
 
-function themeVariables(
+export function themeVariables(
   palette: ThemePalette,
   scheme: ThemeScheme,
   uiFontSize: number,
@@ -35,7 +35,7 @@ function themeVariables(
   const sidebar = palette.sidebar;
   const card = mix(bg, isDark ? "#ffffff" : "#000000", isDark ? 6 : 2);
   const muted = mix(bg, fg, isDark ? 16 + contrast * 0.08 : 10 + contrast * 0.08);
-  const border = mix(bg, fg, isDark ? 20 + contrast * 0.12 : 16 + contrast * 0.1);
+  const border = mix(bg, fg, isDark ? 20 + contrast * 0.12 : 6 + contrast * 0.04);
   const activeSidebar = mix(sidebar, fg, isDark ? 12 + contrast * 0.12 : 10 + contrast * 0.12);
   const sidebarAlpha = palette.translucentSidebar ? " / 0.82" : "";
 
