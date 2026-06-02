@@ -149,7 +149,7 @@ export function TopBar({
     <header
       className={cn(
         "drag-region flex shrink-0 items-center border-b text-muted-foreground",
-        "h-[60px] border-transparent pr-5",
+        "h-(--desktop-header-height) border-border pr-5",
         sidebarOpen ? "pl-5" : "pl-[148px]",
       )}
     >
@@ -158,7 +158,7 @@ export function TopBar({
         size="icon"
         className={cn(
           chromeIconButtonClassNameForState(false),
-          "fixed left-[104px] top-3.5 z-40",
+          "fixed left-20 top-[11px] z-40 size-7 translate-x-2 rounded-lg [&_svg]:size-4",
         )}
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -198,8 +198,7 @@ export function TopBar({
           size="icon"
           className={cn(
             chromeIconButtonClassNameForState(workspacePanelOpen),
-            "fixed top-3.5 z-40",
-            extensionSidebarVisible ? "right-17" : "right-5",
+            "fixed right-2 top-[11px] z-40 size-7 rounded-lg [&_svg]:size-4",
           )}
           aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
           title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}

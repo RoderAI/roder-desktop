@@ -20,6 +20,7 @@ import {
   installOpenSettingsShortcut,
   type AppCommand,
 } from "./shortcuts";
+import { rendererZoomFactor, scaleRendererBounds } from "./renderer-scale";
 
 const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
@@ -31,7 +32,6 @@ let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
 const appServerEvents: AppServerEvent[] = [];
 const appName = "Roder";
-const rendererZoomFactor = 0.84;
 const mainDir = dirname(fileURLToPath(import.meta.url));
 
 type AppServerEvent = {
@@ -189,7 +189,9 @@ ipcMain.handle("chromeBridge:start", () => chromeBridge.start());
 ipcMain.handle("chromeBridge:stop", () => chromeBridge.stop());
 ipcMain.handle("chromeBridge:restart", () => chromeBridge.restart());
 ipcMain.handle("chromeBridge:openExtensionOptions", () => chromeBridge.openExtensionOptions());
-ipcMain.handle("canvas:savePng", (_event, dataUrl: string) => savePngDataUrl(dataUrl, "canvas", "roder-desktop-canvas"));
+ipcMain.handle("canvas:savePng", (_event, dataUrl: string) =>
+  savePngDataUrl(dataUrl, "canvas", "roder-desktop-canvas"),
+);
 ipcMain.handle("clipboard:saveImage", (_event, dataUrl: string) =>
   savePngDataUrl(dataUrl, "clipboard", "roder-desktop-clipboard"),
 );
@@ -326,17 +328,6 @@ app.on("window-all-closed", () => {
   }
 });
 
-function scaleRendererBounds(bounds?: Rectangle): Rectangle {
-  const fallback = { x: 0, y: 52, width: 720, height: 640 };
-  const source = bounds ?? fallback;
-  return {
-    x: Math.round(source.x * rendererZoomFactor),
-    y: Math.round(source.y * rendererZoomFactor),
-    width: Math.max(100, Math.round(source.width * rendererZoomFactor)),
-    height: Math.max(100, Math.round(source.height * rendererZoomFactor)),
-  };
-}
-
 async function savePngDataUrl(
   dataUrl: string,
   filePrefix: string,
@@ -424,5 +415,3 @@ function recordAppServerEvent(kind: AppServerEvent["kind"], method: string | und
   }
   sendToRenderer("appserver:event", event);
 }
-
-

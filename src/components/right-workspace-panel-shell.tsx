@@ -80,7 +80,7 @@ export function RightWorkspacePanelShell({
         role="separator"
         onPointerDown={onBeginResize}
       />
-      <div className="flex h-[60px] shrink-0 items-center gap-1 px-2 pl-3">
+      <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 px-2 pl-3">
         {openEntries.length > 0 ? (
           <>
             <Tabs
@@ -130,7 +130,10 @@ export function RightWorkspacePanelShell({
                   value={entry.id}
                   aria-label={entry.title}
                   inert={inactive ? true : undefined}
-                  className={cn("absolute inset-0 h-full min-h-0 text-base", inactive && "pointer-events-none opacity-0")}
+                  className={cn(
+                    "absolute inset-0 h-full min-h-0 text-base",
+                    inactive && "pointer-events-none opacity-0",
+                  )}
                 >
                   {renderPanel(entry, {
                     active: open && !inactive,
@@ -160,14 +163,14 @@ function WorkspacePanelTab({
   onClosePanel: (panel: RouteWorkspacePanel) => void;
 }): React.JSX.Element {
   return (
-    <div className="group flex h-8 min-w-0 max-w-40 items-center gap-1 rounded-full text-muted-foreground transition-colors">
-      <TabsTrigger value={entry.id} aria-label={entry.title} className="min-w-0 flex-1 pl-2.5 pr-1">
-        <span className="shrink-0 [&_svg]:size-4">{entry.icon}</span>
-        <span className="truncate text-base font-medium">{entry.title}</span>
+    <div className="group flex h-7 min-w-0 max-w-36 items-center gap-0.5 rounded-full text-muted-foreground transition-colors">
+      <TabsTrigger value={entry.id} aria-label={entry.title} className="min-w-0 flex-1 pl-2 pr-0.5">
+        <span className="shrink-0 [&_svg]:size-3.5">{entry.icon}</span>
+        <span className="truncate text-sm font-medium">{entry.title}</span>
       </TabsTrigger>
       <button
         type="button"
-        className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-background/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-background/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={`Close ${entry.title}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -237,7 +240,10 @@ function PanelAddMenu({
   return (
     <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
       <DropdownMenuTrigger
-        className={chromeIconButtonClassNameForState(false, "inline-flex items-center justify-center")}
+        className={chromeIconButtonClassNameForState(
+          false,
+          "inline-flex size-7 items-center justify-center rounded-lg [&_svg]:size-4",
+        )}
         aria-label="Add workspace panel"
         title="Add panel"
       >

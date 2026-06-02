@@ -82,12 +82,12 @@ export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => 
   }
 
   return (
-    <div className="no-drag shrink-0 border-t border-border/70 p-3">
+    <div className="no-drag shrink-0 border-t border-border/70 p-2">
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "squircle-corners h-12 w-full justify-start gap-3 rounded-xl px-2.5 text-base text-sidebar-foreground hover:bg-sidebar-accent",
+            "squircle-corners h-10 w-full justify-start gap-2 rounded-xl px-2 text-base text-sidebar-foreground hover:bg-sidebar-accent",
           )}
           disabled={accountLoading}
           onClick={() => void refresh()}
@@ -96,21 +96,21 @@ export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => 
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-72">
           <DropdownMenuGroup>
-            <DropdownMenuItem className="h-9 px-2" onSelect={onOpenSettings}>
-              <Settings className="size-4" />
+            <DropdownMenuItem className="h-8 px-2" onSelect={onOpenSettings}>
+              <Settings className="size-3.5" />
               Settings
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
           <button
             type="button"
-            className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent"
+            className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent"
             onClick={() => setLimitsOpen((value) => !value)}
           >
-            <Gauge className="size-4 shrink-0" />
+            <Gauge className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Rate limits remaining</span>
             <ChevronDown
-              className={cn("size-4 shrink-0 text-muted-foreground transition-transform", limitsOpen && "rotate-180")}
+              className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", limitsOpen && "rotate-180")}
             />
           </button>
 
@@ -124,24 +124,24 @@ export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => 
           {account?.roderSignedIn ? (
             <button
               type="button"
-              className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent disabled:opacity-60"
+              className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent disabled:opacity-60"
               disabled={busy === "logout"}
               onClick={() => void logout()}
             >
-              {busy === "logout" ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
+              {busy === "logout" ? <Loader2 className="size-3.5 animate-spin" /> : <LogOut className="size-3.5" />}
               Log out
             </button>
           ) : (
             <button
               type="button"
-              className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent disabled:opacity-60"
+              className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-base text-popover-foreground outline-none hover:bg-accent disabled:opacity-60"
               disabled={busy === "login" || account?.loginPending}
               onClick={() => void login()}
             >
               {busy === "login" || account?.loginPending ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <LogIn className="size-4" />
+                <LogIn className="size-3.5" />
               )}
               {account?.loginPending ? "Opening browser..." : "Log in with Codex"}
             </button>
@@ -171,7 +171,7 @@ function AnimatedRateLimitPanel({ children, open }: { children: React.ReactNode;
           open ? "translate-y-0 opacity-100" : "-translate-y-0.5 opacity-0",
         )}
       >
-        <div className="space-y-2 px-2 py-3">{children}</div>
+        <div className="space-y-1.5 px-2 py-2">{children}</div>
       </div>
     </div>
   );
@@ -186,17 +186,17 @@ export function SidebarAccountTriggerContent({
     return (
       <>
         <div
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50"
+          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50"
           aria-hidden="true"
         >
-          <Skeleton className="size-4 rounded-full bg-sidebar-muted/30" />
+          <Skeleton className="size-3.5 rounded-full bg-sidebar-muted/30" />
         </div>
         <span className="flex min-w-0 flex-1 flex-col gap-1.5 text-left" aria-hidden="true">
           <Skeleton className="h-3 w-28 rounded-full bg-sidebar-muted/25" />
           <Skeleton className="h-3 w-20 rounded-full bg-sidebar-muted/20" />
         </span>
         <span className="sr-only">Loading Codex account</span>
-        <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted/60" aria-hidden="true" />
+        <SlidersHorizontal className="size-3.5 shrink-0 text-sidebar-muted/60" aria-hidden="true" />
       </>
     );
   }
@@ -210,21 +210,21 @@ export function SidebarAccountTriggerContent({
 
   return (
     <>
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50 text-sm text-sidebar-muted">
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50 text-sm text-sidebar-muted">
         {account.displayName ? initials(account.displayName) : "G"}
       </div>
       <span className="min-w-0 flex-1 text-left">
         <span className="block truncate text-sidebar-active-foreground">{label}</span>
         {secondary ? <span className="block truncate text-base text-sidebar-muted">{secondary}</span> : null}
       </span>
-      <SlidersHorizontal className="size-4 shrink-0 text-sidebar-muted" />
+      <SlidersHorizontal className="size-3.5 shrink-0 text-sidebar-muted" />
     </>
   );
 }
 
 function LimitLine({ window, fallback }: { window: CodexRateWindow | null; fallback: string }): React.JSX.Element {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_5rem] items-center gap-3 text-base">
+    <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_5rem] items-center gap-2 text-base">
       <span className="truncate text-popover-foreground">{window?.label ?? fallback}</span>
       <span className="text-right font-mono tabular-nums text-muted-foreground">
         {window ? `${Math.round(window.remainingPercent)}%` : "--"}

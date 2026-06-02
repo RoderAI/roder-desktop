@@ -65,6 +65,42 @@ test("theme store adds the default terminal theme to older persisted settings", 
   expect(useThemeStore.getState().settings.terminalTheme).toEqual(defaultThemeSettings.terminalTheme);
 });
 
+test("theme store migrates old default ui font size to the smaller desktop default", async () => {
+  const storage = installStorageMock();
+  storage.set(
+    "roder-desktop-theme",
+    JSON.stringify({
+      state: { settings: legacyThemeSettings(14) },
+      version: 3,
+    }),
+  );
+
+  const { defaultThemeSettings, useThemeStore } = await loadThemeStore();
+
+  expect(useThemeStore.getState().settings.uiFontSize).toBe(defaultThemeSettings.uiFontSize);
+  expect(useThemeStore.getState().settings.codeFontSize).toBe(defaultThemeSettings.codeFontSize);
+});
+
+test("theme store preserves custom font sizes during compact density migration", async () => {
+  const storage = installStorageMock();
+  const settings = {
+    ...legacyThemeSettings(15),
+    uiFontSize: 17,
+  };
+  storage.set(
+    "roder-desktop-theme",
+    JSON.stringify({
+      state: { settings },
+      version: 3,
+    }),
+  );
+
+  const { useThemeStore } = await loadThemeStore();
+
+  expect(useThemeStore.getState().settings.uiFontSize).toBe(17);
+  expect(useThemeStore.getState().settings.codeFontSize).toBe(15);
+});
+
 function legacyThemeSettings(codeFontSize: number) {
   return {
     mode: "system",
