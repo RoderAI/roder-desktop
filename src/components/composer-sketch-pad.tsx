@@ -127,7 +127,7 @@ export function ComposerSketchPad({ onAttach, onClose }: ComposerSketchPadProps)
     redraw();
   }
 
-  async function useSketch(): Promise<void> {
+  async function handleUseSketch(): Promise<void> {
     const canvas = canvasRef.current;
     if (!canvas || !hasContent) {
       return;
@@ -181,7 +181,7 @@ export function ComposerSketchPad({ onAttach, onClose }: ComposerSketchPadProps)
   }
 
   return (
-    <div className="border-b border-border px-3 py-3">
+    <div className="border-b border-border p-3">
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-inner">
         <canvas
           ref={canvasRef}
@@ -234,7 +234,7 @@ export function ComposerSketchPad({ onAttach, onClose }: ComposerSketchPadProps)
           size="sm"
           className="h-8 rounded-md px-2.5"
           disabled={!hasContent || capturing}
-          onClick={() => void useSketch()}
+          onClick={() => void handleUseSketch()}
         >
           <ImagePlus className="size-4" />
           <span>Use sketch</span>

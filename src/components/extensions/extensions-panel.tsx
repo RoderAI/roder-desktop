@@ -124,7 +124,7 @@ function ContributionShortcuts({
     );
   }
   return (
-    <section className="px-3 py-3 text-base text-muted-foreground">
+    <section className="p-3 text-base text-muted-foreground">
       <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
         <TerminalSquare className="size-3.5 text-muted-foreground" />
         Actions

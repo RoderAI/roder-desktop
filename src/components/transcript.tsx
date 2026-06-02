@@ -691,9 +691,9 @@ function ThreadWorkingIndicator(): React.JSX.Element {
 
 function TranscriptWorkingLiveRegion({ active }: { active: boolean }): React.JSX.Element {
   return (
-    <div aria-live="polite" className="sr-only" role="status">
+    <output aria-live="polite" className="sr-only">
       {active ? "Agent is working" : ""}
-    </div>
+    </output>
   );
 }
 

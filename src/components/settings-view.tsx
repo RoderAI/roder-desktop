@@ -215,7 +215,7 @@ function SettingsNavItem({
 function SettingsPlaceholder({ section }: { section: SettingsSection }): React.JSX.Element {
   const title = sectionLabel(section);
   return (
-    <section className="rounded-xl border border-border bg-card px-5 py-5 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <h1 className="text-base font-medium">{title}</h1>
       <p className="mt-2 max-w-[560px] text-base text-muted-foreground">
         This section is wired into settings navigation. Controls for {title.toLowerCase()} can be added here without
@@ -288,13 +288,27 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
           label="Use pointer cursors"
           description="Change the cursor when hovering over interactive elements"
         >
-          <Switch checked={settings.pointerCursors} onChange={setPointerCursors} />
+          <Switch ariaLabel="Use pointer cursors" checked={settings.pointerCursors} onChange={setPointerCursors} />
         </SettingsRow>
         <SettingsRow label="UI font size" description="Adjust the base size used for the Roder UI">
-          <NumberStepper value={settings.uiFontSize} min={11} max={24} suffix="px" onChange={setUiFontSize} />
+          <NumberStepper
+            ariaLabel="UI font size"
+            value={settings.uiFontSize}
+            min={11}
+            max={24}
+            suffix="px"
+            onChange={setUiFontSize}
+          />
         </SettingsRow>
         <SettingsRow label="Code font size" description="Adjust inline, transcript, and diff code text">
-          <NumberStepper value={settings.codeFontSize} min={11} max={18} suffix="px" onChange={setCodeFontSize} />
+          <NumberStepper
+            ariaLabel="Code font size"
+            value={settings.codeFontSize}
+            min={11}
+            max={18}
+            suffix="px"
+            onChange={setCodeFontSize}
+          />
         </SettingsRow>
       </div>
     </section>
@@ -396,6 +410,7 @@ function ThemeEditor({
         <h2 className="min-w-0 flex-1 text-base text-muted-foreground">{title}</h2>
         <select
           value={palette.presetId}
+          aria-label={`${title} preset`}
           className="h-8 w-[210px] rounded-lg border border-border bg-muted px-3 text-base text-foreground outline-none"
           onChange={(event) => onPreset(event.currentTarget.value)}
         >
@@ -416,6 +431,7 @@ function ThemeEditor({
         <TextRow label="Code font" value={palette.codeFont} onChange={(codeFont) => onChange({ codeFont })} />
         <SettingsRow label="Translucent sidebar">
           <Switch
+            ariaLabel={`${title} translucent sidebar`}
             checked={palette.translucentSidebar}
             onChange={(translucentSidebar) => onChange({ translucentSidebar })}
           />
@@ -427,6 +443,7 @@ function ThemeEditor({
               min={0}
               max={100}
               value={palette.contrast}
+              aria-label={`${title} contrast`}
               className="min-w-0 flex-1 accent-primary"
               onChange={(event) => onChange({ contrast: Number(event.currentTarget.value) })}
             />
@@ -485,6 +502,7 @@ function TextRow({
   return (
     <SettingsRow label={label}>
       <input
+        aria-label={label}
         value={value}
         className="h-8 w-[260px] rounded-lg border border-border bg-transparent px-3 font-mono text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
         onChange={(event) => onChange(event.currentTarget.value)}
@@ -513,10 +531,19 @@ function SettingsRow({
   );
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }): React.JSX.Element {
+function Switch({
+  ariaLabel,
+  checked,
+  onChange,
+}: {
+  ariaLabel: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}): React.JSX.Element {
   return (
     <button
       type="button"
+      aria-label={ariaLabel}
       className={cn(
         "relative h-6 w-10 shrink-0 overflow-hidden rounded-full transition-colors",
         checked ? "bg-primary" : "bg-muted",
@@ -613,7 +640,8 @@ function TerminalThemePreview({ theme }: { theme: ReturnType<typeof terminalThem
           <span style={{ color: theme.green }}>$</span> pnpm test
         </div>
         <div>
-          <span style={{ color: theme.blue }}>✓</span> 232 tests passed <span style={{ color: theme.brightBlack }}>in 1.45s</span>
+          <span style={{ color: theme.blue }}>✓</span> 232 tests passed{" "}
+          <span style={{ color: theme.brightBlack }}>in 1.45s</span>
         </div>
         <div className="mt-3 grid grid-cols-8 gap-1">
           {[
@@ -643,12 +671,14 @@ function TerminalThemePreview({ theme }: { theme: ReturnType<typeof terminalThem
 }
 
 function NumberStepper({
+  ariaLabel,
   value,
   min,
   max,
   suffix,
   onChange,
 }: {
+  ariaLabel: string;
   value: number;
   min: number;
   max: number;
@@ -662,6 +692,7 @@ function NumberStepper({
         min={min}
         max={max}
         value={value}
+        aria-label={ariaLabel}
         className="h-8 w-20 rounded-lg border border-border bg-transparent px-3 text-right text-base text-foreground outline-none"
         onChange={(event) => onChange(clamp(Number(event.currentTarget.value), min, max))}
       />
@@ -689,5 +720,3 @@ function sectionLabel(section: SettingsSection): string {
       return section.slice(0, 1).toUpperCase() + section.slice(1);
   }
 }
-
-

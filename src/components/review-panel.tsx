@@ -93,15 +93,19 @@ export function ReviewPanel({
   const effectiveFileTreeWidth = reviewFileTreeWidth(fileTreeWidth, width);
   const reviewPanelStyle = { "--review-file-tree-width": `${effectiveFileTreeWidth}px` } as ReviewPanelStyle;
   const diffLoadablePaths = useMemo(() => files.filter((file) => !file.binary).map((file) => file.path), [files]);
+  const currentNearbyDiffPaths = useMemo(() => {
+    const loadablePaths = new Set(diffLoadablePaths);
+    return new Set([...nearbyDiffPaths].filter((path) => loadablePaths.has(path)));
+  }, [diffLoadablePaths, nearbyDiffPaths]);
   const diffPathsToLoad = useMemo(
     () =>
       reviewDiffPathsToLoad({
         files: diffLoadablePaths,
         selectedPath,
-        nearbyPaths: nearbyDiffPaths,
+        nearbyPaths: currentNearbyDiffPaths,
         diffStatesByPath,
       }),
-    [diffLoadablePaths, diffStatesByPath, nearbyDiffPaths, selectedPath],
+    [currentNearbyDiffPaths, diffLoadablePaths, diffStatesByPath, selectedPath],
   );
   const resizeFileTree = useCallback(
     (startWidth: number, deltaX: number) => {
@@ -222,10 +226,6 @@ export function ReviewPanel({
   }, [files, scrollToReviewFile, selectedPath]);
 
   useEffect(() => {
-    setNearbyDiffPaths(new Set());
-  }, [diffLoadablePaths]);
-
-  useEffect(() => {
     for (const path of diffPathsToLoad) {
       loadDiff(path);
     }
@@ -309,14 +309,13 @@ export function ReviewPanel({
               onSelectedPathChange={handleSelectedPathChange}
             />
           </div>
-          <div
-            className="no-drag absolute inset-y-0 right-0 z-20 -mr-1 w-2 cursor-col-resize bg-transparent hover:bg-border"
+          <hr
+            className="no-drag absolute inset-y-0 right-0 z-20 -mr-1 w-2 cursor-col-resize border-0 bg-transparent hover:bg-border"
             aria-label="Resize changed files"
             aria-orientation="vertical"
             aria-valuemax={reviewFileTreeWidth(width, width)}
             aria-valuemin={reviewFileTreeWidthBounds.min}
             aria-valuenow={effectiveFileTreeWidth}
-            role="separator"
             onPointerDown={beginFileTreeResize}
           />
         </aside>
@@ -689,7 +688,7 @@ function DiffFileBody({
     return (
       <>
         <FallbackFileHeader file={file} loading />
-        <InlineText>Loading diff...</InlineText>
+        <InlineText>Loading diff…</InlineText>
       </>
     );
   }
@@ -697,7 +696,7 @@ function DiffFileBody({
     return (
       <>
         <FallbackFileHeader file={file} />
-        <InlineText>Loading diff...</InlineText>
+        <InlineText>Loading diff…</InlineText>
       </>
     );
   }

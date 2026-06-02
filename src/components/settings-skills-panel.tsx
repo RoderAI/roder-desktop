@@ -50,6 +50,7 @@ export function SkillsSettingsPanel(): React.JSX.Element {
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
+          aria-label="Search skills"
           className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="Search skills"
           onChange={(event) => setQuery(event.currentTarget.value)}

@@ -308,6 +308,7 @@ export function Composer({
             ref={fileInputRef}
             type="file"
             multiple
+            aria-label="Attach files"
             className="hidden"
             onChange={(event) => {
               if (event.currentTarget.files) {

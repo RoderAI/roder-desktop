@@ -14,7 +14,7 @@ const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
 const duplicateItemIdMarker = "::duplicate-";
 
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
-  return [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
+  return threads.toSorted((left, right) => right.updatedAt - left.updatedAt);
 }
 
 export function upsertThread(threads: RoderThread[], incoming: RoderThread): RoderThread[] {

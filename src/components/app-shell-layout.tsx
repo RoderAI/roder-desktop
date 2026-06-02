@@ -135,10 +135,9 @@ export function AppShellLayout({
           />
         </div>
         {sidebarOpen && (
-          <div
-            className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+          <hr
+            className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize border-0 bg-transparent hover:bg-border"
             aria-label="Resize thread sidebar"
-            role="separator"
             onPointerDown={onBeginSidebarResize}
           />
         )}
@@ -268,10 +267,9 @@ export function AppShellLayout({
           />
         </div>
         {sidebarOpen && (
-          <div
-            className="no-drag relative z-30 -ml-1 -mr-1 h-full w-2 shrink-0 cursor-col-resize bg-transparent hover:bg-border"
+          <hr
+            className="no-drag relative z-30 -ml-1 -mr-1 h-full w-2 shrink-0 cursor-col-resize border-0 bg-transparent hover:bg-border"
             aria-label="Resize thread sidebar"
-            role="separator"
             onPointerDown={onBeginSidebarResize}
           />
         )}
