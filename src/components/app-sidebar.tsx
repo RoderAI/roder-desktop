@@ -75,15 +75,15 @@ export function AppSidebar({
       )}
       style={{ width }}
     >
-      {reserveTitlebarSpace && <div className="h-[60px]" />}
-      <div className="no-drag flex flex-col gap-1 px-2">
+      {reserveTitlebarSpace && <div className="h-(--desktop-header-height)" />}
+      <div className="no-drag flex flex-col gap-0.5 px-2">
         <SidebarRowButton onClick={onNewProject}>
-          <FolderPlus className="size-4.5" />
+          <FolderPlus className="size-4" />
           <span className="min-w-0 flex-1 truncate">Add Project</span>
           <Kbd className="ml-auto">⌘+O</Kbd>
         </SidebarRowButton>
         <SidebarRowButton onClick={onNewThread}>
-          <CirclePlus className="size-4.5" />
+          <CirclePlus className="size-4" />
           <span className="min-w-0 flex-1 truncate">New Agent</span>
           <Kbd className="ml-auto">⌘+N</Kbd>
         </SidebarRowButton>
@@ -91,36 +91,36 @@ export function AppSidebar({
           className={cn(activeView === "plugins" && "bg-sidebar-active/20 text-sidebar-active-foreground")}
           onClick={onOpenPlugins}
         >
-          <Store className="size-4.5" />
+          <Store className="size-4" />
           <span className="min-w-0 flex-1 truncate">Plugins</span>
         </SidebarRowButton>
       </div>
 
-      <div className="sidebar-scroll no-drag mt-6 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-5">
-        <div className="flex flex-col gap-7">
+      <div className="sidebar-scroll no-drag mt-5 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4">
+        <div className="flex flex-col gap-5">
           {threadGroups.length > 0 ? (
             threadGroups.map((group) => {
               const expanded = expandedGroupKeys.has(group.key);
               const visibility = visibleThreadsForGroup(group.threads, expanded);
               return (
                 <section key={group.key}>
-                  <div className="group squircle-corners relative flex h-9 items-center rounded-xl px-3 pr-10 text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
+                  <div className="group squircle-corners relative flex h-8 items-center rounded-xl px-2.5 pr-8 text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
                     <div className="min-w-0 flex-1 truncate" title={group.path || group.title}>
                       {group.title}
                     </div>
                     <Tooltip>
                       <TooltipTrigger
                         type="button"
-                        className="absolute right-1 flex size-7 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+                        className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
                         aria-label={`New thread in ${group.title}`}
                         onClick={() => onNewThreadInFolder(group.path)}
                       >
-                        <CirclePlus className="size-4" />
+                        <CirclePlus className="size-3.5" />
                       </TooltipTrigger>
                       <TooltipContent side="right">New thread</TooltipContent>
                     </Tooltip>
                   </div>
-                  <div className="mt-3 flex flex-col gap-1">
+                  <div className="mt-2 flex flex-col gap-0.5">
                     {visibility.primaryThreads.map((thread) => (
                       <ThreadRow
                         key={thread.id}
@@ -146,7 +146,7 @@ export function AppSidebar({
                         data-expanded={expanded ? "true" : undefined}
                         aria-hidden={!expanded}
                       >
-                        <div className="thread-overflow-region-inner flex flex-col gap-1">
+                        <div className="thread-overflow-region-inner flex flex-col gap-0.5">
                           {visibility.overflowThreads.map((thread) => (
                             <ThreadRow
                               key={thread.id}
@@ -201,22 +201,22 @@ function ThreadRow({
   return (
     <div
       className={cn(
-        "thread-row squircle-corners relative flex h-9 w-full items-center rounded-xl text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20",
+        "thread-row squircle-corners relative flex h-8 w-full items-center rounded-xl text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20",
         active && "bg-sidebar-active/20 text-sidebar-active-foreground",
         disabled && "pointer-events-none opacity-50",
       )}
     >
       <button
         type="button"
-        className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-xl px-3 pr-14 text-left outline-none"
+        className="flex h-full min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 pr-12 text-left outline-none"
         disabled={disabled}
         onClick={() => onSelectThread(thread.id)}
       >
         <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
         <span
           className={cn(
-            "thread-row-age absolute right-3 text-base text-sidebar-muted",
-            running && "flex h-7 w-7 -translate-x-px items-center justify-end",
+            "thread-row-age absolute right-2.5 text-base text-sidebar-muted",
+            running && "flex h-6 w-6 -translate-x-px items-center justify-end",
           )}
           aria-label={running ? "Turn running" : undefined}
         >
@@ -226,12 +226,12 @@ function ThreadRow({
       <Tooltip>
         <TooltipTrigger
           type="button"
-          className="thread-row-archive absolute right-3 flex size-7 items-center justify-center rounded-md text-sidebar-muted outline-none hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+          className="thread-row-archive absolute right-2 flex size-6 items-center justify-center rounded-md text-sidebar-muted outline-none hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
           disabled={disabled}
           aria-label={`Archive ${(thread.name ?? thread.preview) || "thread"}`}
           onClick={() => onArchiveThread(thread.id)}
         >
-          <Archive className="size-4" />
+          <Archive className="size-3.5" />
         </TooltipTrigger>
         <TooltipContent side="right">Archive</TooltipContent>
       </Tooltip>
@@ -254,7 +254,7 @@ function SidebarRowButton({
     <button
       type="button"
       className={cn(
-        "squircle-corners flex h-9 w-full items-center gap-3 rounded-xl px-3 text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
+        "squircle-corners flex h-8 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20 disabled:pointer-events-none",
         className,
       )}
       disabled={disabled}

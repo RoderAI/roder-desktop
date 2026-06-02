@@ -12,6 +12,7 @@ import {
   dropdownMenuItemClassName,
   dropdownMenuTriggerVariants,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function PolicyModePicker({
@@ -105,14 +106,16 @@ export function AttachmentChip({
         <FileText className="size-4 shrink-0" />
       )}
       <span className="truncate">{attachment.name}</span>
-      <button
+      <Button
         type="button"
-        className="rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        variant="ghost"
+        size="icon-xs"
+        className="rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
         aria-label={`Remove ${attachment.name}`}
         onClick={onRemove}
       >
         <X className="size-3.5" />
-      </button>
+      </Button>
     </span>
   );
 }

@@ -18,11 +18,11 @@ const buttonVariants = cva(
         subtle: "bg-card/70 text-foreground shadow-sm ring-1 ring-border hover:bg-card",
       },
       size: {
-        default: "h-11 px-5",
-        sm: "h-10 px-4",
-        icon: "size-9",
-        "icon-xs": "size-6",
-        compact: "h-10 px-4",
+        default: "h-10 px-4",
+        sm: "h-8 px-3",
+        icon: "size-8",
+        "icon-xs": "size-5",
+        compact: "h-8 px-3",
       },
     },
     defaultVariants: {
@@ -40,7 +40,7 @@ export type ButtonProps = React.ComponentPropsWithoutRef<typeof BaseButton> &
 export const Button = React.forwardRef<React.ElementRef<typeof BaseButton>, ButtonProps>(
   ({ asChild = false, children, className, variant, size, ...props }, ref) => {
     const hasIconWithText = buttonHasIconWithText(children);
-    const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-4 pr-5 [&_svg]:size-4" : undefined;
+    const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-3 pr-4 [&_svg]:size-3.5" : undefined;
 
     if (asChild && React.isValidElement(children)) {
       return (

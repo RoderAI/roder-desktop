@@ -23,7 +23,7 @@ export function AgentWaitCards({
   }
 
   return (
-    <div className="mx-auto mb-3 flex w-full max-w-[980px] flex-col gap-3 px-8">
+    <div className="mx-auto mb-3 flex w-full max-w-3xl flex-col gap-3 px-8">
       {requests.map((request) => {
         if (request.kind === "approval") {
           return <ApprovalWaitCard key={request.id} request={request} onResolve={onResolveApproval} />;

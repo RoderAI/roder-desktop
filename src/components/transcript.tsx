@@ -457,7 +457,7 @@ export function Transcript({
         viewportRef={setViewportNode}
         onViewportScroll={syncCanScrollToBottom}
       >
-        <main className="mx-auto w-full max-w-[980px] px-8 pt-2">
+        <main className="mx-auto w-full max-w-3xl px-8 pt-2">
           <div
             style={{
               height: rowVirtualizer.getTotalSize(),
