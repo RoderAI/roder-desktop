@@ -86,7 +86,11 @@ export function ReviewPanel({
   const [nearbyDiffPaths, setNearbyDiffPaths] = useState<Set<string>>(() => new Set());
   const fileTreeId = useId();
   const diffScrollRef = useRef<HTMLElement | null>(null);
-  const diffSectionRefs = useRef(new Map<string, HTMLElement>());
+  const diffSectionRefs = useRef<Map<string, HTMLElement> | null>(null);
+  if (!diffSectionRefs.current) {
+    diffSectionRefs.current = new Map<string, HTMLElement>();
+  }
+  const diffSections = diffSectionRefs.current;
   const selectionSourceRef = useRef<"navigation" | "scroll" | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const fileTreeToggleLabel = reviewFileTreeToggleLabel(fileTreeVisible);
@@ -117,17 +121,16 @@ export function ReviewPanel({
     onActiveChange: setFileTreeResizing,
   });
 
-  useEffect(() => {
-    setFileTreeWidth((currentWidth) => reviewFileTreeWidth(currentWidth, width));
-  }, [width]);
-
-  const scrollToReviewFile = useCallback((path: string) => {
-    const section = diffSectionRefs.current.get(path);
-    if (!section) {
-      return;
-    }
-    section.scrollIntoView({ block: "start", behavior: "auto" });
-  }, []);
+  const scrollToReviewFile = useCallback(
+    (path: string) => {
+      const section = diffSections.get(path);
+      if (!section) {
+        return;
+      }
+      section.scrollIntoView({ block: "start", behavior: "auto" });
+    },
+    [diffSections],
+  );
 
   const handleSelectedPathChange = useCallback(
     (path: string) => {
@@ -138,13 +141,16 @@ export function ReviewPanel({
     [onSelectedPathChange, scrollToReviewFile],
   );
 
-  const setDiffSectionRef = useCallback((path: string, section: HTMLElement | null) => {
-    if (section) {
-      diffSectionRefs.current.set(path, section);
-      return;
-    }
-    diffSectionRefs.current.delete(path);
-  }, []);
+  const setDiffSectionRef = useCallback(
+    (path: string, section: HTMLElement | null) => {
+      if (section) {
+        diffSections.set(path, section);
+        return;
+      }
+      diffSections.delete(path);
+    },
+    [diffSections],
+  );
 
   const setDiffScrollNode = useCallback((node: HTMLElement | null) => {
     diffScrollRef.current = node;
@@ -175,7 +181,7 @@ export function ReviewPanel({
     const viewportRect = scrollContainer.getBoundingClientRect();
     const sections = files
       .map((file) => {
-        const section = diffSectionRefs.current.get(file.path);
+        const section = diffSections.get(file.path);
         if (!section) {
           return null;
         }
@@ -192,7 +198,7 @@ export function ReviewPanel({
       selectionSourceRef.current = "scroll";
       onSelectedPathChange(nextPath);
     }
-  }, [files, onSelectedPathChange, selectedPath]);
+  }, [diffSections, files, onSelectedPathChange, selectedPath]);
 
   const handleDiffScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) {

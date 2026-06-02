@@ -510,10 +510,10 @@ function userMessageImages(item: RoderItem): Array<{ imageUrl: string }> {
   if (item.type !== "userMessage") {
     return [];
   }
-  return (item.images ?? [])
-    .map((image) => image.imageUrl ?? image.image_url ?? "")
-    .filter((imageUrl) => imageUrl.trim().length > 0)
-    .map((imageUrl) => ({ imageUrl }));
+  return (item.images ?? []).flatMap((image) => {
+    const imageUrl = image.imageUrl ?? image.image_url ?? "";
+    return imageUrl.trim().length > 0 ? [{ imageUrl }] : [];
+  });
 }
 
 function reasoningBlocksText(blocks: string[] | undefined): string {

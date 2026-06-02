@@ -37,31 +37,35 @@ export type ButtonProps = React.ComponentPropsWithoutRef<typeof BaseButton> &
     asChild?: boolean;
   };
 
-export const Button = React.forwardRef<React.ElementRef<typeof BaseButton>, ButtonProps>(
-  ({ asChild = false, children, className, variant, size, ...props }, ref) => {
-    const hasIconWithText = buttonHasIconWithText(children);
-    const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-3 pr-4 [&_svg]:size-3.5" : undefined;
+export function Button({
+  asChild = false,
+  children,
+  className,
+  ref,
+  variant,
+  size,
+  ...props
+}: ButtonProps & { ref?: React.Ref<React.ElementRef<typeof BaseButton>> }): React.JSX.Element {
+  const hasIconWithText = buttonHasIconWithText(children);
+  const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-3 pr-4 [&_svg]:size-3.5" : undefined;
 
-    if (asChild && React.isValidElement(children)) {
-      return (
-        <BaseButton
-          className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)}
-          ref={ref}
-          render={children}
-          {...props}
-        />
-      );
-    }
-
+  if (asChild && React.isValidElement(children)) {
     return (
-      <BaseButton className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)} ref={ref} {...props}>
-        {children}
-      </BaseButton>
+      <BaseButton
+        className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)}
+        ref={ref}
+        render={children}
+        {...props}
+      />
     );
-  },
-);
+  }
 
-Button.displayName = "Button";
+  return (
+    <BaseButton className={cn(buttonVariants({ variant, size }), iconBalanceClass, className)} ref={ref} {...props}>
+      {children}
+    </BaseButton>
+  );
+}
 
 function buttonHasIconWithText(children: React.ReactNode): boolean {
   const childArray = React.Children.toArray(children).filter((child) => child !== null && child !== undefined);

@@ -1,5 +1,5 @@
 import type { SkillDescriptor } from "@/types/roder";
-import { renderTextWithSkillTokens } from "@/components/skill-token-pill";
+import { textWithSkillTokens } from "@/components/skill-token-pill";
 
 type UserMessageContentProps = {
   images?: Array<{ imageUrl: string }>;
@@ -7,7 +7,9 @@ type UserMessageContentProps = {
   text: string;
 };
 
-export function UserMessageContent({ images = [], skills, text }: UserMessageContentProps): React.JSX.Element {
+const emptyImages: Array<{ imageUrl: string }> = [];
+
+export function UserMessageContent({ images = emptyImages, skills, text }: UserMessageContentProps): React.JSX.Element {
   return (
     <div className="space-y-3 font-medium text-base leading-7">
       {images.length > 0 && (
@@ -22,7 +24,15 @@ export function UserMessageContent({ images = [], skills, text }: UserMessageCon
           ))}
         </div>
       )}
-      {text && <div>{renderTextWithSkillTokens(text, skills)}</div>}
+      {text && (
+        <div>
+          <UserMessageText skills={skills} text={text} />
+        </div>
+      )}
     </div>
   );
+}
+
+function UserMessageText({ skills, text }: { skills: SkillDescriptor[]; text: string }): React.JSX.Element {
+  return <>{textWithSkillTokens(text, skills)}</>;
 }

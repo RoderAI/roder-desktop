@@ -299,10 +299,10 @@ function skillSearchIndex(skill: SkillDescriptor): SkillSearchIndex {
 }
 
 function skillNameParts(name: string): string[] {
-  return name
-    .split(/[-_\s]+/)
-    .map(normalize)
-    .filter(Boolean);
+  return name.split(/[-_\s]+/).flatMap((part) => {
+    const normalized = normalize(part);
+    return normalized ? [normalized] : [];
+  });
 }
 
 function sortSkillsByName(skills: SkillDescriptor[]): SkillDescriptor[] {

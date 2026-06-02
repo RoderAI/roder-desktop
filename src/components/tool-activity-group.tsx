@@ -6,6 +6,8 @@ import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 import { ToolTimelineItem } from "./tool-timeline-item";
 import { DisclosureChevron } from "./tool-timeline-shared";
 
+const emptyDisclosureControl: ToolDisclosureControlProps = {};
+
 export function ToolActivityGroup({
   getEntryDisclosureControl,
   onOpenChange,
@@ -45,7 +47,7 @@ export function ToolActivityGroup({
 }
 
 function ToolEntryDetail({
-  disclosureControl = {},
+  disclosureControl = emptyDisclosureControl,
   entry,
 }: {
   disclosureControl?: ToolDisclosureControlProps;

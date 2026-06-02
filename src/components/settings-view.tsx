@@ -634,7 +634,7 @@ function TerminalThemePreview({ theme }: { theme: ReturnType<typeof terminalThem
           <span className="size-2 rounded-full" style={{ background: theme.red }} />
           <span className="size-2 rounded-full" style={{ background: theme.yellow }} />
           <span className="size-2 rounded-full" style={{ background: theme.green }} />
-          <span className="ml-2">roder — truecolour terminal</span>
+          <span className="ml-2">roder: truecolour terminal</span>
         </div>
         <div>
           <span style={{ color: theme.green }}>$</span> pnpm test

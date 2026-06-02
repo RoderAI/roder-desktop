@@ -5,7 +5,7 @@ export const Route = createFileRoute("/threads/$threadId")({
   component: ThreadRoute,
 });
 
-function ThreadRoute(): React.JSX.Element {
+export function ThreadRoute(): React.JSX.Element {
   const { threadId } = Route.useParams();
   return <ChatPage route="thread" threadId={threadId} />;
 }
