@@ -3,6 +3,7 @@ packages:
   - "examples/extensions/*"
 
 allowBuilds:
+  electron: true
   electron-winstaller: true
   esbuild: false
   node-pty: true

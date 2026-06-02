@@ -51,6 +51,7 @@ function useRoderStoreBootstrap(): void {
 function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
   const activeThread =
     state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
+  const activeThreadGoal = state.threadGoalsByThread[state.activeThreadId] ?? null;
   const messages = messagesFromThread(activeThread);
   const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
   return {
@@ -58,12 +59,16 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     stderr: state.stderr,
     threads: state.threads,
     activeThreadId: state.activeThreadId,
+    activeThreadGoal: activeThreadGoal?.threadId === state.activeThreadId ? activeThreadGoal : null,
     messages,
     allModels: state.models,
     visibleModelIds: state.visibleModelIds,
     selectedModel: state.selectedModel,
     selectedReasoning: state.selectedReasoning,
     selectedPolicyMode: state.selectedPolicyMode,
+    workspaces: state.workspaces,
+    selectedWorkspaceId: state.selectedWorkspaceId,
+    selectedRootId: state.selectedRootId,
     selectedWorkspaceCwd: state.selectedWorkspaceCwd,
     workspaceRecents: state.workspaceRecents,
     waitRequests,

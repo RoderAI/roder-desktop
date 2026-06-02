@@ -39,8 +39,8 @@ const mockState = vi.hoisted(() => ({
     methods: [
       { method: "initialize" },
       { method: "thread/list" },
-      { method: "git/changes/list" },
-      { method: "git/changes/read" },
+      { method: "vcs/changes/list" },
+      { method: "vcs/changes/read" },
       { method: "workspace/changes/list" },
     ],
   },
@@ -125,8 +125,8 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
   expect(status.appServerMethods).toEqual([
     "initialize",
     "thread/list",
-    "git/changes/list",
-    "git/changes/read",
+    "vcs/changes/list",
+    "vcs/changes/read",
     "workspace/changes/list",
   ]);
   expect(mockState.spawnSyncCalls).toEqual([
@@ -134,9 +134,7 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
       args: ["app-server", "schema", "--format", "manifest"],
       options: expect.objectContaining({
         timeout: 5000,
-        env: expect.objectContaining({
-          RODER_DESKTOP: "1",
-        }),
+        env: process.env,
       }),
     }),
   ]);
@@ -144,9 +142,7 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
     expect.objectContaining({
       args: ["app-server", "--listen", "stdio://"],
       options: expect.objectContaining({
-        env: expect.objectContaining({
-          RODER_DESKTOP: "1",
-        }),
+        env: process.env,
       }),
     }),
   ]);

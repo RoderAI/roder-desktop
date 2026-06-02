@@ -10,13 +10,15 @@ import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import type { RouteReviewScope, RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
-import type { DesktopAttachment, RoderStatus, RoderThread } from "@/types/roder";
+import type { DesktopAttachment, RoderStatus, RoderThread, RoderThreadGoal } from "@/types/roder";
 
 export type AppShellLayoutProps = {
   activeThread?: RoderThread;
   activeThreadId: string;
+  activeThreadGoal?: RoderThreadGoal | null;
   activePanel: WorkspacePanel;
   activeWorkspaceCwd: string;
+  activeWorkspaceRef: { workspaceId: string; rootId: string };
   folderOptions: FolderOption[];
   isPluginsRoute: boolean;
   leftSidebarWidth: number;
@@ -60,8 +62,10 @@ export type AppShellLayoutProps = {
 export function AppShellLayout({
   activeThread,
   activeThreadId,
+  activeThreadGoal,
   activePanel,
   activeWorkspaceCwd,
+  activeWorkspaceRef,
   folderOptions,
   isPluginsRoute,
   leftSidebarWidth,
@@ -147,6 +151,7 @@ export function AppShellLayout({
             <>
               <TopBar
                 thread={activeThread}
+                goal={activeThreadGoal}
                 threads={threadOptions}
                 folders={folderOptions}
                 activeFolderPath={activeWorkspaceCwd}
@@ -189,6 +194,7 @@ export function AppShellLayout({
                   appServerMethods: status.appServerMethods ?? [],
                   activeThreadId,
                   activeWorkspaceCwd,
+                  activeWorkspaceRef,
                   hunkSummary,
                   reviewPath,
                   reviewScope,
@@ -220,6 +226,7 @@ export function AppShellLayout({
     <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
       <TopBar
         thread={activeThread}
+        goal={activeThreadGoal}
         threads={threadOptions}
         folders={folderOptions}
         activeFolderPath={activeWorkspaceCwd}
@@ -297,6 +304,7 @@ export function AppShellLayout({
                   appServerMethods: status.appServerMethods ?? [],
                   activeThreadId,
                   activeWorkspaceCwd,
+                  activeWorkspaceRef,
                   hunkSummary,
                   reviewPath,
                   reviewScope,

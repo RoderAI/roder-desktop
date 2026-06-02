@@ -1,7 +1,7 @@
 import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
-import type { RoderStatus, RoderThread } from "@/types/roder";
+import type { RoderStatus, RoderThread, RoderThreadGoal } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import { chromeIconButtonClassNameForState } from "@/components/ui/chrome-icon-button";
 import {
@@ -24,6 +24,7 @@ export type WorkspacePanel = RouteWorkspacePanel | null;
 
 type TopBarProps = {
   thread?: RoderThread;
+  goal?: RoderThreadGoal | null;
   threads: RoderThread[];
   folders: FolderOption[];
   activeFolderPath: string;
@@ -45,6 +46,7 @@ type TopBarProps = {
 
 export function TopBar({
   thread,
+  goal,
   threads,
   folders,
   activeFolderPath,
@@ -174,10 +176,12 @@ export function TopBar({
               /
             </span>
             <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
+            <GoalBreadcrumb goal={goal} />
           </h1>
         ) : (
           <CollapsedBreadcrumb
             thread={thread}
+            goal={goal}
             threads={threads}
             folders={folders}
             activeFolder={activeFolder}
@@ -243,6 +247,7 @@ function WindowMenuButton({ label, items }: { label: string; items: WindowMenuIt
 
 function CollapsedBreadcrumb({
   thread,
+  goal,
   threads,
   folders,
   activeFolder,
@@ -251,6 +256,7 @@ function CollapsedBreadcrumb({
   onSelectThread,
 }: {
   thread?: RoderThread;
+  goal?: RoderThreadGoal | null;
   threads: RoderThread[];
   folders: FolderOption[];
   activeFolder?: FolderOption;
@@ -337,7 +343,33 @@ function CollapsedBreadcrumb({
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      <GoalBreadcrumb goal={goal} />
     </div>
+  );
+}
+
+function GoalBreadcrumb({ goal }: { goal?: RoderThreadGoal | null }): React.JSX.Element | null {
+  if (!goal) {
+    return null;
+  }
+  const label = goal.objective.trim();
+  if (!label) {
+    return null;
+  }
+
+  return (
+    <>
+      <span className="shrink-0 text-muted-foreground/60" aria-hidden="true">
+        /
+      </span>
+      <span
+        aria-label={`Goal: ${label}`}
+        className="goal-breadcrumb-indicator min-w-0 max-w-80 truncate font-normal text-muted-foreground"
+        title={label}
+      >
+        {label}
+      </span>
+    </>
   );
 }
 

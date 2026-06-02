@@ -64,30 +64,41 @@ test("workspace change IPC wrapper lists observed changes by thread and turn", a
   ]);
 });
 
-test("review git IPC wrappers call live branch change methods", async () => {
+test("review VCS IPC wrappers call live branch change methods", async () => {
   const calls = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {
     calls.push({ method, params });
-    return method === "git/changes/read"
-      ? { path: params.path, patch: "", offset: 0, limit: 400, totalLines: 0, nextOffset: null }
-      : { repositoryRoot: params.workspace, files: [], totals: { files: 0, additions: 0, deletions: 0 } };
+    return method === "vcs/changes/read"
+      ? { path: params.path, content: "", offset: 0, totalLines: 0, nextOffset: null, binary: false }
+      : {
+          status: {
+            provider: { id: "git", displayName: "Git" },
+            workspace: { root: "/workspace" },
+            changedFileCount: 0,
+          },
+          files: [],
+          totals: { files: 0, additions: 0, deletions: 0 },
+          truncated: false,
+        };
   });
 
-  await roderIpc.listGitChanges("/workspace", { limit: 250 });
-  await roderIpc.readGitChange("/workspace", "src/app.ts", { offset: 20, limit: 100 });
+  await roderIpc.listVcsChanges({ workspaceId: "ws_1", id: "root_1" }, { limit: 250 });
+  await roderIpc.readVcsChange({ workspaceId: "ws_1", id: "root_1" }, "src/app.ts", { offset: 20, limit: 100 });
 
   expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
-      method: "git/changes/list",
+      method: "vcs/changes/list",
       params: {
-        workspace: "/workspace",
+        workspaceId: "ws_1",
+        rootId: "root_1",
         limit: 250,
       },
     },
     {
-      method: "git/changes/read",
+      method: "vcs/changes/read",
       params: {
-        workspace: "/workspace",
+        workspaceId: "ws_1",
+        rootId: "root_1",
         path: "src/app.ts",
         offset: 20,
         limit: 100,

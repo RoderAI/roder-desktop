@@ -4,6 +4,7 @@ import {
   $isSkillTokenNode,
   createSkillPromptEditor,
   registerSkillPromptPlainText,
+  registerSkillPromptSubmit,
   readSkillPromptEditorSelectionRange,
   readSkillPromptEditorSelectionOffset,
   readSkillPromptEditorText,
@@ -154,6 +155,27 @@ test("plain-text command adapter inserts newlines on shift-enter command", () =>
 
   expect(readSkillPromptEditorText(editor)).toBe("one\n");
   unregister();
+});
+
+test("submit command consumes plain enter without inserting a newline", () => {
+  const editor = createSkillPromptEditor();
+  const unregisterPlainText = registerSkillPromptPlainText(editor, () => []);
+  const submitted: string[] = [];
+  const unregisterSubmit = registerSkillPromptSubmit(editor, () => submitted.push(readSkillPromptEditorText(editor)));
+
+  writeSkillPromptEditorText(editor, "send this", [], "send this".length);
+  editor.dispatchCommand(SKILL_PROMPT_ENTER_COMMAND, keyboardEvent("Enter"));
+
+  expect(submitted).toEqual(["send this"]);
+  expect(readSkillPromptEditorText(editor)).toBe("send this");
+
+  editor.dispatchCommand(SKILL_PROMPT_ENTER_COMMAND, keyboardEvent("Enter", { shiftKey: true }));
+
+  expect(submitted).toEqual(["send this"]);
+  expect(readSkillPromptEditorText(editor)).toBe("send this\n");
+
+  unregisterSubmit();
+  unregisterPlainText();
 });
 
 test("plain-text command adapter removes skill tokens as a unit", () => {

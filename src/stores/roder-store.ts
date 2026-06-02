@@ -4,6 +4,7 @@ import { roderIpc } from "@/lib/roder-ipc";
 import {
   applyThreadItemEvent,
   activeTurnIdForThread,
+  isThreadRunning,
   markThreadStatus,
   patchThread,
   sortThreadsByUpdatedAt,
@@ -34,13 +35,16 @@ import type {
   RoderNotification,
   RoderStatus,
   RoderThread,
+  RoderThreadGoal,
   RoderThreadItemEvent,
   RoderTurn,
   NavigationEntry,
   ReasoningEffort,
   SystemAppearance,
   UserInputWaitRequest,
+  Workspace,
   WorkspaceFolder,
+  WorkspaceRoot,
 } from "@/types/roder";
 
 type RoderStore = {
@@ -48,6 +52,7 @@ type RoderStore = {
   stderr: string[];
   threads: RoderThread[];
   threadDetails: Record<string, RoderThread>;
+  threadGoalsByThread: Record<string, RoderThreadGoal>;
   threadControlsByThread: Record<string, ThreadControlState>;
   hunkRevisionByThread: Record<string, number>;
   activeThreadId: string;
@@ -61,6 +66,9 @@ type RoderStore = {
   selectedModel: string;
   selectedReasoning: ReasoningEffort;
   selectedPolicyMode: PolicyMode;
+  workspaces: Workspace[];
+  selectedWorkspaceId: string;
+  selectedRootId: string;
   selectedWorkspaceCwd: string;
   workspaceRecents: WorkspaceFolder[];
   pendingWaitRequestsByThread: PendingWaitRequestsByThread;
@@ -281,6 +289,7 @@ export const useRoderStore = create<RoderStore>()(
       stderr: [],
       threads: [],
       threadDetails: {},
+      threadGoalsByThread: {},
       threadControlsByThread: {},
       hunkRevisionByThread: {},
       activeThreadId: "",
@@ -294,6 +303,9 @@ export const useRoderStore = create<RoderStore>()(
       selectedModel: "",
       selectedReasoning: "medium",
       selectedPolicyMode: "accept_all",
+      workspaces: [],
+      selectedWorkspaceId: "",
+      selectedRootId: "",
       selectedWorkspaceCwd: "",
       workspaceRecents: [],
       pendingWaitRequestsByThread: {},
@@ -306,11 +318,12 @@ export const useRoderStore = create<RoderStore>()(
         set({ busy: true, error: null });
         try {
           const readyStatus = await roderIpc.start();
-          const [status, threadResult, modelResult, settings] = await Promise.all([
+          const [status, threadResult, modelResult, settings, workspaceResult] = await Promise.all([
             roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
             roderIpc.listThreads(100),
             roderIpc.listModels(),
             roderIpc.settings(),
+            listWorkspacesForBootstrap(),
           ]);
 
           const threads = realThreads(normalizeThreadsCwd(threadResult.data, status.cwd));
@@ -322,10 +335,16 @@ export const useRoderStore = create<RoderStore>()(
             ? current.activeThreadId
             : firstThreadId(threads, "");
           const activeThread = threads.find((thread) => thread.id === activeThreadId);
-          const selectedWorkspaceCwd = normalizeCwd(
-            current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "",
-            status.cwd,
-          );
+          const workspaces = workspaceResult.workspaces ?? [];
+          const workspaceSelection = resolveWorkspaceSelection(workspaces, {
+            workspaceId: current.selectedWorkspaceId || activeThread?.workspaceId || "",
+            rootId: current.selectedRootId || activeThread?.rootId || "",
+            path: current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "",
+            baseCwd: status.cwd,
+          });
+          const selectedWorkspaceCwd = workspaceSelection?.root.path
+            ? normalizeCwd(workspaceSelection.root.path, status.cwd)
+            : normalizeCwd(current.selectedWorkspaceCwd || activeThread?.cwd || status.cwd || "", status.cwd);
           const currentSelectedModel = visibleModels.some((model) => model.id === settings.default_model)
             ? settings.default_model
             : visibleModels.find((model) => model.isDefault)?.id || visibleModels[0]?.id || settings.default_model;
@@ -344,6 +363,9 @@ export const useRoderStore = create<RoderStore>()(
             defaultReasoning,
             defaultPolicyMode,
             selectedWorkspaceCwd,
+            workspaces,
+            selectedWorkspaceId: workspaceSelection?.workspace.id ?? "",
+            selectedRootId: workspaceSelection?.root.id ?? "",
             workspaceRecents: upsertWorkspaceRecent(current.workspaceRecents, selectedWorkspaceCwd),
             selectedModel: activeThread?.model || currentSelectedModel,
             selectedReasoning: defaultReasoning,
@@ -375,6 +397,7 @@ export const useRoderStore = create<RoderStore>()(
       selectThread: async (threadId, options = { pushHistory: true }) => {
         const current = get();
         if (threadId === current.activeThreadId && current.threadDetails[threadId]) {
+          await syncThreadGoal(threadId, set);
           return;
         }
 
@@ -393,7 +416,7 @@ export const useRoderStore = create<RoderStore>()(
         }
 
         try {
-          const result = await roderIpc.readThread(threadId);
+          const [result, goalResult] = await Promise.all([roderIpc.readThread(threadId), readThreadGoal(threadId)]);
           if (!result.thread) {
             throw new Error("roder app-server did not return a thread");
           }
@@ -401,7 +424,10 @@ export const useRoderStore = create<RoderStore>()(
           set((state) => ({
             threadDetails: { ...state.threadDetails, [threadId]: thread },
             threads: upsertThread(state.threads, thread),
+            threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, goalResult.goal),
             selectedWorkspaceCwd: thread.cwd,
+            selectedWorkspaceId: thread.workspaceId ?? state.selectedWorkspaceId,
+            selectedRootId: thread.rootId ?? state.selectedRootId,
             selectedModel: state.threadControlsByThread[threadId]?.model || thread.model || state.defaultModel,
             selectedReasoning: state.threadControlsByThread[threadId]?.reasoning || state.defaultReasoning,
             selectedPolicyMode: state.threadControlsByThread[threadId]?.policyMode || state.defaultPolicyMode,
@@ -425,10 +451,12 @@ export const useRoderStore = create<RoderStore>()(
             current.activeThreadId === threadId ? firstThreadId(nextThreads, "") : current.activeThreadId;
           set((state) => {
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
+            const { [threadId]: _archivedGoal, ...threadGoalsByThread } = state.threadGoalsByThread;
             const { [threadId]: _archivedHunkRevision, ...hunkRevisionByThread } = state.hunkRevisionByThread;
             return {
               threads: state.threads.filter((thread) => thread.id !== threadId),
               threadDetails,
+              threadGoalsByThread,
               threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
               hunkRevisionByThread,
               activeThreadId: nextActiveThreadId,
@@ -479,7 +507,14 @@ export const useRoderStore = create<RoderStore>()(
             return;
           }
           set({ busy: true });
-          await startThreadForWorkspace(folder, set, get);
+          const created = await roderIpc.createWorkspace({ roots: [{ path: folder }], defaultRootPath: folder });
+          set((state) => ({
+            workspaces: upsertWorkspace(state.workspaces, created.workspace),
+            selectedWorkspaceId: created.workspace.id,
+            selectedRootId: created.workspace.defaultRootId,
+            selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? folder,
+          }));
+          await startThreadForSelection(set, get);
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
         }
@@ -488,8 +523,7 @@ export const useRoderStore = create<RoderStore>()(
       newThread: async () => {
         set({ busy: true, error: null });
         try {
-          const cwd = requireAbsoluteCwd(get().selectedWorkspaceCwd || get().status.cwd, get().status.cwd);
-          await startThreadForWorkspace(cwd, set, get);
+          await startThreadForSelection(set, get);
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
         }
@@ -503,20 +537,23 @@ export const useRoderStore = create<RoderStore>()(
 
         let threadId = get().activeThreadId;
         const activeThread = get().threadDetails[threadId] ?? get().threads.find((thread) => thread.id === threadId);
-        const activeTurnId = activeTurnIdForThread(activeThread);
-        const steering = threadId !== "" && activeTurnId !== "";
         let markedTurnStarting = false;
+
+        if (threadId !== "" && isThreadRunning(activeThread)) {
+          return;
+        }
+
         set({ busy: true, error: null });
 
         try {
           if (!threadId) {
             const state = get();
-            const cwd = requireAbsoluteCwd(state.selectedWorkspaceCwd || state.status.cwd, state.status.cwd);
+            const workspaceSelection = await ensureWorkspaceSelection(state, set);
             const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.defaultModel);
             const selectedModel = model?.id ?? state.defaultModel;
             const result = await roderIpc.startThread(
               selectedModel,
-              cwd,
+              threadStartWorkspace(workspaceSelection),
               model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
               state.defaultReasoning,
               { initialPrompt: text },
@@ -529,8 +566,11 @@ export const useRoderStore = create<RoderStore>()(
             set((state) => ({
               threads: upsertThread(state.threads, thread),
               threadDetails: { ...state.threadDetails, [threadId]: thread },
+              threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadId),
               activeThreadId: threadId,
               selectedWorkspaceCwd: thread.cwd,
+              selectedWorkspaceId: thread.workspaceId ?? workspaceSelection.workspace.id,
+              selectedRootId: thread.rootId ?? workspaceSelection.root.id,
               selectedModel: thread.model || result.model || selectedModel,
               selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
               selectedPolicyMode: state.defaultPolicyMode,
@@ -541,11 +581,6 @@ export const useRoderStore = create<RoderStore>()(
               }),
               workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
             }));
-          }
-
-          if (steering) {
-            await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
-            return;
           }
 
           markedTurnStarting = true;
@@ -590,7 +625,7 @@ export const useRoderStore = create<RoderStore>()(
           }
         } catch (error) {
           set((state) => ({
-            busy: steering ? state.busy : false,
+            busy: false,
             error: (error as Error).message,
             threads: markedTurnStarting
               ? markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
@@ -702,8 +737,14 @@ export const useRoderStore = create<RoderStore>()(
       setSelectedWorkspaceCwd: (cwd) =>
         set((state) => {
           const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
+          const selection = resolveWorkspaceSelection(state.workspaces, {
+            path: selectedWorkspaceCwd,
+            baseCwd: state.status.cwd,
+          });
           return {
             selectedWorkspaceCwd,
+            selectedWorkspaceId: selection?.workspace.id ?? "",
+            selectedRootId: selection?.root.id ?? "",
             workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, selectedWorkspaceCwd),
           };
         }),
@@ -711,7 +752,13 @@ export const useRoderStore = create<RoderStore>()(
         const state = get();
         const folder = await roderIpc.openWorkspaceFolder(state.selectedWorkspaceCwd || state.status.cwd);
         if (folder) {
-          get().setSelectedWorkspaceCwd(folder);
+          const created = await roderIpc.createWorkspace({ roots: [{ path: folder }], defaultRootPath: folder });
+          set((state) => ({
+            workspaces: upsertWorkspace(state.workspaces, created.workspace),
+            selectedWorkspaceId: created.workspace.id,
+            selectedRootId: created.workspace.defaultRootId,
+            selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? folder,
+          }));
         }
       },
       resolveApproval: async (request, approved) => {
@@ -754,6 +801,9 @@ export const useRoderStore = create<RoderStore>()(
         backStack: state.backStack,
         forwardStack: state.forwardStack,
         visibleModelIds: state.visibleModelIds,
+        workspaces: state.workspaces,
+        selectedWorkspaceId: state.selectedWorkspaceId,
+        selectedRootId: state.selectedRootId,
         selectedWorkspaceCwd: state.selectedWorkspaceCwd,
         workspaceRecents: state.workspaceRecents,
       }),
@@ -800,14 +850,95 @@ function removeThreadControls(
   return remaining;
 }
 
-async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () => RoderStore): Promise<void> {
+async function readThreadGoal(threadId: string): Promise<{ goal: RoderThreadGoal | null | undefined }> {
+  try {
+    const result = await roderIpc.threadGoal(threadId);
+    if (result.goal && result.goal.threadId !== threadId) {
+      return { goal: null };
+    }
+    return { goal: result.goal };
+  } catch {
+    return { goal: undefined };
+  }
+}
+
+async function syncThreadGoal(threadId: string, set: RoderStoreSet): Promise<void> {
+  if (!threadId) {
+    return;
+  }
+  const result = await readThreadGoal(threadId);
+  set((state) => ({
+    threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, result.goal),
+  }));
+}
+
+function updateThreadGoal(
+  goalsByThread: Record<string, RoderThreadGoal>,
+  threadId: string,
+  goal: RoderThreadGoal | null | undefined,
+): Record<string, RoderThreadGoal> {
+  if (goal === undefined) {
+    return goalsByThread;
+  }
+  if (goal === null) {
+    return removeThreadGoal(goalsByThread, threadId);
+  }
+  if (goal.threadId !== threadId) {
+    return removeThreadGoal(goalsByThread, threadId);
+  }
+  if (!isVisibleThreadGoal(goal)) {
+    return removeThreadGoal(goalsByThread, threadId);
+  }
+  return {
+    ...goalsByThread,
+    [threadId]: goal,
+  };
+}
+
+function removeThreadGoal(
+  goalsByThread: Record<string, RoderThreadGoal>,
+  threadId: string,
+): Record<string, RoderThreadGoal> {
+  if (!goalsByThread[threadId]) {
+    return goalsByThread;
+  }
+  const { [threadId]: _removed, ...remaining } = goalsByThread;
+  return remaining;
+}
+
+function roderThreadGoalParam(value: unknown): RoderThreadGoal | null {
+  if (!isRecord(value) || typeof value.threadId !== "string" || typeof value.objective !== "string") {
+    return null;
+  }
+  return value as RoderThreadGoal;
+}
+
+function isVisibleThreadGoal(goal: RoderThreadGoal): boolean {
+  return (
+    goal.status === "active" ||
+    goal.status === "paused" ||
+    goal.status === "blocked" ||
+    goal.status === "usageLimited" ||
+    goal.status === "budgetLimited"
+  );
+}
+
+async function listWorkspacesForBootstrap(): Promise<{ workspaces: Workspace[] }> {
+  try {
+    return await roderIpc.listWorkspaces();
+  } catch {
+    return { workspaces: [] };
+  }
+}
+
+async function startThreadForSelection(set: RoderStoreSet, get: () => RoderStore): Promise<void> {
   const state = get();
-  const threadCwd = requireAbsoluteCwd(cwd, state.status.cwd);
+  const workspaceSelection = await ensureWorkspaceSelection(state, set);
   const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.defaultModel);
   const selectedModel = model?.id ?? state.defaultModel;
   const result = await roderIpc.startThread(
     selectedModel,
-    threadCwd,
+    threadStartWorkspace(workspaceSelection),
     model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
     state.defaultReasoning,
   );
@@ -818,8 +949,11 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
   set((state) => ({
     threads: upsertThread(state.threads, thread),
     threadDetails: { ...state.threadDetails, [thread.id]: thread },
+    threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, thread.id),
     activeThreadId: thread.id,
     selectedWorkspaceCwd: thread.cwd,
+    selectedWorkspaceId: thread.workspaceId ?? workspaceSelection.workspace.id,
+    selectedRootId: thread.rootId ?? workspaceSelection.root.id,
     selectedModel: thread.model || result.model || selectedModel,
     selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
     selectedPolicyMode: state.defaultPolicyMode,
@@ -835,6 +969,92 @@ async function startThreadForWorkspace(cwd: string, set: RoderStoreSet, get: () 
     forwardStack: [],
     busy: false,
   }));
+}
+
+type WorkspaceSelection = {
+  workspace: Workspace;
+  root: WorkspaceRoot;
+};
+
+async function ensureWorkspaceSelection(state: RoderStore, set: RoderStoreSet): Promise<WorkspaceSelection> {
+  const existing = resolveWorkspaceSelection(state.workspaces, {
+    workspaceId: state.selectedWorkspaceId,
+    rootId: state.selectedRootId,
+    path: state.selectedWorkspaceCwd || state.status.cwd || "",
+    baseCwd: state.status.cwd,
+  });
+  if (existing) {
+    return existing;
+  }
+
+  const cwd = requireAbsoluteCwd(state.selectedWorkspaceCwd || state.status.cwd, state.status.cwd);
+  const created = await roderIpc.createWorkspace({ roots: [{ path: cwd }], defaultRootPath: cwd });
+  const root = selectedRootForWorkspace(created.workspace);
+  if (!root) {
+    throw new Error("roder app-server did not return a workspace root");
+  }
+  set((state) => ({
+    workspaces: upsertWorkspace(state.workspaces, created.workspace),
+    selectedWorkspaceId: created.workspace.id,
+    selectedRootId: root.id,
+    selectedWorkspaceCwd: root.path,
+  }));
+  return { workspace: created.workspace, root };
+}
+
+function threadStartWorkspace(selection: WorkspaceSelection): { workspaceId: string; rootId: string; cwd?: string } {
+  return {
+    workspaceId: selection.workspace.id,
+    rootId: selection.root.id,
+    cwd: selection.root.path,
+  };
+}
+
+function resolveWorkspaceSelection(
+  workspaces: Workspace[],
+  params: { workspaceId?: string | null; rootId?: string | null; path?: string; baseCwd?: string },
+): WorkspaceSelection | null {
+  const workspaceById = params.workspaceId ? workspaces.find((workspace) => workspace.id === params.workspaceId) : null;
+  const rootFromWorkspace = workspaceById ? rootForWorkspace(workspaceById, params.rootId || undefined) : null;
+  if (workspaceById && rootFromWorkspace) {
+    return { workspace: workspaceById, root: rootFromWorkspace };
+  }
+
+  const path = normalizeCwd(params.path || "", params.baseCwd).replace(/\/+$/, "");
+  if (path) {
+    for (const workspace of workspaces) {
+      const root = workspace.roots.find((candidate) => candidate.path.replace(/\/+$/, "") === path);
+      if (root) {
+        return { workspace, root };
+      }
+    }
+  }
+
+  return null;
+}
+
+function upsertWorkspace(workspaces: Workspace[], workspace: Workspace): Workspace[] {
+  return [workspace, ...workspaces.filter((candidate) => candidate.id !== workspace.id)].sort(
+    (left, right) => normalizedWorkspaceTimestamp(right.updatedAt) - normalizedWorkspaceTimestamp(left.updatedAt),
+  );
+}
+
+function selectedRootForWorkspace(workspace: Workspace): WorkspaceRoot | null {
+  return rootForWorkspace(workspace, workspace.defaultRootId);
+}
+
+function rootForWorkspace(workspace: Workspace, rootId?: string): WorkspaceRoot | null {
+  if (rootId) {
+    return workspace.roots.find((root) => root.id === rootId) ?? null;
+  }
+  return workspace.roots[0] ?? null;
+}
+
+function normalizedWorkspaceTimestamp(timestamp: number): number {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return 0;
+  }
+  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
 }
 
 function reduceNotification(state: RoderStore, notification: RoderNotification): Partial<RoderStore> {
@@ -853,19 +1073,31 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       ...waitPatch,
       threads: upsertThread(state.threads, thread),
       threadDetails: { ...state.threadDetails, [thread.id]: state.threadDetails[thread.id] ?? thread },
+      threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, thread.id),
       activeThreadId: state.activeThreadId || thread.id,
       selectedWorkspaceCwd: thread.cwd,
+      selectedWorkspaceId: thread.workspaceId ?? state.selectedWorkspaceId,
+      selectedRootId: thread.rootId ?? state.selectedRootId,
       workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
     };
   }
 
-  if ((notification.method === "thread/updated" || notification.method === "thread/renamed") && isRecord(params.thread)) {
+  if (
+    (notification.method === "thread/updated" || notification.method === "thread/renamed") &&
+    isRecord(params.thread)
+  ) {
     const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
     return {
       ...waitPatch,
       threads: upsertThread(state.threads, thread),
       threadDetails: { ...state.threadDetails, [thread.id]: thread },
       selectedWorkspaceCwd: thread.id === state.activeThreadId ? thread.cwd : state.selectedWorkspaceCwd,
+      selectedWorkspaceId:
+        thread.id === state.activeThreadId
+          ? (thread.workspaceId ?? state.selectedWorkspaceId)
+          : state.selectedWorkspaceId,
+      selectedRootId:
+        thread.id === state.activeThreadId ? (thread.rootId ?? state.selectedRootId) : state.selectedRootId,
       workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
     };
   }
@@ -889,6 +1121,29 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       ...waitPatch,
       threads: patchThread(state.threads, threadId, patch),
       threadDetails: patchThreadDetails(state.threadDetails, threadId, patch),
+    };
+  }
+
+  if (notification.method === "thread/goal/updated") {
+    const threadId = String(params.threadId ?? "");
+    const goal = roderThreadGoalParam(params.goal);
+    if (!threadId || !goal || goal.threadId !== threadId) {
+      return waitPatch;
+    }
+    return {
+      ...waitPatch,
+      threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, goal),
+    };
+  }
+
+  if (notification.method === "thread/goal/cleared") {
+    const threadId = String(params.threadId ?? "");
+    if (!threadId) {
+      return waitPatch;
+    }
+    return {
+      ...waitPatch,
+      threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadId),
     };
   }
 

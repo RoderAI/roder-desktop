@@ -200,6 +200,142 @@ test("typed item events project into stable reasoning and final message items", 
   ]);
 });
 
+test("duplicate completed message item ids are preserved as separate transcript messages", () => {
+  let current = {
+    ...thread("thread-a", 100),
+    turns: [{ id: "turn-a", items: [], itemsView: "default", status: "inProgress" }],
+  };
+
+  current = applyThreadItemEvent(current, {
+    seq: 1,
+    eventId: "event-1",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: { id: "turn-a-user", type: "userMessage", text: "tell me about this project", status: "completed" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 2,
+    eventId: "event-2",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemDelta",
+      itemId: "turn-a-agent-final_answer",
+      delta: { type: "agentMessageText", delta: "This looks like VoicePlan.", phase: "final_answer" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 3,
+    eventId: "event-3",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: {
+        id: "turn-a-agent-final_answer",
+        type: "agentMessage",
+        text: "This looks like VoicePlan.",
+        phase: "final_answer",
+        status: "completed",
+      },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 4,
+    eventId: "event-4",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: { id: "turn-a-user", type: "userMessage", text: "did you set a goal?", status: "completed" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 5,
+    eventId: "event-5",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemDelta",
+      itemId: "turn-a-agent-final_answer",
+      delta: { type: "agentMessageText", delta: "No, I didn't set a goal.", phase: "final_answer" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 6,
+    eventId: "event-6",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: {
+        id: "turn-a-agent-final_answer",
+        type: "agentMessage",
+        text: "No, I didn't set a goal.",
+        phase: "final_answer",
+        status: "completed",
+      },
+    },
+  });
+
+  const messages = messagesFromThread(current);
+  expect(plain(messages.map((message) => [message.role, message.id, message.text]))).toEqual([
+    ["user", "turn-a-user", "tell me about this project"],
+    ["assistant", "turn-a-agent-final_answer", "This looks like VoicePlan."],
+    ["user", "turn-a-user::duplicate-2", "did you set a goal?"],
+    ["assistant", "turn-a-agent-final_answer::duplicate-2", "No, I didn't set a goal."],
+  ]);
+});
+
+test("duplicate message item ids from loaded thread snapshots are localized", () => {
+  const current = {
+    ...thread("thread-a", 100),
+    turns: [
+      {
+        id: "turn-a",
+        itemsView: "default",
+        status: "completed",
+        items: [
+          { id: "turn-a-user", type: "userMessage", text: "tell me about this project", status: "completed" },
+          {
+            id: "turn-a-agent-final_answer",
+            type: "agentMessage",
+            text: "This looks like VoicePlan.",
+            phase: "final_answer",
+            status: "completed",
+          },
+          { id: "turn-a-user", type: "userMessage", text: "did you set a goal?", status: "completed" },
+          {
+            id: "turn-a-agent-final_answer",
+            type: "agentMessage",
+            text: "No, I didn't set a goal.",
+            phase: "final_answer",
+            status: "completed",
+          },
+        ],
+      },
+    ],
+  };
+
+  const messages = messagesFromThread(current);
+
+  expect(plain(messages.map((message) => [message.role, message.id, message.text]))).toEqual([
+    ["user", "turn-a-user", "tell me about this project"],
+    ["assistant", "turn-a-agent-final_answer", "This looks like VoicePlan."],
+    ["user", "turn-a-user::duplicate-2", "did you set a goal?"],
+    ["assistant", "turn-a-agent-final_answer::duplicate-2", "No, I didn't set a goal."],
+  ]);
+});
+
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
