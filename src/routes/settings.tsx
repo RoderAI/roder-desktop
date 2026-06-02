@@ -5,7 +5,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsIndexRoute,
 });
 
-function SettingsIndexRoute(): React.JSX.Element {
+export function SettingsIndexRoute(): React.JSX.Element {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (pathname !== "/settings") {
     return <Outlet />;

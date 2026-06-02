@@ -265,7 +265,7 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
                 <DialogClose
                   render={
                     <Button variant="secondary" size="sm">
-                      Done
+                      Close
                     </Button>
                   }
                 />

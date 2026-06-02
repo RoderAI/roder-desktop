@@ -253,10 +253,10 @@ function pastedImageFiles(data: DataTransfer): File[] {
   if (files.length > 0) {
     return files;
   }
-  return Array.from(data.items)
-    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
-    .map((item) => item.getAsFile())
-    .filter((file): file is File => !!file);
+  return Array.from(data.items).flatMap((item) => {
+    const file = item.kind === "file" && item.type.startsWith("image/") ? item.getAsFile() : null;
+    return file ? [file] : [];
+  });
 }
 
 function revokeImages(images: CanvasImage[]): void {

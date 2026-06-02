@@ -685,7 +685,7 @@ export const useRoderStore = create<RoderStore>()(
           } else {
             currentVisible.delete(modelId);
           }
-          const nextVisibleIds = state.models.map((model) => model.id).filter((id) => currentVisible.has(id));
+          const nextVisibleIds = state.models.flatMap((model) => (currentVisible.has(model.id) ? [model.id] : []));
           if (nextVisibleIds.length === 0) {
             return {};
           }
@@ -1022,11 +1022,15 @@ function resolveWorkspaceSelection(
 
   const path = normalizeCwd(params.path || "", params.baseCwd).replace(/\/+$/, "");
   if (path) {
+    const rootByPath = new Map<string, { workspace: Workspace; root: WorkspaceRoot }>();
     for (const workspace of workspaces) {
-      const root = workspace.roots.find((candidate) => candidate.path.replace(/\/+$/, "") === path);
-      if (root) {
-        return { workspace, root };
+      for (const root of workspace.roots) {
+        rootByPath.set(root.path.replace(/\/+$/, ""), { workspace, root });
       }
+    }
+    const match = rootByPath.get(path);
+    if (match) {
+      return match;
     }
   }
 

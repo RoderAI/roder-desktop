@@ -123,22 +123,14 @@ export function RightWorkspacePanelShell({
             {openEntries.map((entry) => {
               const inactive = entry.id !== activeEntry.id;
               return (
-                <TabsContent
+                <WorkspacePanelContent
                   key={entry.id}
-                  keepMounted
-                  value={entry.id}
-                  aria-label={entry.title}
-                  inert={inactive ? true : undefined}
-                  className={cn(
-                    "absolute inset-0 h-full min-h-0 text-base",
-                    inactive && "pointer-events-none opacity-0",
-                  )}
-                >
-                  {renderPanel(entry, {
-                    active: open && !inactive,
-                    nativeOverlayOcclusion: open && !inactive ? addMenuOcclusion : null,
-                  })}
-                </TabsContent>
+                  active={open && !inactive}
+                  entry={entry}
+                  inactive={inactive}
+                  nativeOverlayOcclusion={open && !inactive ? addMenuOcclusion : null}
+                  renderPanel={renderPanel}
+                />
               );
             })}
           </Tabs>
@@ -147,6 +139,32 @@ export function RightWorkspacePanelShell({
         <WorkspacePanelEmptyState entries={entries} onAddPanel={onAddPanel} />
       )}
     </aside>
+  );
+}
+
+function WorkspacePanelContent({
+  active,
+  entry,
+  inactive,
+  nativeOverlayOcclusion,
+  renderPanel,
+}: {
+  active: boolean;
+  entry: RightWorkspacePanelEntry;
+  inactive: boolean;
+  nativeOverlayOcclusion: NativeOverlayOcclusion | null;
+  renderPanel: RightWorkspacePanelShellProps["renderPanel"];
+}): React.JSX.Element {
+  return (
+    <TabsContent
+      keepMounted
+      value={entry.id}
+      aria-label={entry.title}
+      inert={inactive ? true : undefined}
+      className={cn("absolute inset-0 h-full min-h-0 text-base", inactive && "pointer-events-none opacity-0")}
+    >
+      {renderPanel(entry, { active, nativeOverlayOcclusion })}
+    </TabsContent>
   );
 }
 

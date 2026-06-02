@@ -13,10 +13,14 @@ type ContextMenuContentProps = React.ComponentPropsWithoutRef<typeof BaseContext
   sideOffset?: React.ComponentPropsWithoutRef<typeof BaseContextMenu.Positioner>["sideOffset"];
 };
 
-export const ContextMenuContent = React.forwardRef<
-  React.ElementRef<typeof BaseContextMenu.Popup>,
-  ContextMenuContentProps
->(function ContextMenuContent({ align = "start", className, side, sideOffset = 6, ...props }, ref) {
+export function ContextMenuContent({
+  align = "start",
+  className,
+  ref,
+  side,
+  sideOffset = 6,
+  ...props
+}: ContextMenuContentProps & { ref?: React.Ref<React.ElementRef<typeof BaseContextMenu.Popup>> }): React.JSX.Element {
   return (
     <BaseContextMenu.Portal>
       <BaseContextMenu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
@@ -24,28 +28,33 @@ export const ContextMenuContent = React.forwardRef<
       </BaseContextMenu.Positioner>
     </BaseContextMenu.Portal>
   );
-});
+}
 
 type ContextMenuItemProps = Omit<React.ComponentPropsWithoutRef<typeof BaseContextMenu.Item>, "onSelect"> & {
   onSelect?: (event: React.MouseEvent<HTMLElement>) => void;
   selected?: boolean;
 };
 
-export const ContextMenuItem = React.forwardRef<React.ElementRef<typeof BaseContextMenu.Item>, ContextMenuItemProps>(
-  function ContextMenuItem({ className, onClick, onSelect, selected, ...props }, ref) {
-    return (
-      <BaseContextMenu.Item
-        ref={ref}
-        aria-selected={selected || undefined}
-        className={cn(dropdownMenuItemClassName, selected && "font-medium", className)}
-        onClick={(event) => {
-          onClick?.(event);
-          if (!event.defaultPrevented) {
-            onSelect?.(event);
-          }
-        }}
-        {...props}
-      />
-    );
-  },
-);
+export function ContextMenuItem({
+  className,
+  onClick,
+  onSelect,
+  ref,
+  selected,
+  ...props
+}: ContextMenuItemProps & { ref?: React.Ref<React.ElementRef<typeof BaseContextMenu.Item>> }): React.JSX.Element {
+  return (
+    <BaseContextMenu.Item
+      ref={ref}
+      aria-selected={selected || undefined}
+      className={cn(dropdownMenuItemClassName, selected && "font-medium", className)}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) {
+          onSelect?.(event);
+        }
+      }}
+      {...props}
+    />
+  );
+}

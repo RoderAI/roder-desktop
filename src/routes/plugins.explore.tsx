@@ -5,6 +5,6 @@ export const Route = createFileRoute("/plugins/explore")({
   component: ExplorePluginsRoute,
 });
 
-function ExplorePluginsRoute(): React.JSX.Element {
+export function ExplorePluginsRoute(): React.JSX.Element {
   return <PluginsPage activeTab="explore" />;
 }

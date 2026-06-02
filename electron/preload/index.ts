@@ -161,14 +161,10 @@ const api = {
     ipcRenderer.invoke("extensions:readTheme", extensionId, themeId) as Promise<ExtensionTheme>,
   appServerEvents: () => ipcRenderer.invoke("appserver:events") as Promise<AppServerEvent[]>,
   resolveDroppedFiles: (files: File[]) =>
-    files
-      .map((file) => ({
-        name: file.name,
-        path: webUtils.getPathForFile(file),
-        type: file.type,
-        size: file.size,
-      }))
-      .filter((file) => file.path) as DroppedFile[],
+    files.flatMap((file) => {
+      const path = webUtils.getPathForFile(file);
+      return path ? [{ name: file.name, path, type: file.type, size: file.size } satisfies DroppedFile] : [];
+    }),
   onNotification: (callback: (notification: RoderNotification) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, notification: RoderNotification) => callback(notification);
     ipcRenderer.on("roder:notification", listener);
@@ -218,4 +214,3 @@ const api = {
 };
 
 contextBridge.exposeInMainWorld("roderDesktop", api);
-

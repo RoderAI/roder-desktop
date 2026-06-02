@@ -1,4 +1,4 @@
-import { isValidElement, useMemo, type ReactNode } from "react";
+import { Children, isValidElement, useMemo, type ReactNode } from "react";
 import { harden } from "rehype-harden";
 import { defaultRehypePlugins, Streamdown, type Components, type StreamdownProps } from "streamdown";
 import { createSkillTokenRehypePlugin, SkillTokenPill, skillNameFromExactToken } from "@/components/skill-token-pill";
@@ -10,6 +10,8 @@ type MessageContentProps = {
   skills?: SkillDescriptor[];
   text: string;
 };
+
+const emptySkills: SkillDescriptor[] = [];
 
 const safeRehypePlugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
   defaultRehypePlugins.sanitize,
@@ -44,7 +46,8 @@ function createMarkdownComponents(skills: SkillDescriptor[]): Components {
     },
     inlineCode({ children, className, ...props }) {
       // Rehype handles bare $skill text; this branch handles backticked `$skill`.
-      const skillName = typeof children === "string" ? skillNameFromExactToken(children, skills) : null;
+      const childText = singleStringChild(children);
+      const skillName = childText ? skillNameFromExactToken(childText, skills) : null;
       if (skillName) {
         return <SkillTokenPill name={skillName} />;
       }
@@ -106,6 +109,12 @@ function createMarkdownComponents(skills: SkillDescriptor[]): Components {
   };
 }
 
+function singleStringChild(children: ReactNode): string | null {
+  const childArray = Children.toArray(children);
+  const child = childArray.length === 1 ? childArray[0] : null;
+  return typeof child === "string" ? child : null;
+}
+
 function isInlineCodeOnly(children: ReactNode): boolean {
   const meaningfulChildren = Array.isArray(children)
     ? children.filter((child) => !(typeof child === "string" && child.trim() === ""))
@@ -118,7 +127,11 @@ function isInlineCodeOnly(children: ReactNode): boolean {
   );
 }
 
-export function MessageContent({ isStreaming = false, skills = [], text }: MessageContentProps): React.JSX.Element {
+export function MessageContent({
+  isStreaming = false,
+  skills = emptySkills,
+  text,
+}: MessageContentProps): React.JSX.Element {
   const rehypePlugins = useMemo<StreamdownProps["rehypePlugins"]>(
     () => (skills.length > 0 ? [...safeRehypePlugins, createSkillTokenRehypePlugin(skills)] : safeRehypePlugins),
     [skills],

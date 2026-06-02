@@ -7,26 +7,30 @@ export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
 
-export const SelectTrigger = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "flex h-10 w-full items-center justify-between gap-2 rounded-md bg-transparent px-2.5 text-base text-muted-foreground outline-none hover:bg-accent focus:ring-2 focus:ring-ring",
-      className,
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon>
-      <ChevronDown data-icon="inline-end" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-));
-
-SelectTrigger.displayName = "SelectTrigger";
+export function SelectTrigger({
+  className,
+  children,
+  ref,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
+  ref?: React.Ref<React.ElementRef<typeof SelectPrimitive.Trigger>>;
+}): React.JSX.Element {
+  return (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      className={cn(
+        "flex h-10 w-full items-center justify-between gap-2 rounded-md bg-transparent px-2.5 text-base text-muted-foreground outline-none hover:bg-accent focus:ring-2 focus:ring-ring",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon>
+        <ChevronDown data-icon="inline-end" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+}
 
 type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Popup> & {
   align?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>["align"];
@@ -35,8 +39,17 @@ type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.
   sideOffset?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Positioner>["sideOffset"];
 };
 
-export const SelectContent = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Popup>, SelectContentProps>(
-  ({ align = "start", className, children, position: _position, side, sideOffset = 6, ...props }, ref) => (
+export function SelectContent({
+  align = "start",
+  className,
+  children,
+  position: _position,
+  ref,
+  side,
+  sideOffset = 6,
+  ...props
+}: SelectContentProps & { ref?: React.Ref<React.ElementRef<typeof SelectPrimitive.Popup>> }): React.JSX.Element {
+  return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
         <SelectPrimitive.Popup
@@ -51,30 +64,32 @@ export const SelectContent = React.forwardRef<React.ElementRef<typeof SelectPrim
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
     </SelectPrimitive.Portal>
-  ),
-);
+  );
+}
 
-SelectContent.displayName = "SelectContent";
-
-export const SelectItem = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-base outline-none focus:bg-accent",
-      className,
-    )}
-    {...props}
-  >
-    <span className="absolute left-2 flex size-3.5 items-center justify-center">
-      <SelectPrimitive.ItemIndicator>
-        <Check className="size-3.5" />
-      </SelectPrimitive.ItemIndicator>
-    </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-  </SelectPrimitive.Item>
-));
-
-SelectItem.displayName = "SelectItem";
+export function SelectItem({
+  className,
+  children,
+  ref,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+  ref?: React.Ref<React.ElementRef<typeof SelectPrimitive.Item>>;
+}): React.JSX.Element {
+  return (
+    <SelectPrimitive.Item
+      ref={ref}
+      className={cn(
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-base outline-none focus:bg-accent",
+        className,
+      )}
+      {...props}
+    >
+      <span className="absolute left-2 flex size-3.5 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <Check className="size-3.5" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  );
+}

@@ -5,6 +5,6 @@ export const Route = createFileRoute("/plugins/installed")({
   component: InstalledPluginsRoute,
 });
 
-function InstalledPluginsRoute(): React.JSX.Element {
+export function InstalledPluginsRoute(): React.JSX.Element {
   return <PluginsPage activeTab="installed" />;
 }

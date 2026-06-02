@@ -6,7 +6,7 @@ export const Route = createFileRoute("/settings/$section")({
   component: SettingsRoute,
 });
 
-function SettingsRoute(): React.JSX.Element {
+export function SettingsRoute(): React.JSX.Element {
   const { section } = Route.useParams();
   return <SettingsPage section={normalizeSettingsSectionParam(section)} />;
 }

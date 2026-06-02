@@ -124,8 +124,8 @@ function SkillSettingsRow({ skill }: { skill: SkillDescriptor }): React.JSX.Elem
           {description && <div className="mt-1 text-base text-muted-foreground">{description}</div>}
           {skill.diagnostics.length > 0 && (
             <div className="mt-2 space-y-1 text-base text-muted-foreground">
-              {skill.diagnostics.map((diagnostic, index) => (
-                <div key={`${skill.canonicalPath}:diagnostic:${index}`} className="flex items-start gap-2">
+              {skill.diagnostics.map((diagnostic) => (
+                <div key={`${skill.canonicalPath}:diagnostic:${diagnostic}`} className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
                   <span>{diagnostic}</span>
                 </div>

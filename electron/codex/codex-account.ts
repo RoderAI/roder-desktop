@@ -202,9 +202,14 @@ async function readLatestLimits(): Promise<{ raw: RawRateLimits; updatedAt: stri
   ]);
   let latest: { timestamp: number; raw: RawRateLimits } | null = null;
 
-  for (const file of files.slice(0, 160)) {
-    const data = await readFile(file.path, "utf8").catch(() => "");
-    for (const line of data.split("\n")) {
+  const sessionFiles = await Promise.all(
+    files.slice(0, 160).map(async (file) => ({
+      ...file,
+      data: await readFile(file.path, "utf8").catch(() => ""),
+    })),
+  );
+  for (const file of sessionFiles) {
+    for (const line of file.data.split("\n")) {
       if (!line.trim()) {
         continue;
       }
@@ -235,25 +240,25 @@ async function readLatestLimits(): Promise<{ raw: RawRateLimits; updatedAt: stri
 
 async function collectJsonlFiles(roots: string[]): Promise<Array<{ path: string; mtimeMs: number }>> {
   const files: Array<{ path: string; mtimeMs: number }> = [];
-  for (const root of roots) {
-    await walkJsonl(root, files);
-  }
+  await Promise.all(roots.map((root) => walkJsonl(root, files)));
   return files.sort((left, right) => right.mtimeMs - left.mtimeMs);
 }
 
 async function walkJsonl(dir: string, files: Array<{ path: string; mtimeMs: number }>): Promise<void> {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  for (const entry of entries) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await walkJsonl(path, files);
-    } else if (entry.isFile() && path.endsWith(".jsonl")) {
-      const info = await stat(path).catch(() => null);
-      if (info) {
-        files.push({ path, mtimeMs: info.mtimeMs });
+  await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walkJsonl(path, files);
+      } else if (entry.isFile() && path.endsWith(".jsonl")) {
+        const info = await stat(path).catch(() => null);
+        if (info) {
+          files.push({ path, mtimeMs: info.mtimeMs });
+        }
       }
-    }
-  }
+    }),
+  );
 }
 
 function normalizeRateWindow(label: string, raw: RawRateWindow | null): CodexRateWindow | null {

@@ -62,6 +62,7 @@ type TranscriptProps = {
 };
 
 const defaultTranscriptScrollStateKey = "default";
+const emptyTurnChangeCounts: Record<string, number> = {};
 const transcriptScrollStateByKey = new Map<string, TranscriptScrollRestorationState>();
 
 export function Transcript({
@@ -72,7 +73,7 @@ export function Transcript({
   scrollStateKey = defaultTranscriptScrollStateKey,
   showWorkingIndicator = false,
   threadChangeCount = 0,
-  turnChangeCounts = {},
+  turnChangeCounts = emptyTurnChangeCounts,
   onCanScrollToBottomChange,
   onReviewThreadChanges,
   onReviewTurnChanges,
@@ -354,8 +355,9 @@ export function Transcript({
   );
 
   useLayoutEffect(() => {
-    return () => rememberTranscriptScrollState(scrollStateKeyRef.current);
-  }, [rememberTranscriptScrollState]);
+    const key = scrollStateKeyRef.current;
+    return () => rememberTranscriptScrollState(key);
+  }, [rememberTranscriptScrollState, scrollStateKey]);
 
   useLayoutEffect(() => {
     if (restoredScrollStateKeyRef.current === scrollStateKey) {

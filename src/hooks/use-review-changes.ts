@@ -98,7 +98,11 @@ export function useReviewChanges({
   });
   const listRequestSeq = useRef(0);
   const diffRequestSeq = useRef(0);
-  const diffRequestSeqByPath = useRef(new Map<string, number>());
+  const diffRequestSeqByPath = useRef<Map<string, number> | null>(null);
+  if (!diffRequestSeqByPath.current) {
+    diffRequestSeqByPath.current = new Map<string, number>();
+  }
+  const diffRequestsByPath = diffRequestSeqByPath.current;
   const files = listState.files;
   const diffCollectionKey = useMemo(() => reviewDiffCollectionKey(scope, files), [files, scope]);
   const latestDiffCollectionKey = useRef(diffCollectionKey);
@@ -140,6 +144,9 @@ export function useReviewChanges({
         }
         if (!workspaceId || !rootId) {
           throw new Error("No workspace is selected.");
+        }
+        if (!isCurrentRequest()) {
+          return;
         }
         const result = await roderIpc.listVcsChanges({ workspaceId, id: rootId });
         if (!isCurrentRequest()) {
@@ -248,7 +255,7 @@ export function useReviewChanges({
   const loadDiffForFile = useCallback(
     async (file: ReviewFile, limit: number) => {
       const requestSeq = (diffRequestSeq.current += 1);
-      diffRequestSeqByPath.current.set(file.path, requestSeq);
+      diffRequestsByPath.set(file.path, requestSeq);
       setDiffCollection((collection) => {
         const currentCollection =
           collection.key === diffCollectionKey
@@ -263,11 +270,11 @@ export function useReviewChanges({
         };
       });
       try {
+        if (latestDiffCollectionKey.current !== diffCollectionKey) {
+          return;
+        }
         const diffState = await readDiffForFile(file, limit);
-        if (
-          diffRequestSeqByPath.current.get(file.path) !== requestSeq ||
-          latestDiffCollectionKey.current !== diffCollectionKey
-        ) {
+        if (diffRequestsByPath.get(file.path) !== requestSeq || latestDiffCollectionKey.current !== diffCollectionKey) {
           return;
         }
         setDiffCollection((collection) =>
@@ -276,10 +283,7 @@ export function useReviewChanges({
             : collection,
         );
       } catch (error) {
-        if (
-          diffRequestSeqByPath.current.get(file.path) !== requestSeq ||
-          latestDiffCollectionKey.current !== diffCollectionKey
-        ) {
+        if (diffRequestsByPath.get(file.path) !== requestSeq || latestDiffCollectionKey.current !== diffCollectionKey) {
           return;
         }
         setDiffCollection((collection) => {
@@ -300,7 +304,7 @@ export function useReviewChanges({
         });
       }
     },
-    [diffCollectionKey, readDiffForFile],
+    [diffCollectionKey, diffRequestsByPath, readDiffForFile],
   );
 
   const loadDiff = useCallback(

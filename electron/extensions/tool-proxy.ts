@@ -37,17 +37,17 @@ export function mergeExtensionTools(baseResult: unknown, catalog: ExtensionCatal
 }
 
 export function extensionToolSpecs(catalog: ExtensionCatalogSnapshot): ToolSpec[] {
-  return catalog.extensions
-    .filter((extension) => extension.enabled)
-    .flatMap((extension) =>
-      extension.manifest.contributes.tools.map((tool) => ({
-        name: tool.id,
-        description: tool.description,
-        input_schema: tool.inputSchema,
-        source: "desktop-extension",
-        extension_id: extension.id,
-      })),
-    );
+  return catalog.extensions.flatMap((extension) =>
+    extension.enabled
+      ? extension.manifest.contributes.tools.map((tool) => ({
+          name: tool.id,
+          description: tool.description,
+          input_schema: tool.inputSchema,
+          source: "desktop-extension",
+          extension_id: extension.id,
+        }))
+      : [],
+  );
 }
 
 export function extensionToolName(params: unknown, catalog: ExtensionCatalogSnapshot): string | undefined {

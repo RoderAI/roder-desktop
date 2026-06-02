@@ -10,3 +10,4 @@ allowBuilds:
   node-pty: true
 
 minimumReleaseAge: 1440
+trustPolicy: no-downgrade
