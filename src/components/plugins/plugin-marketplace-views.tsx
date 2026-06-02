@@ -162,9 +162,9 @@ export function PluginSearchRow({
 
   return (
     <>
-      <article className="flex min-h-64 min-w-0 flex-col justify-between gap-4 rounded-3xl border border-border bg-white p-5">
+      <article className="flex min-h-56 min-w-0 flex-col justify-between gap-3 rounded-3xl border border-border bg-white p-4">
         <div className="min-w-0">
-          <div className="mb-4 flex justify-center">
+          <div className="mb-3 flex justify-center">
             <PluginIcon src={iconUrl} alt="" />
           </div>
           {homepageUrl ? (
@@ -179,13 +179,13 @@ export function PluginSearchRow({
           ) : (
             <h2 className="truncate text-center text-base font-medium">{plugin.displayName}</h2>
           )}
-          <p className="mx-auto mt-2 line-clamp-2 min-h-12 max-w-2xl text-center text-base leading-6 text-muted-foreground">
+          <p className="mx-auto mt-1.5 line-clamp-2 min-h-10 max-w-2xl text-center text-base leading-5 text-muted-foreground">
             {plugin.description || "No description provided."}
           </p>
         </div>
 
         {variant && (
-          <div className="grid shrink-0 grid-cols-2 gap-3">
+          <div className="grid shrink-0 grid-cols-2 gap-2.5">
             <Button size="sm" className="w-full" onClick={() => void openDetails()}>
               <span className="min-w-0 truncate">Learn More</span>
             </Button>
@@ -313,7 +313,7 @@ export function MarketplaceSettingsDialog({
         <Button
           variant="ghost"
           size="icon"
-          className="size-8"
+          className="size-7 rounded-lg"
           aria-label="Marketplace settings"
           title="Marketplace settings"
         >

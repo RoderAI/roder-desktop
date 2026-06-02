@@ -38,7 +38,7 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Popup
       ref={ref}
       className={cn(
-        "dialog-popup fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-theme(spacing.12))] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-popover p-5 text-base text-popover-foreground shadow-lg outline-none",
+        "dialog-popup fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-theme(spacing.12))] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-white p-5 text-base text-popover-foreground shadow-lg outline-none dark:bg-popover",
         className,
       )}
       {...props}

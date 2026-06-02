@@ -152,7 +152,7 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
-      <header className="drag-region flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <header className="drag-region flex h-(--desktop-header-height) shrink-0 items-center justify-between gap-3 border-b border-border px-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Store className="size-4 text-muted-foreground" />
@@ -194,9 +194,9 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto" role="tabpanel" aria-label="Explore plugins">
-          <div className="mx-auto grid w-full max-w-screen-2xl gap-5 px-4 py-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="mx-auto grid w-full max-w-screen-2xl gap-4 px-3 py-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             <form
-              className="sticky top-0 z-10 col-span-full flex flex-wrap items-center justify-between gap-3 bg-background/95 py-3 backdrop-blur"
+              className="sticky top-0 z-10 col-span-full flex flex-wrap items-center justify-between gap-2 bg-background/95 py-2 backdrop-blur"
               onSubmit={submitSearch}
             >
               <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -280,7 +280,7 @@ function PluginsTabButton({
       role="tab"
       aria-selected={active}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-full px-3 text-base font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
         active ? "bg-muted/50 text-foreground" : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
       )}
       onClick={onClick}

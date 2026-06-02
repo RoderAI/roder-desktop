@@ -80,13 +80,13 @@ export function RightWorkspacePanelShell({
         role="separator"
         onPointerDown={onBeginResize}
       />
-      <div className="flex h-[60px] shrink-0 items-center gap-1 px-2 pl-3">
+      <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 px-2 pl-3">
         {openEntries.length > 0 ? (
           <>
             <Tabs
               value={activeEntry?.id}
               onValueChange={(value) => onSelectPanel(value as RouteWorkspacePanel)}
-              className="min-w-0 shrink -translate-y-1"
+              className="min-w-0 shrink"
             >
               <TabsList variant="chrome" className="max-w-full overflow-x-auto" aria-label="Workspace panel tabs">
                 {openEntries.map((entry) => (
@@ -242,7 +242,7 @@ function PanelAddMenu({
       <DropdownMenuTrigger
         className={chromeIconButtonClassNameForState(
           false,
-          "inline-flex size-7 -translate-y-1 items-center justify-center rounded-lg [&_svg]:size-4",
+          "inline-flex size-7 items-center justify-center rounded-lg [&_svg]:size-4",
         )}
         aria-label="Add workspace panel"
         title="Add panel"
