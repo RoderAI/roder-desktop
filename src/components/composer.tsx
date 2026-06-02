@@ -19,9 +19,9 @@ import {
   readSkillPromptEditorSelectionOffset,
   readSkillPromptEditorText,
   registerSkillPromptPlainText,
+  registerSkillPromptSubmit,
   writeSkillPromptEditorText,
 } from "@/lib/lexical-skill-prompt";
-import { isComposerSubmitKey } from "@/lib/composer-keyboard";
 import { cn } from "@/lib/utils";
 import type { LexicalEditor } from "lexical";
 
@@ -172,6 +172,9 @@ export function Composer({
   });
 
   async function submit(): Promise<void> {
+    if (busy) {
+      return;
+    }
     const value = prompt.trim();
     if (!value && attachments.length === 0) {
       return;
@@ -185,15 +188,7 @@ export function Composer({
   }
 
   function handlePromptEditorKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>): void {
-    if (skillCompletion.handleSkillCompletionKeyDown(event)) {
-      return;
-    }
-
-    if (isComposerSubmitKey(event)) {
-      event.preventDefault();
-      void submit();
-      return;
-    }
+    skillCompletion.handleSkillCompletionKeyDown(event);
   }
 
   function addAttachments(nextAttachments: DesktopAttachment[]): void {
@@ -325,7 +320,7 @@ export function Composer({
             editor={skillPromptEditor}
             skills={skills}
             value={prompt}
-            placeholder={busy ? "Queue a follow-up or steer the current run" : "Send follow-up"}
+            placeholder={busy ? "Wait for the current run to finish" : "Send follow-up"}
             completionOpen={skillCompletion.showSkillCompletionMenu}
             completionListboxId={skillCompletionListboxId}
             activeCompletionId={
@@ -335,6 +330,7 @@ export function Composer({
             }
             onChange={handlePromptEditorChange}
             onKeyDownCapture={handlePromptEditorKeyDownCapture}
+            onSubmitKey={() => void submit()}
             onPaste={handlePaste}
           />
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
@@ -410,6 +406,7 @@ type SkillPromptEditorProps = {
   activeCompletionId: string | undefined;
   onChange: (value: string, caret: number) => void;
   onKeyDownCapture: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onSubmitKey: () => void;
   onPaste: (event: React.ClipboardEvent<HTMLDivElement>) => void;
 };
 
@@ -423,13 +420,16 @@ function SkillPromptEditor({
   activeCompletionId,
   onChange,
   onKeyDownCapture,
+  onSubmitKey,
   onPaste,
 }: SkillPromptEditorProps): React.JSX.Element {
   const editorRootRef = useRef<HTMLDivElement | null>(null);
   const historyState = useMemo(() => createEmptyHistoryState(), []);
   const skillsRef = useRef(skills);
+  const onSubmitKeyRef = useRef(onSubmitKey);
   // Registered Lexical commands read the latest skills without re-registering on every store update.
   skillsRef.current = skills;
+  onSubmitKeyRef.current = onSubmitKey;
 
   useEffect(() => {
     const rootElement = editorRootRef.current;
@@ -443,6 +443,8 @@ function SkillPromptEditor({
   }, [editor]);
 
   useEffect(() => registerSkillPromptPlainText(editor, () => skillsRef.current), [editor]);
+
+  useEffect(() => registerSkillPromptSubmit(editor, () => onSubmitKeyRef.current()), [editor]);
 
   useEffect(() => registerHistory(editor, historyState, 300), [editor, historyState]);
 

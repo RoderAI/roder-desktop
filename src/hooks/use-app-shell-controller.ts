@@ -79,6 +79,13 @@ export function useAppShellController(): AppShellController {
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
   const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
+  const activeWorkspaceRef = useMemo(
+    () => ({
+      workspaceId: activeThread?.workspaceId ?? agent.selectedWorkspaceId ?? "",
+      rootId: activeThread?.rootId ?? agent.selectedRootId ?? "",
+    }),
+    [activeThread?.rootId, activeThread?.workspaceId, agent.selectedRootId, agent.selectedWorkspaceId],
+  );
   const hunkSummary = useThreadHunkSummary(activeThreadId, agent.hunkRevision);
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
@@ -311,6 +318,7 @@ export function useAppShellController(): AppShellController {
       activeThread,
       activeThreadBusy,
       activeWorkspaceCwd,
+      activeWorkspaceRef,
       canScrollTranscriptToBottom,
       composerAttachments,
       composerFocusSignal,
@@ -333,6 +341,7 @@ export function useAppShellController(): AppShellController {
       activeThread,
       activeThreadBusy,
       activeWorkspaceCwd,
+      activeWorkspaceRef,
       agent,
       attachToComposer,
       canScrollTranscriptToBottom,
@@ -357,8 +366,10 @@ export function useAppShellController(): AppShellController {
     layoutProps: {
       activeThread,
       activeThreadId,
+      activeThreadGoal: agent.activeThreadGoal,
       activePanel,
       activeWorkspaceCwd,
+      activeWorkspaceRef,
       folderOptions,
       isPluginsRoute,
       leftSidebarWidth,

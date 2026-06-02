@@ -248,6 +248,30 @@ code[data-streamdown="inline-code"] {
 }
 
 /*
+ * GOAL BREADCRUMB ANIMATION STORYBOARD
+ *
+ * Read top-to-bottom. Each value is relative to a goal appearing in the header.
+ *
+ *   0ms   label starts slightly lifted and transparent
+ * 140ms   label settles into the breadcrumb baseline
+ */
+.goal-breadcrumb-indicator {
+  animation: goal-breadcrumb-enter 140ms ease-out;
+}
+
+@keyframes goal-breadcrumb-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
  * RIGHT WORKSPACE PANEL ANIMATION STORYBOARD
  *
  * Read top-to-bottom. Each value is relative to the open/close trigger.
@@ -826,6 +850,10 @@ code[data-streamdown="inline-code"] {
   }
 
   .composer-skill-menu {
+    animation: none;
+  }
+
+  .goal-breadcrumb-indicator {
     animation: none;
   }
 }

@@ -1,5 +1,5 @@
 import type {
-  GitChangeStatus,
+  VcsChangeStatus,
   HunkDiffLine,
   HunkRecord,
   PagedHunkDiff,
@@ -9,7 +9,7 @@ import type {
 
 export type ReviewChangedFile = {
   path: string;
-  status: GitChangeStatus;
+  status: VcsChangeStatus;
   additions: number;
   deletions: number;
   hunkIds: string[];
@@ -19,7 +19,7 @@ export type ReviewChangedFile = {
 export type ReviewObservedChangedFile = {
   path: string;
   oldPath?: string | null;
-  status: GitChangeStatus;
+  status: VcsChangeStatus;
   additions: number;
   deletions: number;
   binary: boolean;
@@ -30,7 +30,7 @@ export type ReviewObservedChangedFile = {
 export type ReviewMergedChangedFile = {
   path: string;
   oldPath?: string | null;
-  status: GitChangeStatus;
+  status: VcsChangeStatus;
   additions: number;
   deletions: number;
   binary?: boolean;
@@ -260,7 +260,7 @@ export function hunksToUnifiedPatch(hunks: HunkRecord[]): string {
 
   const first = hunks[0];
   const path = normalizePatchPath(first.path);
-  const status = hunks.reduce<GitChangeStatus>(
+  const status = hunks.reduce<VcsChangeStatus>(
     (current, hunk) => mergeStatuses(current, deriveHunkStatus(hunk)),
     deriveHunkStatus(first),
   );
@@ -293,7 +293,7 @@ function countLines(lines: HunkDiffLine[], kind: HunkDiffLine["kind"]): number {
   return lines.filter((line) => line.kind === kind).length;
 }
 
-function deriveHunkStatus(hunk: HunkRecord): GitChangeStatus {
+function deriveHunkStatus(hunk: HunkRecord): VcsChangeStatus {
   const additions = countLines(hunk.diff, "added");
   const deletions = countLines(hunk.diff, "removed");
 
@@ -306,7 +306,7 @@ function deriveHunkStatus(hunk: HunkRecord): GitChangeStatus {
   return "modified";
 }
 
-function mergeStatuses(left: GitChangeStatus, right: GitChangeStatus): GitChangeStatus {
+function mergeStatuses(left: VcsChangeStatus, right: VcsChangeStatus): VcsChangeStatus {
   return left === right ? left : "modified";
 }
 

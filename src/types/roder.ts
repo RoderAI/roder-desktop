@@ -135,9 +135,24 @@ export type RoderThread = {
     activeTurnId: string | null;
     activeFlags: RoderActiveFlag[];
   };
+  workspaceId?: string | null;
+  rootId?: string | null;
   cwd: string;
   name?: string | null;
   turns?: RoderTurn[];
+};
+
+export type RoderThreadGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
+
+export type RoderThreadGoal = {
+  threadId: string;
+  objective: string;
+  status: RoderThreadGoalStatus;
+  tokenBudget?: number | null;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type RoderTurn = {
@@ -329,6 +344,20 @@ export type WorkspaceFolder = {
   lastUsedAt: number;
 };
 
+export type WorkspaceRoot = {
+  id: string;
+  path: string;
+  name: string;
+};
+
+export type Workspace = {
+  id: string;
+  name: string;
+  roots: WorkspaceRoot[];
+  defaultRootId: string;
+  updatedAt: number;
+};
+
 export type TerminalSnapshot = {
   id: string;
   pid: number;
@@ -501,7 +530,7 @@ export type HunkReadResult = {
   page: PagedHunkDiff | null;
 };
 
-export type GitChangeStatus = "modified" | "added" | "deleted" | "renamed" | "untracked";
+export type VcsChangeStatus = "modified" | "added" | "deleted" | "renamed" | "untracked" | "provider_native";
 
 export type WorkspaceChangeSource = "gitReconciled";
 
@@ -510,7 +539,7 @@ export type WorkspaceChangeConfidence = "observedAfterTool";
 export type WorkspaceObservedFile = {
   path: string;
   oldPath?: string | null;
-  status: GitChangeStatus;
+  status: VcsChangeStatus;
   additions: number;
   deletions: number;
   binary: boolean;
@@ -532,22 +561,37 @@ export type WorkspaceChangesListResult = {
   changes: WorkspaceChangeObservation[];
 };
 
-export type GitChangedFile = {
+export type VcsChangedFile = {
   path: string;
   oldPath?: string | null;
-  status: GitChangeStatus;
+  status: VcsChangeStatus;
   additions: number;
   deletions: number;
   binary: boolean;
 };
 
-export type GitChangesListResult = {
-  repositoryRoot: string;
-  branch?: string | null;
-  baseRef?: string | null;
-  baseSha?: string | null;
-  headSha?: string | null;
-  files: GitChangedFile[];
+export type VcsChangesListResult = {
+  status: {
+    provider: {
+      id: string;
+      displayName: string;
+    };
+    workspace: {
+      root: string;
+      id?: string | null;
+    };
+    activeLine?: {
+      id: string;
+      name: string;
+      kind: string;
+    } | null;
+    base?: {
+      refName?: string | null;
+      sha?: string | null;
+    } | null;
+    changedFileCount: number;
+  };
+  files: VcsChangedFile[];
   totals: {
     files: number;
     additions: number;
@@ -556,13 +600,13 @@ export type GitChangesListResult = {
   truncated?: boolean;
 };
 
-export type GitChangesReadResult = {
+export type VcsChangesReadResult = {
   path: string;
-  patch: string;
+  content?: string | null;
   offset: number;
-  limit: number;
   totalLines: number;
   nextOffset?: number | null;
+  binary: boolean;
 };
 
 export type AppCommand = {
