@@ -11,6 +11,7 @@ import { isShellToolName } from "@/lib/tool-display";
 
 const emptyMessages: ConversationMessage[] = [];
 const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
+const duplicateItemIdMarker = "::duplicate-";
 
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
   return [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
@@ -106,15 +107,37 @@ export function applyThreadItemEventToItems(items: RoderItem[], event: RoderThre
     return upsertRoderItem(items, event.item, mergeStartedItem);
   }
   if (event.type === "itemCompleted") {
-    return upsertRoderItem(items, event.item, mergeCompletedItem);
+    return completeRoderItem(items, event.item);
   }
-  const index = items.findIndex((item) => item.id === event.itemId);
+  const index = activeRoderItemIndex(items, event.itemId);
   if (index === -1) {
-    return [...items, applyThreadItemDelta(itemFromDelta(event.itemId, event.delta), event.delta)];
+    const item = itemFromDelta(nextLocalItemId(items, event.itemId), event.delta);
+    return [...items, applyThreadItemDelta(item, event.delta)];
   }
   const nextItems = [...items];
   nextItems[index] = applyThreadItemDelta(nextItems[index], event.delta);
   return nextItems;
+}
+
+function completeRoderItem(items: RoderItem[], incoming: RoderItem): RoderItem[] {
+  const activeIndex = activeRoderItemIndex(items, incoming.id);
+  if (activeIndex !== -1) {
+    const nextItems = [...items];
+    const existing = nextItems[activeIndex];
+    nextItems[activeIndex] = mergeCompletedItem(existing, { ...incoming, id: existing.id });
+    return nextItems;
+  }
+
+  const exactIndex = items.findIndex((item) => item.id === incoming.id);
+  if (exactIndex === -1) {
+    return [...items, incoming];
+  }
+
+  if (hasMeaningfulItemDifference(items[exactIndex], incoming)) {
+    return [...items, { ...incoming, id: nextLocalItemId(items, incoming.id) }];
+  }
+
+  return upsertRoderItem(items, incoming, mergeCompletedItem);
 }
 
 function upsertRoderItem(
@@ -159,6 +182,56 @@ function mergeCompletedItem(existing: RoderItem, incoming: RoderItem): RoderItem
     return { ...existing, phase: incoming.phase ?? existing.phase, status: incoming.status ?? existing.status };
   }
   return incoming;
+}
+
+function activeRoderItemIndex(items: RoderItem[], itemId: string): number {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (protocolItemId(item.id) === itemId && item.status === "inProgress") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function nextLocalItemId(items: RoderItem[], itemId: string): string {
+  return items.some((item) => protocolItemId(item.id) === itemId)
+    ? `${itemId}${duplicateItemIdMarker}${duplicateItemCount(items, itemId) + 1}`
+    : itemId;
+}
+
+function duplicateItemCount(items: RoderItem[], itemId: string): number {
+  return items.filter((item) => protocolItemId(item.id) === itemId).length;
+}
+
+function protocolItemId(itemId: string): string {
+  const markerIndex = itemId.lastIndexOf(duplicateItemIdMarker);
+  return markerIndex === -1 ? itemId : itemId.slice(0, markerIndex);
+}
+
+function hasMeaningfulItemDifference(existing: RoderItem, incoming: RoderItem): boolean {
+  if (existing.type !== incoming.type) {
+    return true;
+  }
+  if (existing.type === "userMessage" && incoming.type === "userMessage") {
+    return existing.text !== incoming.text;
+  }
+  if (existing.type === "agentMessage" && incoming.type === "agentMessage") {
+    return existing.text !== incoming.text || existing.phase !== incoming.phase;
+  }
+  if (existing.type === "reasoning" && incoming.type === "reasoning") {
+    return (
+      reasoningBlocksText(existing.content) !== reasoningBlocksText(incoming.content) ||
+      reasoningBlocksText(existing.summary) !== reasoningBlocksText(incoming.summary)
+    );
+  }
+  if (existing.type === "error" && incoming.type === "error") {
+    return existing.message !== incoming.message;
+  }
+  if (existing.type === "compaction" && incoming.type === "compaction") {
+    return existing.summary !== incoming.summary;
+  }
+  return false;
 }
 
 function itemFromDelta(itemId: string, delta: RoderThreadItemDelta): RoderItem {
@@ -238,7 +311,7 @@ export function messagesFromThread(thread: RoderThread | undefined): Conversatio
 }
 
 export function messagesFromTurn(threadId: string, turn: RoderTurn): ConversationMessage[] {
-  const messages = turn.items.reduce<ConversationMessage[]>((messages, item) => {
+  const messages = localizeDuplicateItemIds(turn.items).reduce<ConversationMessage[]>((messages, item) => {
     for (const message of messagesFromRoderItem(threadId, turn.id, item, turn.status)) {
       upsertConversationMessage(messages, message);
     }
@@ -255,6 +328,26 @@ export function messagesFromTurn(threadId: string, turn: RoderTurn): Conversatio
     });
   }
   return completeAssistantStreamsBeforeLaterTools(messages);
+}
+
+function localizeDuplicateItemIds(items: RoderItem[]): RoderItem[] {
+  const seen: RoderItem[] = [];
+  return items.map((item) => {
+    const baseId = protocolItemId(item.id);
+    const duplicateCount = seen.filter((seenItem) => protocolItemId(seenItem.id) === baseId).length;
+    const exactDuplicate = seen.find((seenItem) => seenItem.id === item.id);
+    seen.push(item);
+
+    if (
+      item.id.includes(duplicateItemIdMarker) ||
+      !exactDuplicate ||
+      !hasMeaningfulItemDifference(exactDuplicate, item)
+    ) {
+      return item;
+    }
+
+    return { ...item, id: `${baseId}${duplicateItemIdMarker}${duplicateCount + 1}` };
+  });
 }
 
 export function completeAssistantStreamsBeforeLaterTools(messages: ConversationMessage[]): ConversationMessage[] {

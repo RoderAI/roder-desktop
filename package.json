@@ -52,6 +52,12 @@
       }
     ]
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "node-pty"
+    ]
+  },
   "devDependencies": {
     "@tanstack/router-plugin": "^1.168.11",
     "@types/node": "^25.9.1",

@@ -34,6 +34,7 @@ import {
   skillTokenRanges,
   type SkillCompletionToken,
 } from "@/lib/roder-skills";
+import { isComposerSubmitKey } from "@/lib/composer-keyboard";
 import type { SkillDescriptor } from "@/types/roder";
 
 export type SerializedSkillTokenNode = SerializedLexicalNode & {
@@ -283,6 +284,25 @@ export function registerSkillPromptPlainText(editor: LexicalEditor, readSkills: 
     unregisterTokenDelete();
     unregisterTokenBackspace();
   };
+}
+
+export function registerSkillPromptSubmit(editor: LexicalEditor, onSubmit: () => void): () => void {
+  return editor.registerCommand(
+    KEY_ENTER_COMMAND,
+    (event) => {
+      if (event?.defaultPrevented) {
+        return true;
+      }
+      if (!event || !isComposerSubmitKey(event)) {
+        return false;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onSubmit();
+      return true;
+    },
+    COMMAND_PRIORITY_CRITICAL,
+  );
 }
 
 function deleteSkillTokenFromCommand(

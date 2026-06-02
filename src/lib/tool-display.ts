@@ -8,7 +8,6 @@ export type ToolGroupDescriptor = {
 
 const compactSummaryTools = new Set([
   "read_file",
-  "create_goal",
   "read_skill",
   "read_skill_file",
   "list_files",
@@ -32,6 +31,7 @@ const fileActivityTools = new Set([
 ]);
 
 const searchActivityTools = new Set(["glob", "grep", "search_files"]);
+const goalStateTools = new Set(["get_goal", "create_goal", "update_goal"]);
 
 export function compactToolGroup(toolName: string | undefined): ToolGroupDescriptor | null {
   if (toolName === "read_file") {
@@ -65,6 +65,10 @@ export function isFileActivityTool(toolName: string | undefined): boolean {
 
 export function isSearchActivityTool(toolName: string | undefined): boolean {
   return searchActivityTools.has(toolName ?? "");
+}
+
+export function isGoalStateTool(toolName: string | undefined): boolean {
+  return goalStateTools.has(toolName ?? "");
 }
 
 export function isShellToolName(toolName: string | undefined): boolean {

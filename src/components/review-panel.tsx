@@ -1,7 +1,7 @@
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import { Virtualizer as DiffsVirtualizer } from "@pierre/diffs";
 import { PatchDiff, VirtualizerContext } from "@pierre/diffs/react";
-import type { FileTree as FileTreeModel, GitStatusEntry } from "@pierre/trees";
+import type { FileTree as FileTreeModel, GitStatus, GitStatusEntry } from "@pierre/trees";
 import { AlertCircle, FileDiff, GitCompareArrows, PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
@@ -24,11 +24,12 @@ import {
 } from "@/lib/review-panel-ui";
 import type { RouteReviewScope } from "@/lib/route-search";
 import { cn } from "@/lib/utils";
-import type { GitChangeStatus, HunkRecord, WorkspaceChangeObservation } from "@/types/roder";
+import type { VcsChangeStatus, HunkRecord, WorkspaceChangeObservation } from "@/types/roder";
 
 type ReviewPanelProps = {
   threadId: string;
-  workspace: string;
+  workspaceId: string;
+  rootId: string;
   threadHunks: HunkRecord[];
   threadObservedChanges: WorkspaceChangeObservation[];
   threadLatestTurnId: string;
@@ -43,7 +44,8 @@ type ReviewPanelProps = {
 
 export function ReviewPanel({
   threadId,
-  workspace,
+  workspaceId,
+  rootId,
   threadHunks,
   threadObservedChanges,
   threadLatestTurnId,
@@ -66,7 +68,8 @@ export function ReviewPanel({
     loadFullDiff,
   } = useReviewChanges({
     threadId,
-    workspace,
+    workspaceId,
+    rootId,
     scope,
     turnId,
     selectedPath,
@@ -513,7 +516,7 @@ function ReviewFileTree({
 
   const paths = useMemo(() => files.map((file) => file.path), [files]);
   const gitStatus = useMemo<GitStatusEntry[]>(
-    () => files.map((file) => ({ path: file.path, status: file.status })),
+    () => files.map((file) => ({ path: file.path, status: fileTreeGitStatus(file.status) })),
     [files],
   );
 
@@ -755,7 +758,7 @@ function ScopeButton({
   );
 }
 
-function StatusPill({ status }: { status: GitChangeStatus }): React.JSX.Element | null {
+function StatusPill({ status }: { status: VcsChangeStatus }): React.JSX.Element | null {
   const label = reviewFileTreeStatusLabel(status);
   if (!label) {
     return null;
@@ -765,6 +768,10 @@ function StatusPill({ status }: { status: GitChangeStatus }): React.JSX.Element 
       {label}
     </span>
   );
+}
+
+function fileTreeGitStatus(status: VcsChangeStatus): GitStatus {
+  return status === "provider_native" ? "modified" : status;
 }
 
 function PanelError({ message, inline = false }: { message: string; inline?: boolean }): React.JSX.Element {

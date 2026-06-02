@@ -48,6 +48,7 @@ export type RightWorkspacePanelRenderContext = {
   appServerMethods: string[];
   activeThreadId: string;
   activeWorkspaceCwd: string;
+  activeWorkspaceRef: { workspaceId: string; rootId: string };
   hunkSummary: ThreadHunkSummary;
   reviewPath: string;
   reviewScope: RouteReviewScope;
@@ -85,7 +86,8 @@ export function renderRightWorkspacePanel(
     return (
       <ReviewPanel
         threadId={context.activeThreadId}
-        workspace={context.activeWorkspaceCwd}
+        workspaceId={context.activeWorkspaceRef.workspaceId}
+        rootId={context.activeWorkspaceRef.rootId}
         threadHunks={context.hunkSummary.hunks}
         threadObservedChanges={context.hunkSummary.observedChanges}
         threadLatestTurnId={context.hunkSummary.latestTurnId}

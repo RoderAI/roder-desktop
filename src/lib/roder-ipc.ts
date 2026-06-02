@@ -1,21 +1,24 @@
 import type {
   DesktopAttachment,
-  GitChangesListResult,
-  GitChangesReadResult,
   HunkListResult,
   HunkReadResult,
   PolicyMode,
   RoderModel,
   RoderStatus,
   RoderThread,
+  RoderThreadGoal,
   SkillExposure,
   SkillsListResult,
   SkillsUpdateResult,
   SystemAppearance,
   TurnInputItem,
+  VcsChangesListResult,
+  VcsChangesReadResult,
   SpeechProviderDescriptor,
   SpeechTranscribeResult,
+  Workspace,
   WorkspaceChangesListResult,
+  WorkspaceRoot,
 } from "@/types/roder";
 
 export type ThreadListResult = {
@@ -32,12 +35,49 @@ export type ThreadStartOptions = {
   initialPrompt?: string;
 };
 
+export type ThreadStartWorkspace = {
+  workspaceId: string;
+  rootId?: string;
+  cwd?: string;
+};
+
 export type ThreadStartResult = {
   thread: RoderThread;
   model: string;
   modelProvider: string;
   reasoning: string;
+  workspaceId: string;
+  rootId: string;
   cwd: string;
+};
+
+export type WorkspaceListResult = {
+  workspaces: Workspace[];
+};
+
+export type WorkspaceCreateParams = {
+  name?: string;
+  roots: Array<{ path: string; name?: string }>;
+  defaultRootPath?: string;
+};
+
+export type WorkspaceCreateResult = {
+  workspace: Workspace;
+};
+
+export type WorkspaceUpdateParams = {
+  workspaceId: string;
+  name?: string;
+  roots?: Array<{ path: string; name?: string }>;
+  defaultRootId?: string;
+};
+
+export type WorkspaceUpdateResult = {
+  workspace: Workspace;
+};
+
+export type WorkspaceForgetResult = {
+  forgotten: boolean;
 };
 
 export type ProviderSelectResult = {
@@ -49,6 +89,10 @@ export type ProviderSelectResult = {
 export type ThreadArchiveResult = {
   threadId: string;
   archived: boolean;
+};
+
+export type ThreadGoalGetResult = {
+  goal: RoderThreadGoal | null;
 };
 
 export type ModelListResult = {
@@ -116,11 +160,11 @@ export type WorkspaceChangesListOptions = {
   turnId?: string;
 };
 
-export type GitChangesListOptions = {
+export type VcsChangesListOptions = {
   limit?: number;
 };
 
-export type GitChangesReadOptions = {
+export type VcsChangesReadOptions = {
   offset?: number;
   limit?: number;
 };
@@ -131,21 +175,32 @@ export const roderIpc = {
   status: () => window.roderDesktop.status(),
   appearance: () => window.roderDesktop.appearance(),
   openWorkspaceFolder: (defaultPath?: string) => window.roderDesktop.openWorkspaceFolder(defaultPath),
+  listWorkspaces: () => window.roderDesktop.request("workspace/list", {}) as Promise<WorkspaceListResult>,
+  createWorkspace: (params: WorkspaceCreateParams) =>
+    window.roderDesktop.request("workspace/create", params) as Promise<WorkspaceCreateResult>,
+  updateWorkspace: (params: WorkspaceUpdateParams) =>
+    window.roderDesktop.request("workspace/update", params) as Promise<WorkspaceUpdateResult>,
+  forgetWorkspace: (workspaceId: string) =>
+    window.roderDesktop.request("workspace/forget", { workspaceId }) as Promise<WorkspaceForgetResult>,
   listThreads: (limit = 100) => window.roderDesktop.request("thread/list", { limit }) as Promise<ThreadListResult>,
   readThread: (threadId: string) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
+  threadGoal: (threadId: string) =>
+    window.roderDesktop.request("thread/goal/get", { threadId }) as Promise<ThreadGoalGetResult>,
   archiveThread: (threadId: string) =>
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
   startThread: (
     model: string,
-    cwd: string,
+    workspace: ThreadStartWorkspace,
     modelProvider?: string,
     reasoning?: string,
     options: ThreadStartOptions = {},
   ) =>
     window.roderDesktop.request("thread/start", {
+      workspaceId: workspace.workspaceId,
+      rootId: workspace.rootId || undefined,
       model,
-      cwd,
+      cwd: workspace.cwd || undefined,
       modelProvider,
       reasoning,
       ephemeral: false,
@@ -193,18 +248,27 @@ export const roderIpc = {
       threadId,
       turnId: options.turnId || undefined,
     }) as Promise<WorkspaceChangesListResult>,
-  listGitChanges: (workspace: string, options: GitChangesListOptions = {}) =>
-    window.roderDesktop.request("git/changes/list", {
-      workspace,
+  listVcsChanges: (
+    workspace: Pick<WorkspaceRoot, "id"> & { workspaceId: string },
+    options: VcsChangesListOptions = {},
+  ) =>
+    window.roderDesktop.request("vcs/changes/list", {
+      workspaceId: workspace.workspaceId,
+      rootId: workspace.id,
       limit: options.limit,
-    }) as Promise<GitChangesListResult>,
-  readGitChange: (workspace: string, path: string, options: GitChangesReadOptions = {}) =>
-    window.roderDesktop.request("git/changes/read", {
-      workspace,
+    }) as Promise<VcsChangesListResult>,
+  readVcsChange: (
+    workspace: Pick<WorkspaceRoot, "id"> & { workspaceId: string },
+    path: string,
+    options: VcsChangesReadOptions = {},
+  ) =>
+    window.roderDesktop.request("vcs/changes/read", {
+      workspaceId: workspace.workspaceId,
+      rootId: workspace.id,
       path,
       offset: options.offset,
       limit: options.limit,
-    }) as Promise<GitChangesReadResult>,
+    }) as Promise<VcsChangesReadResult>,
   threadState: () => window.roderDesktop.request("thread/state", {}) as Promise<ThreadStateResult>,
   resolveApproval: (params: { approvalId: string; approved: boolean }) =>
     window.roderDesktop.request("thread/resolve_approval", {

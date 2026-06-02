@@ -4,6 +4,7 @@ import {
   isCommandActivityTool,
   isExplorationActivityTool,
   isFileActivityTool,
+  isGoalStateTool,
   isSearchActivityTool,
   type ToolGroupDescriptor,
 } from "@/lib/tool-display";
@@ -53,7 +54,8 @@ export function groupToolMessagesForTranscript(
   messages: ConversationMessage[],
   options: ToolMessageGroupingOptions = {},
 ): TranscriptMessageEntry[] {
-  return groupCompletedActivityRuns(groupAdjacentToolMessages(messages), options);
+  const visibleMessages = messages.filter((message) => !(message.role === "tool" && isGoalStateTool(message.toolName)));
+  return groupCompletedActivityRuns(groupAdjacentToolMessages(visibleMessages), options);
 }
 
 function groupAdjacentToolMessages(messages: ConversationMessage[]): TranscriptToolEntry[] {

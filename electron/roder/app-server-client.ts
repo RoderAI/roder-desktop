@@ -83,10 +83,7 @@ export class RoderAppServerClient extends EventEmitter {
 
     this.#child = spawn(target.command, target.args, {
       cwd: target.cwd,
-      env: {
-        ...process.env,
-        RODER_DESKTOP: "1",
-      },
+      env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -278,10 +275,7 @@ function readAppServerMethods(target: SpawnTarget): string[] {
   const result = spawnSync(target.command, ["app-server", "schema", "--format", "manifest"], {
     cwd: target.cwd,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      RODER_DESKTOP: "1",
-    },
+    env: process.env,
     timeout: schemaProbeTimeoutMs,
   });
   if (result.error || result.status !== 0 || !result.stdout) {

@@ -30,6 +30,36 @@ test("threadState reads the live policy mode from the app-server", async () => {
   ]);
 });
 
+test("threadGoal reads the durable goal for a thread", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return {
+      goal: {
+        threadId: params.threadId,
+        objective: "Ship the header goal signal",
+        status: "active",
+        tokensUsed: 0,
+        timeUsedSeconds: 0,
+        createdAt: "2026-05-30T12:00:00Z",
+        updatedAt: "2026-05-30T12:00:00Z",
+      },
+    };
+  });
+
+  const result = await roderIpc.threadGoal("thread-1");
+
+  expect(result.goal?.objective).toBe("Ship the header goal signal");
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "thread/goal/get",
+      params: {
+        threadId: "thread-1",
+      },
+    },
+  ]);
+});
+
 test("setThreadMode sends the policy mode wire value to the app-server", async () => {
   const calls = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {
@@ -202,18 +232,23 @@ test("startThread sends the first prompt so the app-server can name immediately"
       model: params.model,
       modelProvider: params.modelProvider,
       reasoning: params.reasoning,
-      cwd: params.cwd,
+      workspaceId: params.workspaceId,
+      rootId: params.rootId,
+      cwd: "/workspace",
     };
   });
 
-  await roderIpc.startThread("gpt-5.5", "/workspace", "openai", "high", { initialPrompt: "fix the tests" });
+  await roderIpc.startThread("gpt-5.5", { workspaceId: "ws_1", rootId: "root_1" }, "openai", "high", {
+    initialPrompt: "fix the tests",
+  });
 
   expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "thread/start",
       params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
         model: "gpt-5.5",
-        cwd: "/workspace",
         modelProvider: "openai",
         reasoning: "high",
         ephemeral: false,

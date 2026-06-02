@@ -112,11 +112,18 @@ clients. It is shaped as:
   "createdAt": 1770000000,
   "updatedAt": 1770000100,
   "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
+  "workspaceId": "ws_abc123",
+  "rootId": "root_abc123",
   "cwd": "/Users/pz/w/gode",
   "name": "optional title",
   "turns": []
 }
 ```
+
+`workspace` is a named project container with one or more registered filesystem
+roots. `root` is an admitted absolute directory inside that workspace. `cwd` is
+the execution directory derived from the selected root unless a client supplies
+a child path.
 
 `turn` is one model interaction within a thread:
 
@@ -171,6 +178,7 @@ Threads and turns:
 | `thread/list`               | List desktop threads.                                             |
 | `thread/read`               | Read a desktop thread with optional turns.                        |
 | `thread/archive`            | Archive a desktop thread so it no longer appears in active lists. |
+| `thread/goal/get`           | Read the durable goal state for a thread.                         |
 | `turn/start`                | Start a desktop turn from rich text input.                        |
 | `turn/steer`                | Add user input to an active desktop turn.                         |
 | `turn/interrupt`            | Interrupt an active desktop turn.                                 |
@@ -219,43 +227,47 @@ Teams and panes:
 
 Review, hunks, workflow imports, media, memory, and speech:
 
-| Method                     | Purpose                                                 |
-| -------------------------- | ------------------------------------------------------- |
-| `turn/subagentTraces/list` | List subagent traces for a turn.                        |
-| `turn/subagentTrace/read`  | Read paged subagent trace deltas.                       |
-| `plan/review/read`         | Read a plan review.                                     |
-| `plan/review/comment`      | Add a review comment and steer the turn.                |
-| `plan/review/rewrite`      | Request a plan rewrite and steer the turn.              |
-| `plan/review/approve`      | Approve a plan review.                                  |
-| `plan/review/reject`       | Reject a plan review.                                   |
-| `git/changes/list`         | List live branch changes against the resolved base.     |
-| `git/changes/read`         | Read paged unified patch text for one live branch file. |
-| `hunk/list`                | List recorded hunks, optionally by turn/review.         |
-| `hunk/read`                | Read a paged hunk diff.                                 |
-| `hunk/rollback`            | Confirm and apply a hunk reverse patch.                 |
-| `workspace/changes/list`   | List observed git-reconciled shell/exec changes.        |
-| `workflow/scan`            | Scan workflow imports.                                  |
-| `workflow/preview`         | Preview workflow import items.                          |
-| `workflow/enable`          | Enable a workflow import.                               |
-| `workflow/ignore`          | Ignore a workflow import.                               |
-| `workflow/refresh`         | Re-scan and detect stale enabled imports.               |
-| `workflow/remove`          | Remove an enabled workflow import decision.             |
-| `media/list`               | List media artifacts.                                   |
-| `media/read`               | Read artifact bytes as base64.                          |
-| `media/thumbnail`          | Read an artifact preview.                               |
-| `media/delete`             | Delete an artifact.                                     |
-| `media/attachToTurn`       | Convert an artifact to a turn attachment/image.         |
-| `memory/list`              | List memory records.                                    |
-| `memory/read`              | Read one memory.                                        |
-| `memory/save`              | Save a memory.                                          |
-| `memory/update`            | Update a memory.                                        |
-| `memory/delete`            | Delete a memory.                                        |
-| `memory/query`             | Search memories.                                        |
-| `memory/provider/list`     | List embedding providers and selected provider.         |
-| `memory/provider/set`      | Persist the embedding provider/model.                   |
-| `memory/recall/preview`    | Preview recall citations/results for a turn.            |
-| `speech/providers/list`    | Discover available speech transcription providers.      |
-| `speech/transcribe`        | Transcribe an audio recording to text.                  |
+| Method                     | Purpose                                                     |
+| -------------------------- | ----------------------------------------------------------- |
+| `turn/subagentTraces/list` | List subagent traces for a turn.                            |
+| `turn/subagentTrace/read`  | Read paged subagent trace deltas.                           |
+| `plan/review/read`         | Read a plan review.                                         |
+| `plan/review/comment`      | Add a review comment and steer the turn.                    |
+| `plan/review/rewrite`      | Request a plan rewrite and steer the turn.                  |
+| `plan/review/approve`      | Approve a plan review.                                      |
+| `plan/review/reject`       | Reject a plan review.                                       |
+| `vcs/changes/list`         | List live provider changes against the resolved base.       |
+| `vcs/changes/read`         | Read paged changed content for one provider file.           |
+| `workspace/list`           | List registered project workspaces and roots.               |
+| `workspace/create`         | Create a workspace from one or more filesystem roots.       |
+| `workspace/update`         | Rename a workspace, replace roots, or set its default root. |
+| `workspace/forget`         | Remove a workspace registry entry.                          |
+| `hunk/list`                | List recorded hunks, optionally by turn/review.             |
+| `hunk/read`                | Read a paged hunk diff.                                     |
+| `hunk/rollback`            | Confirm and apply a hunk reverse patch.                     |
+| `workspace/changes/list`   | List observed VCS-reconciled shell/exec changes.            |
+| `workflow/scan`            | Scan workflow imports.                                      |
+| `workflow/preview`         | Preview workflow import items.                              |
+| `workflow/enable`          | Enable a workflow import.                                   |
+| `workflow/ignore`          | Ignore a workflow import.                                   |
+| `workflow/refresh`         | Re-scan and detect stale enabled imports.                   |
+| `workflow/remove`          | Remove an enabled workflow import decision.                 |
+| `media/list`               | List media artifacts.                                       |
+| `media/read`               | Read artifact bytes as base64.                              |
+| `media/thumbnail`          | Read an artifact preview.                                   |
+| `media/delete`             | Delete an artifact.                                         |
+| `media/attachToTurn`       | Convert an artifact to a turn attachment/image.             |
+| `memory/list`              | List memory records.                                        |
+| `memory/read`              | Read one memory.                                            |
+| `memory/save`              | Save a memory.                                              |
+| `memory/update`            | Update a memory.                                            |
+| `memory/delete`            | Delete a memory.                                            |
+| `memory/query`             | Search memories.                                            |
+| `memory/provider/list`     | List embedding providers and selected provider.             |
+| `memory/provider/set`      | Persist the embedding provider/model.                       |
+| `memory/recall/preview`    | Preview recall citations/results for a turn.                |
+| `speech/providers/list`    | Discover available speech transcription providers.          |
+| `speech/transcribe`        | Transcribe an audio recording to text.                      |
 
 ## Detailed Method Reference
 
@@ -518,10 +530,11 @@ Request:
 
 ```json
 {
+  "workspaceId": "ws_abc123",
+  "rootId": "root_abc123",
   "model": "gpt-5.5",
   "modelProvider": "openai",
   "reasoning": "high",
-  "cwd": "/Users/pz/w/gode",
   "initialPrompt": "inspect this repo",
   "ephemeral": false
 }
@@ -539,19 +552,26 @@ Response:
     "createdAt": 1770000000,
     "updatedAt": 1770000000,
     "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
+    "workspaceId": "ws_abc123",
+    "rootId": "root_abc123",
     "cwd": "/Users/pz/w/gode"
   },
   "model": "gpt-5.5",
   "modelProvider": "openai",
   "reasoning": "high",
+  "workspaceId": "ws_abc123",
+  "rootId": "root_abc123",
   "cwd": "/Users/pz/w/gode"
 }
 ```
 
 Behavior:
 
-- Creates a persisted runtime thread with optional provider/model and required absolute workspace `cwd`.
-- Rejects missing, empty, or relative `cwd`; thread snapshots do not fall back to the app-server process cwd.
+- Creates a persisted runtime thread with optional provider/model and required
+  `workspaceId`.
+- `rootId` is optional and defaults to the workspace default root.
+- `cwd` is optional. When omitted, it defaults to the selected root path. When
+  supplied, it must be the selected root or a child path of that root.
 - Stores the selected provider/model/reasoning for later `turn/start` overrides.
 - If `reasoning` is omitted, returns and stores the effective reasoning effort for the selected model.
 - If `initialPrompt` is supplied, uses it as the first-turn prompt context for immediate thread naming.
@@ -670,6 +690,43 @@ Behavior:
   thread.
 - After archive, `thread/list` no longer returns the thread and `thread/read`
   returns `{ "thread": null }`.
+
+### `thread/goal/get`
+
+Purpose: Read the durable goal state for a thread.
+
+Request:
+
+```json
+{
+  "threadId": "thread-123"
+}
+```
+
+Response:
+
+```json
+{
+  "goal": {
+    "threadId": "thread-123",
+    "objective": "Ship the goal parity slice",
+    "status": "active",
+    "tokenBudget": 20000,
+    "tokensUsed": 1200,
+    "timeUsedSeconds": 180,
+    "createdAt": "2026-05-22T09:00:00Z",
+    "updatedAt": "2026-05-22T09:03:00Z"
+  }
+}
+```
+
+Behavior:
+
+- Returns `{ "goal": null }` when no goal is set.
+- Goal status is one of `active`, `paused`, `blocked`, `usageLimited`,
+  `budgetLimited`, or `complete`.
+- Goal changes are also surfaced through `thread/goal/updated` and
+  `thread/goal/cleared` notifications.
 
 ### `turn/start`
 
@@ -1052,7 +1109,7 @@ Response:
 
 Behavior:
 
-- Only `get_goal` and `create_goal` can be called directly.
+- Only `get_goal`, `create_goal`, and `update_goal` can be called directly.
 - Other tool names return code `-32602`.
 
 ### `commands/list`
@@ -1570,21 +1627,22 @@ Examples:
 Behavior:
 
 - `workspace/changes/list` can filter by `turnId`.
-- Observed changes are git-reconciled file summaries, not exact structured
-  hunks. The review panel can read current patch text through `git/changes/read`.
+- Observed changes are VCS-reconciled file summaries, not exact structured
+  hunks. The review panel can read current changed content through `vcs/changes/read`.
 - New observed changes emit `workspace/changeObserved`.
 
-### Git change review methods
+### VCS change review methods
 
-Purpose: Inspect the live branch delta without mutating files.
+Purpose: Inspect the active version-control provider without mutating files.
 
 Examples:
 
 ```json
 {
-  "method": "git/changes/list",
+  "method": "vcs/changes/list",
   "params": {
-    "workspace": "/Users/pz/w/gode",
+    "workspaceId": "ws_abc123",
+    "rootId": "root_abc123",
     "limit": 500
   }
 }
@@ -1592,9 +1650,10 @@ Examples:
 
 ```json
 {
-  "method": "git/changes/read",
+  "method": "vcs/changes/read",
   "params": {
-    "workspace": "/Users/pz/w/gode",
+    "workspaceId": "ws_abc123",
+    "rootId": "root_abc123",
     "path": "src/app.rs",
     "offset": 0,
     "limit": 400
@@ -1604,14 +1663,14 @@ Examples:
 
 Behavior:
 
-- `git/changes/list` returns repository root, branch, base ref/sha, changed
-  files, totals, and whether the file list was truncated.
-- Branch scope compares the merge-base of the resolved base with the current
+- VCS review operates on a registered workspace root. `workspaceId` is required;
+  `rootId` is optional and defaults to the workspace default root.
+- `vcs/changes/list` returns provider status, changed files, totals, and whether
+  the file list was truncated.
+- The bundled git provider compares the merge-base of the resolved base with the
   working tree, including committed, staged, unstaged, and untracked changes.
-- Base resolution tries upstream, origin default branch, `origin/master`,
-  `origin/main`, `master`, then `main`.
-- `git/changes/read` validates repository-relative paths and returns paged
-  unified patch text for one changed file.
+- `vcs/changes/read` validates provider-relative paths and returns paged changed
+  content for one changed file.
 
 ### Workflow import methods
 
@@ -1828,6 +1887,31 @@ targets the same stable item id that later appears in `thread/read`.
 {
   "threadId": "thread-123",
   "status": { "type": "running", "activeTurnId": "turn-123", "activeFlags": ["approvalRequired"] }
+}
+```
+
+`thread/goal/updated`:
+
+```json
+{
+  "threadId": "thread-123",
+  "goal": {
+    "threadId": "thread-123",
+    "objective": "Ship the goal parity slice",
+    "status": "active",
+    "tokensUsed": 1200,
+    "timeUsedSeconds": 180,
+    "createdAt": "2026-05-22T09:00:00Z",
+    "updatedAt": "2026-05-22T09:03:00Z"
+  }
+}
+```
+
+`thread/goal/cleared`:
+
+```json
+{
+  "threadId": "thread-123"
 }
 ```
 
