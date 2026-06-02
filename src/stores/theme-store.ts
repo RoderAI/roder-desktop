@@ -180,11 +180,11 @@ export const defaultThemeSettings: ThemeSettings = {
     customJson: "",
   },
   pointerCursors: false,
-  uiFontSize: 18,
+  uiFontSize: 14,
   codeFontSize: 14,
 };
 
-const themeStorageVersion = 3;
+const themeStorageVersion = 4;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -262,7 +262,10 @@ function migratePersistedTheme(persisted: unknown, version: number): unknown {
     ...value,
     settings: {
       ...settings,
-      uiFontSize: settings.uiFontSize === 14 ? defaultThemeSettings.uiFontSize : settings.uiFontSize,
+      uiFontSize:
+        version < 4 && (settings.uiFontSize == null || settings.uiFontSize === 14 || settings.uiFontSize === 18)
+          ? defaultThemeSettings.uiFontSize
+          : settings.uiFontSize,
       codeFontSize:
         version < 2 && (settings.codeFontSize == null || settings.codeFontSize === 13)
           ? defaultThemeSettings.codeFontSize
@@ -356,4 +359,3 @@ export function selectedPresetLabel(
     palette.presetId
   );
 }
-

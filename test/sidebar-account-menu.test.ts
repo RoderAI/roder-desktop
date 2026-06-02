@@ -8,7 +8,7 @@ test("sidebar account trigger shows a loading skeleton before account state reso
   const html = renderToStaticMarkup(React.createElement(SidebarAccountTriggerContent, { account: undefined }));
 
   expect(html).toContain("Loading Codex account");
-  expect(html).toContain("size-7");
+  expect(html).toContain("size-6");
   expect(html).not.toContain("Sign in to Codex");
   expect(html).not.toContain("Connect provider");
 });
@@ -36,7 +36,7 @@ test("sidebar account trigger omits provider status after an authenticated snaps
   );
 
   expect(html).toContain("Ada Lovelace");
-  expect(html).toContain("size-7");
+  expect(html).toContain("size-6");
   expect(html).not.toContain("Roder connected");
 });
 
