@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck && pnpm --filter aurora-theme-extension typecheck"
+    "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck && pnpm --filter aurora-theme-extension typecheck",
+    "doctor": "react-doctor"
   },
   "build": {
     "appId": "sc.roder.desktop",
@@ -70,6 +71,7 @@
     "npm-run-all": "^4.1.5",
     "oxfmt": "0.49.0",
     "oxlint": "1.64.0",
+    "react-doctor": "^0.2.15",
     "typescript": "~6.0.3",
     "vite": "^7.3.3",
     "vitest": "^4.1.6",

@@ -67,7 +67,7 @@ export class ExtensionCatalog {
   async list(): Promise<ExtensionCatalogSnapshot> {
     const catalog = await this.#read();
     return {
-      extensions: [...catalog.extensions].sort((left, right) =>
+      extensions: catalog.extensions.toSorted((left, right) =>
         left.manifest.displayName.localeCompare(right.manifest.displayName),
       ),
     };

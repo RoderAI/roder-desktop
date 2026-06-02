@@ -6,6 +6,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, shell } from "electron";
 
+const rateLimitResetDateFormatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+
 export type CodexRateWindow = {
   label: string;
   usedPercent: number;
@@ -283,8 +285,7 @@ function formatResetLabel(resetsAt: number | null): string {
     const minutes = totalMinutes % 60;
     return `${hours}:${minutes.toString().padStart(2, "0")}`;
   }
-  const formatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
-  return formatter.format(new Date(resetMs));
+  return rateLimitResetDateFormatter.format(new Date(resetMs));
 }
 
 async function readJson<T>(path: string): Promise<T | null> {

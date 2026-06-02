@@ -39,6 +39,7 @@ export function ModelsSettingsPanel(): React.JSX.Element {
         <Search className="size-4 text-muted-foreground" />
         <input
           value={query}
+          aria-label="Search models"
           className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="Search models"
           onChange={(event) => setQuery(event.currentTarget.value)}

@@ -299,11 +299,14 @@ function skillSearchIndex(skill: SkillDescriptor): SkillSearchIndex {
 }
 
 function skillNameParts(name: string): string[] {
-  return name.split(/[-_\s]+/).map(normalize).filter(Boolean);
+  return name
+    .split(/[-_\s]+/)
+    .map(normalize)
+    .filter(Boolean);
 }
 
 function sortSkillsByName(skills: SkillDescriptor[]): SkillDescriptor[] {
-  return [...skills].sort((left, right) =>
+  return skills.toSorted((left, right) =>
     left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true }),
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { RouteReviewScope } from "@/lib/route-search";
 import {
@@ -19,6 +19,7 @@ import type {
 } from "@/types/roder";
 
 const initialDiffLimit = 20_000;
+const emptyDiffLimitsByPath: Record<string, number> = {};
 
 export type ReviewFile = {
   path: string;
@@ -52,6 +53,12 @@ export type ReviewDiffState =
   | { status: "ready"; patch: string; truncated: boolean; totalLines: number }
   | { status: "error"; patch: string; error: string };
 
+type ReviewDiffCollection = {
+  key: string;
+  limitsByPath: Record<string, number>;
+  statesByPath: Record<string, ReviewDiffState>;
+};
+
 type LoadDiffOptions = {
   force?: boolean;
 };
@@ -84,12 +91,31 @@ export function useReviewChanges({
   onSelectedPathChange,
 }: UseReviewChangesParams) {
   const [listState, setListState] = useState<ReviewListState>({ status: "idle", files: [] });
-  const [diffStatesByPath, setDiffStatesByPath] = useState<Record<string, ReviewDiffState>>({});
-  const [diffLimitsByPath, setDiffLimitsByPath] = useState<Record<string, number>>({});
+  const [diffCollection, setDiffCollection] = useState<ReviewDiffCollection>({
+    key: "",
+    limitsByPath: {},
+    statesByPath: {},
+  });
   const listRequestSeq = useRef(0);
   const diffRequestSeq = useRef(0);
   const diffRequestSeqByPath = useRef(new Map<string, number>());
   const files = listState.files;
+  const diffCollectionKey = useMemo(() => reviewDiffCollectionKey(scope, files), [files, scope]);
+  const latestDiffCollectionKey = useRef(diffCollectionKey);
+  latestDiffCollectionKey.current = diffCollectionKey;
+  const defaultDiffStatesByPath = useMemo(
+    () => Object.fromEntries(files.map((file) => [file.path, { status: "idle", patch: "" } satisfies ReviewDiffState])),
+    [files],
+  );
+  const diffStatesByPath = useMemo(
+    () =>
+      diffCollection.key === diffCollectionKey
+        ? { ...defaultDiffStatesByPath, ...diffCollection.statesByPath }
+        : defaultDiffStatesByPath,
+    [defaultDiffStatesByPath, diffCollection, diffCollectionKey],
+  );
+  const diffLimitsByPath =
+    diffCollection.key === diffCollectionKey ? diffCollection.limitsByPath : emptyDiffLimitsByPath;
   const branchReviewAvailable =
     appServerMethods.includes("vcs/changes/list") && appServerMethods.includes("vcs/changes/read");
   const scopedLatestTurnId = listState.latestTurnId ?? "";
@@ -223,27 +249,58 @@ export function useReviewChanges({
     async (file: ReviewFile, limit: number) => {
       const requestSeq = (diffRequestSeq.current += 1);
       diffRequestSeqByPath.current.set(file.path, requestSeq);
-      setDiffStatesByPath((state) => ({
-        ...state,
-        [file.path]: { status: "loading", patch: state[file.path]?.patch ?? "" },
-      }));
+      setDiffCollection((collection) => {
+        const currentCollection =
+          collection.key === diffCollectionKey
+            ? collection
+            : { key: diffCollectionKey, limitsByPath: {}, statesByPath: {} };
+        return {
+          ...currentCollection,
+          statesByPath: {
+            ...currentCollection.statesByPath,
+            [file.path]: { status: "loading", patch: currentCollection.statesByPath[file.path]?.patch ?? "" },
+          },
+        };
+      });
       try {
         const diffState = await readDiffForFile(file, limit);
-        if (diffRequestSeqByPath.current.get(file.path) !== requestSeq) {
+        if (
+          diffRequestSeqByPath.current.get(file.path) !== requestSeq ||
+          latestDiffCollectionKey.current !== diffCollectionKey
+        ) {
           return;
         }
-        setDiffStatesByPath((state) => ({ ...state, [file.path]: diffState }));
+        setDiffCollection((collection) =>
+          collection.key === diffCollectionKey
+            ? { ...collection, statesByPath: { ...collection.statesByPath, [file.path]: diffState } }
+            : collection,
+        );
       } catch (error) {
-        if (diffRequestSeqByPath.current.get(file.path) !== requestSeq) {
+        if (
+          diffRequestSeqByPath.current.get(file.path) !== requestSeq ||
+          latestDiffCollectionKey.current !== diffCollectionKey
+        ) {
           return;
         }
-        setDiffStatesByPath((state) => ({
-          ...state,
-          [file.path]: { status: "error", patch: state[file.path]?.patch ?? "", error: errorMessage(error) },
-        }));
+        setDiffCollection((collection) => {
+          if (collection.key !== diffCollectionKey) {
+            return collection;
+          }
+          return {
+            ...collection,
+            statesByPath: {
+              ...collection.statesByPath,
+              [file.path]: {
+                status: "error",
+                patch: collection.statesByPath[file.path]?.patch ?? "",
+                error: errorMessage(error),
+              },
+            },
+          };
+        });
       }
     },
-    [readDiffForFile],
+    [diffCollectionKey, readDiffForFile],
   );
 
   const loadDiff = useCallback(
@@ -276,15 +333,6 @@ export function useReviewChanges({
     }
   }, [files, listState.status, onSelectedPathChange, selectedPath]);
 
-  useEffect(() => {
-    if (listState.status !== "ready") {
-      return;
-    }
-    diffRequestSeqByPath.current.clear();
-    setDiffLimitsByPath(Object.fromEntries(files.map((file) => [file.path, initialDiffLimit])));
-    setDiffStatesByPath(Object.fromEntries(files.map((file) => [file.path, { status: "idle", patch: "" }])));
-  }, [files, listState.status, scope]);
-
   const loadFullDiff = useCallback(
     (path = selectedPath) => {
       const file = files.find((candidate) => candidate.path === path);
@@ -293,10 +341,19 @@ export function useReviewChanges({
         return;
       }
       const limit = Math.max(diffState.totalLines, initialDiffLimit);
-      setDiffLimitsByPath((state) => ({ ...state, [path]: limit }));
+      setDiffCollection((collection) => {
+        const currentCollection =
+          collection.key === diffCollectionKey
+            ? collection
+            : { key: diffCollectionKey, limitsByPath: {}, statesByPath: {} };
+        return {
+          ...currentCollection,
+          limitsByPath: { ...currentCollection.limitsByPath, [path]: limit },
+        };
+      });
       void loadDiffForFile(file, limit);
     },
-    [diffStatesByPath, files, loadDiffForFile, selectedPath],
+    [diffCollectionKey, diffStatesByPath, files, loadDiffForFile, selectedPath],
   );
 
   return {
@@ -309,6 +366,32 @@ export function useReviewChanges({
     loadFiles,
     loadFullDiff,
   };
+}
+
+function reviewDiffCollectionKey(scope: RouteReviewScope, files: ReviewFile[]): string {
+  // Diff state is only valid for the exact review scope and file identities that produced it.
+  // This key lets stale diff patches fall away without clearing state in a prop-change effect.
+  return JSON.stringify([
+    scope,
+    files.map((file) => [
+      file.path,
+      file.oldPath ?? "",
+      file.status,
+      file.additions,
+      file.deletions,
+      Boolean(file.binary),
+      file.source ?? "",
+      file.hunks?.map((hunk) => hunk.id) ?? [],
+      file.observedFiles?.map((observedFile) => [
+        observedFile.path,
+        observedFile.oldPath ?? "",
+        observedFile.status,
+        observedFile.additions,
+        observedFile.deletions,
+        observedFile.binary,
+      ]) ?? [],
+    ]),
+  ]);
 }
 
 function reviewFileFromVcs(file: VcsChangedFile): ReviewFile {

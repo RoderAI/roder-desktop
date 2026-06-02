@@ -20,26 +20,29 @@ export function TerminalPanel({ active = true, cwd }: TerminalPanelProps): React
   const activeRef = useRef(active);
   const startedRef = useRef(false);
 
-  const fitAndResize = useCallback((focus = false): void => {
-    if (!activeRef.current) {
-      return;
-    }
-    const terminal = terminalRef.current;
-    const fit = fitRef.current;
-    if (!terminal || !fit) {
-      return;
-    }
-    fit.fit();
-    if (startedRef.current) {
-      void window.roderDesktop.terminalResize(terminal.cols, terminal.rows);
-    } else {
-      startedRef.current = true;
-      void window.roderDesktop.terminalStart({ cols: terminal.cols, rows: terminal.rows, cwd });
-    }
-    if (focus) {
-      terminal.focus();
-    }
-  }, []);
+  const fitAndResize = useCallback(
+    (focus = false): void => {
+      if (!activeRef.current) {
+        return;
+      }
+      const terminal = terminalRef.current;
+      const fit = fitRef.current;
+      if (!terminal || !fit) {
+        return;
+      }
+      fit.fit();
+      if (startedRef.current) {
+        void window.roderDesktop.terminalResize(terminal.cols, terminal.rows);
+      } else {
+        startedRef.current = true;
+        void window.roderDesktop.terminalStart({ cols: terminal.cols, rows: terminal.rows, cwd });
+      }
+      if (focus) {
+        terminal.focus();
+      }
+    },
+    [cwd],
+  );
 
   useEffect(() => {
     activeRef.current = active;

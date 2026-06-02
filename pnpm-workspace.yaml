@@ -6,6 +6,7 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: false
+  msgpackr-extract: false
   node-pty: true
 
 minimumReleaseAge: 1440

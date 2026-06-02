@@ -8,31 +8,38 @@ type ExtensionWebviewPanelProps = {
   title: string;
 };
 
+type PanelHtmlState = {
+  key: string;
+  html: string | null;
+  error: string | null;
+};
+
 export function ExtensionWebviewPanel({ extensionId, panelId, title }: ExtensionWebviewPanelProps): React.JSX.Element {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [html, setHtml] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const panelKey = `${extensionId}\0${panelId}`;
+  const [panelHtmlState, setPanelHtmlState] = useState<PanelHtmlState | null>(null);
+  const currentPanelState = panelHtmlState?.key === panelKey ? panelHtmlState : null;
+  const html = currentPanelState?.html ?? null;
+  const error = currentPanelState?.error ?? null;
 
   useEffect(() => {
     let disposed = false;
-    setHtml(null);
-    setError(null);
     extensionsIpc
       .readPanel(extensionId, panelId)
       .then((nextHtml) => {
         if (!disposed) {
-          setHtml(nextHtml);
+          setPanelHtmlState({ key: panelKey, html: nextHtml, error: null });
         }
       })
       .catch((nextError: Error) => {
         if (!disposed) {
-          setError(nextError.message);
+          setPanelHtmlState({ key: panelKey, html: null, error: nextError.message });
         }
       });
     return () => {
       disposed = true;
     };
-  }, [extensionId, panelId]);
+  }, [extensionId, panelId, panelKey]);
 
   useEffect(() => {
     if (!html) {
