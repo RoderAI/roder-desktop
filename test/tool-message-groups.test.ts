@@ -167,18 +167,15 @@ test("completed tool runs collapse into one expandable activity group", () => {
   ]);
 });
 
-test("goal updates stay visible before collapsed exploration activity", () => {
+test("goal tool mechanics are omitted from transcript activity", () => {
   const grouped = groupToolMessagesForTranscript([
     createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
+    createToolMessage("tool-1b", "update_goal", "Goal complete: Inspect this repo."),
     createToolMessage("tool-2", "list_files", "Listed files in ."),
     createToolMessage("tool-3", "read_file", "Read README.md"),
   ]);
 
   expect(plain(grouped)).toEqual([
-    {
-      kind: "message",
-      message: createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
-    },
     {
       id: "activity-group:tool-2:tool-3",
       kind: "activityGroup",

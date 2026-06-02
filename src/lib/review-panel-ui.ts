@@ -1,4 +1,4 @@
-import type { GitChangeStatus } from "@/types/roder";
+import type { VcsChangeStatus } from "@/types/roder";
 
 export type ReviewFileSectionBounds = {
   path: string;
@@ -47,12 +47,15 @@ export function reviewFileTreeWidth(value: number, panelWidth = Number.POSITIVE_
   return Math.min(maxForPanel, Math.max(reviewFileTreeWidthBounds.min, value));
 }
 
-export function reviewFileTreeStatusLabel(status: GitChangeStatus): string | null {
+export function reviewFileTreeStatusLabel(status: VcsChangeStatus): string | null {
   if (status === "modified") {
     return null;
   }
   if (status === "untracked") {
     return "new";
+  }
+  if (status === "provider_native") {
+    return "provider";
   }
   return status;
 }

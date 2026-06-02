@@ -10,10 +10,10 @@ import {
   reviewTurnIdCandidate,
 } from "@/lib/review-changes";
 import type {
-  GitChangedFile,
-  GitChangeStatus,
   HunkRecord,
   PagedHunkDiff,
+  VcsChangedFile,
+  VcsChangeStatus,
   WorkspaceChangeObservation,
   WorkspaceObservedFile,
 } from "@/types/roder";
@@ -23,7 +23,7 @@ const initialDiffLimit = 20_000;
 export type ReviewFile = {
   path: string;
   oldPath?: string | null;
-  status: GitChangeStatus;
+  status: VcsChangeStatus;
   additions: number;
   deletions: number;
   binary?: boolean;
@@ -58,7 +58,8 @@ type LoadDiffOptions = {
 
 type UseReviewChangesParams = {
   threadId: string;
-  workspace: string;
+  workspaceId: string;
+  rootId: string;
   scope: RouteReviewScope;
   turnId: string;
   selectedPath: string;
@@ -71,7 +72,8 @@ type UseReviewChangesParams = {
 
 export function useReviewChanges({
   threadId,
-  workspace,
+  workspaceId,
+  rootId,
   scope,
   turnId,
   selectedPath,
@@ -89,7 +91,7 @@ export function useReviewChanges({
   const diffRequestSeqByPath = useRef(new Map<string, number>());
   const files = listState.files;
   const branchReviewAvailable =
-    appServerMethods.includes("git/changes/list") && appServerMethods.includes("git/changes/read");
+    appServerMethods.includes("vcs/changes/list") && appServerMethods.includes("vcs/changes/read");
   const scopedLatestTurnId = listState.latestTurnId ?? "";
   const effectiveTurnId = reviewTurnIdCandidate(turnId, scopedLatestTurnId, threadLatestTurnId);
 
@@ -106,24 +108,23 @@ export function useReviewChanges({
           setListState({
             status: "error",
             files: [],
-            error:
-              "Branch review needs a newer Roder app-server. Rebundle from the backend branch that includes git/changes/list.",
+            error: "Branch review needs a Roder app-server with vcs/changes/list and vcs/changes/read support.",
           });
           return;
         }
-        if (!workspace) {
+        if (!workspaceId || !rootId) {
           throw new Error("No workspace is selected.");
         }
-        const result = await roderIpc.listGitChanges(workspace);
+        const result = await roderIpc.listVcsChanges({ workspaceId, id: rootId });
         if (!isCurrentRequest()) {
           return;
         }
         setListState({
           status: "ready",
-          files: result.files.map(reviewFileFromGit),
-          branch: result.branch,
-          baseRef: result.baseRef,
-          repositoryRoot: result.repositoryRoot,
+          files: result.files.map(reviewFileFromVcs),
+          branch: result.status.activeLine?.name ?? null,
+          baseRef: result.status.base?.refName ?? null,
+          repositoryRoot: result.status.workspace.root,
           truncated: Boolean(result.truncated),
         });
         return;
@@ -173,7 +174,8 @@ export function useReviewChanges({
     threadLatestTurnId,
     threadObservedChanges,
     turnId,
-    workspace,
+    workspaceId,
+    rootId,
   ]);
 
   const readDiffForFile = useCallback(
@@ -183,19 +185,19 @@ export function useReviewChanges({
           if (scope === "branch") {
             return { status: "idle", patch: "" };
           }
-          throw new Error("Observed workspace changes need git/changes/read support from the app-server.");
+          throw new Error("Observed workspace changes need vcs/changes/read support from the app-server.");
         }
-        if (!workspace) {
+        if (!workspaceId || !rootId) {
           if (file.source === "hunk") {
             throw new Error("No workspace is selected.");
           }
           throw new Error("Observed workspace changes need a selected workspace.");
         }
         if (scope === "branch" || file.observedFiles?.length) {
-          const result = await roderIpc.readGitChange(workspace, file.path, { limit });
+          const result = await roderIpc.readVcsChange({ workspaceId, id: rootId }, file.path, { limit });
           return {
             status: "ready",
-            patch: result.patch,
+            patch: result.content ?? "",
             truncated: result.nextOffset != null,
             totalLines: result.totalLines,
           };
@@ -214,7 +216,7 @@ export function useReviewChanges({
       );
       return { status: "ready", ...hunkPagesToReviewPatch(pages) };
     },
-    [branchReviewAvailable, scope, threadId, workspace],
+    [branchReviewAvailable, scope, threadId, workspaceId, rootId],
   );
 
   const loadDiffForFile = useCallback(
@@ -309,7 +311,7 @@ export function useReviewChanges({
   };
 }
 
-function reviewFileFromGit(file: GitChangedFile): ReviewFile {
+function reviewFileFromVcs(file: VcsChangedFile): ReviewFile {
   return {
     path: file.path,
     oldPath: file.oldPath,
