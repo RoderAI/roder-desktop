@@ -44,20 +44,23 @@ export function DropdownTriggerChevron({ className }: { className?: string }): R
   );
 }
 
-export const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuTriggerProps>(
-  ({ children, className, showChevron, variant, ...props }, ref) => {
-    const shouldShowChevron = showChevron ?? variant === "pill";
+export function DropdownMenuTrigger({
+  children,
+  className,
+  ref,
+  showChevron,
+  variant,
+  ...props
+}: DropdownMenuTriggerProps & { ref?: React.Ref<HTMLButtonElement> }): React.JSX.Element {
+  const shouldShowChevron = showChevron ?? variant === "pill";
 
-    return (
-      <Menu.Trigger ref={ref} className={cn(dropdownMenuTriggerVariants({ variant }), className)} {...props}>
-        {children}
-        {shouldShowChevron && <DropdownTriggerChevron />}
-      </Menu.Trigger>
-    );
-  },
-);
-
-DropdownMenuTrigger.displayName = "DropdownMenuTrigger";
+  return (
+    <Menu.Trigger ref={ref} className={cn(dropdownMenuTriggerVariants({ variant }), className)} {...props}>
+      {children}
+      {shouldShowChevron && <DropdownTriggerChevron />}
+    </Menu.Trigger>
+  );
+}
 
 type DropdownMenuContentProps = React.ComponentPropsWithoutRef<typeof Menu.Popup> & {
   align?: React.ComponentPropsWithoutRef<typeof Menu.Positioner>["align"];
@@ -65,38 +68,48 @@ type DropdownMenuContentProps = React.ComponentPropsWithoutRef<typeof Menu.Popup
   sideOffset?: React.ComponentPropsWithoutRef<typeof Menu.Positioner>["sideOffset"];
 };
 
-export const DropdownMenuContent = React.forwardRef<React.ElementRef<typeof Menu.Popup>, DropdownMenuContentProps>(
-  function DropdownMenuContent({ align = "start", className, side, sideOffset = 6, ...props }, ref) {
-    return (
-      <Menu.Portal>
-        <Menu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
-          <Menu.Popup ref={ref} className={cn(dropdownMenuContentClassName, className)} {...props} />
-        </Menu.Positioner>
-      </Menu.Portal>
-    );
-  },
-);
+export function DropdownMenuContent({
+  align = "start",
+  className,
+  ref,
+  side,
+  sideOffset = 6,
+  ...props
+}: DropdownMenuContentProps & { ref?: React.Ref<React.ElementRef<typeof Menu.Popup>> }): React.JSX.Element {
+  return (
+    <Menu.Portal>
+      <Menu.Positioner align={align} side={side} sideOffset={sideOffset} className="z-[100]">
+        <Menu.Popup ref={ref} className={cn(dropdownMenuContentClassName, className)} {...props} />
+      </Menu.Positioner>
+    </Menu.Portal>
+  );
+}
 
 type DropdownMenuItemProps = Omit<React.ComponentPropsWithoutRef<typeof Menu.Item>, "onSelect"> & {
   onSelect?: (event: React.MouseEvent<HTMLElement>) => void;
   selected?: boolean;
 };
 
-export const DropdownMenuItem = React.forwardRef<React.ElementRef<typeof Menu.Item>, DropdownMenuItemProps>(
-  function DropdownMenuItem({ className, onClick, onSelect, selected, ...props }, ref) {
-    return (
-      <Menu.Item
-        ref={ref}
-        aria-selected={selected || undefined}
-        className={cn(dropdownMenuItemClassName, selected && "font-medium", className)}
-        onClick={(event) => {
-          onClick?.(event);
-          if (!event.defaultPrevented) {
-            onSelect?.(event);
-          }
-        }}
-        {...props}
-      />
-    );
-  },
-);
+export function DropdownMenuItem({
+  className,
+  onClick,
+  onSelect,
+  ref,
+  selected,
+  ...props
+}: DropdownMenuItemProps & { ref?: React.Ref<React.ElementRef<typeof Menu.Item>> }): React.JSX.Element {
+  return (
+    <Menu.Item
+      ref={ref}
+      aria-selected={selected || undefined}
+      className={cn(dropdownMenuItemClassName, selected && "font-medium", className)}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) {
+          onSelect?.(event);
+        }
+      }}
+      {...props}
+    />
+  );
+}

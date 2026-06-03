@@ -86,22 +86,30 @@ export function ReviewPanel({
   const [nearbyDiffPaths, setNearbyDiffPaths] = useState<Set<string>>(() => new Set());
   const fileTreeId = useId();
   const diffScrollRef = useRef<HTMLElement | null>(null);
-  const diffSectionRefs = useRef(new Map<string, HTMLElement>());
+  const diffSectionRefs = useRef<Map<string, HTMLElement> | null>(null);
+  if (!diffSectionRefs.current) {
+    diffSectionRefs.current = new Map<string, HTMLElement>();
+  }
+  const diffSections = diffSectionRefs.current;
   const selectionSourceRef = useRef<"navigation" | "scroll" | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const fileTreeToggleLabel = reviewFileTreeToggleLabel(fileTreeVisible);
   const effectiveFileTreeWidth = reviewFileTreeWidth(fileTreeWidth, width);
   const reviewPanelStyle = { "--review-file-tree-width": `${effectiveFileTreeWidth}px` } as ReviewPanelStyle;
   const diffLoadablePaths = useMemo(() => files.filter((file) => !file.binary).map((file) => file.path), [files]);
+  const currentNearbyDiffPaths = useMemo(() => {
+    const loadablePaths = new Set(diffLoadablePaths);
+    return new Set([...nearbyDiffPaths].filter((path) => loadablePaths.has(path)));
+  }, [diffLoadablePaths, nearbyDiffPaths]);
   const diffPathsToLoad = useMemo(
     () =>
       reviewDiffPathsToLoad({
         files: diffLoadablePaths,
         selectedPath,
-        nearbyPaths: nearbyDiffPaths,
+        nearbyPaths: currentNearbyDiffPaths,
         diffStatesByPath,
       }),
-    [diffLoadablePaths, diffStatesByPath, nearbyDiffPaths, selectedPath],
+    [currentNearbyDiffPaths, diffLoadablePaths, diffStatesByPath, selectedPath],
   );
   const resizeFileTree = useCallback(
     (startWidth: number, deltaX: number) => {
@@ -113,17 +121,16 @@ export function ReviewPanel({
     onActiveChange: setFileTreeResizing,
   });
 
-  useEffect(() => {
-    setFileTreeWidth((currentWidth) => reviewFileTreeWidth(currentWidth, width));
-  }, [width]);
-
-  const scrollToReviewFile = useCallback((path: string) => {
-    const section = diffSectionRefs.current.get(path);
-    if (!section) {
-      return;
-    }
-    section.scrollIntoView({ block: "start", behavior: "auto" });
-  }, []);
+  const scrollToReviewFile = useCallback(
+    (path: string) => {
+      const section = diffSections.get(path);
+      if (!section) {
+        return;
+      }
+      section.scrollIntoView({ block: "start", behavior: "auto" });
+    },
+    [diffSections],
+  );
 
   const handleSelectedPathChange = useCallback(
     (path: string) => {
@@ -134,13 +141,16 @@ export function ReviewPanel({
     [onSelectedPathChange, scrollToReviewFile],
   );
 
-  const setDiffSectionRef = useCallback((path: string, section: HTMLElement | null) => {
-    if (section) {
-      diffSectionRefs.current.set(path, section);
-      return;
-    }
-    diffSectionRefs.current.delete(path);
-  }, []);
+  const setDiffSectionRef = useCallback(
+    (path: string, section: HTMLElement | null) => {
+      if (section) {
+        diffSections.set(path, section);
+        return;
+      }
+      diffSections.delete(path);
+    },
+    [diffSections],
+  );
 
   const setDiffScrollNode = useCallback((node: HTMLElement | null) => {
     diffScrollRef.current = node;
@@ -171,7 +181,7 @@ export function ReviewPanel({
     const viewportRect = scrollContainer.getBoundingClientRect();
     const sections = files
       .map((file) => {
-        const section = diffSectionRefs.current.get(file.path);
+        const section = diffSections.get(file.path);
         if (!section) {
           return null;
         }
@@ -188,7 +198,7 @@ export function ReviewPanel({
       selectionSourceRef.current = "scroll";
       onSelectedPathChange(nextPath);
     }
-  }, [files, onSelectedPathChange, selectedPath]);
+  }, [diffSections, files, onSelectedPathChange, selectedPath]);
 
   const handleDiffScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) {
@@ -220,10 +230,6 @@ export function ReviewPanel({
     }
     scrollToReviewFile(selectedPath);
   }, [files, scrollToReviewFile, selectedPath]);
-
-  useEffect(() => {
-    setNearbyDiffPaths(new Set());
-  }, [diffLoadablePaths]);
 
   useEffect(() => {
     for (const path of diffPathsToLoad) {
@@ -309,14 +315,13 @@ export function ReviewPanel({
               onSelectedPathChange={handleSelectedPathChange}
             />
           </div>
-          <div
-            className="no-drag absolute inset-y-0 right-0 z-20 -mr-1 w-2 cursor-col-resize bg-transparent hover:bg-border"
+          <hr
+            className="no-drag absolute inset-y-0 right-0 z-20 -mr-1 w-2 cursor-col-resize border-0 bg-transparent hover:bg-border"
             aria-label="Resize changed files"
             aria-orientation="vertical"
             aria-valuemax={reviewFileTreeWidth(width, width)}
             aria-valuemin={reviewFileTreeWidthBounds.min}
             aria-valuenow={effectiveFileTreeWidth}
-            role="separator"
             onPointerDown={beginFileTreeResize}
           />
         </aside>
@@ -689,7 +694,7 @@ function DiffFileBody({
     return (
       <>
         <FallbackFileHeader file={file} loading />
-        <InlineText>Loading diff...</InlineText>
+        <InlineText>Loading diff…</InlineText>
       </>
     );
   }
@@ -697,7 +702,7 @@ function DiffFileBody({
     return (
       <>
         <FallbackFileHeader file={file} />
-        <InlineText>Loading diff...</InlineText>
+        <InlineText>Loading diff…</InlineText>
       </>
     );
   }

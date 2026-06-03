@@ -488,18 +488,21 @@ function LocalMarketplaceForm({
       <input
         className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
         value={id}
+        aria-label="Provider ID"
         placeholder="id"
         onChange={(event) => setId(event.currentTarget.value)}
       />
       <input
         className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
         value={displayName}
+        aria-label="Provider display name"
         placeholder="Display name"
         onChange={(event) => setDisplayName(event.currentTarget.value)}
       />
       <input
         className="h-9 w-full rounded-md border border-border bg-background px-2 text-base outline-none focus:ring-2 focus:ring-ring"
         value={path}
+        aria-label="Provider marketplace path"
         placeholder="/path/to/marketplace"
         onChange={(event) => setPath(event.currentTarget.value)}
       />

@@ -10,6 +10,6 @@ export const Route = createFileRoute("/plugins")({
   component: PluginsRoute,
 });
 
-function PluginsRoute(): React.JSX.Element {
+export function PluginsRoute(): React.JSX.Element {
   return <Outlet />;
 }

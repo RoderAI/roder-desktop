@@ -134,10 +134,10 @@ export class ChromeBridgeManager extends EventEmitter {
   #upgrade(socket: Socket, request: string, token: string): boolean {
     const headers = parseHeaders(request);
     const key = headers.get("sec-websocket-key");
-    const protocols = (headers.get("sec-websocket-protocol") ?? "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const protocols = (headers.get("sec-websocket-protocol") ?? "").split(",").flatMap((item) => {
+      const protocol = item.trim();
+      return protocol ? [protocol] : [];
+    });
     const authorized = protocols.includes(protocol) && protocols.includes(`bearer.${token}`);
 
     if (!key || !authorized) {
@@ -146,9 +146,7 @@ export class ChromeBridgeManager extends EventEmitter {
       return false;
     }
 
-    const accept = createHash("sha1")
-      .update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
-      .digest("base64");
+    const accept = createHash("sha1").update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest("base64");
     socket.write(
       [
         "HTTP/1.1 101 Switching Protocols",
@@ -242,7 +240,8 @@ function previewToken(token: string): string {
 function summarizeMessage(message: string): string {
   try {
     const parsed = JSON.parse(message) as { type?: unknown; method?: unknown };
-    const label = typeof parsed.type === "string" ? parsed.type : typeof parsed.method === "string" ? parsed.method : "message";
+    const label =
+      typeof parsed.type === "string" ? parsed.type : typeof parsed.method === "string" ? parsed.method : "message";
     return `Extension: ${label}`;
   } catch {
     return `Extension message (${message.length} bytes)`;

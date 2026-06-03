@@ -48,7 +48,7 @@ export function groupThreadsByFolder(threads: RoderThread[], projectOrder: strin
   }
 
   const orderByKey = new Map(projectOrder.map((key, index) => [key, index]));
-  return [...groups.values()].sort((left, right) => {
+  return Array.from(groups.values()).toSorted((left, right) => {
     const leftIndex = orderByKey.get(left.key) ?? Number.MAX_SAFE_INTEGER;
     const rightIndex = orderByKey.get(right.key) ?? Number.MAX_SAFE_INTEGER;
     return leftIndex - rightIndex || left.title.localeCompare(right.title);

@@ -26,3 +26,10 @@ coverage
 .qa/*
 out/*
 resources/bin/*
+
+# React Doctor can install identical skills for many agent products.
+# Keep the repo-local Agents/Codex skill tracked and ignore generated duplicates.
+/*/skills/react-doctor/
+!/.agents/skills/react-doctor/
+!/.agents/skills/react-doctor/SKILL.md
+/skills/react-doctor/

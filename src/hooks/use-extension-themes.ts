@@ -15,14 +15,14 @@ export function useExtensionThemes(): void {
 
   useEffect(() => {
     let disposed = false;
-    const themeContributions = extensions
-      .filter((extension) => extension.enabled)
-      .flatMap((extension) =>
-        extension.manifest.contributes.themes.map((theme) => ({
-          extension,
-          theme,
-        })),
-      );
+    const themeContributions = extensions.flatMap((extension) =>
+      extension.enabled
+        ? extension.manifest.contributes.themes.map((theme) => ({
+            extension,
+            theme,
+          }))
+        : [],
+    );
 
     Promise.all(
       themeContributions.map(async ({ extension, theme }) => {

@@ -25,10 +25,9 @@ export async function createRdxPackage(options: CreateRdxPackageOptions): Promis
   if (!files.includes("package.json")) {
     throw new Error("Extension package must include package.json");
   }
-  const archiveEntries: Record<string, Uint8Array> = {};
-  for (const file of files) {
-    archiveEntries[file] = await readFile(join(packageRoot, file));
-  }
+  const archiveEntries = Object.fromEntries(
+    await Promise.all(files.map(async (file) => [file, await readFile(join(packageRoot, file))] as const)),
+  );
   await writeFile(archivePath, zipSync(archiveEntries, { level: 9 }));
   return {
     archivePath,
@@ -38,43 +37,53 @@ export async function createRdxPackage(options: CreateRdxPackageOptions): Promis
 
 export async function collectPackageFiles(packageRoot: string): Promise<string[]> {
   const root = resolve(packageRoot);
-  const files: string[] = [];
-  for (const entry of await readdir(root, { withFileTypes: true })) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules") {
-      continue;
-    }
-    const entryPath = join(root, entry.name);
-    if (entry.isFile() && allowedRootFiles.has(entry.name)) {
-      files.push(entry.name);
-    }
-    if (entry.isDirectory() && allowedRootDirectories.has(entry.name)) {
-      files.push(...(await collectDirectory(root, entryPath)));
-    }
-  }
+  const files = (
+    await Promise.all(
+      (
+        await readdir(root, { withFileTypes: true })
+      ).map(async (entry) => {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") {
+          return [];
+        }
+        const entryPath = join(root, entry.name);
+        if (entry.isFile() && allowedRootFiles.has(entry.name)) {
+          return [entry.name];
+        }
+        if (entry.isDirectory() && allowedRootDirectories.has(entry.name)) {
+          return collectDirectory(root, entryPath);
+        }
+        return [];
+      }),
+    )
+  ).flat();
   return files.sort();
 }
 
 async function collectDirectory(root: string, directory: string): Promise<string[]> {
-  const files: string[] = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (entry.name.startsWith(".")) {
-      continue;
-    }
-    const entryPath = join(directory, entry.name);
-    const entryStat = await stat(entryPath);
-    if (entryStat.isDirectory()) {
-      files.push(...(await collectDirectory(root, entryPath)));
-      continue;
-    }
-    if (entryStat.isFile()) {
-      const archivePath = normalize(relative(root, entryPath)).split(sep).join("/");
-      if (archivePath.startsWith("../")) {
-        throw new Error(`Refusing to package path outside extension root: ${archivePath}`);
-      }
-      files.push(archivePath);
-    }
-  }
-  return files;
+  return (
+    await Promise.all(
+      (
+        await readdir(directory, { withFileTypes: true })
+      ).map(async (entry) => {
+        if (entry.name.startsWith(".")) {
+          return [];
+        }
+        const entryPath = join(directory, entry.name);
+        const entryStat = await stat(entryPath);
+        if (entryStat.isDirectory()) {
+          return collectDirectory(root, entryPath);
+        }
+        if (!entryStat.isFile()) {
+          return [];
+        }
+        const archivePath = normalize(relative(root, entryPath)).split(sep).join("/");
+        if (archivePath.startsWith("../")) {
+          throw new Error(`Refusing to package path outside extension root: ${archivePath}`);
+        }
+        return [archivePath];
+      }),
+    )
+  ).flat();
 }
 
 function archiveSegment(value: string): string {

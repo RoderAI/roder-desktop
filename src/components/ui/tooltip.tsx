@@ -13,26 +13,30 @@ export function TooltipProvider({ delayDuration, delay, ...props }: TooltipProvi
 export const Tooltip = TooltipPrimitive.Root;
 export const TooltipTrigger = TooltipPrimitive.Trigger;
 
-export const TooltipContent = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Popup>,
-  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Popup> & {
-    align?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Positioner>["align"];
-    side?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Positioner>["side"];
-    sideOffset?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Positioner>["sideOffset"];
-  }
->(({ align, className, side, sideOffset = 6, ...props }, ref) => (
-  <TooltipPrimitive.Portal>
-    <TooltipPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-50">
-      <TooltipPrimitive.Popup
-        ref={ref}
-        className={cn(
-          "rounded-md bg-primary px-2 py-1 text-base text-primary-foreground shadow-md outline-none",
-          className,
-        )}
-        {...props}
-      />
-    </TooltipPrimitive.Positioner>
-  </TooltipPrimitive.Portal>
-));
-
-TooltipContent.displayName = "TooltipContent";
+export function TooltipContent({
+  align,
+  className,
+  ref,
+  side,
+  sideOffset = 6,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Popup> & {
+  align?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Positioner>["align"];
+  side?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Positioner>["side"];
+  sideOffset?: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Positioner>["sideOffset"];
+} & { ref?: React.Ref<React.ElementRef<typeof TooltipPrimitive.Popup>> }): React.JSX.Element {
+  return (
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Positioner align={align} side={side} sideOffset={sideOffset} className="z-50">
+        <TooltipPrimitive.Popup
+          ref={ref}
+          className={cn(
+            "rounded-md bg-primary px-2 py-1 text-base text-primary-foreground shadow-md outline-none",
+            className,
+          )}
+          {...props}
+        />
+      </TooltipPrimitive.Positioner>
+    </TooltipPrimitive.Portal>
+  );
+}

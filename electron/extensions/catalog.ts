@@ -67,7 +67,7 @@ export class ExtensionCatalog {
   async list(): Promise<ExtensionCatalogSnapshot> {
     const catalog = await this.#read();
     return {
-      extensions: [...catalog.extensions].sort((left, right) =>
+      extensions: catalog.extensions.toSorted((left, right) =>
         left.manifest.displayName.localeCompare(right.manifest.displayName),
       ),
     };
@@ -234,7 +234,10 @@ export class ExtensionCatalog {
       return {
         version: 1,
         extensions: Array.isArray(parsed.extensions)
-          ? parsed.extensions.map(normalizeRecord).filter(isExtensionCatalogRecord)
+          ? parsed.extensions.flatMap((record) => {
+              const normalized = normalizeRecord(record);
+              return isExtensionCatalogRecord(normalized) ? [normalized] : [];
+            })
           : [],
       };
     } catch (error) {

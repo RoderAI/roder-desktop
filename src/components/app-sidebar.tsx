@@ -1,5 +1,5 @@
 import { Archive, CirclePlus, FolderPlus, Store } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { RoderThread } from "@/types/roder";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
@@ -40,15 +40,10 @@ export function AppSidebar({
   onOpenSettings,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
-  const [projectOrder, setProjectOrder] = useState<string[]>(() => []);
-  const nextProjectOrder = useMemo(() => sidebarProjectOrder(threads, projectOrder), [projectOrder, threads]);
-  const threadGroups = useMemo(() => groupThreadsByFolder(threads, nextProjectOrder), [nextProjectOrder, threads]);
-
-  useEffect(() => {
-    if (!sameStringList(projectOrder, nextProjectOrder)) {
-      setProjectOrder(nextProjectOrder);
-    }
-  }, [nextProjectOrder, projectOrder]);
+  const projectOrderRef = useRef<string[]>([]);
+  const projectOrder = sidebarProjectOrder(threads, projectOrderRef.current);
+  projectOrderRef.current = projectOrder;
+  const threadGroups = useMemo(() => groupThreadsByFolder(threads, projectOrder), [projectOrder, threads]);
 
   function showMoreForGroup(groupKey: string): void {
     setExpandedGroupKeys((current) => {
@@ -263,10 +258,6 @@ function SidebarRowButton({
       {children}
     </button>
   );
-}
-
-function sameStringList(left: string[], right: string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function relativeAge(timestamp: number): string {

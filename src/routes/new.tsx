@@ -5,6 +5,6 @@ export const Route = createFileRoute("/new")({
   component: NewRoute,
 });
 
-function NewRoute(): React.JSX.Element {
+export function NewRoute(): React.JSX.Element {
   return <ChatPage route="new" />;
 }

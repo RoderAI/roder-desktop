@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { roderIpc } from "@/lib/roder-ipc";
 import { summarizeReviewChanges } from "@/lib/review-changes";
 import type { HunkRecord, WorkspaceChangeObservation } from "@/types/roder";
@@ -23,33 +23,34 @@ const emptySummary: ThreadHunkSummary = {
   error: null,
 };
 
+type ThreadHunkSummaryState = ThreadHunkSummary & {
+  hunkRevision: number;
+  threadId: string;
+};
+
 export function useThreadHunkSummary(threadId: string, hunkRevision = 0): ThreadHunkSummary {
-  const [summary, setSummary] = useState<ThreadHunkSummary>(emptySummary);
-  const lastThreadIdRef = useRef("");
+  const [summaryState, setSummaryState] = useState<ThreadHunkSummaryState | null>(null);
+  const summary =
+    summaryState?.threadId === threadId && summaryState.hunkRevision === hunkRevision
+      ? summaryState
+      : { ...emptySummary, loading: Boolean(threadId) };
 
   useEffect(() => {
     if (!threadId) {
-      lastThreadIdRef.current = "";
-      setSummary(emptySummary);
       return;
     }
 
     let disposed = false;
-    const threadChanged = lastThreadIdRef.current !== threadId;
-    lastThreadIdRef.current = threadId;
-    setSummary((current) => ({
-      ...(threadChanged ? emptySummary : current),
-      loading: true,
-      error: null,
-    }));
     void Promise.all([roderIpc.listHunks(threadId), listObservedChanges(threadId)])
       .then(([hunkResult, observedResult]) => {
         if (disposed) {
           return;
         }
         const metadata = summarizeReviewChanges(hunkResult.hunks, observedResult.changes);
-        setSummary({
+        setSummaryState({
           ...metadata,
+          hunkRevision,
+          threadId,
           hunks: hunkResult.hunks,
           observedChanges: observedResult.changes,
           loading: false,
@@ -60,8 +61,10 @@ export function useThreadHunkSummary(threadId: string, hunkRevision = 0): Thread
         if (disposed) {
           return;
         }
-        setSummary({
+        setSummaryState({
           ...emptySummary,
+          hunkRevision,
+          threadId,
           loading: false,
           error: error instanceof Error ? error.message : String(error),
         });

@@ -147,9 +147,13 @@ export function transcriptRowDisclosureKeys(row: TranscriptRow): string[] {
 
 export function transcriptRowsSearchText(rows: TranscriptRow[], options: TranscriptRowsSearchTextOptions = {}): string {
   return rows
-    .filter((row) => !options.excludedRowKeys?.has(row.key))
-    .map(transcriptRowSearchText)
-    .filter(Boolean)
+    .flatMap((row) => {
+      if (options.excludedRowKeys?.has(row.key)) {
+        return [];
+      }
+      const searchText = transcriptRowSearchText(row);
+      return searchText ? [searchText] : [];
+    })
     .join("\n\n");
 }
 
@@ -224,7 +228,12 @@ function transcriptEntrySearchText(entry: TranscriptMessageEntry): string {
   if (entry.kind === "message") {
     return messageSearchText(entry.message);
   }
-  return entry.messages.map(messageSearchText).filter(Boolean).join("\n");
+  return entry.messages
+    .flatMap((message) => {
+      const searchText = messageSearchText(message);
+      return searchText ? [searchText] : [];
+    })
+    .join("\n");
 }
 
 function messageSearchText(message: ConversationMessage): string {

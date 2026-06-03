@@ -8,7 +8,7 @@ export const Route = createRootRoute({
   component: RootRoute,
 });
 
-function RootRoute(): React.JSX.Element {
+export function RootRoute(): React.JSX.Element {
   return (
     <NuqsAdapter
       defaultOptions={{

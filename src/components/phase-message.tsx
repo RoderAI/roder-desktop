@@ -13,8 +13,13 @@ type PhaseMessageText = {
 };
 
 const leadingBoldHeadingPattern = /^\s*\*\*([^*\n]{1,80})\*\*\s*(?:\r?\n+|$)/;
+const emptySkills: SkillDescriptor[] = [];
 
-export function PhaseMessage({ isStreaming = false, skills = [], text }: PhaseMessageProps): React.JSX.Element {
+export function PhaseMessage({
+  isStreaming = false,
+  skills = emptySkills,
+  text,
+}: PhaseMessageProps): React.JSX.Element {
   const phaseText = splitPhaseMessageText(text);
 
   return (

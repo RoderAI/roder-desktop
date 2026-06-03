@@ -31,6 +31,10 @@ import { cn } from "@/lib/utils";
 import { usePluginsStore } from "@/stores/plugins-store";
 import type { DedupedMarketplacePlugin } from "@/types/plugins";
 
+function openSourceCode(url: string): void {
+  void window.roderDesktop.openExternal(url);
+}
+
 export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSection }): React.JSX.Element {
   const navigate = useNavigate();
   const marketplaces = usePluginsStore((state) => state.marketplaces);
@@ -113,10 +117,6 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
 
   function openTab(nextTab: PluginSection): void {
     void navigate({ to: pluginsRouteForSection(nextTab), search: true });
-  }
-
-  function openSourceCode(url: string): void {
-    void window.roderDesktop.openExternal(url);
   }
 
   async function refreshProvider(): Promise<void> {
