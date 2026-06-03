@@ -44,6 +44,27 @@ function createMarkdownComponents(skills: SkillDescriptor[]): Components {
         </blockquote>
       );
     },
+    ul({ children, className, ...props }) {
+      return (
+        <ul className={cn(className, "message-list message-list-unordered")} {...props}>
+          {children}
+        </ul>
+      );
+    },
+    ol({ children, className, ...props }) {
+      return (
+        <ol className={cn(className, "message-list message-list-ordered")} {...props}>
+          {children}
+        </ol>
+      );
+    },
+    li({ children, className, ...props }) {
+      return (
+        <li className={cn(className, "message-list-item")} {...props}>
+          {children}
+        </li>
+      );
+    },
     inlineCode({ children, className, ...props }) {
       // Rehype handles bare $skill text; this branch handles backticked `$skill`.
       const childText = singleStringChild(children);

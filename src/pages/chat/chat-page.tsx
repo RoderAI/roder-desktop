@@ -9,7 +9,7 @@ import { Transcript } from "@/components/transcript";
 import { threadSelectionForRoute } from "@/lib/route-selection";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
 import { useCommandsStore } from "@/stores/commands-store";
-import { useSkillsStore } from "@/stores/skills-store";
+import { skillsLoadContextKey, useSkillsStore } from "@/stores/skills-store";
 
 const transcriptComposerGapPx = 24;
 const composerGuardFadeHeightPx = 88;
@@ -46,6 +46,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const loadCommands = useCommandsStore((state) => state.load);
   const skills = useSkillsStore((state) => state.skills);
   const skillsLoaded = useSkillsStore((state) => state.loaded);
+  const skillsLoadedContextKey = useSkillsStore((state) => state.loadedContextKey);
   const skillsLoading = useSkillsStore((state) => state.loading);
   const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
@@ -72,10 +73,25 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   );
 
   useEffect(() => {
-    if (agent.status.state === "ready" && !skillsLoaded && !skillsLoading) {
-      void loadSkills();
+    const skillsContext = {
+      workspaceId: agent.selectedWorkspaceId,
+      rootId: agent.selectedRootId,
+      cwd: agent.selectedWorkspaceCwd,
+    };
+    const contextKey = skillsLoadContextKey(skillsContext);
+    if (agent.status.state === "ready" && !skillsLoading && (!skillsLoaded || skillsLoadedContextKey !== contextKey)) {
+      void loadSkills(skillsContext);
     }
-  }, [agent.status.state, loadSkills, skillsLoaded, skillsLoading]);
+  }, [
+    agent.status.state,
+    agent.selectedRootId,
+    agent.selectedWorkspaceCwd,
+    agent.selectedWorkspaceId,
+    loadSkills,
+    skillsLoaded,
+    skillsLoadedContextKey,
+    skillsLoading,
+  ]);
 
   useEffect(() => {
     if (agent.status.state === "ready" && !commandsLoaded && !commandsLoading) {

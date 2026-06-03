@@ -30,6 +30,27 @@ test("listSkills requests the runtime skills catalog", async () => {
   ]);
 });
 
+test("listSkills passes workspace context when provided", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { skills: [], diagnostics: [] };
+  });
+
+  await roderIpc.listSkills({ workspaceId: "ws_1", rootId: "root_1", cwd: "/repo" });
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "skills/list",
+      params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
+        cwd: "/repo",
+      },
+    },
+  ]);
+});
+
 test("setSkillEnabled mutates by canonical path selector", async () => {
   const calls: Array<{ method: string; params: unknown }> = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {
