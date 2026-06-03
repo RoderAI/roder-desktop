@@ -33,7 +33,15 @@ export default defineConfig({
         "@": resolve(root, "src"),
       },
     },
-    plugins: [TanStackRouterVite(), react(), tailwindcss()],
+    plugins: [
+      TanStackRouterVite(),
+      react({
+        babel: {
+          plugins: ["babel-plugin-react-compiler"],
+        },
+      }),
+      tailwindcss(),
+    ],
     build: {
       rollupOptions: {
         input: resolve(root, "index.html"),
