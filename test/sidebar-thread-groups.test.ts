@@ -43,10 +43,7 @@ test("sidebar project groups follow the stable project order", () => {
 
 test("sidebar project groups display Windows folder names", () => {
   const groups = groupThreadsByFolder(
-    [
-      thread("local", "C:\\Users\\pz\\w\\gode"),
-      thread("unc", "\\\\server\\share\\project"),
-    ],
+    [thread("local", "C:\\Users\\pz\\w\\gode"), thread("unc", "\\\\server\\share\\project")],
     [],
   );
 

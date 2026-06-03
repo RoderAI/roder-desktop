@@ -20,7 +20,7 @@ export type NativeCommandInvocation = {
 export type NativeCommandResult =
   | { type: "output"; output: NativeCommandOutput }
   | { type: "openModelPicker" }
-  | { type: "selectModel"; modelId: string }
+  | { type: "selectModel"; modelId: string; modelProvider: string }
   | { type: "clear" }
   | { type: "retry" }
   | { type: "agents" }
@@ -138,6 +138,7 @@ function planModelCommand(argumentsText: string, models: RoderModel[]): NativeCo
   return {
     type: "selectModel",
     modelId: model.id,
+    modelProvider: model.modelProvider,
   };
 }
 

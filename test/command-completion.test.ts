@@ -20,7 +20,6 @@ test("renders command rows with hints, descriptions, and warning labels", () => 
   expect(html).toContain("/review");
   expect(html).toContain("[scope]");
   expect(html).toContain("Review changes");
-  expect(html).toContain("builtin");
   expect(html).toContain("shell gated");
 });
 

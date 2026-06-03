@@ -1,7 +1,11 @@
 import type { RoderModel } from "@/types/roder";
 
-export function selectedModelProvider(models: RoderModel[], selectedModel: string): string | undefined {
-  return models.find((model) => model.id === selectedModel)?.modelProvider;
+export function selectedModelProvider(
+  models: RoderModel[],
+  selectedModel: string,
+  preferredProvider?: string,
+): string | undefined {
+  return selectedModelRecord(models, selectedModel, preferredProvider)?.modelProvider;
 }
 
 export function visibleModelIdsFor(models: RoderModel[], explicitIds: string[]): string[] {
@@ -32,7 +36,19 @@ export function effectiveSelectedModel(
   models: RoderModel[],
   visibleModelIds: string[],
   selectedModel: string,
+  selectedProvider?: string,
 ): RoderModel | undefined {
   const visibleModels = visibleModelsFor(models, visibleModelIds);
-  return visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
+  return selectedModelRecord(visibleModels, selectedModel, selectedProvider) ?? visibleModels[0];
+}
+
+export function selectedModelRecord(
+  models: RoderModel[],
+  selectedModel: string,
+  selectedProvider?: string,
+): RoderModel | undefined {
+  return (
+    models.find((model) => model.id === selectedModel && model.modelProvider === selectedProvider) ??
+    models.find((model) => model.id === selectedModel)
+  );
 }

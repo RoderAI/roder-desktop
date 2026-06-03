@@ -173,6 +173,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             models={agent.models}
             open={nativeModelPickerOpen}
             selectedModel={agent.selectedModel}
+            selectedModelProvider={agent.selectedModelProvider}
             onDismiss={closeNativeModelPicker}
             onSelect={selectNativeCommandModel}
           />
@@ -186,6 +187,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             models={agent.models}
             skills={skills}
             selectedModel={agent.selectedModel}
+            selectedModelProvider={agent.selectedModelProvider}
             selectedPolicyMode={agent.selectedPolicyMode}
             selectedReasoning={agent.selectedReasoning}
             attachments={composerAttachments}

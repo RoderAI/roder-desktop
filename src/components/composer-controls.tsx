@@ -145,20 +145,25 @@ export function ComposerAttachMenuItems({
 export function ModelPicker({
   models,
   selectedModel,
+  selectedModelProvider,
   selectedReasoning,
   onChange,
   onReasoningChange,
 }: {
   models: RoderModel[];
   selectedModel: string;
+  selectedModelProvider: string;
   selectedReasoning: ReasoningEffort;
-  onChange: (model: string) => void;
+  onChange: (model: string, provider?: string) => void;
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const visibleModels: RoderModel[] =
     models.length > 0 ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
-  const selected = visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
+  const selected =
+    visibleModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
+    visibleModels.find((model) => model.id === selectedModel) ??
+    visibleModels[0];
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
@@ -177,7 +182,7 @@ export function ModelPicker({
         }}
         onValueChange={(model) => {
           if (model) {
-            onChange(model.id);
+            onChange(model.id, model.modelProvider);
           }
         }}
       >

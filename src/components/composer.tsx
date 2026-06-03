@@ -61,12 +61,13 @@ type ComposerProps = {
   models: RoderModel[];
   skills: SkillDescriptor[];
   selectedModel: string;
+  selectedModelProvider: string;
   selectedPolicyMode: PolicyMode;
   selectedReasoning: ReasoningEffort;
   attachments: DesktopAttachment[];
   focusSignal: number;
   showScrollToBottom: boolean;
-  onSelectedModelChange: (model: string) => void;
+  onSelectedModelChange: (model: string, provider?: string) => void;
   onSelectedPolicyModeChange: (mode: PolicyMode) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
@@ -99,6 +100,7 @@ export function Composer({
   models,
   skills,
   selectedModel,
+  selectedModelProvider,
   selectedPolicyMode,
   selectedReasoning,
   attachments,
@@ -436,6 +438,7 @@ export function Composer({
               <ModelPicker
                 models={models}
                 selectedModel={selectedModel}
+                selectedModelProvider={selectedModelProvider}
                 selectedReasoning={selectedReasoning}
                 onChange={onSelectedModelChange}
                 onReasoningChange={onSelectedReasoningChange}

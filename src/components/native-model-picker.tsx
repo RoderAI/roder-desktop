@@ -13,14 +13,16 @@ type NativeModelPickerProps = {
   models: RoderModel[];
   open: boolean;
   selectedModel: string;
+  selectedModelProvider: string;
   onDismiss: () => void;
-  onSelect: (modelId: string) => void;
+  onSelect: (modelId: string, modelProvider: string) => void;
 };
 
 export function NativeModelPicker({
   models,
   open,
   selectedModel,
+  selectedModelProvider,
   onDismiss,
   onSelect,
 }: NativeModelPickerProps): React.JSX.Element | null {
@@ -28,7 +30,7 @@ export function NativeModelPicker({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listboxId = useId();
-  const modelOptions = models.length > 0 ? models : fallbackModels(selectedModel);
+  const modelOptions = models.length > 0 ? models : fallbackModels(selectedModel, selectedModelProvider);
   const visibleModels = filteredModels(modelOptions, query);
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export function NativeModelPicker({
                 const model = visibleModels[highlightedIndex];
                 if (model) {
                   event.preventDefault();
-                  onSelect(model.id);
+                  onSelect(model.id, model.modelProvider);
                 }
               }
             }}
@@ -108,7 +110,7 @@ export function NativeModelPicker({
           {visibleModels.length > 0 ? (
             visibleModels.map((model, index) => {
               const active = index === highlightedIndex;
-              const selectedModelRow = model.id === selectedModel;
+              const selectedModelRow = model.id === selectedModel && model.modelProvider === selectedModelProvider;
               return (
                 <CompletionMenuOption
                   key={`${model.modelProvider}:${model.id}`}
@@ -117,21 +119,13 @@ export function NativeModelPicker({
                   active={active}
                   className={selectedModelRow ? "text-foreground" : undefined}
                   onHighlight={setHighlightedIndex}
-                  onClick={() => onSelect(model.id)}
+                  onClick={() => onSelect(model.id, model.modelProvider)}
                 >
-                  <span className="min-w-0 flex-1 truncate text-base text-foreground">
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                     <span className="font-medium">{modelName(model)}</span>
-                    <span className="text-muted-foreground"> - {model.id}</span>
+                    <span className="text-muted-foreground"> - {model.modelProvider}</span>
                   </span>
-                  <span className="rounded-md border border-border/70 px-1.5 py-0.5 text-base text-muted-foreground">
-                    {model.modelProvider}
-                  </span>
-                  {selectedModelRow && (
-                    <span className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-base text-muted-foreground">
-                      <Check className="size-3.5" />
-                      Current
-                    </span>
-                  )}
+                  {selectedModelRow && <Check className="size-4 shrink-0 text-foreground" />}
                 </CompletionMenuOption>
               );
             })
@@ -159,8 +153,10 @@ function modelName(model: RoderModel): string {
   return model.name || model.id;
 }
 
-function fallbackModels(selectedModel: string): RoderModel[] {
-  return selectedModel ? [{ id: selectedModel, name: selectedModel, modelProvider: "desktop" }] : [];
+function fallbackModels(selectedModel: string, selectedModelProvider: string): RoderModel[] {
+  return selectedModel
+    ? [{ id: selectedModel, name: selectedModel, modelProvider: selectedModelProvider || "desktop" }]
+    : [];
 }
 
 function nativeModelOptionId(listboxId: string, index: number): string {

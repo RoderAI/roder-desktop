@@ -64,6 +64,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     allModels: state.models,
     visibleModelIds: state.visibleModelIds,
     selectedModel: state.selectedModel,
+    selectedModelProvider: state.selectedModelProvider,
     selectedReasoning: state.selectedReasoning,
     selectedPolicyMode: state.selectedPolicyMode,
     workspaces: state.workspaces,

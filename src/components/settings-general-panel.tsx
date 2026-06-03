@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { visibleModelsFor } from "@/lib/roder-models";
+import { selectedModelRecord as resolveSelectedModelRecord, visibleModelsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type { PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
 
@@ -36,6 +36,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
   const allModels = useRoderStore((state) => state.models);
   const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
   const defaultModel = useRoderStore((state) => state.defaultModel);
+  const defaultModelProvider = useRoderStore((state) => state.defaultModelProvider);
   const defaultReasoning = useRoderStore((state) => state.defaultReasoning);
   const defaultPolicyMode = useRoderStore((state) => state.defaultPolicyMode);
   const setDefaultModel = useRoderStore((state) => state.setDefaultModel);
@@ -48,10 +49,13 @@ export function GeneralSettingsPanel(): React.JSX.Element {
 
   const models = useMemo(() => visibleModelsFor(allModels, visibleModelIds), [allModels, visibleModelIds]);
   const selectedModelRecord = useMemo(
-    () => models.find((model) => model.id === defaultModel) ?? models[0],
-    [models, defaultModel],
+    () => resolveSelectedModelRecord(models, defaultModel, defaultModelProvider) ?? models[0],
+    [models, defaultModel, defaultModelProvider],
   );
-  const modelItems = useMemo(() => Object.fromEntries(models.map((model) => [model.id, modelName(model)])), [models]);
+  const modelItems = useMemo(
+    () => Object.fromEntries(models.map((model) => [modelValue(model), modelName(model)])),
+    [models],
+  );
   const canSave = Boolean(selectedModelRecord) && !saving;
 
   async function saveDefaultControls(): Promise<void> {
@@ -85,9 +89,12 @@ export function GeneralSettingsPanel(): React.JSX.Element {
         <SettingsRow label="Model" description={selectedModelDescription(selectedModelRecord)}>
           <Select
             items={modelItems}
-            value={selectedModelRecord?.id ?? ""}
+            value={selectedModelRecord ? modelValue(selectedModelRecord) : ""}
             disabled={models.length === 0}
-            onValueChange={(value) => setDefaultModel(value ?? "")}
+            onValueChange={(value) => {
+              const model = models.find((candidate) => modelValue(candidate) === value);
+              setDefaultModel(model?.id ?? "", model?.modelProvider);
+            }}
           >
             <SelectTrigger className="w-[300px] border border-border bg-card">
               <SelectValue />
@@ -95,7 +102,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
             <SelectContent className="w-[340px]">
               <SelectGroup>
                 {models.map((model) => (
-                  <SelectItem key={`${model.modelProvider}:${model.id}`} value={model.id}>
+                  <SelectItem key={modelValue(model)} value={modelValue(model)}>
                     {modelName(model)}
                   </SelectItem>
                 ))}
@@ -177,6 +184,10 @@ function SettingsRow({
 
 function modelName(model: RoderModel): string {
   return model.name || model.id;
+}
+
+function modelValue(model: RoderModel): string {
+  return `${model.modelProvider}:${model.id}`;
 }
 
 function selectedModelDescription(model: RoderModel | undefined): string {

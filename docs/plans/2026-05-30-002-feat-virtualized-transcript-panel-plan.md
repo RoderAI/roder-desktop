@@ -63,12 +63,12 @@ TanStack Virtual's latest chat guidance is directly aimed at this contract: norm
 
 ## Alternative Approaches Considered
 
-| Approach | Strength | Weakness | Plan Decision |
-|---|---|---|---|
-| Keep full render and memoize rows | Lowest dependency and compatibility risk; native find/copy remain intact | Does not reduce total DOM nodes and leaves custom bottom-follow logic in place | Use as the baseline for the spike; keep if virtualization does not clearly improve the problem |
-| TanStack Virtual chat mode | Direct support for end anchoring, pinned append following, dynamic measurement, and stable keyed prepends | Recent chat APIs and virtualized DOM can affect find/copy/accessibility workflows | Primary candidate because it matches the transcript scroll contract |
-| Dedicated chat/message-list library | May include more chat-specific batteries | Larger migration surface and more visual/opinionated behavior to reconcile with existing transcript rows | Defer unless TanStack fails the spike but virtualization remains necessary |
-| Small custom windowing layer | Full local control and no new runtime dependency | Recreates hard scroll/measurement edge cases the library is designed to own | Reject for this spike unless the dependency proves incompatible |
+| Approach                            | Strength                                                                                                  | Weakness                                                                                                 | Plan Decision                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Keep full render and memoize rows   | Lowest dependency and compatibility risk; native find/copy remain intact                                  | Does not reduce total DOM nodes and leaves custom bottom-follow logic in place                           | Use as the baseline for the spike; keep if virtualization does not clearly improve the problem |
+| TanStack Virtual chat mode          | Direct support for end anchoring, pinned append following, dynamic measurement, and stable keyed prepends | Recent chat APIs and virtualized DOM can affect find/copy/accessibility workflows                        | Primary candidate because it matches the transcript scroll contract                            |
+| Dedicated chat/message-list library | May include more chat-specific batteries                                                                  | Larger migration surface and more visual/opinionated behavior to reconcile with existing transcript rows | Defer unless TanStack fails the spike but virtualization remains necessary                     |
+| Small custom windowing layer        | Full local control and no new runtime dependency                                                          | Recreates hard scroll/measurement edge cases the library is designed to own                              | Reject for this spike unless the dependency proves incompatible                                |
 
 ---
 

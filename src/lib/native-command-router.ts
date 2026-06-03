@@ -37,7 +37,7 @@ export type NativeCommandRouterActions = {
   sendPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
   setCommandOutput: (output: NativeCommandOutput | null) => void;
   setLocalTranscriptOffset: (offset: LocalTranscriptOffset) => void;
-  setSelectedModel: (modelId: string) => void;
+  setSelectedModel: (modelId: string, modelProvider?: string) => void;
 };
 
 export type NativeCommandRouterIpc = {
@@ -78,7 +78,7 @@ export async function runNativeCommandInvocation({
     }
     if (result.type === "selectModel") {
       actions.closeModelPicker();
-      actions.setSelectedModel(result.modelId);
+      actions.setSelectedModel(result.modelId, result.modelProvider);
       actions.setCommandOutput(null);
       return true;
     }
