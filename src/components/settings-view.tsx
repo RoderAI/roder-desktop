@@ -215,7 +215,7 @@ function SettingsNavItem({
 function SettingsPlaceholder({ section }: { section: SettingsSection }): React.JSX.Element {
   const title = sectionLabel(section);
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-xl bg-card p-5 shadow-sm ring-1 ring-border/70">
       <h1 className="text-base font-medium">{title}</h1>
       <p className="mt-2 max-w-[560px] text-base text-muted-foreground">
         This section is wired into settings navigation. Controls for {title.toLowerCase()} can be added here without
@@ -241,7 +241,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
+    <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
       <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
         <div>
           <h1 className="text-base font-medium">Theme</h1>
@@ -569,7 +569,7 @@ function TerminalSettingsPanel(): React.JSX.Element {
   const customParseResult = parseTerminalThemeJson(terminalTheme.customJson);
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
+    <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
       <header className="border-b border-border px-5 py-4">
         <h1 className="text-base font-medium">Terminal</h1>
         <p className="mt-1 text-base text-muted-foreground">
@@ -629,7 +629,7 @@ function TerminalSettingsPanel(): React.JSX.Element {
 function TerminalThemePreview({ theme }: { theme: ReturnType<typeof terminalThemeForSettings> }): React.JSX.Element {
   return (
     <div className="p-5" style={{ background: theme.background, color: theme.foreground }}>
-      <div className="rounded-lg border border-white/10 bg-black/10 p-4 font-mono text-sm shadow-inner">
+      <div className="rounded-lg bg-black/10 p-4 font-mono text-sm shadow-inner ring-1 ring-white/10">
         <div className="mb-3 flex items-center gap-2 text-xs opacity-75">
           <span className="size-2 rounded-full" style={{ background: theme.red }} />
           <span className="size-2 rounded-full" style={{ background: theme.yellow }} />

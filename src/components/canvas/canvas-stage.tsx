@@ -35,7 +35,7 @@ export function CanvasStage({
       <div
         ref={wrapperRef}
         className={cn(
-          "relative h-full overflow-hidden rounded-lg border border-border bg-white shadow-inner",
+          "relative h-full overflow-hidden rounded-lg bg-white shadow-inner ring-1 ring-border/70",
           dragActive && "ring-2 ring-ring",
         )}
         onDragEnter={(event) => {

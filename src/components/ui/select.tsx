@@ -55,7 +55,7 @@ export function SelectContent({
         <SelectPrimitive.Popup
           ref={ref}
           className={cn(
-            "min-w-48 overflow-hidden rounded-md border border-border bg-popover shadow-md outline-none",
+            "min-w-48 overflow-hidden rounded-md bg-popover shadow-md ring-1 ring-foreground/10 outline-none",
             className,
           )}
           {...props}

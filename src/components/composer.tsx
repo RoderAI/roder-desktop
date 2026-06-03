@@ -331,8 +331,8 @@ export function Composer({
     >
       <div
         className={cn(
-          "relative mt-3 rounded-3xl border border-border bg-card/95 shadow-sm backdrop-blur-md transition-[background-color,border-color,box-shadow]",
-          dragActive && "border-ring bg-card shadow-md ring-2 ring-ring/25",
+          "relative mt-3 rounded-3xl bg-card/95 shadow-sm ring-1 ring-border/70 backdrop-blur-md transition-[background-color,box-shadow]",
+          dragActive && "bg-card shadow-md ring-2 ring-ring/30",
         )}
       >
         <ScrollToBottomButton visible={showScrollToBottom} onClick={onScrollToBottom} />
@@ -588,9 +588,9 @@ function ScrollToBottomButton({ visible, onClick }: { visible: boolean; onClick:
       style={scrollButtonAnimationStyle}
     >
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
-        className="rounded-full text-muted-foreground shadow-sm"
+        className="rounded-full bg-card/95 text-muted-foreground shadow-sm ring-1 ring-border/70 hover:bg-card hover:text-foreground"
         aria-label="Scroll to bottom"
         tabIndex={visible ? 0 : -1}
         onClick={onClick}

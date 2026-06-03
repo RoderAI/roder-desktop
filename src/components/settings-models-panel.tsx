@@ -21,7 +21,7 @@ export function ModelsSettingsPanel(): React.JSX.Element {
   const customised = visibleModelIds.length > 0;
 
   return (
-    <section className="rounded-xl border border-border bg-card shadow-sm">
+    <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
       <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
         <div>
           <h1 className="text-base font-medium">Models</h1>

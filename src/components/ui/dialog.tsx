@@ -43,7 +43,7 @@ export function DialogContent({
       <DialogPrimitive.Popup
         ref={ref}
         className={cn(
-          "dialog-popup fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-theme(spacing.12))] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-white p-5 text-base text-popover-foreground shadow-lg outline-none dark:bg-popover",
+          "dialog-popup fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-theme(spacing.12))] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg bg-white p-5 text-base text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none dark:bg-popover",
           className,
         )}
         {...props}

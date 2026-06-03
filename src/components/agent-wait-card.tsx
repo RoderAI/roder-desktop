@@ -206,7 +206,7 @@ function WaitCard({
   error?: string;
 }): React.JSX.Element {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+    <div className="rounded-lg bg-card px-4 py-3 shadow-sm ring-1 ring-border/70">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
           {icon}
