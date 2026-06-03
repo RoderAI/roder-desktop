@@ -53,6 +53,18 @@ plain browser automation against the Vite renderer URL. The renderer depends on
 Electron preload APIs and may appear blank or misleading outside the desktop
 shell. Ask the user to test UI changes in the running desktop app instead.
 
+## React Compiler
+
+This project uses React Compiler. Do not add `useMemo`, `useCallback`, or
+`React.memo` by default for render optimization; prefer plain values and
+functions and let the compiler handle memoization.
+
+Manual memoization is still appropriate when it expresses real semantics rather
+than routine render tuning, such as preserving referential identity for a
+third-party API, stabilizing a context value, or caching work that is observable
+outside React rendering. When adding manual memoization, make the reason clear in
+the surrounding code or review notes.
+
 ## TDD
 
 Use TDD when the change affects behavior that can be proven with a meaningful
