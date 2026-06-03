@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { errorMessage } from "@/lib/error-message";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { SkillDescriptor, SkillExposure, SkillsListResult } from "@/types/roder";
 
@@ -95,11 +96,4 @@ async function withPendingSkill(set: StoreSet, canonicalPath: string, action: ()
 function removeKey<T>(record: Record<string, T>, key: string): Record<string, T> {
   const { [key]: _removed, ...next } = record;
   return next;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return typeof error === "string" ? error : "Something went wrong";
 }

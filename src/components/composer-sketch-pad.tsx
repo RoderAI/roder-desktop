@@ -182,7 +182,7 @@ export function ComposerSketchPad({ onAttach, onClose }: ComposerSketchPadProps)
 
   return (
     <div className="border-b border-border p-3">
-      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-inner">
+      <div className="overflow-hidden rounded-xl bg-white shadow-inner ring-1 ring-border/70">
         <canvas
           ref={canvasRef}
           className="block h-40 w-full touch-none cursor-crosshair"

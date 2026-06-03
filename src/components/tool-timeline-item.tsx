@@ -16,7 +16,9 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
   const Title = status === "running" ? ShimmerText : "span";
 
   if (isShellToolName(message.toolName) && (message.toolInput || message.toolOutput)) {
-    return <ToolShellItem message={message} onOpenChange={onOpenChange} open={open} status={status} summary={summary} />;
+    return (
+      <ToolShellItem message={message} onOpenChange={onOpenChange} open={open} status={status} summary={summary} />
+    );
   }
 
   return (

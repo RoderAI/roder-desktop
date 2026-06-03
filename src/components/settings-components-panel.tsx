@@ -279,7 +279,7 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
         <ContextMenu>
           <ContextMenuTrigger className="flex min-h-[132px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/45 p-5 text-center outline-none data-[popup-open]:border-primary data-[popup-open]:bg-accent">
             <div className="flex flex-col items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-full bg-card text-muted-foreground shadow-sm ring-1 ring-border">
+              <span className="flex size-10 items-center justify-center rounded-full bg-card text-muted-foreground shadow-sm ring-1 ring-border/70">
                 <MousePointer2 className="size-4" />
               </span>
               <div>
@@ -452,7 +452,7 @@ function DirectorySection({
   title: string;
 }): React.JSX.Element {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <section className="overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-border/70">
       <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
         <h2 className="text-base font-medium">{title}</h2>
         <Badge variant="muted">{note}</Badge>

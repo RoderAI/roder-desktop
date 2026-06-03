@@ -30,17 +30,21 @@ export function textWithSkillTokens(text: string, skills: SkillDescriptor[]): Re
 
   const nodes: ReactNode[] = [];
   let cursor = 0;
-  ranges.forEach((range, index) => {
+  ranges.forEach((range) => {
     if (range.start > cursor) {
       nodes.push(text.slice(cursor, range.start));
     }
-    nodes.push(<SkillTokenPill key={`${range.name}:${range.start}:${index}`} name={range.name} />);
+    nodes.push(<SkillTokenPill key={`${range.name}:${range.start}:${range.end}`} name={range.name} />);
     cursor = range.end;
   });
   if (cursor < text.length) {
     nodes.push(text.slice(cursor));
   }
   return nodes;
+}
+
+export function renderTextWithSkillTokens(text: string, skills: SkillDescriptor[]): ReactNode[] {
+  return textWithSkillTokens(text, skills);
 }
 
 export function skillNameFromExactToken(text: string, skills: SkillDescriptor[]): string | null {
