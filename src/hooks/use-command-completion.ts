@@ -1,10 +1,11 @@
 import type { KeyboardEvent } from "react";
 import { useComposerCompletion } from "@/hooks/use-composer-completion";
+import { shouldClearDismissedCompletion } from "@/lib/composer-completions";
 import {
   completedCommandInvocation,
   matchingCommandCompletions,
   replaceSlashCommandToken,
-  slashCommandToken,
+  slashCommandCompletionToken,
   type CommandInvocation,
 } from "@/lib/roder-commands";
 import { readSkillPromptEditorText, writeSkillPromptEditorText } from "@/lib/lexical-skill-prompt";
@@ -41,7 +42,7 @@ export function useCommandCompletion({
   onCommandSubmit,
   onPromptChange,
 }: UseCommandCompletionOptions): CommandCompletionState {
-  const completionToken = disabled ? null : slashCommandToken(prompt, caretPosition);
+  const completionToken = disabled ? null : slashCommandCompletionToken(prompt, caretPosition);
   const commandCompletions = completionToken ? matchingCommandCompletions(commands, completionToken.query) : [];
   const completion = useComposerCompletion({ token: completionToken, itemCount: commandCompletions.length });
   const highlightedCommandIndex = completion.highlightedIndex;
@@ -73,6 +74,10 @@ export function useCommandCompletion({
   }
 
   function handleCommandCompletionKeyDown(event: KeyboardEvent<HTMLDivElement>): boolean {
+    if (shouldClearDismissedCompletion(completion.completionKey, completion.dismissedCompletionKey, event)) {
+      completion.reset();
+    }
+
     if (!completion.showMenu) {
       return false;
     }

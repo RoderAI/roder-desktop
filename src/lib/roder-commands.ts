@@ -40,6 +40,15 @@ export function slashCommandToken(text: string, caret: number): SlashCommandToke
   };
 }
 
+export function slashCommandCompletionToken(text: string, caret: number): SlashCommandToken | null {
+  const token = slashCommandToken(text, caret);
+  const trimmedStart = text.match(/^\s*/)?.[0].length ?? 0;
+  if (token || caret !== trimmedStart || text.slice(trimmedStart) !== "/") {
+    return token;
+  }
+  return slashCommandToken(text, text.length);
+}
+
 export function matchingCommandCompletions(
   commands: CommandDescriptor[],
   query: string,

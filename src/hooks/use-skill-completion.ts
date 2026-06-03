@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from "react";
 import { useComposerCompletion } from "@/hooks/use-composer-completion";
+import { shouldClearDismissedCompletion } from "@/lib/composer-completions";
 import { readSkillPromptEditorText, replaceSkillPromptCompletionToken } from "@/lib/lexical-skill-prompt";
 import { matchingSkillCompletions, skillCompletionToken } from "@/lib/roder-skills";
 import type { SkillDescriptor } from "@/types/roder";
@@ -61,6 +62,10 @@ export function useSkillCompletion({
   }
 
   function handleSkillCompletionKeyDown(event: KeyboardEvent<HTMLDivElement>): boolean {
+    if (shouldClearDismissedCompletion(completion.completionKey, completion.dismissedCompletionKey, event)) {
+      completion.reset();
+    }
+
     if (!showSkillCompletionMenu) {
       return false;
     }
