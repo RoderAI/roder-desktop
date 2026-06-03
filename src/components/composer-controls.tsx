@@ -1,5 +1,6 @@
 import { Check, FileText, FileUp, ImageIcon, PencilLine, Search, ShieldCheck, X } from "lucide-react";
 import { Combobox } from "@base-ui/react/combobox";
+import { useState } from "react";
 import type { DesktopAttachment, PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
 import {
   DropdownMenu,
@@ -144,23 +145,31 @@ export function ComposerAttachMenuItems({
 export function ModelPicker({
   models,
   selectedModel,
+  selectedModelProvider,
   selectedReasoning,
   onChange,
   onReasoningChange,
 }: {
   models: RoderModel[];
   selectedModel: string;
+  selectedModelProvider: string;
   selectedReasoning: ReasoningEffort;
-  onChange: (model: string) => void;
+  onChange: (model: string, provider?: string) => void;
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
   const visibleModels: RoderModel[] =
     models.length > 0 ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
-  const selected = visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
+  const selected =
+    visibleModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
+    visibleModels.find((model) => model.id === selectedModel) ??
+    visibleModels[0];
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
       <Combobox.Root<RoderModel>
+        open={open}
+        onOpenChange={setOpen}
         value={selected}
         items={visibleModels}
         limit={10}
@@ -173,7 +182,7 @@ export function ModelPicker({
         }}
         onValueChange={(model) => {
           if (model) {
-            onChange(model.id);
+            onChange(model.id, model.modelProvider);
           }
         }}
       >
@@ -354,6 +363,9 @@ const providerLogoAliases: Record<string, string> = {
   opencodego: "opencode",
 };
 
+const providerLogoAliasMatchers = Object.entries(providerLogoAliases).map(([token, logoKey]) => ({ token, logoKey }));
+const providerLogoMatchers = Object.entries(providerLogos).map(([token, logo]) => ({ token, logo }));
+
 function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
   const logo = providerLogoFor(provider);
 
@@ -388,17 +400,21 @@ function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
 
 function providerLogoFor(provider: string): ProviderLogoDefinition | undefined {
   const normalizedProvider = provider.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const [token, logoKey] of Object.entries(providerLogoAliases)) {
-    if (normalizedProvider.includes(token)) {
+  for (const { token, logoKey } of providerLogoAliasMatchers) {
+    if (containsProviderToken(normalizedProvider, token)) {
       return providerLogos[logoKey];
     }
   }
-  for (const [logoKey, logo] of Object.entries(providerLogos)) {
-    if (normalizedProvider.includes(logoKey)) {
+  for (const { token, logo } of providerLogoMatchers) {
+    if (containsProviderToken(normalizedProvider, token)) {
       return logo;
     }
   }
   return undefined;
+}
+
+function containsProviderToken(normalizedProvider: string, token: string): boolean {
+  return normalizedProvider.indexOf(token) !== -1;
 }
 
 function modelName(model: RoderModel | undefined): string {

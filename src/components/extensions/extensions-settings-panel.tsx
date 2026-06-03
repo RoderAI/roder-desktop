@@ -25,7 +25,7 @@ export function ExtensionsSettingsPanel({ surface = "settings" }: ExtensionsSett
 
   return (
     <section
-      className={cn("bg-card", surface === "settings" ? "rounded-xl border border-border shadow-sm" : "min-h-full")}
+      className={cn("bg-card", surface === "settings" ? "rounded-xl shadow-sm ring-1 ring-border/70" : "min-h-full")}
     >
       <header
         className={cn(

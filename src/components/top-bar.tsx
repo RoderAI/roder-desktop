@@ -267,7 +267,7 @@ function CollapsedBreadcrumb({
   const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
   const activeFolderKey = normalizeWorkspacePath(activeFolder?.path ?? activeFolderPath);
   return (
-    <div className="no-drag flex min-w-0 items-center gap-1.5 rounded-full bg-card/70 p-1 text-base shadow-sm ring-1 ring-border">
+    <div className="no-drag flex min-w-0 items-center gap-1.5 rounded-full bg-card/70 p-1 text-base shadow-sm ring-1 ring-border/70">
       <DropdownMenu>
         <DropdownMenuTrigger
           className="flex h-7 max-w-[220px] items-center gap-2 rounded-full px-2.5 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[popup-open]:bg-accent"

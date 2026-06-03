@@ -1,9 +1,5 @@
 import { expect, test } from "vitest";
-import {
-  buildTranscriptRows,
-  transcriptRowDisclosureKeys,
-  transcriptRowsSearchText,
-} from "../src/lib/transcript-rows";
+import { buildTranscriptRows, transcriptRowDisclosureKeys, transcriptRowsSearchText } from "../src/lib/transcript-rows";
 import type { ConversationMessage } from "../src/types/roder";
 
 test("builds stable rows for collapsed activity groups", () => {
@@ -184,10 +180,7 @@ test("builds searchable text for virtualized rows that are not mounted", () => {
 
 test("excludes mounted rows from the hidden search mirror text", () => {
   const rows = buildTranscriptRows({
-    messages: [
-      createUserMessage("Visible alpha", "turn-1"),
-      createAssistantMessage("Hidden beta", "turn-1"),
-    ],
+    messages: [createUserMessage("Visible alpha", "turn-1"), createAssistantMessage("Hidden beta", "turn-1")],
   });
   const searchText = transcriptRowsSearchText(rows, {
     excludedRowKeys: new Set(["message:user-1"]),

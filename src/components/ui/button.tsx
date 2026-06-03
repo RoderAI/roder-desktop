@@ -15,7 +15,7 @@ const buttonVariants = cva(
         warning: "bg-amber-100/70 text-amber-500 hover:bg-amber-100",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         outline: "border border-border bg-card hover:bg-accent",
-        subtle: "bg-card/70 text-foreground shadow-sm ring-1 ring-border hover:bg-card",
+        subtle: "bg-card/70 text-foreground shadow-sm ring-1 ring-border/70 hover:bg-card",
       },
       size: {
         default: "h-10 px-4",

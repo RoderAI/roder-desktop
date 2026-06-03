@@ -7,7 +7,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<"div">): React
     <div
       data-slot="input-group"
       className={cn(
-        "group/input-group flex min-h-8 w-full items-center rounded-lg border border-input bg-background text-foreground shadow-sm transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 has-aria-invalid:border-destructive has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20",
+        "group/input-group flex min-h-8 w-full items-center rounded-lg bg-background text-foreground shadow-sm ring-1 ring-input/60 transition-[background-color,box-shadow] focus-within:ring-3 focus-within:ring-ring/50 has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20",
         className,
       )}
       {...props}
