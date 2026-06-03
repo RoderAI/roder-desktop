@@ -53,7 +53,7 @@ export function CanvasToolbar({
   };
 
   return (
-    <div className="flex max-w-full flex-wrap items-center justify-center gap-1 overflow-visible rounded-2xl border border-border bg-card/95 px-2 py-1.5 shadow-lg backdrop-blur-md">
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-1 overflow-visible rounded-2xl bg-card/95 px-2 py-1.5 shadow-lg ring-1 ring-border/70 backdrop-blur-md">
       <ToolbarButton label="Draw" active={mode === "draw"} onClick={() => onModeChange("draw")}>
         <Pencil className="size-4" />
       </ToolbarButton>

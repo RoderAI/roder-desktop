@@ -16,7 +16,7 @@ export function NativeCommandOutput({ output }: { output: NativeCommandOutputMod
       )}
       aria-live={output.tone === "error" ? "assertive" : "polite"}
     >
-      <div className="rounded-xl border border-border bg-card/95 px-3.5 py-3 text-base shadow-sm">
+      <div className="rounded-xl bg-card/95 px-3.5 py-3 text-base shadow-sm ring-1 ring-border/70">
         <div className="flex min-w-0 items-start gap-2.5">
           <Icon className="mt-0.5 size-4 shrink-0" />
           <div className="min-w-0 flex-1">
