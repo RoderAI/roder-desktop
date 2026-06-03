@@ -50,10 +50,13 @@ export function useComposerCompletion({ token, itemCount }: UseComposerCompletio
 
   function dismiss(): void {
     if (key) {
-      setUiState({
-        completionKey: key,
-        dismissedCompletionKey: key,
-        highlightedIndex,
+      setUiState((state) => {
+        const stateForKey = currentCompletionUiState(state, key);
+        return {
+          completionKey: key,
+          dismissedCompletionKey: key,
+          highlightedIndex: boundedCompletionIndex(stateForKey.highlightedIndex, itemCount),
+        };
       });
     }
   }
@@ -65,12 +68,19 @@ export function useComposerCompletion({ token, itemCount }: UseComposerCompletio
     showMenu,
     dismiss,
     moveHighlight,
-    reset: () => setUiState({ completionKey: key, dismissedCompletionKey: null, highlightedIndex: 0 }),
+    reset: () => setUiState(() => ({ completionKey: key, dismissedCompletionKey: null, highlightedIndex: 0 })),
     setHighlightedIndex: (index) =>
-      setUiState({
-        completionKey: key,
-        dismissedCompletionKey: currentState.dismissedCompletionKey,
-        highlightedIndex: index,
+      setUiState((state) => {
+        const stateForKey = currentCompletionUiState(state, key);
+        return {
+          completionKey: key,
+          dismissedCompletionKey: stateForKey.dismissedCompletionKey,
+          highlightedIndex: index,
+        };
       }),
   };
+}
+
+function boundedCompletionIndex(index: number, itemCount: number): number {
+  return Math.max(0, Math.min(index, itemCount - 1));
 }

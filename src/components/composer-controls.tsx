@@ -363,14 +363,8 @@ const providerLogoAliases: Record<string, string> = {
   opencodego: "opencode",
 };
 
-const providerLogoAliasMatchers = Object.entries(providerLogoAliases).map(([token, logoKey]) => ({
-  pattern: new RegExp(token),
-  logoKey,
-}));
-const providerLogoMatchers = Object.entries(providerLogos).map(([logoKey, logo]) => ({
-  pattern: new RegExp(logoKey),
-  logo,
-}));
+const providerLogoAliasMatchers = Object.entries(providerLogoAliases).map(([token, logoKey]) => ({ token, logoKey }));
+const providerLogoMatchers = Object.entries(providerLogos).map(([token, logo]) => ({ token, logo }));
 
 function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
   const logo = providerLogoFor(provider);
@@ -406,17 +400,21 @@ function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
 
 function providerLogoFor(provider: string): ProviderLogoDefinition | undefined {
   const normalizedProvider = provider.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const { pattern, logoKey } of providerLogoAliasMatchers) {
-    if (pattern.test(normalizedProvider)) {
+  for (const { token, logoKey } of providerLogoAliasMatchers) {
+    if (containsProviderToken(normalizedProvider, token)) {
       return providerLogos[logoKey];
     }
   }
-  for (const { pattern, logo } of providerLogoMatchers) {
-    if (pattern.test(normalizedProvider)) {
+  for (const { token, logo } of providerLogoMatchers) {
+    if (containsProviderToken(normalizedProvider, token)) {
       return logo;
     }
   }
   return undefined;
+}
+
+function containsProviderToken(normalizedProvider: string, token: string): boolean {
+  return normalizedProvider.indexOf(token) !== -1;
 }
 
 function modelName(model: RoderModel | undefined): string {

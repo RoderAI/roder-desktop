@@ -1,4 +1,5 @@
 import { nativeCommandInvocation, planNativeCommand } from "@/lib/native-commands";
+import { errorMessage } from "@/lib/error-message";
 import {
   errorOutput,
   formatAgentsOutput,
@@ -66,92 +67,79 @@ export async function runNativeCommandInvocation({
 
   try {
     const result = planNativeCommand(nativeInvocation, state.models);
-    if (result.type === "output") {
-      actions.closeModelPicker();
-      actions.setCommandOutput(result.output);
-      return true;
-    }
-    if (result.type === "openModelPicker") {
-      actions.setCommandOutput(null);
-      actions.openModelPicker();
-      return true;
-    }
-    if (result.type === "selectModel") {
-      actions.closeModelPicker();
-      actions.setSelectedModel(result.modelId, result.modelProvider);
-      actions.setCommandOutput(null);
-      return true;
-    }
-    if (result.type === "clear") {
-      actions.closeModelPicker();
-      actions.setCommandOutput(null);
-      actions.setLocalTranscriptOffset({
-        threadId: state.activeThreadId || "new-thread",
-        hiddenMessageCount: state.messages.length,
-      });
-      return true;
-    }
-    if (result.type === "retry") {
-      actions.closeModelPicker();
-      if (state.activeThreadBusy) {
-        actions.setCommandOutput(errorOutput("Retry unavailable", "Wait for the current run to finish first."));
+    actions.closeModelPicker();
+
+    switch (result.type) {
+      case "output":
+        actions.setCommandOutput(result.output);
+        return true;
+      case "openModelPicker":
+        actions.setCommandOutput(null);
+        actions.openModelPicker();
+        return true;
+      case "selectModel":
+        actions.setSelectedModel(result.modelId, result.modelProvider);
+        actions.setCommandOutput(null);
+        return true;
+      case "clear":
+        actions.setCommandOutput(null);
+        actions.setLocalTranscriptOffset({
+          threadId: state.activeThreadId || "new-thread",
+          hiddenMessageCount: state.messages.length,
+        });
+        return true;
+      case "retry": {
+        if (state.activeThreadBusy) {
+          actions.setCommandOutput(errorOutput("Retry unavailable", "Wait for the current run to finish first."));
+          return true;
+        }
+        const lastUserMessage = [...state.messages]
+          .reverse()
+          .find((message) => message.role === "user" && message.text.trim());
+        if (!lastUserMessage) {
+          actions.setCommandOutput(errorOutput("Nothing to retry yet."));
+          return true;
+        }
+        actions.setCommandOutput(null);
+        await actions.sendPrompt(lastUserMessage.text, []);
         return true;
       }
-      const lastUserMessage = [...state.messages]
-        .reverse()
-        .find((message) => message.role === "user" && message.text.trim());
-      if (!lastUserMessage) {
-        actions.setCommandOutput(errorOutput("Nothing to retry yet."));
+      case "agents":
+        actions.setCommandOutput(formatAgentsOutput((await ipc.listAgents()).agents));
+        return true;
+      case "tasks":
+        actions.setCommandOutput(formatTasksOutput((await ipc.listTasks()).tasks));
+        return true;
+      case "processes":
+        actions.setCommandOutput(formatProcessesOutput((await ipc.listProcesses(result.includeCompleted)).processes));
+        return true;
+      case "stopProcess": {
+        const stopped = await ipc.stopProcess(result.processId, "Stopped from desktop slash command");
+        actions.setCommandOutput(
+          stopped.result.stopped
+            ? successOutput("Process stopped", result.processId)
+            : errorOutput("Process was not stopped", result.processId),
+        );
         return true;
       }
-      actions.setCommandOutput(null);
-      await actions.sendPrompt(lastUserMessage.text, []);
-      return true;
-    }
-    if (result.type === "agents") {
-      actions.closeModelPicker();
-      actions.setCommandOutput(formatAgentsOutput((await ipc.listAgents()).agents));
-      return true;
-    }
-    if (result.type === "tasks") {
-      actions.closeModelPicker();
-      actions.setCommandOutput(formatTasksOutput((await ipc.listTasks()).tasks));
-      return true;
-    }
-    if (result.type === "processes") {
-      actions.closeModelPicker();
-      actions.setCommandOutput(formatProcessesOutput((await ipc.listProcesses(result.includeCompleted)).processes));
-      return true;
-    }
-    if (result.type === "stopProcess") {
-      actions.closeModelPicker();
-      const stopped = await ipc.stopProcess(result.processId, "Stopped from desktop slash command");
-      actions.setCommandOutput(
-        stopped.result.stopped
-          ? successOutput("Process stopped", result.processId)
-          : errorOutput("Process was not stopped", result.processId),
-      );
-      return true;
-    }
-    if (result.type === "stopAllProcesses") {
-      actions.closeModelPicker();
-      const stopped = await ipc.stopAllProcesses("Stopped from desktop slash command");
-      const count = stopped.results.filter((item) => item.stopped).length;
-      actions.setCommandOutput(successOutput("Processes stopped", `${count} stopped.`));
-      return true;
+      case "stopAllProcesses": {
+        const stopped = await ipc.stopAllProcesses("Stopped from desktop slash command");
+        const count = stopped.results.filter((item) => item.stopped).length;
+        actions.setCommandOutput(
+          count > 0
+            ? successOutput("Processes stopped", `${count} stopped.`)
+            : errorOutput("No processes stopped", "No running processes matched."),
+        );
+        return true;
+      }
+      default: {
+        const exhaustive: never = result;
+        return exhaustive;
+      }
     }
   } catch (error) {
     actions.closeModelPicker();
     actions.setCommandOutput(errorOutput("Command failed", errorMessage(error)));
     return true;
   }
-
-  return true;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return typeof error === "string" ? error : "Something went wrong";
 }

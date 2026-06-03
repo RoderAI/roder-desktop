@@ -169,14 +169,15 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onResolveUserInput={agent.resolveUserInput}
             onExitPlan={agent.exitPlan}
           />
-          <NativeModelPicker
-            models={agent.models}
-            open={nativeModelPickerOpen}
-            selectedModel={agent.selectedModel}
-            selectedModelProvider={agent.selectedModelProvider}
-            onDismiss={closeNativeModelPicker}
-            onSelect={selectNativeCommandModel}
-          />
+          {nativeModelPickerOpen && (
+            <NativeModelPicker
+              models={agent.models}
+              selectedModel={agent.selectedModel}
+              selectedModelProvider={agent.selectedModelProvider}
+              onDismiss={closeNativeModelPicker}
+              onSelect={selectNativeCommandModel}
+            />
+          )}
           <NativeCommandOutput output={nativeCommandOutput} />
           {agent.error && (
             <div className="mx-auto mb-3 w-full max-w-3xl px-8 text-base text-destructive">{agent.error}</div>

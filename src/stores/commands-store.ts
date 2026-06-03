@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { errorMessage } from "@/lib/error-message";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { CommandDescriptor, CommandsListResult } from "@/types/roder";
 
@@ -63,11 +64,4 @@ function normalizeCommandsResult(result: CommandsListResult): CommandsListResult
         )
       : [],
   };
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return typeof error === "string" ? error : "Something went wrong";
 }

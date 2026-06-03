@@ -7,11 +7,11 @@ import {
   CompletionMenuShell,
 } from "@/components/composer-completion-popup";
 import { Button } from "@/components/ui/button";
+import { completionOptionId, moveCompletionIndex } from "@/lib/composer-completions";
 import type { RoderModel } from "@/types/roder";
 
 type NativeModelPickerProps = {
   models: RoderModel[];
-  open: boolean;
   selectedModel: string;
   selectedModelProvider: string;
   onDismiss: () => void;
@@ -20,7 +20,6 @@ type NativeModelPickerProps = {
 
 export function NativeModelPicker({
   models,
-  open,
   selectedModel,
   selectedModelProvider,
   onDismiss,
@@ -32,25 +31,13 @@ export function NativeModelPicker({
   const listboxId = useId();
   const modelOptions = models.length > 0 ? models : fallbackModels(selectedModel, selectedModelProvider);
   const visibleModels = filteredModels(modelOptions, query);
+  const activeIndex = boundedModelIndex(highlightedIndex, visibleModels.length);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-    setQuery("");
-    setHighlightedIndex(0);
     requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
-  }, [open]);
-
-  useEffect(() => {
-    setHighlightedIndex((index) => Math.min(index, Math.max(visibleModels.length - 1, 0)));
-  }, [visibleModels.length]);
-
-  if (!open) {
-    return null;
-  }
+  }, []);
 
   return (
     <section
@@ -77,14 +64,12 @@ export function NativeModelPicker({
                   return;
                 }
                 setHighlightedIndex((index) =>
-                  event.key === "ArrowDown"
-                    ? (index + 1) % visibleModels.length
-                    : (index - 1 + visibleModels.length) % visibleModels.length,
+                  moveCompletionIndex(index, visibleModels.length, event.key === "ArrowDown" ? "next" : "previous"),
                 );
                 return;
               }
               if (event.key === "Enter") {
-                const model = visibleModels[highlightedIndex];
+                const model = visibleModels[activeIndex];
                 if (model) {
                   event.preventDefault();
                   onSelect(model.id, model.modelProvider);
@@ -109,12 +94,12 @@ export function NativeModelPicker({
         <CompletionMenuList id={listboxId} ariaLabel="Model completions">
           {visibleModels.length > 0 ? (
             visibleModels.map((model, index) => {
-              const active = index === highlightedIndex;
+              const active = index === activeIndex;
               const selectedModelRow = model.id === selectedModel && model.modelProvider === selectedModelProvider;
               return (
                 <CompletionMenuOption
                   key={`${model.modelProvider}:${model.id}`}
-                  id={nativeModelOptionId(listboxId, index)}
+                  id={completionOptionId(listboxId, index)}
                   index={index}
                   active={active}
                   className={selectedModelRow ? "text-foreground" : undefined}
@@ -159,6 +144,6 @@ function fallbackModels(selectedModel: string, selectedModelProvider: string): R
     : [];
 }
 
-function nativeModelOptionId(listboxId: string, index: number): string {
-  return `${listboxId}-model-option-${index}`;
+function boundedModelIndex(index: number, itemCount: number): number {
+  return Math.max(0, Math.min(index, itemCount - 1));
 }
