@@ -8,7 +8,6 @@ type ComposerCompletionPopupProps<T> = {
   ariaLabel: string;
   items: T[];
   highlightedIndex: number;
-  matchCountLabel?: string;
   onHighlight: (index: number) => void;
   onSelect: (item: T) => void;
   renderItem: (params: ComposerCompletionRenderItemParams<T>) => ReactNode;
@@ -26,7 +25,6 @@ export function ComposerCompletionPopup<T>({
   ariaLabel,
   items,
   highlightedIndex,
-  matchCountLabel,
   onHighlight,
   onSelect,
   renderItem,
@@ -34,8 +32,6 @@ export function ComposerCompletionPopup<T>({
   if (!visible) {
     return null;
   }
-
-  const countLabel = matchCountLabel ?? `${items.length} ${items.length === 1 ? "match" : "matches"}`;
 
   return (
     <CompletionMenuShell className="absolute bottom-full left-0 right-0 z-50 mb-2">
@@ -56,7 +52,6 @@ export function ComposerCompletionPopup<T>({
           );
         })}
       </CompletionMenuList>
-      {items.length > 8 && <CompletionMenuCount>{countLabel}</CompletionMenuCount>}
     </CompletionMenuShell>
   );
 }
@@ -96,7 +91,7 @@ export function CompletionMenuList({
       id={id}
       role="listbox"
       aria-label={ariaLabel}
-      className={cn("no-scrollbar max-h-72 scroll-py-1 overflow-y-auto overscroll-contain p-1", className)}
+      className={cn("no-scrollbar max-h-72 scroll-py-1.5 overflow-y-auto overscroll-contain p-1.5", className)}
     >
       {children}
     </div>
@@ -136,7 +131,7 @@ export function CompletionMenuOption({
       data-completion-index={index}
       data-completion-active={active ? "true" : undefined}
       className={cn(
-        "relative flex w-full cursor-default items-center gap-2 rounded-2xl px-3 py-2 text-left outline-hidden select-none data-[completion-active=true]:bg-foreground/8 data-[completion-active=true]:text-foreground",
+        "relative flex w-full cursor-default items-center gap-1.5 rounded-2xl px-2.5 py-1.5 text-left outline-hidden select-none data-[completion-active=true]:bg-foreground/5 data-[completion-active=true]:text-foreground",
         className,
       )}
       onMouseDown={(event) => {
@@ -151,7 +146,7 @@ export function CompletionMenuOption({
 }
 
 export function CompletionMenuCount({ children }: { children: ReactNode }): React.JSX.Element {
-  return <div className="border-t border-border/70 px-4 py-2 text-base text-muted-foreground">{children}</div>;
+  return <div className="border-t border-border/70 px-4 py-1.5 text-sm text-muted-foreground">{children}</div>;
 }
 
 export { completionOptionId as composerCompletionOptionId };

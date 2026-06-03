@@ -213,8 +213,8 @@ export function useAppShellController(): AppShellController {
   }, []);
 
   const selectNativeCommandModel = useCallback(
-    (modelId: string) => {
-      setSelectedModel(modelId);
+    (modelId: string, modelProvider?: string) => {
+      setSelectedModel(modelId, modelProvider);
       setNativeModelPickerOpen(false);
       setNativeCommandOutput(null);
       setComposerFocusSignal((value) => value + 1);

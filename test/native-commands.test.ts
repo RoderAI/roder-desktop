@@ -57,6 +57,7 @@ test("plans model command behavior", () => {
   expect(planNativeCommand(nativeCommandInvocation("model", "gpt-5.5")!, models)).toMatchObject({
     type: "selectModel",
     modelId: "gpt-5.5",
+    modelProvider: "openai",
   });
   expect(planNativeCommand(nativeCommandInvocation("model", "missing")!, models)).toMatchObject({
     type: "output",

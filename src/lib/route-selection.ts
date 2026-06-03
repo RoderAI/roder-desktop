@@ -94,4 +94,3 @@ export function archiveRouteAfterThreadRemoval({
   const nextThread = threads.find((thread) => thread.id !== archivedThreadId);
   return nextThread ? { route: "thread", threadId: nextThread.id } : { route: "new" };
 }
-

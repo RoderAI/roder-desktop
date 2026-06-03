@@ -36,7 +36,7 @@ test("selects a model without success output", async () => {
     state: commandState(),
   });
 
-  expect(calls).toEqual(["close-model-picker", "select-model:gpt-5.5", "clear-output"]);
+  expect(calls).toEqual(["close-model-picker", "select-model:openai:gpt-5.5", "clear-output"]);
   expect(outputs).toEqual([null]);
 });
 
@@ -129,7 +129,7 @@ function commandActions(calls: string[]) {
       offsets.push(offset);
       calls.push(`offset:${offset.threadId}:${offset.hiddenMessageCount}`);
     },
-    setSelectedModel: (modelId) => calls.push(`select-model:${modelId}`),
+    setSelectedModel: (modelId, modelProvider) => calls.push(`select-model:${modelProvider}:${modelId}`),
   };
   return { actions, offsets, outputs };
 }

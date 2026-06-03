@@ -43,12 +43,12 @@ function SkillCompletionItem({ skill }: SkillCompletionItemProps): React.JSX.Ele
 
   return (
     <>
-      <span className="min-w-0 flex-1 truncate text-base text-foreground">
+      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
         <span className="font-medium">{label}</span>
         {description && <span className="text-muted-foreground"> - {description}</span>}
       </span>
       {skill.experimental && (
-        <span className="rounded-md border border-border px-1.5 py-0.5 text-base text-muted-foreground">
+        <span className="rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
           Experimental
         </span>
       )}

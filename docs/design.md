@@ -191,6 +191,19 @@ content, or a separate tool context.
 Prefer quiet contrast between surfaces. Heavy shadows, bright outlines, and
 stacked borders should be rare.
 
+When a surface has elevation, use a ring for its outline rather than a border.
+This keeps the frame from changing layout and lets shadow and outline blend as
+one material. Use opacity-tuned rings for raised surfaces: `ring-border/70` for
+ordinary app surfaces, `ring-foreground/10` for floating menus and dialogs, and
+stronger `ring-ring` treatments only for focus, drag, or active interaction
+states.
+
+Use borders for structural separators and flat controls: section dividers,
+table or list rules, attachment separators, dashed drop targets, and explicit
+outline variants that do not also carry elevation. If a component combines
+`shadow-*` with `border border-*`, prefer replacing the border with `ring-1`
+and a subtle opacity.
+
 ### Motion
 
 Motion should explain state change:

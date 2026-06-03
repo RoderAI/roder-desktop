@@ -196,12 +196,16 @@ test("one-sided hunks in existing files stay modified instead of becoming file a
       deletions: 1,
     }),
   ]);
-  expect(hunkPagesToReviewPatch([{ hunk: insertion, offset: 0, limit: 2, totalLines: 2, lines: insertion.diff }])).toEqual(
+  expect(
+    hunkPagesToReviewPatch([{ hunk: insertion, offset: 0, limit: 2, totalLines: 2, lines: insertion.diff }]),
+  ).toEqual(
     expect.objectContaining({
       patch: expect.stringContaining("--- a/src/app.ts\n+++ b/src/app.ts"),
     }),
   );
-  expect(hunkPagesToReviewPatch([{ hunk: deletion, offset: 0, limit: 2, totalLines: 2, lines: deletion.diff }])).toEqual(
+  expect(
+    hunkPagesToReviewPatch([{ hunk: deletion, offset: 0, limit: 2, totalLines: 2, lines: deletion.diff }]),
+  ).toEqual(
     expect.objectContaining({
       patch: expect.stringContaining("--- a/src/app.ts\n+++ b/src/app.ts"),
     }),

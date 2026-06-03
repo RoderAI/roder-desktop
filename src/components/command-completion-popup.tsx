@@ -39,16 +39,13 @@ function CommandCompletionItem({ command }: { command: CommandDescriptor }): Rea
 
   return (
     <>
-      <span className="min-w-0 flex-1 truncate text-base text-foreground">
+      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
         <span className="font-medium">/{command.name}</span>
         {command.argument_hint && <span className="text-muted-foreground"> {command.argument_hint}</span>}
         {detail && <span className="text-muted-foreground"> - {detail}</span>}
       </span>
-      <span className="rounded-md border border-border/70 px-1.5 py-0.5 text-base text-muted-foreground">
-        {command.source}
-      </span>
       {warnings.map((warning) => (
-        <span key={warning} className="rounded-md border border-border px-1.5 py-0.5 text-base text-muted-foreground">
+        <span key={warning} className="rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
           {warning}
         </span>
       ))}
