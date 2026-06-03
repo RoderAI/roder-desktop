@@ -169,26 +169,6 @@ function shouldAppendCompletionSpace(nextCharacter: string | undefined): boolean
   return !nextCharacter || (!/\s/.test(nextCharacter) && !isSkillTokenEndBoundary(nextCharacter));
 }
 
-export function moveSkillCompletionIndex(
-  currentIndex: number,
-  itemCount: number,
-  direction: "next" | "previous",
-): number {
-  if (itemCount <= 0) {
-    return -1;
-  }
-
-  if (currentIndex < 0 || currentIndex >= itemCount) {
-    return direction === "next" ? 0 : itemCount - 1;
-  }
-  if (direction === "next") {
-    return (currentIndex + 1) % itemCount;
-  }
-  return (currentIndex - 1 + itemCount) % itemCount;
-}
-
-export const nextSkillCompletionIndex = moveSkillCompletionIndex;
-
 export function skillTokenRanges(text: string, skills: SkillDescriptor[]): SkillTokenRange[] {
   const skillNames = new Set(skills.map((skill) => skill.name));
   if (skillNames.size === 0) {

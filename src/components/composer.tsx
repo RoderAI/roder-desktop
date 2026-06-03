@@ -1,9 +1,17 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Plus, Square } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { DesktopAttachment, PolicyMode, RoderModel, ReasoningEffort, SkillDescriptor } from "@/types/roder";
+import type {
+  CommandDescriptor,
+  DesktopAttachment,
+  PolicyMode,
+  RoderModel,
+  ReasoningEffort,
+  SkillDescriptor,
+} from "@/types/roder";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AttachmentChip, ComposerAttachMenuItems, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
+import { CommandCompletionPopup, commandCompletionOptionId } from "@/components/command-completion-popup";
 import { ComposerSketchPad } from "@/components/composer-sketch-pad";
 import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
 import {
@@ -12,8 +20,10 @@ import {
   DropdownMenuGroup,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCommandCompletion } from "@/hooks/use-command-completion";
 import { useSkillCompletion } from "@/hooks/use-skill-completion";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
+import type { CommandInvocation } from "@/lib/roder-commands";
 import {
   createSkillPromptEditor,
   readSkillPromptEditorSelectionOffset,
@@ -47,6 +57,7 @@ const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
 
 type ComposerProps = {
   busy: boolean;
+  commands: CommandDescriptor[];
   models: RoderModel[];
   skills: SkillDescriptor[];
   selectedModel: string;
@@ -60,6 +71,7 @@ type ComposerProps = {
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
   onAttachmentsChange: (attachments: DesktopAttachment[]) => void;
+  onCommandSubmit: (invocation: CommandInvocation) => Promise<void>;
   onSend: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
   onStop: () => Promise<void>;
 };
@@ -83,6 +95,7 @@ async function imageFileToPngDataUrl(file: File): Promise<string> {
 
 export function Composer({
   busy,
+  commands,
   models,
   skills,
   selectedModel,
@@ -96,6 +109,7 @@ export function Composer({
   onSelectedReasoningChange,
   onScrollToBottom,
   onAttachmentsChange,
+  onCommandSubmit,
   onSend,
   onStop,
 }: ComposerProps): React.JSX.Element {
@@ -106,6 +120,7 @@ export function Composer({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const skillPromptEditor = useMemo(() => createSkillPromptEditor(), []);
   const skillCompletionListboxId = useId();
+  const commandCompletionListboxId = useId();
   const skillsRef = useRef(skills);
   const skillNamesKey = useMemo(
     () =>
@@ -170,6 +185,16 @@ export function Composer({
     skills,
     onPromptChange: handlePromptEditorChange,
   });
+  const commandCompletion = useCommandCompletion({
+    editor: skillPromptEditor,
+    prompt,
+    caretPosition,
+    commands,
+    skills,
+    disabled: attachments.length > 0,
+    onPromptChange: handlePromptEditorChange,
+    onCommandSubmit: (invocation) => void submitCommand(invocation),
+  });
 
   async function submit(): Promise<void> {
     if (busy) {
@@ -187,7 +212,21 @@ export function Composer({
     await onSend(value, submittedAttachments);
   }
 
+  async function submitCommand(invocation: CommandInvocation): Promise<void> {
+    if (busy) {
+      return;
+    }
+    setPrompt("");
+    setCaretPosition(0);
+    writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
+    onAttachmentsChange([]);
+    await onCommandSubmit(invocation);
+  }
+
   function handlePromptEditorKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (commandCompletion.handleCommandCompletionKeyDown(event)) {
+      return;
+    }
     skillCompletion.handleSkillCompletionKeyDown(event);
   }
 
@@ -258,6 +297,16 @@ export function Composer({
     }
   }
 
+  const completionOpen = commandCompletion.showCommandCompletionMenu || skillCompletion.showSkillCompletionMenu;
+  const activeCompletionListboxId = commandCompletion.showCommandCompletionMenu
+    ? commandCompletionListboxId
+    : skillCompletionListboxId;
+  const activeCompletionOptionId = commandCompletion.showCommandCompletionMenu
+    ? commandCompletionOptionId(commandCompletionListboxId, commandCompletion.highlightedCommandIndex)
+    : skillCompletion.showSkillCompletionMenu
+      ? skillCompletionOptionId(skillCompletionListboxId, skillCompletion.highlightedSkillIndex)
+      : undefined;
+
   return (
     <div
       ref={speechLifecycleRef}
@@ -299,6 +348,14 @@ export function Composer({
           </div>
         )}
         {sketchOpen && <ComposerSketchPad onAttach={attachSketch} onClose={() => setSketchOpen(false)} />}
+        <CommandCompletionPopup
+          visible={commandCompletion.showCommandCompletionMenu}
+          listboxId={commandCompletionListboxId}
+          commands={commandCompletion.commandCompletions}
+          highlightedCommandIndex={commandCompletion.highlightedCommandIndex}
+          onHighlight={commandCompletion.setHighlightedCommandIndex}
+          onSelect={commandCompletion.runCommandCompletion}
+        />
         <SkillCompletionPopup
           visible={skillCompletion.showSkillCompletionMenu}
           listboxId={skillCompletionListboxId}
@@ -326,13 +383,9 @@ export function Composer({
             skills={skills}
             value={prompt}
             placeholder={busy ? "Wait for the current run to finish" : "Send follow-up"}
-            completionOpen={skillCompletion.showSkillCompletionMenu}
-            completionListboxId={skillCompletionListboxId}
-            activeCompletionId={
-              skillCompletion.showSkillCompletionMenu
-                ? skillCompletionOptionId(skillCompletionListboxId, skillCompletion.highlightedSkillIndex)
-                : undefined
-            }
+            completionOpen={completionOpen}
+            completionListboxId={activeCompletionListboxId}
+            activeCompletionId={activeCompletionOptionId}
             onChange={handlePromptEditorChange}
             onKeyDownCapture={handlePromptEditorKeyDownCapture}
             onSubmitKey={() => void submit()}
