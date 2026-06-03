@@ -4,6 +4,7 @@ import {
   completionOptionId,
   currentCompletionUiState,
   moveCompletionIndex,
+  shouldClearDismissedCompletion,
   shouldShowCompletionMenu,
   type CompletionUiState,
 } from "../src/lib/composer-completions";
@@ -42,4 +43,29 @@ test("hides only the dismissed completion key", () => {
   expect(shouldShowCompletionMenu("0:3:rev", "0:2:re", 2)).toBe(true);
   expect(shouldShowCompletionMenu(null, null, 2)).toBe(false);
   expect(shouldShowCompletionMenu("0:3:rev", null, 0)).toBe(false);
+});
+
+test("keeps dismissed completions dismissed only until the token exits", () => {
+  let state: CompletionUiState = {
+    completionKey: "0:1:",
+    dismissedCompletionKey: "0:1:",
+    highlightedIndex: 0,
+  };
+
+  state = currentCompletionUiState(state, null);
+  state = currentCompletionUiState(state, "0:1:");
+
+  expect(state).toEqual({
+    completionKey: "0:1:",
+    dismissedCompletionKey: null,
+    highlightedIndex: 0,
+  });
+});
+
+test("clears dismissed completions when editing the dismissed token", () => {
+  expect(shouldClearDismissedCompletion("0:1:", "0:1:", { key: "Backspace" })).toBe(true);
+  expect(shouldClearDismissedCompletion("0:1:", "0:1:", { key: "a" })).toBe(true);
+  expect(shouldClearDismissedCompletion("0:1:", "0:1:", { key: "ArrowLeft" })).toBe(false);
+  expect(shouldClearDismissedCompletion("0:1:", "0:1:", { key: "a", metaKey: true })).toBe(false);
+  expect(shouldClearDismissedCompletion("0:2:a", "0:1:", { key: "Backspace" })).toBe(false);
 });

@@ -10,6 +10,13 @@ export type CompletionUiState = {
   highlightedIndex: number;
 };
 
+export type CompletionEditingKeyEvent = {
+  altKey?: boolean;
+  ctrlKey?: boolean;
+  key: string;
+  metaKey?: boolean;
+};
+
 export function completionKey(token: CompletionToken | null): string | null {
   return token ? `${token.start}:${token.end}:${token.query}` : null;
 }
@@ -26,6 +33,20 @@ export function currentCompletionUiState(state: CompletionUiState, key: string |
 
 export function shouldShowCompletionMenu(key: string | null, dismissedKey: string | null, itemCount: number): boolean {
   return Boolean(key && itemCount > 0 && key !== dismissedKey);
+}
+
+export function shouldClearDismissedCompletion(
+  key: string | null,
+  dismissedKey: string | null,
+  event: CompletionEditingKeyEvent,
+): boolean {
+  if (!key || key !== dismissedKey) {
+    return false;
+  }
+  if (event.key === "Backspace" || event.key === "Delete") {
+    return true;
+  }
+  return event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey;
 }
 
 export function moveCompletionIndex(currentIndex: number, itemCount: number, direction: "next" | "previous"): number {

@@ -7,12 +7,14 @@ import {
   commandWarnings,
   matchingCommandCompletions,
   replaceSlashCommandToken,
+  slashCommandCompletionToken,
   slashCommandLikeText,
   slashCommandToken,
 } from "../src/lib/roder-commands";
 import type { CommandDescriptor } from "../src/types/roder";
 
 test("detects a slash command token at the start of a single-line prompt", () => {
+  expect(slashCommandToken("/", 1)).toEqual({ start: 0, end: 1, query: "" });
   expect(slashCommandToken("/re", 3)).toEqual({ start: 0, end: 3, query: "re" });
   expect(slashCommandToken("/review", 4)).toEqual({ start: 0, end: 7, query: "review" });
   expect(slashCommandToken(" /review", " /review".length)).toEqual({ start: 1, end: 8, query: "review" });
@@ -20,6 +22,12 @@ test("detects a slash command token at the start of a single-line prompt", () =>
   expect(slashCommandToken("open /review", "open /review".length)).toBeNull();
   expect(slashCommandToken("/review api", "/review api".length)).toBeNull();
   expect(slashCommandToken("/review\napi", "/review\napi".length)).toBeNull();
+});
+
+test("keeps a just-typed slash eligible for completions when the editor caret is one update behind", () => {
+  expect(slashCommandCompletionToken("/", 0)).toEqual({ start: 0, end: 1, query: "" });
+  expect(slashCommandCompletionToken(" /", 1)).toEqual({ start: 1, end: 2, query: "" });
+  expect(slashCommandCompletionToken("/review", 0)).toBeNull();
 });
 
 test("detects slash-looking command submissions before the catalog is loaded", () => {

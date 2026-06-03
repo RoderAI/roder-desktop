@@ -15,6 +15,7 @@ type UseComposerCompletionOptions = {
 
 type ComposerCompletionState = {
   completionKey: string | null;
+  dismissedCompletionKey: string | null;
   highlightedIndex: number;
   showMenu: boolean;
   dismiss: () => void;
@@ -59,6 +60,7 @@ export function useComposerCompletion({ token, itemCount }: UseComposerCompletio
 
   return {
     completionKey: key,
+    dismissedCompletionKey: currentState.dismissedCompletionKey,
     highlightedIndex,
     showMenu,
     dismiss,
