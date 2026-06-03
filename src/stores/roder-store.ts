@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { roderIpc } from "@/lib/roder-ipc";
+import { commandInvocationText, type CommandInvocation } from "@/lib/roder-commands";
 import {
   applyThreadItemEvent,
   activeTurnIdForThread,
@@ -84,6 +85,7 @@ type RoderStore = {
   goForward: () => Promise<void>;
   newProject: () => Promise<void>;
   newThread: () => Promise<void>;
+  runCommandInvocation: (invocation: CommandInvocation) => Promise<void>;
   sendPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
   stopTurn: () => Promise<void>;
   restart: () => Promise<void>;
@@ -526,6 +528,121 @@ export const useRoderStore = create<RoderStore>()(
           await startThreadForSelection(set, get);
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
+        }
+      },
+
+      runCommandInvocation: async (invocation) => {
+        const name = invocation.name.trim();
+        if (!name) {
+          return;
+        }
+
+        const initialState = get();
+        let threadId = initialState.activeThreadId;
+        const activeThread =
+          initialState.threadDetails[threadId] ?? initialState.threads.find((thread) => thread.id === threadId);
+        let markedTurnStarting = false;
+
+        if (!threadId && initialState.busy) {
+          return;
+        }
+        if (threadId !== "" && isThreadRunning(activeThread)) {
+          return;
+        }
+
+        set({ busy: true, error: null });
+
+        try {
+          if (!threadId) {
+            const state = get();
+            const workspaceSelection = await ensureWorkspaceSelection(state, set);
+            const model = effectiveSelectedModel(state.models, state.visibleModelIds, state.defaultModel);
+            const selectedModel = model?.id ?? state.defaultModel;
+            const result = await roderIpc.startThread(
+              selectedModel,
+              threadStartWorkspace(workspaceSelection),
+              model?.modelProvider ?? selectedModelProvider(state.models, selectedModel),
+              state.defaultReasoning,
+              { initialPrompt: commandInvocationText({ name, arguments: invocation.arguments }) },
+            );
+            if (!result.thread) {
+              throw new Error("roder app-server did not return a thread");
+            }
+            const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+            threadId = thread.id;
+            set((state) => ({
+              threads: upsertThread(state.threads, thread),
+              threadDetails: { ...state.threadDetails, [threadId]: thread },
+              threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadId),
+              activeThreadId: threadId,
+              selectedWorkspaceCwd: thread.cwd,
+              selectedWorkspaceId: thread.workspaceId ?? workspaceSelection.workspace.id,
+              selectedRootId: thread.rootId ?? workspaceSelection.root.id,
+              selectedModel: thread.model || result.model || selectedModel,
+              selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+              selectedPolicyMode: state.defaultPolicyMode,
+              threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
+                model: thread.model || result.model || selectedModel,
+                reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+                policyMode: state.defaultPolicyMode,
+              }),
+              workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+            }));
+          }
+
+          markedTurnStarting = true;
+          set((state) => ({
+            threads: markThreadStatus(state.threads, threadId, {
+              type: "running",
+              activeTurnId: null,
+              activeFlags: [],
+            }),
+            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
+              type: "running",
+              activeTurnId: null,
+              activeFlags: [],
+            }),
+          }));
+
+          const commandState = get();
+          const thread = threadForState(commandState, threadId);
+          const workspace = thread?.cwd || commandState.selectedWorkspaceCwd || commandState.status.cwd || undefined;
+          const started = await roderIpc.runCommand({
+            threadId,
+            name,
+            arguments: invocation.arguments,
+            workspace,
+          });
+          if (typeof started.turn_id !== "string" || !started.turn_id) {
+            throw new Error("roder app-server did not return a command turn");
+          }
+          set((state) => ({
+            threads: markThreadStatus(state.threads, threadId, {
+              type: "running",
+              activeTurnId: started.turn_id,
+              activeFlags: [],
+            }),
+            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
+              type: "running",
+              activeTurnId: started.turn_id,
+              activeFlags: [],
+            }),
+          }));
+        } catch (error) {
+          set((state) => ({
+            busy: false,
+            error: (error as Error).message,
+            threads: markedTurnStarting
+              ? markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] })
+              : state.threads,
+            threadDetails: markedTurnStarting
+              ? markThreadDetailStatus(state.threadDetails, threadId, {
+                  type: "idle",
+                  activeTurnId: null,
+                  activeFlags: [],
+                })
+              : state.threadDetails,
+          }));
         }
       },
 

@@ -1,5 +1,6 @@
 import { Check, FileText, FileUp, ImageIcon, PencilLine, Search, ShieldCheck, X } from "lucide-react";
 import { Combobox } from "@base-ui/react/combobox";
+import { useState } from "react";
 import type { DesktopAttachment, PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
 import {
   DropdownMenu,
@@ -154,6 +155,7 @@ export function ModelPicker({
   onChange: (model: string) => void;
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
   const visibleModels: RoderModel[] =
     models.length > 0 ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
   const selected = visibleModels.find((model) => model.id === selectedModel) ?? visibleModels[0];
@@ -161,6 +163,8 @@ export function ModelPicker({
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
       <Combobox.Root<RoderModel>
+        open={open}
+        onOpenChange={setOpen}
         value={selected}
         items={visibleModels}
         limit={10}
@@ -354,6 +358,15 @@ const providerLogoAliases: Record<string, string> = {
   opencodego: "opencode",
 };
 
+const providerLogoAliasMatchers = Object.entries(providerLogoAliases).map(([token, logoKey]) => ({
+  pattern: new RegExp(token),
+  logoKey,
+}));
+const providerLogoMatchers = Object.entries(providerLogos).map(([logoKey, logo]) => ({
+  pattern: new RegExp(logoKey),
+  logo,
+}));
+
 function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
   const logo = providerLogoFor(provider);
 
@@ -388,13 +401,13 @@ function ProviderLogo({ provider }: { provider: string }): React.JSX.Element {
 
 function providerLogoFor(provider: string): ProviderLogoDefinition | undefined {
   const normalizedProvider = provider.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const [token, logoKey] of Object.entries(providerLogoAliases)) {
-    if (normalizedProvider.includes(token)) {
+  for (const { pattern, logoKey } of providerLogoAliasMatchers) {
+    if (pattern.test(normalizedProvider)) {
       return providerLogos[logoKey];
     }
   }
-  for (const [logoKey, logo] of Object.entries(providerLogos)) {
-    if (normalizedProvider.includes(logoKey)) {
+  for (const { pattern, logo } of providerLogoMatchers) {
+    if (pattern.test(normalizedProvider)) {
       return logo;
     }
   }

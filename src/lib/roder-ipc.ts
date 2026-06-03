@@ -1,8 +1,14 @@
 import type {
+  CommandsListResult,
+  CommandsRunResult,
   DesktopAttachment,
+  AgentsListResult,
   HunkListResult,
   HunkReadResult,
   PolicyMode,
+  ProcessesListResult,
+  ProcessesStopAllResult,
+  ProcessesStopResult,
   RoderModel,
   RoderStatus,
   RoderThread,
@@ -11,6 +17,8 @@ import type {
   SkillsListResult,
   SkillsUpdateResult,
   SystemAppearance,
+  TasksGetResult,
+  TasksListResult,
   TurnInputItem,
   VcsChangesListResult,
   VcsChangesReadResult,
@@ -144,6 +152,13 @@ export type TurnSteerResult = {
 
 export type TurnInterruptResult = {
   turnId: string | null;
+};
+
+export type CommandRunParams = {
+  threadId: string;
+  name: string;
+  arguments: string;
+  workspace?: string;
 };
 
 export type HunkListOptions = {
@@ -285,6 +300,28 @@ export const roderIpc = {
     window.roderDesktop.request("settings/set_default_mode", { mode }) as Promise<SettingsSetDefaultModeResult>,
   settings: () => window.roderDesktop.request("settings/get", {}) as Promise<SettingsGetResult>,
   listModels: () => window.roderDesktop.request("model/list", {}) as Promise<ModelListResult>,
+  listCommands: () => window.roderDesktop.request("commands/list", {}) as Promise<CommandsListResult>,
+  runCommand: (params: CommandRunParams) =>
+    window.roderDesktop.request("commands/run", {
+      thread_id: params.threadId,
+      name: params.name,
+      arguments: params.arguments,
+      workspace: params.workspace || undefined,
+    }) as Promise<CommandsRunResult>,
+  listAgents: () => window.roderDesktop.request("agents/list", {}) as Promise<AgentsListResult>,
+  listTasks: () => window.roderDesktop.request("tasks/list", {}) as Promise<TasksListResult>,
+  getTask: (taskId: string) => window.roderDesktop.request("tasks/get", { task_id: taskId }) as Promise<TasksGetResult>,
+  listProcesses: (includeCompleted = false) =>
+    window.roderDesktop.request("processes/list", { includeCompleted }) as Promise<ProcessesListResult>,
+  stopProcess: (processId: string, reason?: string) =>
+    window.roderDesktop.request("processes/stop", {
+      processId,
+      reason: reason || undefined,
+    }) as Promise<ProcessesStopResult>,
+  stopAllProcesses: (reason?: string) =>
+    window.roderDesktop.request("processes/stopAll", {
+      reason: reason || undefined,
+    }) as Promise<ProcessesStopAllResult>,
   listSkills: () => window.roderDesktop.request("skills/list", {}) as Promise<SkillsListResult>,
   setSkillEnabled: (canonicalPath: string, enabled: boolean) =>
     window.roderDesktop.request("skills/setEnabled", {

@@ -155,6 +155,153 @@ export type RoderThreadGoal = {
   updatedAt: string;
 };
 
+export type CommandDescriptor = {
+  name: string;
+  description: string | null;
+  argument_hint: string | null;
+  source: string;
+  model: string | null;
+  agent: string | null;
+  has_shell_includes: boolean;
+  has_url_includes: boolean;
+};
+
+export type CommandsListResult = {
+  commands: CommandDescriptor[];
+};
+
+export type CommandContextBlockKind =
+  | "Instruction"
+  | "RepositoryFact"
+  | "Memory"
+  | "RetrievedDocument"
+  | "Environment"
+  | "ToolAvailability"
+  | "SafetyPolicy"
+  | "TaskMetadata"
+  | "PriorSummary"
+  | "EntrypointHint"
+  | "RetrievalHint"
+  | { Other: string };
+
+export type CommandContextBlock = {
+  id: string;
+  kind: CommandContextBlockKind;
+  text: string;
+  priority: number;
+  token_estimate: number | null;
+  metadata: unknown;
+};
+
+export type CommandsExpandedResult = {
+  command: CommandDescriptor;
+  message: string;
+  context_blocks: CommandContextBlock[];
+  allowed_tools: string[];
+  model: string | null;
+  agent: string | null;
+};
+
+export type CommandsRunResult = {
+  turn_id: string;
+  expanded: CommandsExpandedResult;
+};
+
+export type AgentDescriptor = {
+  agent_type: string;
+  description: string;
+  tools: string[];
+  model: string | null;
+  permission_mode: string;
+  max_turns: number | null;
+  max_result_chars: number | null;
+};
+
+export type AgentsListResult = {
+  agents: AgentDescriptor[];
+};
+
+export type TaskSpec = {
+  kind: string;
+  description: string;
+  input_schema: unknown;
+  default_timeout_seconds?: number | null;
+  metadata: unknown;
+};
+
+export type TaskState = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export type TaskHandle = {
+  task_id: string;
+  executor_id: string;
+  spec: TaskSpec;
+  state: TaskState;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
+export type TasksListResult = {
+  tasks: TaskHandle[];
+};
+
+export type TaskLogDescriptor = {
+  stream: "stdout" | "stderr" | "log";
+  chunk: string;
+  timestamp: string;
+};
+
+export type TasksGetResult = {
+  task: TaskHandle;
+  logs: TaskLogDescriptor[];
+  dropped_bytes: number;
+};
+
+export type ProcessState =
+  | "starting"
+  | "running"
+  | "stopping"
+  | "stopped"
+  | { exited: { exitCode?: number | null } }
+  | { failed: { error: string } };
+
+export type ProcessDescriptor = {
+  processId: string;
+  origin: "command_exec" | "background_task" | "shell_tool" | "remote_runner";
+  state: ProcessState;
+  command: string[];
+  commandSummary: string;
+  cwd?: string | null;
+  pid?: number | null;
+  taskId?: string | null;
+  threadId?: string | null;
+  turnId?: string | null;
+  runnerDestinationId?: string | null;
+  runnerSessionId?: string | null;
+  stoppable: boolean;
+  startedAt: string;
+  updatedAt: string;
+  stdoutTail?: string | null;
+  stderrTail?: string | null;
+};
+
+export type ProcessesListResult = {
+  processes: ProcessDescriptor[];
+};
+
+export type ProcessesStopResult = {
+  result: {
+    processId: string;
+    stopped: boolean;
+    process?: ProcessDescriptor | null;
+    error?: string | null;
+  };
+};
+
+export type ProcessesStopAllResult = {
+  results: ProcessesStopResult["result"][];
+};
+
 export type RoderTurn = {
   id: string;
   items: RoderItem[];

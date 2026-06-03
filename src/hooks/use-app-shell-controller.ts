@@ -7,6 +7,11 @@ import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { clamp, useHorizontalResize } from "@/hooks/use-horizontal-resize";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import { mergedCommandDescriptors } from "@/lib/native-commands";
+import type { NativeCommandOutput } from "@/lib/native-command-formatters";
+import { runNativeCommandInvocation, type LocalTranscriptOffset } from "@/lib/native-command-router";
+import { roderIpc } from "@/lib/roder-ipc";
+import { commandInvocation, slashCommandLikeText, type CommandInvocation } from "@/lib/roder-commands";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import { archiveRouteAfterThreadRemoval, defaultPluginsRoute, isPluginsRoutePath } from "@/lib/route-selection";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
@@ -24,6 +29,7 @@ import {
   type RouteWorkspacePanel,
 } from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
+import { useCommandsStore } from "@/stores/commands-store";
 import type { DesktopAttachment } from "@/types/roder";
 
 type AppShellController = {
@@ -41,11 +47,14 @@ export function useAppShellController(): AppShellController {
     appearance,
     archiveThread: archiveAgentThread,
     messages,
+    models,
     newProject: createProjectThread,
     restart,
+    runCommandInvocation,
     selectedWorkspaceCwd,
     selectThread: selectAgentThread,
     sendPrompt: sendAgentPrompt,
+    setSelectedModel,
     setSelectedWorkspaceCwd,
     status,
     threads,
@@ -63,6 +72,9 @@ export function useAppShellController(): AppShellController {
   const [followSignal, setFollowSignal] = useState(0);
   const [canScrollTranscriptToBottom, setCanScrollTranscriptToBottom] = useState(false);
   const [composerFocusSignal, setComposerFocusSignal] = useState(0);
+  const [nativeModelPickerOpen, setNativeModelPickerOpen] = useState(false);
+  const [nativeCommandOutput, setNativeCommandOutput] = useState<NativeCommandOutput | null>(null);
+  const [localTranscriptOffset, setLocalTranscriptOffset] = useState<LocalTranscriptOffset | null>(null);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
   const toolPanelElementRef = useRef<HTMLElement | null>(null);
@@ -186,12 +198,88 @@ export function useAppShellController(): AppShellController {
     },
     [followBottom],
   );
+  useEffect(() => {
+    setNativeCommandOutput(null);
+    setNativeModelPickerOpen(false);
+  }, [activeThreadId]);
+
+  const hideNativeModelPicker = useCallback(() => {
+    setNativeModelPickerOpen(false);
+  }, []);
+
+  const closeNativeModelPicker = useCallback(() => {
+    setNativeModelPickerOpen(false);
+    setComposerFocusSignal((value) => value + 1);
+  }, []);
+
+  const selectNativeCommandModel = useCallback(
+    (modelId: string) => {
+      setSelectedModel(modelId);
+      setNativeModelPickerOpen(false);
+      setNativeCommandOutput(null);
+      setComposerFocusSignal((value) => value + 1);
+    },
+    [setSelectedModel],
+  );
+
+  const runNativeCommand = useCallback(
+    async (invocation: CommandInvocation): Promise<boolean> => {
+      return runNativeCommandInvocation({
+        actions: {
+          closeModelPicker: hideNativeModelPicker,
+          openModelPicker: () => setNativeModelPickerOpen(true),
+          sendPrompt: sendAgentPrompt,
+          setCommandOutput: setNativeCommandOutput,
+          setLocalTranscriptOffset,
+          setSelectedModel,
+        },
+        invocation,
+        ipc: roderIpc,
+        state: {
+          activeThreadBusy,
+          activeThreadId,
+          messages,
+          models,
+        },
+      });
+    },
+    [activeThreadBusy, activeThreadId, hideNativeModelPicker, messages, models, sendAgentPrompt, setSelectedModel],
+  );
+
+  const runCommandOrNativeInvocation = useCallback(
+    async (invocation: CommandInvocation): Promise<void> => {
+      if (await runNativeCommand(invocation)) {
+        return;
+      }
+      await runCommandInvocation(invocation);
+    },
+    [runCommandInvocation, runNativeCommand],
+  );
+
+  // These send handlers are part of the memoized app-shell context value, so keep their identity stable.
   const sendPrompt = useCallback(
     async (prompt: string, attachments: DesktopAttachment[]) => {
       followBottom();
+      let commands = mergedCommandDescriptors(useCommandsStore.getState().commands);
+      if (attachments.length === 0 && slashCommandLikeText(prompt) && !useCommandsStore.getState().loaded) {
+        await useCommandsStore.getState().load();
+        commands = mergedCommandDescriptors(useCommandsStore.getState().commands);
+      }
+      const invocation = attachments.length === 0 ? commandInvocation(prompt, commands) : null;
+      if (invocation) {
+        await runCommandOrNativeInvocation(invocation);
+        return;
+      }
       await sendAgentPrompt(prompt, attachments);
     },
-    [followBottom, sendAgentPrompt],
+    [followBottom, runCommandOrNativeInvocation, sendAgentPrompt],
+  );
+  const sendCommandInvocation = useCallback(
+    async (invocation: CommandInvocation) => {
+      followBottom();
+      await runCommandOrNativeInvocation(invocation);
+    },
+    [followBottom, runCommandOrNativeInvocation],
   );
   const selectExtensionFromRail = useCallback(
     (extensionId: string) => {
@@ -321,6 +409,8 @@ export function useAppShellController(): AppShellController {
       canScrollTranscriptToBottom,
       composerAttachments,
       composerFocusSignal,
+      nativeModelPickerOpen,
+      nativeCommandOutput,
       folderOptions,
       followSignal,
       hunkSummary,
@@ -330,10 +420,14 @@ export function useAppShellController(): AppShellController {
       setComposerAttachments,
       setRouteSearch,
       showWorkingIndicator,
+      localTranscriptOffset,
       threadOptions,
       attachToComposer,
+      closeNativeModelPicker,
       followBottom,
       openReview,
+      selectNativeCommandModel,
+      sendCommandInvocation,
       sendPrompt,
     }),
     [
@@ -346,6 +440,8 @@ export function useAppShellController(): AppShellController {
       canScrollTranscriptToBottom,
       composerAttachments,
       composerFocusSignal,
+      nativeModelPickerOpen,
+      nativeCommandOutput,
       folderOptions,
       followBottom,
       followSignal,
@@ -353,10 +449,14 @@ export function useAppShellController(): AppShellController {
       openReview,
       routeSearch,
       selectedExtensionId,
+      sendCommandInvocation,
       sendPrompt,
       setRouteSearch,
       showWorkingIndicator,
+      localTranscriptOffset,
       threadOptions,
+      closeNativeModelPicker,
+      selectNativeCommandModel,
     ],
   );
 

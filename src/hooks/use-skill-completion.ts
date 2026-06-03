@@ -1,13 +1,7 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
-import {
-  readSkillPromptEditorText,
-  replaceSkillPromptCompletionToken,
-} from "@/lib/lexical-skill-prompt";
-import {
-  matchingSkillCompletions,
-  moveSkillCompletionIndex,
-  skillCompletionToken,
-} from "@/lib/roder-skills";
+import type { KeyboardEvent } from "react";
+import { useComposerCompletion } from "@/hooks/use-composer-completion";
+import { readSkillPromptEditorText, replaceSkillPromptCompletionToken } from "@/lib/lexical-skill-prompt";
+import { matchingSkillCompletions, skillCompletionToken } from "@/lib/roder-skills";
 import type { SkillDescriptor } from "@/types/roder";
 import type { LexicalEditor } from "lexical";
 
@@ -28,12 +22,6 @@ type UseSkillCompletionOptions = {
   onPromptChange: (prompt: string, caret: number) => void;
 };
 
-type SkillCompletionUiState = {
-  completionKey: string | null;
-  dismissedCompletionKey: string | null;
-  highlightedSkillIndex: number;
-};
-
 export function useSkillCompletion({
   editor,
   prompt,
@@ -41,28 +29,11 @@ export function useSkillCompletion({
   skills,
   onPromptChange,
 }: UseSkillCompletionOptions): SkillCompletionState {
-  const [uiState, setUiState] = useState<SkillCompletionUiState>({
-    completionKey: null,
-    dismissedCompletionKey: null,
-    highlightedSkillIndex: 0,
-  });
-  const completionToken = useMemo(() => skillCompletionToken(prompt, caretPosition), [caretPosition, prompt]);
-  const completionKey = completionToken
-    ? `${completionToken.start}:${completionToken.end}:${completionToken.query}`
-    : null;
-  const skillCompletions = useMemo(
-    () => (completionToken ? matchingSkillCompletions(skills, completionToken.query) : []),
-    [completionToken, skills],
-  );
-  const currentUiState =
-    uiState.completionKey === completionKey
-      ? uiState
-      : { completionKey, dismissedCompletionKey: null, highlightedSkillIndex: 0 };
-  const showSkillCompletionMenu =
-    Boolean(completionToken && skillCompletions.length > 0) && completionKey !== currentUiState.dismissedCompletionKey;
-  const highlightedSkillIndex = showSkillCompletionMenu
-    ? Math.max(0, Math.min(currentUiState.highlightedSkillIndex, skillCompletions.length - 1))
-    : currentUiState.highlightedSkillIndex;
+  const completionToken = skillCompletionToken(prompt, caretPosition);
+  const skillCompletions = completionToken ? matchingSkillCompletions(skills, completionToken.query) : [];
+  const completion = useComposerCompletion({ token: completionToken, itemCount: skillCompletions.length });
+  const showSkillCompletionMenu = completion.showMenu;
+  const highlightedSkillIndex = completion.highlightedIndex;
 
   function insertSkillCompletion(skill: SkillDescriptor): void {
     if (!completionToken) {
@@ -71,7 +42,7 @@ export function useSkillCompletion({
     const nextCaret = replaceSkillPromptCompletionToken(editor, completionToken, skill.name, skills);
     const nextPrompt = readSkillPromptEditorText(editor);
     onPromptChange(nextPrompt, nextCaret);
-    setUiState({ completionKey, dismissedCompletionKey: null, highlightedSkillIndex: 0 });
+    completion.reset();
     requestAnimationFrame(() => {
       editor.focus();
     });
@@ -82,24 +53,11 @@ export function useSkillCompletion({
   }
 
   function moveSkillCompletionHighlight(direction: "next" | "previous"): void {
-    setUiState((state) => {
-      const previousIndex = state.completionKey === completionKey ? state.highlightedSkillIndex : 0;
-      return {
-        completionKey,
-        dismissedCompletionKey: state.completionKey === completionKey ? state.dismissedCompletionKey : null,
-        highlightedSkillIndex: moveSkillCompletionIndex(previousIndex, skillCompletions.length, direction),
-      };
-    });
+    completion.moveHighlight(direction);
   }
 
   function dismissSkillCompletion(): void {
-    if (completionKey) {
-      setUiState({
-        completionKey,
-        dismissedCompletionKey: completionKey,
-        highlightedSkillIndex,
-      });
-    }
+    completion.dismiss();
   }
 
   function handleSkillCompletionKeyDown(event: KeyboardEvent<HTMLDivElement>): boolean {
@@ -139,12 +97,7 @@ export function useSkillCompletion({
     handleSkillCompletionKeyDown,
     highlightedSkillIndex,
     insertSkillCompletion,
-    setHighlightedSkillIndex: (index) =>
-      setUiState({
-        completionKey,
-        dismissedCompletionKey: currentUiState.dismissedCompletionKey,
-        highlightedSkillIndex: index,
-      }),
+    setHighlightedSkillIndex: completion.setHighlightedIndex,
     showSkillCompletionMenu,
     skillCompletions,
   };

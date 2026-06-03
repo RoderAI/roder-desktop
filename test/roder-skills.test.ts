@@ -5,7 +5,6 @@ import {
   filterSkills,
   humanizedSkillName,
   matchingSkillCompletions,
-  nextSkillCompletionIndex,
   replaceSkillToken,
   skillTokenRanges,
   skillCompletionToken,
@@ -102,15 +101,6 @@ test("replacing a skill token avoids duplicate spacing before existing boundarie
 test("does not treat shell variables or mid-word dollars as skill tokens", () => {
   expect(skillCompletionToken("echo $PATH", "echo $PATH".length)).toBeNull();
   expect(skillCompletionToken("price$ai", "price$ai".length)).toBeNull();
-});
-
-test("moves skill completion highlight with wrapping arrow navigation", () => {
-  expect(nextSkillCompletionIndex(0, 3, "next")).toBe(1);
-  expect(nextSkillCompletionIndex(2, 3, "next")).toBe(0);
-  expect(nextSkillCompletionIndex(0, 3, "previous")).toBe(2);
-  expect(nextSkillCompletionIndex(-1, 3, "next")).toBe(0);
-  expect(nextSkillCompletionIndex(-1, 3, "previous")).toBe(2);
-  expect(nextSkillCompletionIndex(0, 0, "next")).toBe(-1);
 });
 
 test("finds exact selected skill tokens for rich composer rendering", () => {
