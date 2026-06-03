@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, use } from "react";
 import type { SetValues } from "nuqs";
 import type { useRoderAgent } from "@/hooks/use-roder-agent";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
@@ -35,7 +35,7 @@ const AppShellContext = createContext<AppShellContextValue | null>(null);
 export const AppShellProvider = AppShellContext.Provider;
 
 export function useAppShell(): AppShellContextValue {
-  const value = useContext(AppShellContext);
+  const value = use(AppShellContext);
   if (!value) {
     throw new Error("useAppShell must be used inside AppShellProvider");
   }

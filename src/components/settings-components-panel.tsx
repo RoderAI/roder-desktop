@@ -258,14 +258,14 @@ export function ComponentsSettingsPanel(): React.JSX.Element {
                 <DialogTitle>Component settings</DialogTitle>
                 <DialogDescription>Dialog content inherits the current theme and base UI text size.</DialogDescription>
               </DialogHeader>
-              <div className="rounded-md border border-border bg-background px-3 py-3 text-muted-foreground">
+              <div className="rounded-md border border-border bg-background p-3 text-muted-foreground">
                 Use dialogs for focused secondary workflows that should not live permanently in the main surface.
               </div>
               <DialogFooter>
                 <DialogClose
                   render={
                     <Button variant="secondary" size="sm">
-                      Done
+                      Close
                     </Button>
                   }
                 />

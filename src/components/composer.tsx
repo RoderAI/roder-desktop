@@ -195,12 +195,16 @@ export function Composer({
     const seen = new Set(attachments.map((attachment) => attachment.path));
     onAttachmentsChange([
       ...attachments,
-      ...nextAttachments
-        .filter((attachment) => attachment.path && !seen.has(attachment.path))
-        .map((attachment) => ({
-          ...attachment,
-          id: attachment.id || crypto.randomUUID(),
-        })),
+      ...nextAttachments.flatMap((attachment) =>
+        attachment.path && !seen.has(attachment.path)
+          ? [
+              {
+                ...attachment,
+                id: attachment.id || crypto.randomUUID(),
+              },
+            ]
+          : [],
+      ),
     ]);
   }
 
@@ -308,6 +312,7 @@ export function Composer({
             ref={fileInputRef}
             type="file"
             multiple
+            aria-label="Attach files"
             className="hidden"
             onChange={(event) => {
               if (event.currentTarget.files) {

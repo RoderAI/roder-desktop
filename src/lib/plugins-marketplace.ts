@@ -318,7 +318,7 @@ export function marketplaceStateLabel(state: MarketplaceState): string {
 }
 
 export function activeComponentLabels(hints: PluginComponentHints): string[] {
-  return componentHintLabels.filter(([key]) => hints[key]).map(([, label]) => label);
+  return componentHintLabels.flatMap(([key, label]) => (hints[key] ? [label] : []));
 }
 
 export function riskLabel(risk: MarketplacePluginRisk): string {

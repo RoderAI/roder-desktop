@@ -74,10 +74,9 @@ export function RightWorkspacePanelShell({
       aria-hidden={!open}
       inert={!open ? true : undefined}
     >
-      <div
-        className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize bg-transparent hover:bg-border"
+      <hr
+        className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize border-0 bg-transparent hover:bg-border"
         aria-label="Resize workspace panel"
-        role="separator"
         onPointerDown={onBeginResize}
       />
       <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 px-2 pl-3">
@@ -124,22 +123,14 @@ export function RightWorkspacePanelShell({
             {openEntries.map((entry) => {
               const inactive = entry.id !== activeEntry.id;
               return (
-                <TabsContent
+                <WorkspacePanelContent
                   key={entry.id}
-                  keepMounted
-                  value={entry.id}
-                  aria-label={entry.title}
-                  inert={inactive ? true : undefined}
-                  className={cn(
-                    "absolute inset-0 h-full min-h-0 text-base",
-                    inactive && "pointer-events-none opacity-0",
-                  )}
-                >
-                  {renderPanel(entry, {
-                    active: open && !inactive,
-                    nativeOverlayOcclusion: open && !inactive ? addMenuOcclusion : null,
-                  })}
-                </TabsContent>
+                  active={open && !inactive}
+                  entry={entry}
+                  inactive={inactive}
+                  nativeOverlayOcclusion={open && !inactive ? addMenuOcclusion : null}
+                  renderPanel={renderPanel}
+                />
               );
             })}
           </Tabs>
@@ -148,6 +139,32 @@ export function RightWorkspacePanelShell({
         <WorkspacePanelEmptyState entries={entries} onAddPanel={onAddPanel} />
       )}
     </aside>
+  );
+}
+
+function WorkspacePanelContent({
+  active,
+  entry,
+  inactive,
+  nativeOverlayOcclusion,
+  renderPanel,
+}: {
+  active: boolean;
+  entry: RightWorkspacePanelEntry;
+  inactive: boolean;
+  nativeOverlayOcclusion: NativeOverlayOcclusion | null;
+  renderPanel: RightWorkspacePanelShellProps["renderPanel"];
+}): React.JSX.Element {
+  return (
+    <TabsContent
+      keepMounted
+      value={entry.id}
+      aria-label={entry.title}
+      inert={inactive ? true : undefined}
+      className={cn("absolute inset-0 h-full min-h-0 text-base", inactive && "pointer-events-none opacity-0")}
+    >
+      {renderPanel(entry, { active, nativeOverlayOcclusion })}
+    </TabsContent>
   );
 }
 
@@ -255,7 +272,7 @@ function PanelAddMenu({
             <DropdownMenuItem
               key={entry.id}
               selected={entry.id === openPanel}
-              className="min-h-12 items-start rounded-lg px-2 py-2"
+              className="min-h-12 items-start rounded-lg p-2"
               onSelect={() => onAddPanel(entry.id)}
             >
               <span className="mt-0.5 shrink-0 text-muted-foreground [&_svg]:size-4">{entry.icon}</span>

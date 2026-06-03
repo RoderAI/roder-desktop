@@ -249,7 +249,7 @@ function ContributionList({
     <section className="rounded-lg border border-border">
       <div className="border-b border-border px-3 py-2 text-base font-medium text-muted-foreground">{title}</div>
       {items.length === 0 ? (
-        <div className="px-3 py-3 text-base text-muted-foreground">{empty}</div>
+        <div className="p-3 text-base text-muted-foreground">{empty}</div>
       ) : (
         <div className="divide-y divide-border">
           {items.map((item) => (

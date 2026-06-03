@@ -22,7 +22,7 @@ export function SkillTokenPill({ name }: { name: string }): React.JSX.Element {
   );
 }
 
-export function renderTextWithSkillTokens(text: string, skills: SkillDescriptor[]): ReactNode[] {
+export function textWithSkillTokens(text: string, skills: SkillDescriptor[]): ReactNode[] {
   const ranges = skillTokenRanges(text, skills);
   if (ranges.length === 0) {
     return [text];

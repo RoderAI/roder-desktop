@@ -34,7 +34,7 @@ export function buildFolderOptions(threads: RoderThread[], activePath: string): 
     });
   }
 
-  return [...folders.values()].sort((left, right) => {
+  return Array.from(folders.values()).toSorted((left, right) => {
     if (left.path === activeFolderPath) {
       return -1;
     }

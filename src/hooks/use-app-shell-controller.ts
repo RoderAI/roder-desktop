@@ -158,7 +158,6 @@ export function useAppShellController(): AppShellController {
       setViewportWidth(window.innerWidth);
     }
 
-    syncViewportWidth();
     window.addEventListener("resize", syncViewportWidth);
     return () => window.removeEventListener("resize", syncViewportWidth);
   }, []);

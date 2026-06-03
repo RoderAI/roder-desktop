@@ -155,6 +155,7 @@ export function BrowserPanel({
         </ToolbarButton>
         <input
           value={location}
+          aria-label="Browser URL"
           className="mx-1 h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
           onChange={(event) => setLocation(event.target.value)}
           onKeyDown={(event) => {
@@ -164,6 +165,7 @@ export function BrowserPanel({
           }}
         />
         <button
+          type="button"
           className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           aria-label="Navigate browser"
           onClick={() => void navigate()}
