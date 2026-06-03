@@ -96,7 +96,7 @@ type RoderStore = {
   setDefaultPolicyMode: (mode: PolicyMode) => void;
   setSelectedModel: (model: string, provider?: string) => void;
   setSelectedReasoning: (reasoning: ReasoningEffort) => void;
-  setSelectedPolicyMode: (mode: PolicyMode) => void;
+  setSelectedPolicyMode: (mode: PolicyMode) => Promise<void>;
   saveDefaults: () => Promise<void>;
   setModelVisibility: (modelId: string, visible: boolean) => void;
   resetVisibleModels: () => void;
@@ -568,12 +568,11 @@ export const useRoderStore = create<RoderStore>()(
         set({ busy: true, error: null });
 
         try {
+          const commandText = commandInvocationText({ name, arguments: invocation.arguments });
           if (!threadId) {
-            threadId = await createThreadForPrompt(
-              set,
-              get,
-              commandInvocationText({ name, arguments: invocation.arguments }),
-            );
+            threadId = await createThreadForPrompt(set, get, commandText);
+          } else {
+            set((state) => patchThreadPreviewFromPrompt(state, threadId, commandText));
           }
 
           markedTurnStarting = true;
@@ -651,6 +650,8 @@ export const useRoderStore = create<RoderStore>()(
         try {
           if (!threadId) {
             threadId = await createThreadForPrompt(set, get, text);
+          } else {
+            set((state) => patchThreadPreviewFromPrompt(state, threadId, text));
           }
 
           markedTurnStarting = true;
@@ -799,13 +800,29 @@ export const useRoderStore = create<RoderStore>()(
           selectedReasoning,
           threadControlsByThread: updateActiveThreadControls(state, { reasoning: selectedReasoning }),
         })),
-      setSelectedPolicyMode: (selectedPolicyMode) => {
+      setSelectedPolicyMode: async (selectedPolicyMode) => {
         const mode = normalizePolicyMode(selectedPolicyMode);
+        const previousMode = get().selectedPolicyMode;
         set((state) => ({
           selectedPolicyMode: mode,
           threadControlsByThread: updateActiveThreadControls(state, { policyMode: mode }),
           error: null,
         }));
+        if (mode === previousMode) {
+          return;
+        }
+        try {
+          const result = await roderIpc.setThreadMode(mode, "desktop permission selector");
+          const appliedMode = normalizePolicyMode(result.mode || mode);
+          set((state) => ({
+            selectedPolicyMode: appliedMode,
+            threadControlsByThread: updateActiveThreadControls(state, { policyMode: appliedMode }),
+            error: null,
+          }));
+        } catch (error) {
+          set({ error: (error as Error).message });
+          throw error;
+        }
       },
       saveDefaults: async () => {
         const state = get();
@@ -1047,45 +1064,47 @@ async function createThreadForPrompt(
 ): Promise<string> {
   const state = get();
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
+  const latestState = get();
   const model = effectiveSelectedModel(
-    state.models,
-    state.visibleModelIds,
-    state.defaultModel,
-    state.defaultModelProvider,
+    latestState.models,
+    latestState.visibleModelIds,
+    latestState.defaultModel,
+    latestState.defaultModelProvider,
   );
-  const selectedModel = model?.id ?? state.defaultModel;
+  const selectedModel = model?.id ?? latestState.defaultModel;
   const selectedProvider =
-    model?.modelProvider ?? selectedModelProvider(state.models, selectedModel, state.defaultModelProvider);
+    model?.modelProvider ?? selectedModelProvider(latestState.models, selectedModel, latestState.defaultModelProvider);
   const result = await roderIpc.startThread(
     selectedModel,
     threadStartWorkspace(workspaceSelection),
     selectedProvider,
-    state.defaultReasoning,
+    latestState.defaultReasoning,
     initialPrompt === undefined ? undefined : { initialPrompt },
   );
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
   }
   const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+  const threadWithPreview = initialPrompt ? threadWithPromptPreview(thread, initialPrompt) : thread;
   set((state) => ({
-    threads: upsertThread(state.threads, thread),
-    threadDetails: { ...state.threadDetails, [thread.id]: thread },
-    threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, thread.id),
-    activeThreadId: thread.id,
-    selectedWorkspaceCwd: thread.cwd,
-    selectedWorkspaceId: thread.workspaceId ?? workspaceSelection.workspace.id,
-    selectedRootId: thread.rootId ?? workspaceSelection.root.id,
-    selectedModel: thread.model || result.model || selectedModel,
-    selectedModelProvider: thread.modelProvider || selectedProvider || state.defaultModelProvider,
+    threads: upsertThread(state.threads, threadWithPreview),
+    threadDetails: { ...state.threadDetails, [threadWithPreview.id]: threadWithPreview },
+    threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadWithPreview.id),
+    activeThreadId: threadWithPreview.id,
+    selectedWorkspaceCwd: threadWithPreview.cwd,
+    selectedWorkspaceId: threadWithPreview.workspaceId ?? workspaceSelection.workspace.id,
+    selectedRootId: threadWithPreview.rootId ?? workspaceSelection.root.id,
+    selectedModel: threadWithPreview.model || result.model || selectedModel,
+    selectedModelProvider: threadWithPreview.modelProvider || selectedProvider || state.defaultModelProvider,
     selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
     selectedPolicyMode: state.defaultPolicyMode,
-    threadControlsByThread: setThreadControls(state.threadControlsByThread, thread.id, {
-      model: thread.model || result.model || selectedModel,
-      modelProvider: thread.modelProvider || selectedProvider || state.defaultModelProvider,
+    threadControlsByThread: setThreadControls(state.threadControlsByThread, threadWithPreview.id, {
+      model: threadWithPreview.model || result.model || selectedModel,
+      modelProvider: threadWithPreview.modelProvider || selectedProvider || state.defaultModelProvider,
       reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
       policyMode: state.defaultPolicyMode,
     }),
-    workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+    workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, threadWithPreview.cwd),
     backStack:
       options.recordHistory && state.activeThreadId
         ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80)
@@ -1093,7 +1112,7 @@ async function createThreadForPrompt(
     forwardStack: options.recordHistory ? [] : state.forwardStack,
     busy: options.clearBusy ? false : state.busy,
   }));
-  return thread.id;
+  return threadWithPreview.id;
 }
 
 type WorkspaceSelection = {
@@ -1179,6 +1198,53 @@ function rootForWorkspace(workspace: Workspace, rootId?: string): WorkspaceRoot 
   return workspace.roots[0] ?? null;
 }
 
+function patchThreadPreviewFromPrompt(state: RoderStore, threadId: string, prompt: string): Partial<RoderStore> {
+  const thread = threadForState(state, threadId);
+  if (!thread || !isUntitledThread(thread)) {
+    return {};
+  }
+  const preview = optimisticThreadPreview(prompt);
+  if (!preview) {
+    return {};
+  }
+  return {
+    threads: patchThread(state.threads, threadId, { name: preview, preview }),
+    threadDetails: patchThreadDetails(state.threadDetails, threadId, { name: preview, preview }),
+  };
+}
+
+function threadWithPromptPreview(thread: RoderThread, prompt: string): RoderThread {
+  if (!isUntitledThread(thread)) {
+    return thread;
+  }
+  const preview = optimisticThreadPreview(prompt);
+  return preview ? { ...thread, name: preview, preview } : thread;
+}
+
+function preserveOptimisticThreadTitle(incoming: RoderThread, existing: RoderThread | undefined): RoderThread {
+  if (!existing || isUntitledThread(existing) || !isUntitledThread(incoming)) {
+    return incoming;
+  }
+  return {
+    ...incoming,
+    name: existing.name ?? existing.preview,
+    preview: existing.preview,
+  };
+}
+
+function isUntitledThread(thread: RoderThread): boolean {
+  const label = (thread.name ?? thread.preview).trim().toLowerCase();
+  return !label || label === "untitled thread" || label === "untitled agent";
+}
+
+function optimisticThreadPreview(prompt: string): string {
+  const normalized = prompt.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 80) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 77).trimEnd()}...`;
+}
+
 function normalizedWorkspaceTimestamp(timestamp: number): number {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return 0;
@@ -1197,7 +1263,8 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     pendingWaitRequestsByThread === state.pendingWaitRequestsByThread ? {} : { pendingWaitRequestsByThread };
 
   if (notification.method === "thread/started" && isRecord(params.thread)) {
-    const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
+    const normalizedThread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
+    const thread = preserveOptimisticThreadTitle(normalizedThread, threadForState(state, normalizedThread.id));
     return {
       ...waitPatch,
       threads: upsertThread(state.threads, thread),
@@ -1215,7 +1282,8 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     (notification.method === "thread/updated" || notification.method === "thread/renamed") &&
     isRecord(params.thread)
   ) {
-    const thread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
+    const normalizedThread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
+    const thread = preserveOptimisticThreadTitle(normalizedThread, threadForState(state, normalizedThread.id));
     return {
       ...waitPatch,
       threads: upsertThread(state.threads, thread),

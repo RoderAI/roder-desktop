@@ -389,7 +389,7 @@ export function useAppShellController(): AppShellController {
   });
   const beginToolPanelResize = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      const toolPanelElement = event.currentTarget.parentElement;
+      const toolPanelElement = event.currentTarget.nextElementSibling;
       if (toolPanelElement instanceof HTMLElement) {
         toolPanelElementRef.current = toolPanelElement;
         toolPanelElement.style.setProperty("--right-workspace-panel-width", `${toolPanelWidth}px`);

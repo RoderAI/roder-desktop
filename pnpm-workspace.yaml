@@ -11,3 +11,4 @@ allowBuilds:
 
 minimumReleaseAge: 1440
 trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 1440

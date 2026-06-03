@@ -54,6 +54,34 @@ async function loadRoderStore(
   return module.useRoderStore;
 }
 
+test("changing selected policy mode applies it to the running thread immediately", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    calls.push({ method, params });
+    if (method === "thread/set_mode") {
+      return { mode: (params as { mode: string }).mode };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({ selectedPolicyMode: "default", activeThreadId: "thread-1" });
+
+  await useRoderStore.getState().setSelectedPolicyMode("accept_all");
+
+  expect(useRoderStore.getState().selectedPolicyMode).toBe("accept_all");
+  expect(useRoderStore.getState().threadControlsByThread["thread-1"]?.policyMode).toBe("accept_all");
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "thread/set_mode",
+      params: {
+        mode: "accept_all",
+        reason: "desktop permission selector",
+      },
+    },
+  ]);
+});
+
 test("new threads use the current cwd instead of an unmatched stale workspace", async () => {
   const currentCwd = "/Users/example/gode-desktop";
   const staleCwd = "/private/var/folders/example/roder-thread-cwd-123/process-workspace";
@@ -289,6 +317,83 @@ test("stale root ids do not silently select the first root in a workspace", asyn
   );
 });
 
+test("new blank threads preserve an explicitly selected project folder", async () => {
+  const targetCwd = "/workspace/project-b";
+  const targetWorkspace = {
+    id: "ws_target",
+    name: "project-b",
+    roots: [{ id: "root_target", path: targetCwd, name: "project-b" }],
+    defaultRootId: "root_target",
+    updatedAt: 1770000200,
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "workspace/create":
+        return { workspace: targetWorkspace };
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-target",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            createdAt: 1770000200,
+            updatedAt: 1770000200,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: targetWorkspace.id,
+            rootId: targetWorkspace.defaultRootId,
+            cwd: targetCwd,
+            turns: [],
+          },
+          model: "gpt-5.5",
+          reasoning: "medium",
+        };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "thread-a",
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    selectedWorkspaceCwd: "/workspace/project-a",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    selectedModel: "gpt-5.5",
+    threadDetails: {
+      "thread-a": {
+        id: "thread-a",
+        preview: "Project A",
+        modelProvider: "openai",
+        model: "gpt-5.5",
+        createdAt: 1770000100,
+        updatedAt: 1770000100,
+        status: { type: "idle", activeTurnId: null, activeFlags: [] },
+        cwd: "/workspace/project-a",
+        turns: [],
+      },
+    },
+    workspaces: [],
+  });
+
+  useRoderStore.getState().setSelectedWorkspaceCwd(targetCwd);
+  await useRoderStore.getState().selectThread("", { pushHistory: false });
+  await useRoderStore.getState().newThread();
+
+  expect(request).toHaveBeenCalledWith("workspace/create", {
+    roots: [{ path: targetCwd }],
+    defaultRootPath: targetCwd,
+  });
+  expect(request).toHaveBeenCalledWith(
+    "thread/start",
+    expect.objectContaining({
+      workspaceId: targetWorkspace.id,
+      rootId: targetWorkspace.defaultRootId,
+    }),
+  );
+});
+
 test("hunk recorded notifications bump the hunk revision for the changed thread", async () => {
   const useRoderStore = await loadRoderStore();
 
@@ -443,6 +548,150 @@ test("sendPrompt starts a new turn when a stale activeTurnId is not running", as
       model: "gpt-5.5",
     }),
   );
+});
+
+test("sendPrompt immediately labels an untitled blank thread from the first prompt", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    if (method === "turn/start") {
+      return { turnId: "turn-1" };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+  const thread = {
+    id: "thread-untitled",
+    preview: "Untitled thread",
+    modelProvider: "openai",
+    model: "gpt-5.5",
+    createdAt: 1770000000,
+    updatedAt: 1770000100,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    cwd: "/workspace",
+    turns: [],
+  };
+
+  useRoderStore.setState({
+    activeThreadId: "thread-untitled",
+    busy: false,
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    selectedReasoning: "medium",
+    selectedPolicyMode: "accept_all",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    threadDetails: { "thread-untitled": thread },
+    threads: [thread],
+  });
+
+  await useRoderStore.getState().sendPrompt("fix the failing desktop tests");
+
+  expect(useRoderStore.getState().threads[0]?.name).toBe("fix the failing desktop tests");
+  expect(useRoderStore.getState().threads[0]?.preview).toBe("fix the failing desktop tests");
+  expect(useRoderStore.getState().threadDetails["thread-untitled"]?.name).toBe("fix the failing desktop tests");
+});
+
+test("prompt-created threads use the first prompt as an immediate optimistic title", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-new",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            createdAt: 1770000000,
+            updatedAt: 1770000100,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: "ws_1",
+            rootId: "root_1",
+            cwd: "/workspace",
+            turns: [],
+          },
+          model: "gpt-5.5",
+          reasoning: "medium",
+        };
+      case "turn/start":
+        return { turnId: "turn-1" };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "",
+    busy: false,
+    selectedWorkspaceId: "ws_1",
+    selectedRootId: "root_1",
+    selectedWorkspaceCwd: "/workspace",
+    defaultModel: "gpt-5.5",
+    defaultModelProvider: "openai",
+    defaultReasoning: "medium",
+    defaultPolicyMode: "accept_all",
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    workspaces: [
+      {
+        id: "ws_1",
+        name: "workspace",
+        roots: [{ id: "root_1", path: "/workspace", name: "workspace" }],
+        defaultRootId: "root_1",
+        updatedAt: 1770000000,
+      },
+    ],
+    threads: [],
+    threadDetails: {},
+  });
+
+  await useRoderStore.getState().sendPrompt("summarize the project architecture");
+
+  expect(useRoderStore.getState().activeThreadId).toBe("thread-new");
+  expect(useRoderStore.getState().threads[0]?.name).toBe("summarize the project architecture");
+  expect(useRoderStore.getState().threadDetails["thread-new"]?.preview).toBe("summarize the project architecture");
+});
+
+test("untitled thread notifications do not clobber an optimistic first-prompt title", async () => {
+  const useRoderStore = await loadRoderStore();
+  const optimisticThread = {
+    id: "thread-optimistic",
+    name: "fix the resize handle",
+    preview: "fix the resize handle",
+    modelProvider: "openai",
+    model: "gpt-5.5",
+    createdAt: 1770000000,
+    updatedAt: 1770000100,
+    status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
+    cwd: "/workspace",
+    turns: [],
+  };
+
+  useRoderStore.setState({
+    activeThreadId: "thread-optimistic",
+    threads: [optimisticThread],
+    threadDetails: { "thread-optimistic": optimisticThread },
+  });
+
+  useRoderStore.getState().applyNotification({
+    method: "thread/updated",
+    params: {
+      thread: {
+        id: "thread-optimistic",
+        preview: "Untitled thread",
+        modelProvider: "openai",
+        model: "gpt-5.5",
+        createdAt: 1770000000,
+        updatedAt: 1770000200,
+        status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
+        cwd: "/workspace",
+        turns: [],
+      },
+    },
+  });
+
+  expect(useRoderStore.getState().threads[0]?.name).toBe("fix the resize handle");
+  expect(useRoderStore.getState().threads[0]?.preview).toBe("fix the resize handle");
+  expect(useRoderStore.getState().threads[0]?.updatedAt).toBe(1770000200);
 });
 
 test("goal notifications update the thread goal state", async () => {

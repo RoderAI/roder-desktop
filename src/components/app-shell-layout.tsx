@@ -177,6 +177,13 @@ export function AppShellLayout({
         </section>
         {!isPluginsRoute && (
           <>
+            {workspacePanelOpen && (
+              <hr
+                className="no-drag relative z-30 -ml-1 -mr-1 h-screen w-2 shrink-0 cursor-col-resize border-0 bg-transparent hover:bg-border"
+                aria-label="Resize workspace panel"
+                onPointerDown={onBeginToolPanelResize}
+              />
+            )}
             <RightWorkspacePanelShell
               open={workspacePanelOpen}
               tabs={panelTabs}
@@ -184,7 +191,6 @@ export function AppShellLayout({
               entries={rightWorkspacePanelEntries}
               width={toolPanelWidth}
               onAddPanel={onOpenWorkspacePanel}
-              onBeginResize={onBeginToolPanelResize}
               onClosePanel={onCloseWorkspacePanel}
               onSelectPanel={onSelectWorkspacePanel}
               renderPanel={(entry, state) =>
@@ -286,6 +292,13 @@ export function AppShellLayout({
         </section>
         {!isPluginsRoute && (
           <>
+            {workspacePanelOpen && (
+              <hr
+                className="no-drag relative z-30 -ml-1 -mr-1 h-full w-2 shrink-0 cursor-col-resize border-0 bg-transparent hover:bg-border"
+                aria-label="Resize workspace panel"
+                onPointerDown={onBeginToolPanelResize}
+              />
+            )}
             <RightWorkspacePanelShell
               open={workspacePanelOpen}
               tabs={panelTabs}
@@ -293,7 +306,6 @@ export function AppShellLayout({
               entries={rightWorkspacePanelEntries}
               width={toolPanelWidth}
               onAddPanel={onOpenWorkspacePanel}
-              onBeginResize={onBeginToolPanelResize}
               onClosePanel={onCloseWorkspacePanel}
               onSelectPanel={onSelectWorkspacePanel}
               renderPanel={(entry, state) =>
