@@ -35,7 +35,6 @@ type RightWorkspacePanelShellProps = {
   entries: RightWorkspacePanelEntry[];
   width: number;
   onAddPanel: (panel: RouteWorkspacePanel) => void;
-  onBeginResize: (event: React.PointerEvent<HTMLDivElement>) => void;
   onClosePanel: (panel: RouteWorkspacePanel) => void;
   onSelectPanel: (panel: RouteWorkspacePanel) => void;
   renderPanel: (
@@ -51,7 +50,6 @@ export function RightWorkspacePanelShell({
   entries,
   width,
   onAddPanel,
-  onBeginResize,
   onClosePanel,
   onSelectPanel,
   renderPanel,
@@ -74,11 +72,6 @@ export function RightWorkspacePanelShell({
       aria-hidden={!open}
       inert={!open ? true : undefined}
     >
-      <hr
-        className="no-drag absolute inset-y-0 left-0 z-30 w-2 cursor-col-resize border-0 bg-transparent hover:bg-border"
-        aria-label="Resize workspace panel"
-        onPointerDown={onBeginResize}
-      />
       <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 px-2 pl-3">
         {openEntries.length > 0 ? (
           <>
