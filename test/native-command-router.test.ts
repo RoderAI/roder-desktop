@@ -21,7 +21,7 @@ test("opens the native model picker without command output", async () => {
   });
 
   expect(handled).toBe(true);
-  expect(calls).toEqual(["clear-output", "open-model-picker"]);
+  expect(calls).toEqual(["close-model-picker", "clear-output", "open-model-picker"]);
   expect(outputs).toEqual([null]);
 });
 
@@ -97,6 +97,27 @@ test("agents command formats app-server output rows", async () => {
 
   expect(calls).toEqual(["close-model-picker", "output:Configured subagents"]);
   expect(outputs[0]).toMatchObject({ title: "Configured subagents", rows: [{ title: "reviewer" }] });
+});
+
+test("stop-all reports when no processes were stopped", async () => {
+  const calls: string[] = [];
+  const { actions, outputs } = commandActions(calls);
+
+  await runNativeCommandInvocation({
+    actions,
+    invocation: { name: "ps", arguments: "stop-all --confirm" },
+    ipc: commandIpc({
+      stopAllProcesses: async () => ({ results: [] }),
+    }),
+    state: commandState(),
+  });
+
+  expect(calls).toEqual(["close-model-picker", "output:No processes stopped"]);
+  expect(outputs[0]).toMatchObject({
+    tone: "error",
+    title: "No processes stopped",
+    body: "No running processes matched.",
+  });
 });
 
 function commandState(patch: Partial<Parameters<typeof runNativeCommandInvocation>[0]["state"]> = {}) {

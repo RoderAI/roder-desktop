@@ -10,7 +10,6 @@ test("renders a dedicated native model picker with the current model", () => {
         { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
         { id: "claude-sonnet-5", name: "Claude Sonnet 5", modelProvider: "anthropic" },
       ],
-      open: true,
       selectedModel: "gpt-5.5",
       selectedModelProvider: "openai",
       onDismiss: () => undefined,
@@ -34,7 +33,6 @@ test("marks only the selected provider with the selected-row indicator for dupli
         { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "codex" },
         { id: "gpt-5.5", name: "gpt-5.5", modelProvider: "opencode" },
       ],
-      open: true,
       selectedModel: "gpt-5.5",
       selectedModelProvider: "opencode",
       onDismiss: () => undefined,
@@ -47,19 +45,4 @@ test("marks only the selected provider with the selected-row indicator for dupli
   expect(html).toMatch(/gpt-5\.5<\/span><span class="text-muted-foreground"> - opencode/);
   expect(html).not.toMatch(/GPT-5\.5<\/span><span class="text-muted-foreground"> - gpt-5\.5/);
   expect(html).not.toContain("Current");
-});
-
-test("does not render when closed", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(NativeModelPicker, {
-      models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" }],
-      open: false,
-      selectedModel: "gpt-5.5",
-      selectedModelProvider: "openai",
-      onDismiss: () => undefined,
-      onSelect: () => undefined,
-    }),
-  );
-
-  expect(html).toBe("");
 });

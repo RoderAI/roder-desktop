@@ -569,49 +569,11 @@ export const useRoderStore = create<RoderStore>()(
 
         try {
           if (!threadId) {
-            const state = get();
-            const workspaceSelection = await ensureWorkspaceSelection(state, set);
-            const model = effectiveSelectedModel(
-              state.models,
-              state.visibleModelIds,
-              state.defaultModel,
-              state.defaultModelProvider,
+            threadId = await createThreadForPrompt(
+              set,
+              get,
+              commandInvocationText({ name, arguments: invocation.arguments }),
             );
-            const selectedModel = model?.id ?? state.defaultModel;
-            const selectedProvider =
-              model?.modelProvider ?? selectedModelProvider(state.models, selectedModel, state.defaultModelProvider);
-            const result = await roderIpc.startThread(
-              selectedModel,
-              threadStartWorkspace(workspaceSelection),
-              selectedProvider,
-              state.defaultReasoning,
-              { initialPrompt: commandInvocationText({ name, arguments: invocation.arguments }) },
-            );
-            if (!result.thread) {
-              throw new Error("roder app-server did not return a thread");
-            }
-            const thread = normalizeThreadCwd(result.thread, get().status.cwd);
-            threadId = thread.id;
-            set((state) => ({
-              threads: upsertThread(state.threads, thread),
-              threadDetails: { ...state.threadDetails, [threadId]: thread },
-              threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadId),
-              activeThreadId: threadId,
-              selectedWorkspaceCwd: thread.cwd,
-              selectedWorkspaceId: thread.workspaceId ?? workspaceSelection.workspace.id,
-              selectedRootId: thread.rootId ?? workspaceSelection.root.id,
-              selectedModel: thread.model || result.model || selectedModel,
-              selectedModelProvider: thread.modelProvider || selectedProvider || state.defaultModelProvider,
-              selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
-              selectedPolicyMode: state.defaultPolicyMode,
-              threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
-                model: thread.model || result.model || selectedModel,
-                modelProvider: thread.modelProvider || selectedProvider || state.defaultModelProvider,
-                reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
-                policyMode: state.defaultPolicyMode,
-              }),
-              workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-            }));
           }
 
           markedTurnStarting = true;
@@ -688,49 +650,7 @@ export const useRoderStore = create<RoderStore>()(
 
         try {
           if (!threadId) {
-            const state = get();
-            const workspaceSelection = await ensureWorkspaceSelection(state, set);
-            const model = effectiveSelectedModel(
-              state.models,
-              state.visibleModelIds,
-              state.defaultModel,
-              state.defaultModelProvider,
-            );
-            const selectedModel = model?.id ?? state.defaultModel;
-            const selectedProvider =
-              model?.modelProvider ?? selectedModelProvider(state.models, selectedModel, state.defaultModelProvider);
-            const result = await roderIpc.startThread(
-              selectedModel,
-              threadStartWorkspace(workspaceSelection),
-              selectedProvider,
-              state.defaultReasoning,
-              { initialPrompt: text },
-            );
-            if (!result.thread) {
-              throw new Error("roder app-server did not return a thread");
-            }
-            const thread = normalizeThreadCwd(result.thread, get().status.cwd);
-            threadId = thread.id;
-            set((state) => ({
-              threads: upsertThread(state.threads, thread),
-              threadDetails: { ...state.threadDetails, [threadId]: thread },
-              threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadId),
-              activeThreadId: threadId,
-              selectedWorkspaceCwd: thread.cwd,
-              selectedWorkspaceId: thread.workspaceId ?? workspaceSelection.workspace.id,
-              selectedRootId: thread.rootId ?? workspaceSelection.root.id,
-              selectedModel: thread.model || result.model || selectedModel,
-              selectedModelProvider: thread.modelProvider || selectedProvider || state.defaultModelProvider,
-              selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
-              selectedPolicyMode: state.defaultPolicyMode,
-              threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
-                model: thread.model || result.model || selectedModel,
-                modelProvider: thread.modelProvider || selectedProvider || state.defaultModelProvider,
-                reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
-                policyMode: state.defaultPolicyMode,
-              }),
-              workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-            }));
+            threadId = await createThreadForPrompt(set, get, text);
           }
 
           markedTurnStarting = true;
@@ -1116,6 +1036,15 @@ async function listWorkspacesForBootstrap(): Promise<{ workspaces: Workspace[] }
 }
 
 async function startThreadForSelection(set: RoderStoreSet, get: () => RoderStore): Promise<void> {
+  await createThreadForPrompt(set, get, undefined, { recordHistory: true, clearBusy: true });
+}
+
+async function createThreadForPrompt(
+  set: RoderStoreSet,
+  get: () => RoderStore,
+  initialPrompt?: string,
+  options: { recordHistory?: boolean; clearBusy?: boolean } = {},
+): Promise<string> {
   const state = get();
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
   const model = effectiveSelectedModel(
@@ -1132,6 +1061,7 @@ async function startThreadForSelection(set: RoderStoreSet, get: () => RoderStore
     threadStartWorkspace(workspaceSelection),
     selectedProvider,
     state.defaultReasoning,
+    initialPrompt === undefined ? undefined : { initialPrompt },
   );
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
@@ -1156,12 +1086,14 @@ async function startThreadForSelection(set: RoderStoreSet, get: () => RoderStore
       policyMode: state.defaultPolicyMode,
     }),
     workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-    backStack: state.activeThreadId
-      ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80)
-      : state.backStack,
-    forwardStack: [],
-    busy: false,
+    backStack:
+      options.recordHistory && state.activeThreadId
+        ? [...state.backStack, { threadId: state.activeThreadId, at: Date.now() }].slice(-80)
+        : state.backStack,
+    forwardStack: options.recordHistory ? [] : state.forwardStack,
+    busy: options.clearBusy ? false : state.busy,
   }));
+  return thread.id;
 }
 
 type WorkspaceSelection = {
