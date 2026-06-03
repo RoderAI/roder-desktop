@@ -1234,7 +1234,11 @@ List request:
 ```json
 {
   "method": "skills/list",
-  "params": {}
+  "params": {
+    "workspaceId": "ws_abc123",
+    "rootId": "root_abc123",
+    "cwd": "/Users/pz/w/gode"
+  }
 }
 ```
 
@@ -1287,6 +1291,9 @@ Behavior:
 
 - `skills/list`, `skills/setEnabled`, and `skills/setExposure` return
   `{ "skills": [], "diagnostics": [] }`.
+- `skills/list` accepts optional `workspaceId`, `rootId`, and `cwd`. When
+  supplied, the app-server resolves the workspace root and lists workspace-local
+  skills for that path; with `{}` it returns the runtime skill snapshot.
 - `selector` accepts a skill `name` or canonical `path`. Desktop callers should
   prefer `{ "path": canonicalPath }` to avoid ambiguous skill-name errors.
 - `activation` is `enabled`, `disabled`, or `experimental`.

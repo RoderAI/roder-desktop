@@ -17,7 +17,10 @@ async function loadSkillsStore(request: (method: string, params: unknown) => Pro
     loading: false,
     error: null,
     loaded: false,
+    loadedContextKey: null,
+    loadedContext: null,
     pendingByPath: {},
+    errorsByPath: {},
   });
   return module.useSkillsStore;
 }
@@ -35,6 +38,31 @@ test("load stores skills and diagnostics", async () => {
   expect(useSkillsStore.getState().loaded).toBe(true);
   expect(useSkillsStore.getState().loading).toBe(false);
   expect(useSkillsStore.getState().error).toBeNull();
+});
+
+test("load passes workspace context and records the loaded context", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const useSkillsStore = await loadSkillsStore(async (method, params) => {
+    calls.push({ method, params });
+    return { skills: [skill({ name: "local", source: "workspace" })], diagnostics: [] };
+  });
+
+  await useSkillsStore.getState().load({ workspaceId: "ws_1", rootId: "root_1", cwd: "/repo" });
+
+  expect(useSkillsStore.getState().skills.map((item) => item.name)).toEqual(["local"]);
+  expect(useSkillsStore.getState().loadedContextKey).toBe(
+    JSON.stringify({ workspaceId: "ws_1", rootId: "root_1", cwd: "/repo" }),
+  );
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "skills/list",
+      params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
+        cwd: "/repo",
+      },
+    },
+  ]);
 });
 
 test("load normalizes missing skill diagnostics from the app-server", async () => {
@@ -79,6 +107,48 @@ test("setSkillEnabled refreshes skills and tracks pending path", async () => {
       params: {
         selector: { path: "builtin://skills/commit/SKILL.md" },
         enabled: false,
+      },
+    },
+    {
+      method: "skills/list",
+      params: {},
+    },
+  ]);
+});
+
+test("skill mutations preserve the current loaded context", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const useSkillsStore = await loadSkillsStore(async (method, params) => {
+    calls.push({ method, params });
+    return {
+      skills: [skill({ name: "commit", activation: "disabled" })],
+      diagnostics: [],
+    };
+  });
+  useSkillsStore.setState({
+    loadedContextKey: JSON.stringify({ workspaceId: "ws_1", rootId: "root_1", cwd: "/repo" }),
+    loadedContext: { workspaceId: "ws_1", rootId: "root_1", cwd: "/repo" },
+  });
+
+  await useSkillsStore.getState().setSkillEnabled("builtin://skills/commit/SKILL.md", false);
+
+  expect(useSkillsStore.getState().loadedContextKey).toBe(
+    JSON.stringify({ workspaceId: "ws_1", rootId: "root_1", cwd: "/repo" }),
+  );
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "skills/setEnabled",
+      params: {
+        selector: { path: "builtin://skills/commit/SKILL.md" },
+        enabled: false,
+      },
+    },
+    {
+      method: "skills/list",
+      params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
+        cwd: "/repo",
       },
     },
   ]);

@@ -49,6 +49,12 @@ export type ThreadStartWorkspace = {
   cwd?: string;
 };
 
+export type SkillsListOptions = {
+  workspaceId?: string;
+  rootId?: string;
+  cwd?: string;
+};
+
 export type ThreadStartResult = {
   thread: RoderThread;
   model: string;
@@ -322,7 +328,12 @@ export const roderIpc = {
     window.roderDesktop.request("processes/stopAll", {
       reason: reason || undefined,
     }) as Promise<ProcessesStopAllResult>,
-  listSkills: () => window.roderDesktop.request("skills/list", {}) as Promise<SkillsListResult>,
+  listSkills: (options: SkillsListOptions = {}) =>
+    window.roderDesktop.request("skills/list", {
+      workspaceId: options.workspaceId || undefined,
+      rootId: options.rootId || undefined,
+      cwd: options.cwd || undefined,
+    }) as Promise<SkillsListResult>,
   setSkillEnabled: (canonicalPath: string, enabled: boolean) =>
     window.roderDesktop.request("skills/setEnabled", {
       selector: { path: canonicalPath },

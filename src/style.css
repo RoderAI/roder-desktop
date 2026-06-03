@@ -229,6 +229,45 @@ code[data-streamdown="inline-code"] {
   margin-block-start: 0.25rem;
 }
 
+.message-markdown .message-list {
+  margin-block: 0;
+}
+
+.message-markdown > .message-list-unordered {
+  display: grid;
+  gap: 0.25rem;
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.message-markdown > .message-list-ordered {
+  display: grid;
+  gap: 0.25rem;
+  padding-inline-start: 1.35rem;
+}
+
+.message-markdown .message-list-item {
+  margin-block: 0;
+}
+
+.message-markdown > .message-list-unordered > .message-list-item {
+  padding-inline-start: 0;
+}
+
+.message-markdown .message-list .message-list {
+  margin-block-start: 0.25rem;
+  padding-inline-start: 1.15rem;
+}
+
+.message-markdown .message-list-unordered .message-list-unordered {
+  list-style: disc;
+}
+
+.message-markdown .message-list-item::marker {
+  color: color-mix(in oklab, var(--color-muted-foreground) 65%, transparent);
+  font-size: 0.8em;
+}
+
 .pointer-cursors button,
 .pointer-cursors [role="button"],
 .pointer-cursors [role="menuitem"],
