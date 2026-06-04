@@ -1,8 +1,9 @@
 import type { ConversationMessage } from "@/types/roder";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
+import { toolTextClass, toolTitle } from "@/lib/tool-timeline";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
-import { DisclosureChevron, ShimmerText, toolTextClass, toolTitle } from "./tool-timeline-shared";
+import { DisclosureChevron, ShimmerText } from "./tool-timeline-shared";
 
 type ToolShellItemProps = ToolDisclosureControlProps & {
   message: ConversationMessage;
