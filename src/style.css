@@ -40,7 +40,7 @@
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-size-ui: 14px;
   --font-size-composer: 17px;
-  --font-size-code: 14px;
+  --font-size-code: 13px;
   --desktop-header-height: 52px;
   --tool-running: hsl(38 96% 43%);
   --tool-success: hsl(260 60% 56%);
