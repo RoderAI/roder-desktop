@@ -540,6 +540,7 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
     toolStatus,
     toolInput: isShellToolName(toolName) ? command : undefined,
     toolOutput: toolDetailOutput(toolName, detailOutput) ?? (detailOutput || undefined),
+    toolPreview: toolPreview(toolName, input, payload),
     toolSubject: toolSubject(toolName, input, payload),
     toolSummary: summary,
   };
@@ -655,6 +656,7 @@ function mergeMessage(existing: ConversationMessage, incoming: ConversationMessa
     toolSummary: preferredToolSummary(existing, incoming),
     toolInput: incoming.toolInput || existing.toolInput,
     toolOutput: mergedToolOutput(existing, incoming),
+    toolPreview: incoming.toolPreview || existing.toolPreview,
     toolName: mergedToolName(existing, incoming),
     toolSubject: incoming.toolSubject || existing.toolSubject,
     toolCallId: incoming.toolCallId || existing.toolCallId,
@@ -696,7 +698,10 @@ function completedToolSummary(summary: string, status: ConversationMessage["stat
   return summary
     .replace(/^Reading\s+/, "Read ")
     .replace(/^Searching for\s+/, "Searched for ")
-    .replace(/^Running\s+/, "Ran ");
+    .replace(/^Running\s+/, "Ran ")
+    .replace(/^Writing\s+/, "Wrote ")
+    .replace(/^Editing\s+/, "Edited ")
+    .replace(/^Applying patch\b/, "Applied patch");
 }
 
 function messageKey(message: ConversationMessage): string {
@@ -722,6 +727,10 @@ function rawString(...values: unknown[]): string | undefined {
     }
   }
   return undefined;
+}
+
+function firstArray(...values: unknown[]): unknown[] | undefined {
+  return values.find(Array.isArray);
 }
 
 function summarizeInput(input: Record<string, unknown>): string {
@@ -801,6 +810,66 @@ function toolSubject(
     return shellCommand(input, payload);
   }
   return undefined;
+}
+
+function toolPreview(
+  toolName: string,
+  input: Record<string, unknown>,
+  payload: Record<string, unknown>,
+): string | undefined {
+  const canonicalName = canonicalToolName(toolName);
+  if (canonicalName === "apply_patch") {
+    return rawString(payload.patch, input.patch);
+  }
+  if (canonicalName === "write_file") {
+    return rawString(payload.content, payload.text, input.content, input.text);
+  }
+  if (canonicalName === "edit") {
+    return editPreview(input, payload);
+  }
+  if (canonicalName === "multi_edit") {
+    return multiEditPreview(input, payload);
+  }
+  return undefined;
+}
+
+function editPreview(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  const oldText = rawString(
+    payload.old_string,
+    payload.oldText,
+    payload.old,
+    input.old_string,
+    input.oldText,
+    input.old,
+  );
+  const newText = rawString(
+    payload.new_string,
+    payload.newText,
+    payload.new,
+    input.new_string,
+    input.newText,
+    input.new,
+  );
+  if (!oldText && !newText) {
+    return rawString(payload.patch, input.patch);
+  }
+  return [`- ${oldText ?? ""}`, `+ ${newText ?? ""}`].join("\n");
+}
+
+function multiEditPreview(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  const edits = firstArray(payload.edits, input.edits);
+  if (!edits) {
+    return editPreview(input, payload);
+  }
+
+  const blocks = edits.flatMap((edit, index) => {
+    if (!isRecord(edit)) {
+      return [];
+    }
+    const preview = editPreview(edit, {});
+    return preview ? [`@@ edit ${index + 1} @@\n${preview}`] : [];
+  });
+  return blocks.length > 0 ? blocks.join("\n") : undefined;
 }
 
 function stripShellHarnessMetadata(output: string): string {

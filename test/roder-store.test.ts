@@ -176,6 +176,58 @@ test("new threads use the current cwd instead of an unmatched stale workspace", 
   );
 });
 
+test("staging a new thread keeps the clicked project when a previous thread read finishes late", async () => {
+  let resolveThreadRead: ((value: unknown) => void) | undefined;
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>((method) => {
+    switch (method) {
+      case "thread/read":
+        return new Promise((resolve) => {
+          resolveThreadRead = resolve;
+        });
+      case "thread/goal/get":
+        return Promise.resolve({ goal: null });
+      default:
+        return Promise.resolve({});
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "previous-thread",
+    selectedWorkspaceCwd: "/work/previous-project",
+    selectedWorkspaceId: "ws-previous",
+    selectedRootId: "root-previous",
+    threads: [],
+    threadDetails: {},
+  });
+
+  const selectingPrevious = useRoderStore.getState().selectThread("previous-thread", { pushHistory: false });
+  useRoderStore.getState().setSelectedWorkspaceCwd("/work/clicked-project");
+  await useRoderStore.getState().selectThread("", { pushHistory: false });
+
+  resolveThreadRead?.({
+    thread: {
+      id: "previous-thread",
+      preview: "Previous thread",
+      modelProvider: "openai",
+      model: "gpt-5.5",
+      createdAt: 1770000100,
+      updatedAt: 1770000100,
+      status: { type: "idle", activeTurnId: null, activeFlags: [] },
+      workspaceId: "ws-previous",
+      rootId: "root-previous",
+      cwd: "/work/previous-project",
+      turns: [],
+    },
+  });
+  await selectingPrevious;
+
+  expect(useRoderStore.getState().activeThreadId).toBe("");
+  expect(useRoderStore.getState().selectedWorkspaceCwd).toBe("/work/clicked-project");
+  expect(useRoderStore.getState().selectedWorkspaceId).toBe("");
+  expect(useRoderStore.getState().selectedRootId).toBe("");
+});
+
 test("bootstrap still loads core app data when workspace listing is unavailable", async () => {
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
     switch (method) {

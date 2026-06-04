@@ -474,6 +474,7 @@ export type ConversationMessage = {
   toolStatus?: "running" | "complete" | "failed";
   toolInput?: string;
   toolOutput?: string;
+  toolPreview?: string;
   toolSubject?: string;
   toolSummary?: string;
 };
