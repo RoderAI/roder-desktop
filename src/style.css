@@ -154,6 +154,51 @@ code {
   font-size: var(--font-size-code);
 }
 
+.file-code-view .shiki {
+  min-width: 100%;
+  margin: 0;
+  padding: 1rem;
+  overflow: visible;
+  background: var(--color-background) !important;
+  color: var(--shiki-light);
+  font-family: var(--font-code);
+  font-size: var(--font-size-code);
+  font-weight: 400;
+  line-height: calc(var(--font-size-code) + 7px);
+  tab-size: 2;
+}
+
+.file-code-view .shiki code {
+  display: block;
+  min-width: max-content;
+  font-family: inherit;
+}
+
+.file-code-view .shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg, inherit);
+}
+
+:root.dark .file-code-view .shiki {
+  color: var(--shiki-dark);
+}
+
+:root.dark .file-code-view .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg, inherit);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .file-code-view .shiki {
+    color: var(--shiki-dark);
+  }
+
+  :root:not(.light) .file-code-view .shiki span {
+    color: var(--shiki-dark);
+    background-color: var(--shiki-dark-bg, inherit);
+  }
+}
+
 .skill-prompt-token {
   display: inline-grid;
   max-inline-size: 100%;

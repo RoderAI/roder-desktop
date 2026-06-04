@@ -4,6 +4,8 @@ import { AlertCircle, FileCode2, RefreshCw } from "lucide-react";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useFilePanelTree } from "@/hooks/use-file-panel-tree";
+import { useMountEffect } from "@/hooks/use-mount-effect";
+import { highlightFileContent, type HighlightedFileContent } from "@/lib/file-syntax-highlight";
 import {
   decodeFileContent,
   filePanelIndexedPathByTreePath,
@@ -243,13 +245,53 @@ function FileViewer({ state }: { state: FileViewState }): React.JSX.Element {
       )}
       {state.status === "error" && <PanelError message={state.error} inline />}
       {state.status === "text" && (
-        <div className="workspace-scrollbar min-h-0 flex-1 overflow-auto">
-          <pre className="m-0 min-w-full p-4 font-mono text-sm font-normal leading-6 text-foreground">
-            <code>{state.content.text}</code>
-          </pre>
-        </div>
+        <HighlightedCodeView
+          key={`${state.selection.rootId}:${state.selection.relativePath}`}
+          path={state.selection.relativePath}
+          text={state.content.text}
+        />
       )}
     </section>
+  );
+}
+
+function HighlightedCodeView({ path, text }: { path: string; text: string }): React.JSX.Element {
+  const [highlightedContent, setHighlightedContent] = useState<HighlightedFileContent | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useMountEffect(() => {
+    let active = true;
+    void highlightFileContent(path, text)
+      .then((content) => {
+        if (active) {
+          setHighlightedContent(content);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  });
+
+  if (highlightedContent && !failed) {
+    return (
+      <div
+        className="file-code-view workspace-scrollbar min-h-0 flex-1 overflow-auto"
+        dangerouslySetInnerHTML={{ __html: highlightedContent.html }}
+      />
+    );
+  }
+
+  return (
+    <div className="workspace-scrollbar min-h-0 flex-1 overflow-auto">
+      <pre className="m-0 min-w-full p-4 font-mono text-sm font-normal leading-6 text-foreground">
+        <code>{text}</code>
+      </pre>
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   resolveFilePanelPath,
   type FilePanelIndexedPath,
 } from "../src/lib/file-panel";
+import { highlightFileContent, languageForFilePath } from "../src/lib/file-syntax-highlight";
 import type { WorkspaceRoot } from "../src/types/roder";
 
 const roots: WorkspaceRoot[] = [
@@ -99,6 +100,25 @@ test("file panel decodes text and rejects binary or oversized content", () => {
     status: "too-large",
     bytes: 5,
   });
+});
+
+test("file panel detects syntax languages from common file paths", () => {
+  expect(languageForFilePath("src/components/file-panel.tsx")).toBe("tsx");
+  expect(languageForFilePath("package.json")).toBe("json");
+  expect(languageForFilePath(".env.example")).toBe("dotenv");
+  expect(languageForFilePath("unknown.custom-extension")).toBe("text");
+});
+
+test("file panel highlights text with the same Pierre themes as diffs", async () => {
+  const highlighted = await highlightFileContent("src/file.ts", 'const value: number = "<script>";\n');
+
+  expect(highlighted.language).toBe("typescript");
+  expect(highlighted.html).toContain("pierre-light");
+  expect(highlighted.html).toContain("pierre-dark-soft");
+  expect(highlighted.html).toContain("--shiki-light");
+  expect(highlighted.html).toContain("--shiki-dark");
+  expect(highlighted.html).toContain("&#x3C;script>");
+  expect(highlighted.html).not.toContain('"<script>"');
 });
 
 test("file panel renders unavailable and empty workspace states", async () => {
