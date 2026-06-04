@@ -30,6 +30,7 @@ type TopBarProps = {
   activeFolderPath: string;
   status: RoderStatus;
   workspacePanelOpen: boolean;
+  workspacePanelToggleVisible?: boolean;
   extensionSidebarVisible?: boolean;
   sidebarOpen: boolean;
   placement: "content" | "window";
@@ -52,6 +53,7 @@ export function TopBar({
   activeFolderPath,
   status,
   workspacePanelOpen,
+  workspacePanelToggleVisible = true,
   extensionSidebarVisible = false,
   sidebarOpen,
   placement,
@@ -71,6 +73,15 @@ export function TopBar({
   const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
   const isWindowTopBar = placement === "window";
   const goalLabel = goal?.objective.trim() ?? "";
+  const viewMenuItems: WindowMenuItem[] = [
+    { label: sidebarOpen ? "Hide sidebar" : "Show sidebar", onSelect: onToggleSidebar },
+  ];
+  if (workspacePanelToggleVisible) {
+    viewMenuItems.push({
+      label: workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel",
+      onSelect: workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell,
+    });
+  }
 
   if (isWindowTopBar) {
     return (
@@ -96,16 +107,7 @@ export function TopBar({
               ]}
             />
             <WindowMenuButton label="Edit" items={[{ label: "No edit actions available", disabled: true }]} />
-            <WindowMenuButton
-              label="View"
-              items={[
-                { label: sidebarOpen ? "Hide sidebar" : "Show sidebar", onSelect: onToggleSidebar },
-                {
-                  label: workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel",
-                  onSelect: workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell,
-                },
-              ]}
-            />
+            <WindowMenuButton label="View" items={viewMenuItems} />
             <WindowMenuButton
               label="Window"
               items={[{ label: "Window controls use the system buttons", disabled: true }]}
@@ -129,20 +131,22 @@ export function TopBar({
               Restart
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              chromeIconButtonClassNameForState(workspacePanelOpen),
-              "size-7 rounded-lg [&_svg]:size-4",
-              extensionSidebarVisible && "mr-12",
-            )}
-            aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-            title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-            onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
-          >
-            <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
-          </Button>
+          {workspacePanelToggleVisible && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                chromeIconButtonClassNameForState(workspacePanelOpen),
+                "size-7 rounded-lg [&_svg]:size-4",
+                extensionSidebarVisible && "mr-12",
+              )}
+              aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+              title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+              onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
+            >
+              <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
+            </Button>
+          )}
         </div>
       </header>
     );
@@ -151,11 +155,12 @@ export function TopBar({
   return (
     <header
       className={cn(
-        "drag-region flex shrink-0 items-center border-b text-muted-foreground",
+        "drag-region flex min-w-0 shrink-0 items-center overflow-hidden border-b text-muted-foreground",
         "h-(--desktop-header-height) border-border pr-12",
-        sidebarOpen ? "pl-5" : "pl-[148px]",
+        sidebarOpen ? "pl-5" : "pl-0",
       )}
     >
+      {!sidebarOpen && <div className="shrink-0 basis-[148px]" aria-hidden="true" />}
       <Button
         variant="ghost"
         size="icon"
@@ -169,9 +174,9 @@ export function TopBar({
       >
         <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
       </Button>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
         {sidebarOpen ? (
-          <h1 className="flex min-w-0 flex-1 items-baseline gap-1.5 text-base">
+          <h1 className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-base">
             <span className="max-w-48 shrink-0 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>
             <span className="shrink-0 text-muted-foreground/60" aria-hidden="true">
               /
@@ -179,7 +184,7 @@ export function TopBar({
             <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
               <span
                 className={cn(
-                  "thread-title-breadcrumb min-w-40 truncate font-semibold text-foreground",
+                  "thread-title-breadcrumb min-w-0 truncate font-semibold text-foreground",
                   goalLabel ? "shrink" : "flex-1",
                 )}
               >
@@ -207,19 +212,21 @@ export function TopBar({
             Restart
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            chromeIconButtonClassNameForState(workspacePanelOpen),
-            "fixed right-2 top-[11px] z-40 size-7 rounded-lg [&_svg]:size-4",
-          )}
-          aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-          title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-          onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
-        >
-          <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
-        </Button>
+        {workspacePanelToggleVisible && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              chromeIconButtonClassNameForState(workspacePanelOpen),
+              "fixed right-2 top-[11px] z-40 size-7 rounded-lg [&_svg]:size-4",
+            )}
+            aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+            title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+            onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
+          >
+            <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
+          </Button>
+        )}
       </div>
     </header>
   );
@@ -277,10 +284,10 @@ function CollapsedBreadcrumb({
   const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
   const activeFolderKey = normalizeWorkspacePath(activeFolder?.path ?? activeFolderPath);
   return (
-    <div className="no-drag flex min-w-0 items-center gap-1.5 rounded-full bg-card/70 p-1 text-base shadow-sm ring-1 ring-border/70">
+    <div className="no-drag flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-full bg-card/70 p-1 text-base shadow-sm ring-1 ring-border/70">
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="flex h-7 max-w-[220px] items-center gap-2 rounded-full px-2.5 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[popup-open]:bg-accent"
+          className="flex h-7 min-w-0 max-w-[220px] shrink items-center gap-2 rounded-full px-2.5 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[popup-open]:bg-accent"
           aria-label={`Choose folder: ${activeFolderLabel}`}
           title={activeFolder?.path ?? activeFolderPath}
         >
@@ -317,7 +324,7 @@ function CollapsedBreadcrumb({
       <span className="select-none text-muted-foreground/60">/</span>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="flex h-7 max-w-[280px] items-center gap-2 rounded-full px-2.5 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[popup-open]:bg-accent"
+          className="flex h-7 min-w-0 max-w-[280px] shrink items-center gap-2 rounded-full px-2.5 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-[popup-open]:bg-accent"
           aria-label={`Choose thread: ${threadTitle(thread)}`}
           title={threadTitle(thread)}
         >
@@ -353,7 +360,7 @@ function CollapsedBreadcrumb({
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-      <GoalBreadcrumb goal={goal} />
+      <GoalBreadcrumb goal={goal} constrain />
     </div>
   );
 }

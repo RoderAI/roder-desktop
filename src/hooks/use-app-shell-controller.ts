@@ -422,7 +422,6 @@ export function useAppShellController(): AppShellController {
       panelTabs: routeSearch.panelTabs,
       selectedExtensionId,
       selectedExtensionPanelId: routeSearch.extensionPanel || null,
-      initialSidebarWidth: routeSearch.leftWidth,
       initialWorkspacePanelWidth: routeSearch.rightWidth,
       sidebarOpen,
       status,

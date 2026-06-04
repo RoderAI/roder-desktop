@@ -21,7 +21,6 @@ test("route search defaults preserve practical app layout state", () => {
     extension: "",
     extensionPanel: "",
     sidebar: true,
-    leftWidth: 274,
     rightWidth: 560,
     provider: "all",
     q: "",
@@ -29,7 +28,7 @@ test("route search defaults preserve practical app layout state", () => {
   });
 });
 
-test("route search rejects unknown literals and clamps layout widths", () => {
+test("route search rejects unknown literals and clamps workspace panel width", () => {
   expect(
     normalizeRouteSearch({
       panelTabs: "browser,debugger,review,browser",
@@ -38,7 +37,6 @@ test("route search rejects unknown literals and clamps layout widths", () => {
       reviewTurnId: "turn-1",
       reviewPath: "src/app.ts",
       sidebar: "false",
-      leftWidth: "120",
       rightWidth: "1200",
       provider: "github",
       categories: "codex,local",
@@ -53,7 +51,6 @@ test("route search rejects unknown literals and clamps layout widths", () => {
     extension: "",
     extensionPanel: "",
     sidebar: false,
-    leftWidth: 220,
     rightWidth: 1200,
     provider: "all",
     q: "",
@@ -72,7 +69,6 @@ test("route search accepts supported practical URL state values", () => {
       extension: "github",
       extensionPanel: "settings",
       sidebar: "false",
-      leftWidth: "320",
       rightWidth: "640",
       provider: "codex",
       q: "lint",
@@ -88,7 +84,6 @@ test("route search accepts supported practical URL state values", () => {
     extension: "github",
     extensionPanel: "settings",
     sidebar: false,
-    leftWidth: 320,
     rightWidth: 640,
     provider: "codex",
     q: "lint",
