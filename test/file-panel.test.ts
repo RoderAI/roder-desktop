@@ -9,11 +9,12 @@ import {
   filePanelShouldIndexDirectory,
   filePanelTreeInitialExpansion,
   filePanelTreePaths,
+  indexFilePanelWorkspaceRoots,
   resolveFilePanelPath,
   type FilePanelIndexedPath,
 } from "../src/lib/file-panel";
 import { highlightFileContent, languageForFilePath } from "../src/lib/file-syntax-highlight";
-import type { WorkspaceRoot } from "../src/types/roder";
+import type { FileSystemReadDirectoryResult, WorkspaceRoot } from "../src/types/roder";
 
 const roots: WorkspaceRoot[] = [
   { id: "root_a", name: "app", path: "/workspace/app" },
@@ -87,6 +88,32 @@ test("file panel opens tree results while searching", () => {
   expect(filePanelTreeInitialExpansion("index")).toBe("open");
 });
 
+test("file panel indexing keeps readable paths when a nested directory fails", async () => {
+  const result = await indexFilePanelWorkspaceRoots([roots[0]], 100, async (path) => {
+    if (path === "/workspace/app") {
+      return readDirectoryResult([directoryEntry("private"), directoryEntry("src"), fileEntry("README.md")]);
+    }
+    if (path === "/workspace/app/private") {
+      throw new Error("Permission denied");
+    }
+    if (path === "/workspace/app/src") {
+      return readDirectoryResult([fileEntry("index.ts")]);
+    }
+    throw new Error(`Unexpected path ${path}`);
+  });
+
+  expect(result).toEqual({
+    truncated: false,
+    indexedPaths: [
+      { rootId: "root_a", relativePath: "private", kind: "directory" },
+      { rootId: "root_a", relativePath: "src", kind: "directory" },
+      { rootId: "root_a", relativePath: "README.md", kind: "file" },
+      { rootId: "root_a", relativePath: "src/index.ts", kind: "file" },
+    ],
+    directoryErrors: [{ rootId: "root_a", relativePath: "private", error: "Permission denied" }],
+  });
+});
+
 test("file panel skips heavy directories while indexing", () => {
   expect(filePanelShouldIndexDirectory("src")).toBe(true);
   expect(filePanelShouldIndexDirectory("node_modules")).toBe(false);
@@ -141,6 +168,18 @@ function indexedPath(
   kind: FilePanelIndexedPath["kind"] = "file",
 ): FilePanelIndexedPath {
   return { rootId, relativePath, kind };
+}
+
+function readDirectoryResult(entries: FileSystemReadDirectoryResult["entries"]): FileSystemReadDirectoryResult {
+  return { entries };
+}
+
+function directoryEntry(fileName: string): FileSystemReadDirectoryResult["entries"][number] {
+  return { fileName, isDirectory: true, isFile: false };
+}
+
+function fileEntry(fileName: string): FileSystemReadDirectoryResult["entries"][number] {
+  return { fileName, isDirectory: false, isFile: true };
 }
 
 async function renderPanel({
