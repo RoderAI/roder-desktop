@@ -22,6 +22,7 @@ import type {
   TasksGetResult,
   TasksListResult,
   TurnInputItem,
+  VcsChangeArea,
   VcsChangesListResult,
   VcsChangesReadResult,
   SpeechProviderDescriptor,
@@ -190,6 +191,8 @@ export type VcsChangesListOptions = {
 export type VcsChangesReadOptions = {
   offset?: number;
   limit?: number;
+  area?: VcsChangeArea;
+  ignoreWhitespace?: boolean;
 };
 
 export const roderIpc = {
@@ -294,6 +297,8 @@ export const roderIpc = {
       path,
       offset: options.offset,
       limit: options.limit,
+      area: options.area,
+      ignoreWhitespace: options.ignoreWhitespace,
     }) as Promise<VcsChangesReadResult>,
   threadState: () => window.roderDesktop.request("thread/state", {}) as Promise<ThreadStateResult>,
   resolveApproval: (params: { approvalId: string; approved: boolean }) =>

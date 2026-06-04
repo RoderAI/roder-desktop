@@ -2,7 +2,8 @@ import type { ConversationMessage } from "@/types/roder";
 import type { ToolGroupKind } from "@/lib/tool-display";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
-import { DisclosureChevron, groupStatus, groupStatusLabel, ShimmerText, toolTextClass } from "./tool-timeline-shared";
+import { groupStatus, groupStatusLabel, toolTextClass } from "@/lib/tool-timeline";
+import { DisclosureChevron, ShimmerText } from "./tool-timeline-shared";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 
 export function CompactToolGroup({

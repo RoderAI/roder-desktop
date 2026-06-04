@@ -234,6 +234,9 @@ code[data-streamdown="inline-code"] {
 
 [data-streamdown="code-block"] {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 [data-streamdown="code-block"] > div:has(> [data-streamdown="code-block-actions"]) {
@@ -248,6 +251,24 @@ code[data-streamdown="inline-code"] {
 [data-streamdown="code-block-body"] pre > code > span {
   display: block;
   min-height: 1lh;
+}
+
+.message-markdown [data-streamdown="code-block-body"] {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.message-markdown [data-streamdown="code-block-body"] pre {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  white-space: pre;
+}
+
+.message-markdown [data-streamdown="code-block-body"] code,
+.message-markdown [data-streamdown="code-block-body"] code > span {
+  white-space: pre;
 }
 
 .message-markdown > * {

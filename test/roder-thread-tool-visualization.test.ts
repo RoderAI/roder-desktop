@@ -131,6 +131,27 @@ test("common typed tool executions are summarized as compact activity", () => {
   ]);
 });
 
+test("namespaced typed tool executions use compact timeline summaries", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool("tool-read-1", "functions.read_file", { path: "src/components/tool-timeline-item.tsx" }),
+        tool("tool-grep-1", "functions.grep", { query: "ToolTimelineItem", path: "src" }),
+        tool("tool-shell-1", "functions.exec_command", { cmd: "pnpm test" }, "completed", "ok"),
+      ],
+      "completed",
+    ),
+  );
+
+  expect(plain(messages.map((message) => message.toolSummary))).toEqual([
+    "Read tool-timeline-item.tsx",
+    'Searched for "ToolTimelineItem" in src',
+    "Ran pnpm test",
+  ]);
+  expect(messages[2].toolInput).toBe("pnpm test");
+});
+
 test("shell tools summarize the command and keep cleaned output details", () => {
   const messages = messagesFromTurn(
     "thread-1",
