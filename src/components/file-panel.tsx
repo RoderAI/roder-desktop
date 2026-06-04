@@ -220,7 +220,7 @@ function OpenFileTabs({
       <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 flex-1 overflow-hidden">
         <TabsList
           variant="chrome"
-          className="file-tabs-scroll w-full max-w-full flex-nowrap justify-start overflow-x-auto overflow-y-hidden"
+          className="file-tabs-scroll w-full max-w-full flex-nowrap justify-start overflow-x-auto overflow-y-hidden px-8 scroll-px-8"
           aria-label="Open files"
         >
           {tabs.map((tab) => (
@@ -257,7 +257,14 @@ function OpenFileTabs({
           ))}
         </TabsList>
       </Tabs>
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-white" />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-white"
+      />
     </div>
   );
 }
