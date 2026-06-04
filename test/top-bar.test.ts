@@ -17,7 +17,30 @@ test("content top bar moves the workspace panel button to the window edge withou
   expect(html).not.toContain("right-14");
 });
 
-function renderTopBar({ extensionSidebarVisible }: { extensionSidebarVisible: boolean }): string {
+test("content top bar hides the workspace panel toggle when the panel cannot fit", () => {
+  const html = renderTopBar({ extensionSidebarVisible: false, workspacePanelToggleVisible: false });
+
+  expect(html).not.toContain("Show workspace panel");
+  expect(html).not.toContain("right-2");
+});
+
+test("content top bar keeps the sidebar toggle in the same position when toggled", () => {
+  const openHtml = renderTopBar({ extensionSidebarVisible: false, sidebarOpen: true });
+  const closedHtml = renderTopBar({ extensionSidebarVisible: false, sidebarOpen: false });
+
+  expect(openHtml).toContain("fixed left-20 top-[11px]");
+  expect(closedHtml).toContain("fixed left-20 top-[11px]");
+});
+
+function renderTopBar({
+  extensionSidebarVisible,
+  sidebarOpen = false,
+  workspacePanelToggleVisible = true,
+}: {
+  extensionSidebarVisible: boolean;
+  sidebarOpen?: boolean;
+  workspacePanelToggleVisible?: boolean;
+}): string {
   return renderToStaticMarkup(
     React.createElement(TopBar, {
       threads: [],
@@ -25,8 +48,9 @@ function renderTopBar({ extensionSidebarVisible }: { extensionSidebarVisible: bo
       activeFolderPath: "/Users/pz/project",
       status: { state: "ready", binary: "roder" },
       workspacePanelOpen: false,
+      workspacePanelToggleVisible,
       extensionSidebarVisible,
-      sidebarOpen: false,
+      sidebarOpen,
       placement: "content",
       onNewProject: () => {},
       onNewThread: () => {},

@@ -30,6 +30,8 @@ export function reviewFileTreeToggleLabel(visible: boolean): string {
   return visible ? "Hide changed files" : "Show changed files";
 }
 
+export const reviewFileTreeDefaultVisible = false;
+
 export const reviewFileTreeWidthBounds = {
   min: 180,
   defaultValue: 240,

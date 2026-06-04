@@ -97,6 +97,7 @@ export type AppCommand = {
 const api = {
   platform: process.platform,
   request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
+  setMinWindowWidth: (width: number) => ipcRenderer.invoke("window:setMinWidth", width) as Promise<void>,
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
   restart: () => ipcRenderer.invoke("roder:restart") as Promise<RoderStatus>,
   status: () => ipcRenderer.invoke("roder:status") as Promise<RoderStatus>,
