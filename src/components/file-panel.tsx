@@ -112,7 +112,7 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(190px,240px)_minmax(0,1fr)]">
         <aside className="flex min-h-0 min-w-0 flex-col border-r border-border bg-background">
-          <div className="border-b border-border px-3 py-2">
+          <div className="px-3 py-2">
             <input
               value={search}
               type="search"
