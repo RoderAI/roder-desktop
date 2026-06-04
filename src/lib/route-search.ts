@@ -11,7 +11,7 @@ import {
   type inferParserType,
 } from "nuqs";
 
-export const workspacePanelValues = ["terminal", "browser", "canvas", "extensions", "review"] as const;
+export const workspacePanelValues = ["terminal", "browser", "canvas", "extensions", "review", "files"] as const;
 export const pluginProviderValues = ["all", "anthropic", "cursor", "codex", "local"] as const;
 export const reviewScopeValues = ["thread", "turn", "branch"] as const;
 

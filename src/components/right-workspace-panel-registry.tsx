@@ -1,14 +1,15 @@
-import { GitCompareArrows, Globe2, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
+import { Files, GitCompareArrows, Globe2, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
 import type React from "react";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
+import { FilePanel } from "@/components/file-panel";
 import { ReviewPanel } from "@/components/review-panel";
 import { TerminalPanel } from "@/components/terminal-panel";
 import type { NativeOverlayOcclusion, RightWorkspacePanelEntry } from "@/components/right-workspace-panel-shell";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
 import type { RouteReviewScope, RouteWorkspacePanel } from "@/lib/route-search";
-import type { DesktopAttachment } from "@/types/roder";
+import type { DesktopAttachment, WorkspaceRoot } from "@/types/roder";
 
 export const rightWorkspacePanelEntries: RightWorkspacePanelEntry[] = [
   {
@@ -41,6 +42,12 @@ export const rightWorkspacePanelEntries: RightWorkspacePanelEntry[] = [
     description: "Installed panels",
     icon: <Puzzle />,
   },
+  {
+    id: "files",
+    title: "Files",
+    description: "Browse workspace",
+    icon: <Files />,
+  },
 ];
 
 export type RightWorkspacePanelRenderContext = {
@@ -49,6 +56,7 @@ export type RightWorkspacePanelRenderContext = {
   activeThreadId: string;
   activeWorkspaceCwd: string;
   activeWorkspaceRef: { workspaceId: string; rootId: string };
+  activeWorkspaceRoots: WorkspaceRoot[];
   hunkSummary: ThreadHunkSummary;
   reviewPath: string;
   reviewScope: RouteReviewScope;
@@ -107,6 +115,21 @@ export function renderRightWorkspacePanel(
         selectedExtensionId={context.selectedExtensionId}
         selectedPanelId={context.selectedExtensionPanelId}
         onSelectedPanelChange={context.onSelectedExtensionPanelChange}
+      />
+    );
+  }
+  if (panel === "files") {
+    const workspaceKey = context.activeWorkspaceRoots.map((root) => `${root.id}:${root.path}`).join("|");
+    const filesystemKey =
+      context.appServerMethods.includes("fs/readDirectory") && context.appServerMethods.includes("fs/readFile")
+        ? "fs-ready"
+        : "fs-unavailable";
+    return (
+      <FilePanel
+        key={`${context.activeWorkspaceRef.workspaceId}:${context.activeWorkspaceRef.rootId}:${workspaceKey}:${filesystemKey}`}
+        roots={context.activeWorkspaceRoots}
+        selectedRootId={context.activeWorkspaceRef.rootId}
+        appServerMethods={context.appServerMethods}
       />
     );
   }
