@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  activeWorkspaceCwdForPathname,
   archiveRouteAfterThreadRemoval,
   defaultRouteForHydratedState,
   defaultPluginsRoute,
@@ -15,6 +16,28 @@ test("thread routes select the URL thread without pushing custom thread history"
     pushHistory: false,
   });
   expect(threadSelectionForRoute({ route: "thread", threadId: "thread-a", activeThreadId: "thread-a" })).toBeNull();
+});
+
+test("new route stages prompts in the selected folder instead of the previous active thread folder", () => {
+  expect(
+    activeWorkspaceCwdForPathname({
+      pathname: "/new",
+      activeThreadCwd: "/work/previous-project",
+      selectedWorkspaceCwd: "/work/clicked-project",
+      statusCwd: "/work/default",
+    }),
+  ).toBe("/work/clicked-project");
+});
+
+test("thread route still reflects the active thread folder", () => {
+  expect(
+    activeWorkspaceCwdForPathname({
+      pathname: "/threads/thread-a",
+      activeThreadCwd: "/work/active-project",
+      selectedWorkspaceCwd: "/work/selected-project",
+      statusCwd: "/work/default",
+    }),
+  ).toBe("/work/active-project");
 });
 
 test("new route clears active thread selection so prompt send starts a thread", () => {

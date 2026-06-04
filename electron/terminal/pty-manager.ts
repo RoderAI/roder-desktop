@@ -25,7 +25,7 @@ export class TerminalManager extends EventEmitter {
     }
 
     const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "zsh");
-    const term = nodePty.spawn(shell, [], {
+    const term = nodePty.spawn(shell, terminalShellArgs(shell, process.platform), {
       name: "xterm-256color",
       cols: options.cols ?? 96,
       rows: options.rows ?? 28,
@@ -72,4 +72,18 @@ export class TerminalManager extends EventEmitter {
     this.#session.pty.kill();
     this.#session = null;
   }
+}
+
+export function terminalShellArgs(shell: string, platform: NodeJS.Platform = process.platform): string[] {
+  if (platform === "win32") {
+    return [];
+  }
+  const shellName = shell.split(/[\\/]/).pop() ?? shell;
+  if (shellName === "bash" || shellName === "zsh") {
+    return ["-l"];
+  }
+  if (shellName === "fish") {
+    return ["--login"];
+  }
+  return [];
 }

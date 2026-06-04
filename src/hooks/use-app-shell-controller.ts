@@ -13,7 +13,12 @@ import { runNativeCommandInvocation, type LocalTranscriptOffset } from "@/lib/na
 import { roderIpc } from "@/lib/roder-ipc";
 import { commandInvocation, slashCommandLikeText, type CommandInvocation } from "@/lib/roder-commands";
 import { useThemeApplication } from "@/hooks/use-theme-application";
-import { archiveRouteAfterThreadRemoval, defaultPluginsRoute, isPluginsRoutePath } from "@/lib/route-selection";
+import {
+  activeWorkspaceCwdForPathname,
+  archiveRouteAfterThreadRemoval,
+  defaultPluginsRoute,
+  isPluginsRoutePath,
+} from "@/lib/route-selection";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
 import {
   closeWorkspacePanelShell,
@@ -90,7 +95,12 @@ export function useAppShellController(): AppShellController {
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
-  const activeWorkspaceCwd = activeThread?.cwd ?? selectedWorkspaceCwd ?? status.cwd ?? "";
+  const activeWorkspaceCwd = activeWorkspaceCwdForPathname({
+    pathname,
+    activeThreadCwd: activeThread?.cwd,
+    selectedWorkspaceCwd,
+    statusCwd: status.cwd,
+  });
   const activeWorkspaceRef = useMemo(
     () => ({
       workspaceId: activeThread?.workspaceId ?? agent.selectedWorkspaceId ?? "",

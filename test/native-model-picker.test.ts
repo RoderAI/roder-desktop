@@ -46,3 +46,40 @@ test("marks only the selected provider with the selected-row indicator for dupli
   expect(html).not.toMatch(/GPT-5\.5<\/span><span class="text-muted-foreground"> - gpt-5\.5/);
   expect(html).not.toContain("Current");
 });
+
+test("groups the native model picker by provider and includes visible configured claude-code models", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(NativeModelPicker, {
+      models: [
+        { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+        { id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" },
+        { id: "claude-code/opus", name: "Claude Code Opus", modelProvider: "claude-code" },
+      ],
+      selectedModel: "claude-code/sonnet",
+      selectedModelProvider: "claude-code",
+      onDismiss: () => undefined,
+      onSelect: () => undefined,
+    }),
+  );
+
+  expect(html).toContain("OpenAI");
+  expect(html).toContain("claude-code");
+  expect(html).toContain("Claude Code Sonnet");
+  expect(html).toContain("Claude Code Opus");
+  expect(html).toMatch(/Claude Code Sonnet<\/span><span class="text-muted-foreground"> - claude-code/);
+});
+
+test("does not render models hidden by desktop settings", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(NativeModelPicker, {
+      models: [{ id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" }],
+      selectedModel: "claude-code/sonnet",
+      selectedModelProvider: "claude-code",
+      onDismiss: () => undefined,
+      onSelect: () => undefined,
+    }),
+  );
+
+  expect(html).toContain("Claude Code Sonnet");
+  expect(html).not.toContain("Claude Code Opus");
+});

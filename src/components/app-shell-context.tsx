@@ -34,7 +34,7 @@ export type AppShellContextValue = {
   closeNativeModelPicker: () => void;
   followBottom: () => void;
   openReview: (scope: RouteReviewScope, turnId?: string) => void;
-  selectNativeCommandModel: (modelId: string) => void;
+  selectNativeCommandModel: (modelId: string, modelProvider?: string) => void;
   sendCommandInvocation: (invocation: CommandInvocation) => Promise<void>;
   sendPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
 };

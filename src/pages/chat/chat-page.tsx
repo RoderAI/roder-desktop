@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { useAppShell } from "@/components/app-shell-context";
@@ -62,15 +62,12 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const composerGuardStyle = {
     height: composerStackHeight + (canScrollTranscriptToBottom ? composerGuardFadeHeightPx : 0),
   };
-  const openThreadChanges = useCallback(() => {
+  const openThreadChanges = () => {
     openReview("thread");
-  }, [openReview]);
-  const openTurnChanges = useCallback(
-    (turnId: string) => {
-      openReview("turn", turnId);
-    },
-    [openReview],
-  );
+  };
+  const openTurnChanges = (turnId: string) => {
+    openReview("turn", turnId);
+  };
 
   useEffect(() => {
     const skillsContext = {

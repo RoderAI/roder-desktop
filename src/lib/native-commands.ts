@@ -132,7 +132,7 @@ function planModelCommand(argumentsText: string, models: RoderModel[]): NativeCo
   if (!model) {
     return {
       type: "output",
-      output: errorOutput("Model not found", `No visible model matches ${modelId}.`),
+      output: errorOutput("Model not found", `No configured model matches ${modelId}.`),
     };
   }
   return {
