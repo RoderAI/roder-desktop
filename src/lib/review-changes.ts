@@ -39,11 +39,25 @@ export type ReviewMergedChangedFile = {
   source: "hunk" | "observed" | "mixed";
 };
 
+export type ReviewTurnChangeSummary = {
+  additions: number;
+  deletions: number;
+  files: ReviewMergedChangedFile[];
+};
+
 export type HunkSummary = {
   fileCount: number;
   latestTurnId: string;
   turnChangeCounts: Record<string, number>;
+  turnChangeSummaries: Record<string, ReviewTurnChangeSummary>;
 };
+
+export function reviewTurnChangeLabel(summary: ReviewTurnChangeSummary): string {
+  if (summary.files.length === 1) {
+    return `Edited ${reviewFileName(summary.files[0].path)}`;
+  }
+  return `Edited ${summary.files.length} files`;
+}
 
 export type ReviewPatch = {
   patch: string;
@@ -211,6 +225,42 @@ export function changeCountsByTurn(
   return Object.fromEntries(Array.from(pathsByTurn.entries()).map(([turnId, paths]) => [turnId, paths.size]));
 }
 
+export function reviewTurnSummaries(
+  hunks: HunkRecord[],
+  observations: WorkspaceChangeObservation[] = [],
+): Record<string, ReviewTurnChangeSummary> {
+  const turnIds = new Set<string>();
+  for (const hunk of hunks) {
+    if (hunk.turnId) {
+      turnIds.add(hunk.turnId);
+    }
+  }
+  for (const observation of observations) {
+    if (observation.turnId) {
+      turnIds.add(observation.turnId);
+    }
+  }
+
+  return Object.fromEntries(
+    Array.from(turnIds)
+      .sort()
+      .map((turnId) => {
+        const files = mergeReviewChangedFiles(
+          groupHunksByFile(hunks.filter((hunk) => hunk.turnId === turnId)),
+          groupObservedChangesByFile(observations.filter((observation) => observation.turnId === turnId)),
+        );
+        return [
+          turnId,
+          {
+            additions: files.reduce((total, file) => total + file.additions, 0),
+            deletions: files.reduce((total, file) => total + file.deletions, 0),
+            files,
+          },
+        ];
+      }),
+  );
+}
+
 export function latestChangedTurnId(hunks: HunkRecord[], observations: WorkspaceChangeObservation[] = []): string {
   let latest = { turnId: "", timestamp: Number.NEGATIVE_INFINITY, order: -1 };
   let order = 0;
@@ -250,6 +300,7 @@ export function summarizeReviewChanges(hunks: HunkRecord[], observations: Worksp
     fileCount: paths.size,
     latestTurnId: latestChangedTurnId(hunks, observations),
     turnChangeCounts: changeCountsByTurn(hunks, observations),
+    turnChangeSummaries: reviewTurnSummaries(hunks, observations),
   };
 }
 
@@ -326,4 +377,8 @@ function latestCandidate(
 
 function normalizePatchPath(path: string): string {
   return path.replace(/^\/+/, "");
+}
+
+function reviewFileName(path: string): string {
+  return path.split(/[\\/]/u).filter(Boolean).at(-1) || path;
 }

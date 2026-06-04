@@ -9,8 +9,9 @@ import {
   type WheelEvent,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { GitCompareArrows } from "lucide-react";
+import { FileDiff } from "lucide-react";
 import type { ConversationMessage, SkillDescriptor } from "@/types/roder";
+import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
@@ -54,15 +55,13 @@ type TranscriptProps = {
   activeTurnId?: string;
   scrollStateKey?: string;
   showWorkingIndicator?: boolean;
-  threadChangeCount?: number;
-  turnChangeCounts?: Record<string, number>;
+  turnChangeSummaries?: Record<string, ReviewTurnChangeSummary>;
   onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
-  onReviewThreadChanges?: () => void;
   onReviewTurnChanges?: (turnId: string) => void;
 };
 
 const defaultTranscriptScrollStateKey = "default";
-const emptyTurnChangeCounts: Record<string, number> = {};
+const emptyTurnChangeSummaries: Record<string, ReviewTurnChangeSummary> = {};
 const transcriptScrollStateByKey = new Map<string, TranscriptScrollRestorationState>();
 
 export function Transcript({
@@ -72,10 +71,8 @@ export function Transcript({
   followSignal,
   scrollStateKey = defaultTranscriptScrollStateKey,
   showWorkingIndicator = false,
-  threadChangeCount = 0,
-  turnChangeCounts = emptyTurnChangeCounts,
+  turnChangeSummaries = emptyTurnChangeSummaries,
   onCanScrollToBottomChange,
-  onReviewThreadChanges,
   onReviewTurnChanges,
 }: TranscriptProps): React.JSX.Element {
   const skills = useSkillsStore((state) => state.skills);
@@ -115,18 +112,9 @@ export function Transcript({
         activeTurnId,
         messages,
         showWorkingIndicator,
-        threadChangeCount: onReviewThreadChanges ? threadChangeCount : 0,
-        turnChangeCounts: onReviewTurnChanges ? turnChangeCounts : {},
+        turnChangeSummaries: onReviewTurnChanges ? turnChangeSummaries : {},
       }),
-    [
-      activeTurnId,
-      messages,
-      onReviewThreadChanges,
-      onReviewTurnChanges,
-      showWorkingIndicator,
-      threadChangeCount,
-      turnChangeCounts,
-    ],
+    [activeTurnId, messages, onReviewTurnChanges, showWorkingIndicator, turnChangeSummaries],
   );
   const transcriptRowKeys = useMemo(() => transcriptRows.map((row) => row.key), [transcriptRows]);
   const rowKeyVersion = useMemo(() => transcriptRowKeys.join("\u0000"), [transcriptRowKeys]);
@@ -491,7 +479,6 @@ export function Transcript({
                   <TranscriptRowView
                     disclosureOpenByKey={disclosureOpenByKey}
                     onDisclosureOpenChange={setDisclosureOpen}
-                    onReviewThreadChanges={onReviewThreadChanges}
                     onReviewTurnChanges={onReviewTurnChanges}
                     row={row}
                     skills={skills}
@@ -509,38 +496,21 @@ export function Transcript({
 function TranscriptRowView({
   disclosureOpenByKey,
   onDisclosureOpenChange,
-  onReviewThreadChanges,
   onReviewTurnChanges,
   row,
   skills,
 }: {
   disclosureOpenByKey: TranscriptDisclosureState;
   onDisclosureOpenChange: (key: string, open: boolean) => void;
-  onReviewThreadChanges?: () => void;
   onReviewTurnChanges?: (turnId: string) => void;
   row: TranscriptRow;
   skills: SkillDescriptor[];
 }): React.JSX.Element | null {
-  if (row.kind === "threadReviewChanges") {
-    if (!onReviewThreadChanges) {
-      return null;
-    }
-    return (
-      <div className="flex justify-end">
-        <ChangesLink label="Changes" count={row.count} onClick={onReviewThreadChanges} />
-      </div>
-    );
-  }
-
   if (row.kind === "turnReviewChanges") {
     if (!onReviewTurnChanges) {
       return null;
     }
-    return (
-      <div className="flex justify-start">
-        <ChangesLink label="Turn changes" count={row.count} onClick={() => onReviewTurnChanges(row.turnId)} />
-      </div>
-    );
+    return <TurnChangesCard summary={row.summary} onReview={() => onReviewTurnChanges(row.turnId)} />;
   }
 
   if (row.kind === "working") {
@@ -625,11 +595,8 @@ function TranscriptEntryView({
 }
 
 function transcriptRowSpacing(row: TranscriptRow): string {
-  if (row.kind === "threadReviewChanges") {
-    return "pb-2";
-  }
   if (row.kind === "turnReviewChanges") {
-    return "pb-3";
+    return "py-3";
   }
   if (row.kind === "working") {
     return "py-1.5";
@@ -650,8 +617,8 @@ function estimateTranscriptRowSize(row: TranscriptRow | undefined): number {
   if (!row) {
     return 72;
   }
-  if (row.kind === "threadReviewChanges" || row.kind === "turnReviewChanges") {
-    return 40;
+  if (row.kind === "turnReviewChanges") {
+    return 88;
   }
   if (row.kind === "working") {
     return 56;
@@ -665,21 +632,48 @@ function estimateTranscriptRowSize(row: TranscriptRow | undefined): number {
   return 120;
 }
 
-function ChangesLink({
-  label,
-  count,
-  onClick,
+function TurnChangesCard({
+  summary,
+  onReview,
 }: {
-  label: string;
-  count: number;
-  onClick: () => void;
+  summary: ReviewTurnChangeSummary;
+  onReview: () => void;
 }): React.JSX.Element {
   return (
-    <Button variant="ghost" size="sm" className="h-8 rounded-md px-2.5 text-muted-foreground" onClick={onClick}>
-      <GitCompareArrows className="size-3.5" />
-      <span>{label}</span>
-      <span className="rounded-md bg-muted px-1.5 py-0.5 text-base text-muted-foreground">{count}</span>
-    </Button>
+    <section
+      aria-label={reviewTurnChangeLabel(summary)}
+      className="rounded-xl bg-white text-neutral-900 ring-1 ring-border"
+    >
+      <div className="flex items-center gap-3 p-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/45 text-muted-foreground">
+          <FileDiff className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium">{reviewTurnChangeLabel(summary)}</div>
+          <LineDelta additions={summary.additions} deletions={summary.deletions} />
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-10 rounded-lg bg-white px-4 text-neutral-900 ring-1 ring-border hover:bg-accent"
+          onClick={onReview}
+        >
+          Review changes
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function LineDelta({ additions, deletions }: { additions: number; deletions: number }): React.JSX.Element {
+  return (
+    <div
+      className="flex shrink-0 items-center gap-1.5 font-medium tabular-nums"
+      aria-label={`${additions} additions, ${deletions} deletions`}
+    >
+      <span className="text-emerald-600">+{additions}</span>
+      <span className="text-destructive">-{deletions}</span>
+    </div>
   );
 }
 

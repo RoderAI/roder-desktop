@@ -46,18 +46,11 @@ test("builds stable rows for collapsed activity groups", () => {
   ]);
 });
 
-test("adds a stable thread review-change row without changing message keys", () => {
+test("does not add a thread review-change row", () => {
   const message = createUserMessage("Review this.");
-  const withoutReviewRows = buildTranscriptRows({ messages: [message] });
-  const withReviewRows = buildTranscriptRows({ messages: [message], threadChangeCount: 2 });
+  const rows = buildTranscriptRows({ messages: [message] });
 
-  expect(withoutReviewRows.map((row) => row.key)).toEqual(["message:user-1"]);
-  expect(withReviewRows.map((row) => row.key)).toEqual(["thread-review-changes", "message:user-1"]);
-  expect(withReviewRows[0]).toMatchObject({
-    count: 2,
-    key: "thread-review-changes",
-    kind: "threadReviewChanges",
-  });
+  expect(rows.map((row) => row.key)).toEqual(["message:user-1"]);
 });
 
 test("adds turn review-change rows at the last row for each turn", () => {
@@ -68,9 +61,9 @@ test("adds turn review-change rows at the last row for each turn", () => {
       createUserMessage("Second turn", "turn-2", "user-2"),
       createAssistantMessage("Answer two", "turn-2", "assistant-2"),
     ],
-    turnChangeCounts: {
-      "turn-1": 3,
-      "turn-2": 1,
+    turnChangeSummaries: {
+      "turn-1": changeSummary(["src/app.ts", "README.md", "package.json"]),
+      "turn-2": changeSummary(["docs/api.md"]),
     },
   });
 
@@ -82,8 +75,16 @@ test("adds turn review-change rows at the last row for each turn", () => {
     "message:assistant-2",
     "turn-review-changes:turn-2",
   ]);
-  expect(rows[2]).toMatchObject({ count: 3, kind: "turnReviewChanges", turnId: "turn-1" });
-  expect(rows[5]).toMatchObject({ count: 1, kind: "turnReviewChanges", turnId: "turn-2" });
+  expect(rows[2]).toMatchObject({
+    kind: "turnReviewChanges",
+    summary: changeSummary(["src/app.ts", "README.md", "package.json"]),
+    turnId: "turn-1",
+  });
+  expect(rows[5]).toMatchObject({
+    kind: "turnReviewChanges",
+    summary: changeSummary(["docs/api.md"]),
+    turnId: "turn-2",
+  });
 });
 
 test("appends and removes the working row without changing existing keys", () => {
@@ -101,8 +102,8 @@ test("keeps inserted review rows visible before the stable working row", () => {
   const rows = buildTranscriptRows({
     messages: [message],
     showWorkingIndicator: true,
-    turnChangeCounts: {
-      "turn-1": 1,
+    turnChangeSummaries: {
+      "turn-1": changeSummary(["src/app.ts"]),
     },
   });
 
@@ -111,6 +112,30 @@ test("keeps inserted review rows visible before the stable working row", () => {
     "turn-review-changes:turn-1",
     "thread-working-indicator",
   ]);
+});
+
+test("builds searchable text for review change rows", () => {
+  const rows = buildTranscriptRows({
+    messages: [createAssistantMessage("Done", "turn-1")],
+    turnChangeSummaries: {
+      "turn-1": {
+        additions: 4,
+        deletions: 2,
+        files: [
+          {
+            path: "src/app.ts",
+            status: "modified",
+            additions: 4,
+            deletions: 2,
+            source: "observed",
+          },
+        ],
+      },
+    },
+  });
+
+  expect(transcriptRowsSearchText(rows)).toContain("Edited app.ts");
+  expect(transcriptRowsSearchText(rows)).toContain("+4 -2");
 });
 
 test("uses a stable working row for an otherwise empty transcript", () => {
@@ -228,6 +253,20 @@ function createAssistantMessage(text: string, turnId?: string, id = "assistant-1
     status: "complete",
     text,
     ...(turnId ? { turnId } : {}),
+  };
+}
+
+function changeSummary(paths: string[]) {
+  return {
+    additions: paths.length,
+    deletions: 0,
+    files: paths.map((path) => ({
+      path,
+      status: "modified" as const,
+      additions: 1,
+      deletions: 0,
+      source: "observed" as const,
+    })),
   };
 }
 

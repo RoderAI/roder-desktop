@@ -8,7 +8,9 @@ import {
   latestChangedTurnId,
   mergeReviewChangedFiles,
   pagedHunkToUnifiedPatch,
+  reviewTurnChangeLabel,
   reviewTurnIdCandidate,
+  reviewTurnSummaries,
   summarizeReviewChanges,
   summarizeHunks,
 } from "../src/lib/review-changes";
@@ -226,6 +228,96 @@ test("changeCountsByTurn counts files changed per turn rather than raw hunks", (
   });
 });
 
+test("reviewTurnSummaries merges per-turn hunk and observed file details", () => {
+  expect(
+    reviewTurnSummaries(
+      [
+        makeHunk({
+          id: "hunk-1",
+          turnId: "turn-1",
+          path: "src/app.ts",
+          diff: [
+            { kind: "removed", text: "old", oldLine: 1 },
+            { kind: "added", text: "new", newLine: 1 },
+          ],
+        }),
+        makeHunk({
+          id: "hunk-2",
+          turnId: "turn-1",
+          path: "docs/intro.md",
+          oldLines: 0,
+          newLines: 1,
+          diff: [{ kind: "added", text: "hello", newLine: 1 }],
+        }),
+      ],
+      [
+        makeObservedChange({
+          turnId: "turn-1",
+          files: [{ path: "src/app.ts", status: "modified", additions: 4, deletions: 2, binary: false }],
+        }),
+        makeObservedChange({
+          turnId: "turn-2",
+          files: [{ path: "README.md", status: "modified", additions: 1, deletions: 0, binary: false }],
+        }),
+      ],
+    ),
+  ).toEqual({
+    "turn-1": {
+      additions: 5,
+      deletions: 2,
+      files: [
+        expect.objectContaining({ path: "docs/intro.md", additions: 1, deletions: 0, status: "added" }),
+        expect.objectContaining({ path: "src/app.ts", additions: 4, deletions: 2, status: "modified" }),
+      ],
+    },
+    "turn-2": {
+      additions: 1,
+      deletions: 0,
+      files: [expect.objectContaining({ path: "README.md", additions: 1, deletions: 0, status: "modified" })],
+    },
+  });
+});
+
+test("reviewTurnChangeLabel names a single file and counts multiple files", () => {
+  expect(
+    reviewTurnChangeLabel({
+      additions: 5,
+      deletions: 5,
+      files: [
+        {
+          path: "src/components/file.tsx",
+          status: "modified",
+          additions: 5,
+          deletions: 5,
+          source: "observed",
+        },
+      ],
+    }),
+  ).toBe("Edited file.tsx");
+  expect(
+    reviewTurnChangeLabel({
+      additions: 6,
+      deletions: 1,
+      files: [
+        {
+          path: "src/app.ts",
+          status: "modified",
+          additions: 2,
+          deletions: 1,
+          source: "observed",
+        },
+        {
+          path: "README.md",
+          status: "modified",
+          additions: 4,
+          deletions: 0,
+          source: "observed",
+        },
+      ],
+    }),
+  ).toBe("Edited 2 files");
+});
+
 test("latestChangedTurnId chooses the latest turn represented by recorded hunks", () => {
   expect(
     latestChangedTurnId([
@@ -256,6 +348,18 @@ test("summarizeHunks derives thread-level review metadata once", () => {
       "turn-1": 1,
       "turn-2": 1,
     },
+    turnChangeSummaries: {
+      "turn-1": {
+        additions: 0,
+        deletions: 0,
+        files: [expect.objectContaining({ path: "src/app.ts" })],
+      },
+      "turn-2": {
+        additions: 0,
+        deletions: 0,
+        files: [expect.objectContaining({ path: "README.md" })],
+      },
+    },
   });
 });
 
@@ -282,6 +386,21 @@ test("summarizeReviewChanges combines exact hunks with observed workspace change
     turnChangeCounts: {
       "turn-1": 1,
       "turn-2": 2,
+    },
+    turnChangeSummaries: {
+      "turn-1": {
+        additions: 0,
+        deletions: 0,
+        files: [expect.objectContaining({ path: "src/app.ts" })],
+      },
+      "turn-2": {
+        additions: 6,
+        deletions: 1,
+        files: [
+          expect.objectContaining({ path: "README.md", additions: 4, deletions: 0 }),
+          expect.objectContaining({ path: "src/app.ts", additions: 2, deletions: 1 }),
+        ],
+      },
     },
   });
 });
