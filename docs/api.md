@@ -1662,6 +1662,7 @@ Examples:
     "workspaceId": "ws_abc123",
     "rootId": "root_abc123",
     "path": "src/app.rs",
+    "area": "unstaged",
     "offset": 0,
     "limit": 400
   }
@@ -1677,7 +1678,9 @@ Behavior:
 - The bundled git provider compares the merge-base of the resolved base with the
   working tree, including committed, staged, unstaged, and untracked changes.
 - `vcs/changes/read` validates provider-relative paths and returns paged changed
-  content for one changed file.
+  content for one changed file. When `area` is omitted, it returns the full
+  branch delta. When `area` is provided, providers may return just that file's
+  `committed`, `staged`, `unstaged`, or `untracked` content.
 
 ### Workflow import methods
 
