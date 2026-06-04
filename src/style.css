@@ -315,31 +315,33 @@ code[data-streamdown="inline-code"] {
  *
  * Read top-to-bottom. Each value is relative to the open/close trigger.
  *
- *   0ms   shell width begins 0px ↔ saved right panel width
+ *   0ms   panel root flex begins 0px ↔ saved workspace width
  *   0ms   panel content slides 12px ↔ 0px with the width change
  * 120ms   panel opacity settles 0 ↔ 1
  * 220ms   layout finishes resizing around the workspace panel
  */
+[data-panel][id="workspace-panel"][data-shell-toggle="true"] {
+  transition: flex-grow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: flex-grow;
+}
+
 .right-workspace-panel {
   --right-workspace-panel-duration: 220ms;
   --right-workspace-panel-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
-  width: 0;
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
   transform: translateX(12px);
   border-left-color: transparent;
   transition:
-    width var(--right-workspace-panel-duration) var(--right-workspace-panel-ease),
     transform var(--right-workspace-panel-duration) var(--right-workspace-panel-ease),
     opacity 120ms ease-out,
     border-color 120ms ease-out;
-  will-change: width, opacity, transform;
+  will-change: opacity, transform;
 }
 
 .right-workspace-panel[data-open="true"] {
-  width: var(--right-workspace-panel-width);
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
@@ -674,30 +676,32 @@ code[data-streamdown="inline-code"] {
  *
  * Read top-to-bottom. Each value is relative to the open/close trigger.
  *
- *   0ms   shell width begins 0px ↔ saved sidebar width
+ *   0ms   panel root flex begins 0px ↔ saved sidebar width
  *   0ms   panel slides -8px ↔ 0px with the width change
  * 140ms   panel opacity settles 0 ↔ 1
  * 240ms   layout finishes resizing around the sidebar
  */
+[data-panel][id="thread-sidebar"][data-shell-toggle="true"],
+[data-panel][id="thread-content"][data-shell-toggle="true"] {
+  transition: flex-grow 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: flex-grow;
+}
+
 .sidebar-shell {
   --sidebar-shell-duration: 240ms;
   --sidebar-shell-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
-  width: 0;
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
   /* Temporarily disabled to compare sidebar text rendering without compositor blur. */
   /* transform: translateX(-8px); */
-  transition:
-    width var(--sidebar-shell-duration) var(--sidebar-shell-ease),
-    opacity 140ms ease-out;
+  transition: opacity 140ms ease-out;
   /* transform var(--sidebar-shell-duration) var(--sidebar-shell-ease); */
   /* will-change: width, opacity, transform; */
 }
 
 .sidebar-shell[data-open="true"] {
-  width: var(--sidebar-width);
   opacity: 1;
   pointer-events: auto;
   /* transform: translateX(0); */
@@ -868,6 +872,11 @@ code[data-streamdown="inline-code"] {
   .right-workspace-panel {
     transition: none;
     transform: none;
+  }
+
+  [data-panel][data-shell-toggle="true"] {
+    transition: none;
+    will-change: auto;
   }
 
   .sidebar-shell {

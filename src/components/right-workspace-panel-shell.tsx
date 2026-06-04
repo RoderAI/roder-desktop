@@ -33,7 +33,8 @@ type RightWorkspacePanelShellProps = {
   tabs: RouteWorkspacePanel[];
   activePanel: RouteWorkspacePanel | null;
   entries: RightWorkspacePanelEntry[];
-  width: number;
+  freezeLayout?: boolean;
+  layoutWidth?: number;
   onAddPanel: (panel: RouteWorkspacePanel) => void;
   onClosePanel: (panel: RouteWorkspacePanel) => void;
   onSelectPanel: (panel: RouteWorkspacePanel) => void;
@@ -48,7 +49,8 @@ export function RightWorkspacePanelShell({
   tabs,
   activePanel,
   entries,
-  width,
+  freezeLayout = false,
+  layoutWidth,
   onAddPanel,
   onClosePanel,
   onSelectPanel,
@@ -57,17 +59,28 @@ export function RightWorkspacePanelShell({
   const [addMenuOpen, setAddMenuOpen] = React.useState(false);
   const [addMenuOcclusion, setAddMenuOcclusion] = React.useState<NativeOverlayOcclusion | null>(null);
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
-  const openEntries = tabs
-    .map((tab) => entriesById.get(tab))
-    .filter((entry): entry is RightWorkspacePanelEntry => !!entry);
+  const openEntries = tabs.reduce<RightWorkspacePanelEntry[]>((openEntries, tab) => {
+    const entry = entriesById.get(tab);
+    if (entry) {
+      openEntries.push(entry);
+    }
+    return openEntries;
+  }, []);
   const activeEntry = activePanel ? entriesById.get(activePanel) : null;
-  const panelStyle = { "--right-workspace-panel-width": `${width}px` } as RightWorkspacePanelStyle;
+  const frozenLayoutStyle =
+    freezeLayout && layoutWidth
+      ? ({
+          width: `${layoutWidth}px`,
+          minWidth: `${layoutWidth}px`,
+        } satisfies CSSProperties)
+      : undefined;
 
   return (
     <aside
-      className="right-workspace-panel relative flex h-full min-w-0 shrink-0 flex-col border-l border-border bg-background text-foreground"
+      className="right-workspace-panel relative flex h-full w-full min-w-0 flex-col border-l border-border bg-background text-foreground"
       data-open={open ? "true" : undefined}
-      style={panelStyle}
+      data-layout-frozen={freezeLayout ? "true" : undefined}
+      style={frozenLayoutStyle}
       aria-label="Workspace panel"
       aria-hidden={!open}
       inert={!open ? true : undefined}
@@ -160,10 +173,6 @@ function WorkspacePanelContent({
     </TabsContent>
   );
 }
-
-type RightWorkspacePanelStyle = CSSProperties & {
-  "--right-workspace-panel-width": string;
-};
 
 function WorkspacePanelTab({
   entry,
