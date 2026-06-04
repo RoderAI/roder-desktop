@@ -20,6 +20,10 @@ export type FilePanelSelection = {
   relativePath: string;
 };
 
+export type FilePanelTabIdentity = {
+  key: string;
+};
+
 export type FilePanelResolvedPath = {
   root: WorkspaceRoot;
   absolutePath: string;
@@ -149,6 +153,30 @@ export function filePanelSearchPaths(
 
 export function filePanelTreeInitialExpansion(search: string): FilePanelTreeInitialExpansion {
   return search.trim() ? "open" : 1;
+}
+
+export function filePanelSelectionKey(selection: FilePanelSelection): string {
+  return `${selection.rootId}\u0000${selection.relativePath}`;
+}
+
+export function filePanelTabTitle(selection: FilePanelSelection): string {
+  return basename(selection.relativePath) || selection.relativePath;
+}
+
+export function nextFilePanelActiveTabKey(
+  tabs: readonly FilePanelTabIdentity[],
+  activeKey: string | null,
+  closingKey: string,
+): string | null {
+  if (activeKey !== closingKey) {
+    return activeKey;
+  }
+  const closingIndex = tabs.findIndex((tab) => tab.key === closingKey);
+  if (closingIndex === -1) {
+    return activeKey;
+  }
+  const nextTabs = tabs.filter((tab) => tab.key !== closingKey);
+  return nextTabs[Math.min(closingIndex, nextTabs.length - 1)]?.key ?? null;
 }
 
 export function filePanelShouldIndexDirectory(relativePath: string): boolean {

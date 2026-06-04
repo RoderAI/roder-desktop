@@ -1,6 +1,6 @@
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTree as FileTreeModel } from "@pierre/trees";
-import { AlertCircle, FileCode2, RefreshCw } from "lucide-react";
+import { AlertCircle, FileCode2, RefreshCw, X } from "lucide-react";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useFilePanelTree } from "@/hooks/use-file-panel-tree";
@@ -11,8 +11,11 @@ import {
   filePanelIndexedPathByTreePath,
   filePanelRootItems,
   filePanelSearchPaths,
+  filePanelSelectionKey,
+  filePanelTabTitle,
   filePanelTreeInitialExpansion,
   filePanelTreePaths,
+  nextFilePanelActiveTabKey,
   resolveFilePanelPath,
   type DecodedFileContent,
   type FilePanelIndexedPath,
@@ -38,19 +41,44 @@ type FileViewState =
   | { status: "too-large"; selection: FilePanelSelection; label: string; bytes: number }
   | { status: "error"; selection: FilePanelSelection; label: string; error: string };
 
+type OpenFileViewState = Exclude<FileViewState, { status: "empty" }>;
+
+type OpenFileTab = {
+  key: string;
+  title: string;
+  state: OpenFileViewState;
+};
+
 export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanelProps): React.JSX.Element {
   const filesystemAvailable = appServerMethods.includes("fs/readDirectory") && appServerMethods.includes("fs/readFile");
   const orderedRoots = useMemo(() => orderWorkspaceRoots(roots, selectedRootId), [roots, selectedRootId]);
   const { state, refresh } = useFilePanelTree({ roots: orderedRoots, available: filesystemAvailable });
   const [search, setSearch] = useState("");
-  const [viewState, setViewState] = useState<FileViewState>({ status: "empty" });
+  const [openTabs, setOpenTabs] = useState<OpenFileTab[]>([]);
+  const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const readRequestSeq = useRef(0);
+  const openTabKeysRef = useRef<Set<string> | null>(null);
+  if (!openTabKeysRef.current) {
+    openTabKeysRef.current = new Set<string>();
+  }
+  const openTabKeys = openTabKeysRef.current;
+  openTabKeys.clear();
+  for (const tab of openTabs) {
+    openTabKeys.add(tab.key);
+  }
+  const readRequestSeqByTab = useRef<Map<string, number> | null>(null);
+  if (!readRequestSeqByTab.current) {
+    readRequestSeqByTab.current = new Map<string, number>();
+  }
+  const tabReadRequests = readRequestSeqByTab.current;
   const rootItems = useMemo(() => filePanelRootItems(orderedRoots), [orderedRoots]);
   const visibleIndexedPaths = useMemo(
     () => filePanelSearchPaths(orderedRoots, state.indexedPaths, search),
     [orderedRoots, search, state.indexedPaths],
   );
   const directoryErrorCount = state.status === "ready" ? state.directoryErrors.length : 0;
+  const activeTab = openTabs.find((tab) => tab.key === activeTabKey);
+  const viewState: FileViewState = activeTab?.state ?? { status: "empty" };
 
   const openFile = useCallback(
     (indexedPath: FilePanelIndexedPath) => {
@@ -59,45 +87,74 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
       }
       const selection = { rootId: indexedPath.rootId, relativePath: indexedPath.relativePath };
       const label = fileSelectionLabel(rootItems, selection);
+      const title = filePanelTabTitle(selection);
+      const tabKey = filePanelSelectionKey(selection);
+      setActiveTabKey(tabKey);
+      if (openTabKeys.has(tabKey)) {
+        return;
+      }
+      openTabKeys.add(tabKey);
       const requestId = (readRequestSeq.current += 1);
-      setViewState({ status: "loading", selection, label });
+      tabReadRequests.set(tabKey, requestId);
+      upsertOpenFileTab(setOpenTabs, { key: tabKey, title, state: { status: "loading", selection, label } });
       let resolvedPath: ReturnType<typeof resolveFilePanelPath>;
       try {
         resolvedPath = resolveFilePanelPath(orderedRoots, selection);
       } catch (error) {
-        setViewState({ status: "error", selection, label, error: errorMessage(error) });
+        updateOpenFileTabState(setOpenTabs, tabKey, { status: "error", selection, label, error: errorMessage(error) });
         return;
       }
       void roderIpc
         .readFile(resolvedPath.absolutePath)
         .then((result) => {
-          if (readRequestSeq.current !== requestId) {
+          if (tabReadRequests.get(tabKey) !== requestId) {
             return;
           }
           const content = decodeFileContent(result.dataBase64, { maxBytes: maxRenderedFileBytes });
           if (content.status === "text") {
-            setViewState({ status: "text", selection, label, content });
+            updateOpenFileTabState(setOpenTabs, tabKey, { status: "text", selection, label, content });
           } else if (content.status === "binary") {
-            setViewState({ status: "binary", selection, label, bytes: content.bytes });
+            updateOpenFileTabState(setOpenTabs, tabKey, { status: "binary", selection, label, bytes: content.bytes });
           } else {
-            setViewState({ status: "too-large", selection, label, bytes: content.bytes });
+            updateOpenFileTabState(setOpenTabs, tabKey, {
+              status: "too-large",
+              selection,
+              label,
+              bytes: content.bytes,
+            });
           }
         })
         .catch((error: unknown) => {
-          if (readRequestSeq.current !== requestId) {
+          if (tabReadRequests.get(tabKey) !== requestId) {
             return;
           }
-          setViewState({ status: "error", selection, label, error: errorMessage(error) });
+          updateOpenFileTabState(setOpenTabs, tabKey, {
+            status: "error",
+            selection,
+            label,
+            error: errorMessage(error),
+          });
         });
     },
-    [orderedRoots, rootItems],
+    [openTabKeys, orderedRoots, rootItems, tabReadRequests],
+  );
+
+  const closeFileTab = useCallback(
+    (tabKey: string) => {
+      openTabKeys.delete(tabKey);
+      tabReadRequests.delete(tabKey);
+      setOpenTabs((currentTabs) => {
+        setActiveTabKey((currentActiveKey) => nextFilePanelActiveTabKey(currentTabs, currentActiveKey, tabKey));
+        return currentTabs.filter((tab) => tab.key !== tabKey);
+      });
+    },
+    [openTabKeys, tabReadRequests],
   );
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
-        <FileCode2 className="size-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1 truncate text-base font-medium">Files</div>
+        <OpenFileTabs tabs={openTabs} activeKey={activeTabKey} onSelect={setActiveTabKey} onClose={closeFileTab} />
         <Button
           variant="ghost"
           size="icon-xs"
@@ -135,6 +192,88 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
         <FileViewer state={viewState} />
       </div>
     </div>
+  );
+}
+
+function OpenFileTabs({
+  tabs,
+  activeKey,
+  onSelect,
+  onClose,
+}: {
+  tabs: OpenFileTab[];
+  activeKey: string | null;
+  onSelect: (key: string) => void;
+  onClose: (key: string) => void;
+}): React.JSX.Element {
+  if (tabs.length === 0) {
+    return <div className="min-w-0 flex-1 text-base font-medium text-muted-foreground">Open a file</div>;
+  }
+
+  return (
+    <div
+      className="workspace-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
+      role="tablist"
+      aria-label="Open files"
+    >
+      {tabs.map((tab) => {
+        const active = tab.key === activeKey;
+        return (
+          <div
+            key={tab.key}
+            className={cn(
+              "group flex h-8 max-w-52 shrink-0 items-center rounded-lg text-base font-medium transition-colors",
+              active ? "bg-accent/60 text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+            )}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-l-lg pl-2 pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title={tab.state.label}
+              onClick={() => onSelect(tab.key)}
+            >
+              <FileCode2 className="size-3.5 shrink-0" />
+              <span className="truncate">{tab.title}</span>
+            </button>
+            <button
+              type="button"
+              className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-70 outline-none transition hover:bg-background/70 hover:text-foreground hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Close ${tab.title}`}
+              title={`Close ${tab.title}`}
+              onClick={() => onClose(tab.key)}
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function upsertOpenFileTab(
+  setOpenTabs: React.Dispatch<React.SetStateAction<OpenFileTab[]>>,
+  nextTab: OpenFileTab,
+): void {
+  setOpenTabs((currentTabs) => {
+    if (currentTabs.some((tab) => tab.key === nextTab.key)) {
+      return currentTabs.map((tab) => (tab.key === nextTab.key ? nextTab : tab));
+    }
+    return [...currentTabs, nextTab];
+  });
+}
+
+function updateOpenFileTabState(
+  setOpenTabs: React.Dispatch<React.SetStateAction<OpenFileTab[]>>,
+  tabKey: string,
+  nextState: OpenFileViewState,
+): void {
+  setOpenTabs((currentTabs) =>
+    currentTabs.map((tab) =>
+      tab.key === tabKey ? { ...tab, state: nextState, title: filePanelTabTitle(nextState.selection) } : tab,
+    ),
   );
 }
 
