@@ -645,7 +645,7 @@ function DiffFileSection({
   return (
     <section
       ref={setSection}
-      className="review-diff-file-section scroll-mt-0 bg-background"
+      className="review-diff-file-section scroll-mt-0 border-border bg-background last:border-b"
       data-review-file-path={file.path}
     >
       <DiffFileBody
