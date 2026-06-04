@@ -53,6 +53,16 @@ type OpenFileTab = {
   state: OpenFileViewState;
 };
 
+type FileTabsOverflowState = {
+  canScrollLeft: boolean;
+  canScrollRight: boolean;
+};
+
+const emptyFileTabsOverflowState: FileTabsOverflowState = {
+  canScrollLeft: false,
+  canScrollRight: false,
+};
+
 export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanelProps): React.JSX.Element {
   const filesystemAvailable = appServerMethods.includes("fs/readDirectory") && appServerMethods.includes("fs/readFile");
   const orderedRoots = useMemo(() => orderWorkspaceRoots(roots, selectedRootId), [roots, selectedRootId]);
@@ -210,6 +220,40 @@ function OpenFileTabs({
   onSelect: (key: string) => void;
   onClose: (key: string) => void;
 }): React.JSX.Element {
+  const [overflowState, setOverflowState] = useState<FileTabsOverflowState>(emptyFileTabsOverflowState);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const updateOverflowState = useCallback((node: HTMLElement) => {
+    const scrollLeft = Math.max(0, node.scrollLeft);
+    const maxScrollLeft = Math.max(0, node.scrollWidth - node.clientWidth);
+    const nextState = {
+      canScrollLeft: scrollLeft > 1,
+      canScrollRight: maxScrollLeft - scrollLeft > 1,
+    };
+    setOverflowState((currentState) =>
+      currentState.canScrollLeft === nextState.canScrollLeft && currentState.canScrollRight === nextState.canScrollRight
+        ? currentState
+        : nextState,
+    );
+  }, []);
+  const tabsListRef = (node: HTMLElement | null) => {
+    resizeObserverRef.current?.disconnect();
+    resizeObserverRef.current = null;
+    if (!node) {
+      return;
+    }
+    updateOverflowState(node);
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const resizeObserver = new ResizeObserver(() => updateOverflowState(node));
+    resizeObserver.observe(node);
+    resizeObserverRef.current = resizeObserver;
+  };
+  const updateTabsScrollState = useCallback(
+    (event: React.UIEvent<HTMLElement>) => updateOverflowState(event.currentTarget),
+    [updateOverflowState],
+  );
+
   if (tabs.length === 0) {
     return <div className="min-w-0 flex-1" />;
   }
@@ -219,9 +263,11 @@ function OpenFileTabs({
       <span aria-hidden dangerouslySetInnerHTML={{ __html: filePanelFileIconSpriteSheet }} />
       <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 flex-1 overflow-hidden">
         <TabsList
+          ref={tabsListRef}
           variant="chrome"
           className="file-tabs-scroll w-full max-w-full flex-nowrap justify-start overflow-x-auto overflow-y-hidden pr-8 scroll-pr-8"
           aria-label="Open files"
+          onScroll={updateTabsScrollState}
         >
           {tabs.map((tab) => (
             <div
@@ -258,14 +304,18 @@ function OpenFileTabs({
           ))}
         </TabsList>
       </Tabs>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-white"
-      />
+      {overflowState.canScrollLeft && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent"
+        />
+      )}
+      {overflowState.canScrollRight && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-white"
+        />
+      )}
     </div>
   );
 }
