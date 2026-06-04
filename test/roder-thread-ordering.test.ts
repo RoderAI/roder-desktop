@@ -143,7 +143,7 @@ test("user message images are projected into transcript messages", () => {
   ]);
 });
 
-test("typed item events project into stable reasoning and final message items", () => {
+test("typed item events keep reasoning items hidden and project commentary updates", () => {
   let current = {
     ...thread("thread-a", 100),
     status: { type: "running", activeTurnId: "turn-a", activeFlags: [] },
@@ -181,21 +181,36 @@ test("typed item events project into stable reasoning and final message items", 
     timestamp: "1970-01-01T00:00:00Z",
     event: {
       type: "itemDelta",
+      itemId: "turn-a-agent-commentary",
+      delta: { type: "agentMessageText", delta: "checking files", phase: "commentary" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 4,
+    eventId: "event-4",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemDelta",
       itemId: "turn-a-agent-final_answer",
       delta: { type: "agentMessageText", delta: "done", phase: "final_answer" },
     },
   });
 
   const items = current.turns[0].items;
-  expect(items.length).toBe(2);
+  expect(items.length).toBe(3);
   expect(items[0].type).toBe("reasoning");
   expect(Array.from(items[0].content)).toEqual(["thinking"]);
   expect(items[1].type).toBe("agentMessage");
-  expect(items[1].text).toBe("done");
+  expect(items[1].text).toBe("checking files");
+  expect(items[1].phase).toBe("commentary");
+  expect(items[2].type).toBe("agentMessage");
+  expect(items[2].text).toBe("done");
 
   const messages = messagesFromThread(current);
   expect(plain(messages.map((message) => [message.id, message.text, message.phase]))).toEqual([
-    ["turn-a-agent-reasoning", "thinking", "reasoning"],
+    ["turn-a-agent-commentary:commentary", "checking files", "commentary"],
     ["turn-a-agent-final_answer", "done", "final_answer"],
   ]);
 });

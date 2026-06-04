@@ -167,10 +167,13 @@ test("completed tool runs collapse into one expandable activity group", () => {
   ]);
 });
 
-test("goal tool mechanics are omitted from transcript activity", () => {
+test("state update tool mechanics are omitted from transcript activity", () => {
   const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-0", "get_goal", "Goal active: Inspect this repo."),
     createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
     createToolMessage("tool-1b", "update_goal", "Goal complete: Inspect this repo."),
+    createToolMessage("tool-1c", "update_plan", "Continue investigating the resize path."),
+    createToolMessage("tool-1d", "verification_review", "Verification completed: 1 changed files, 2 tests recorded"),
     createToolMessage("tool-2", "list_files", "Listed files in ."),
     createToolMessage("tool-3", "read_file", "Read README.md"),
   ]);
@@ -193,6 +196,41 @@ test("goal tool mechanics are omitted from transcript activity", () => {
         {
           kind: "message",
           message: createToolMessage("tool-3", "read_file", "Read README.md"),
+        },
+      ],
+    },
+  ]);
+});
+
+test("write stdin commands collapse into completed activity groups", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "read_file", "Read package.json"),
+    createToolMessage("tool-2", "write_stdin", "Ran pnpm typecheck"),
+    createToolMessage("tool-3", "shell", "Ran pnpm lint"),
+  ]);
+
+  expect(plain(grouped)).toEqual([
+    {
+      id: "activity-group:tool-1:tool-3",
+      kind: "activityGroup",
+      summary: {
+        commands: 2,
+        files: 1,
+        label: "Explored 1 file, ran 2 commands",
+        searches: 0,
+      },
+      entries: [
+        {
+          kind: "message",
+          message: createToolMessage("tool-1", "read_file", "Read package.json"),
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-2", "write_stdin", "Ran pnpm typecheck"),
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-3", "shell", "Ran pnpm lint"),
         },
       ],
     },

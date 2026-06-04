@@ -70,6 +70,7 @@ export function TopBar({
   );
   const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
   const isWindowTopBar = placement === "window";
+  const goalLabel = goal?.objective.trim() ?? "";
 
   if (isWindowTopBar) {
     return (
@@ -151,7 +152,7 @@ export function TopBar({
     <header
       className={cn(
         "drag-region flex shrink-0 items-center border-b text-muted-foreground",
-        "h-(--desktop-header-height) border-border pr-5",
+        "h-(--desktop-header-height) border-border pr-12",
         sidebarOpen ? "pl-5" : "pl-[148px]",
       )}
     >
@@ -170,13 +171,22 @@ export function TopBar({
       </Button>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {sidebarOpen ? (
-          <h1 className="flex min-w-0 items-baseline gap-1.5 text-base">
-            <span className="max-w-48 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>
+          <h1 className="flex min-w-0 flex-1 items-baseline gap-1.5 text-base">
+            <span className="max-w-48 shrink-0 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>
             <span className="shrink-0 text-muted-foreground/60" aria-hidden="true">
               /
             </span>
-            <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
-            <GoalBreadcrumb goal={goal} />
+            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+              <span
+                className={cn(
+                  "thread-title-breadcrumb min-w-40 truncate font-semibold text-foreground",
+                  goalLabel ? "shrink" : "flex-1",
+                )}
+              >
+                {threadTitle(thread)}
+              </span>
+              <GoalBreadcrumb goal={goal} constrain />
+            </span>
           </h1>
         ) : (
           <CollapsedBreadcrumb
@@ -348,7 +358,13 @@ function CollapsedBreadcrumb({
   );
 }
 
-function GoalBreadcrumb({ goal }: { goal?: RoderThreadGoal | null }): React.JSX.Element | null {
+function GoalBreadcrumb({
+  constrain = false,
+  goal,
+}: {
+  constrain?: boolean;
+  goal?: RoderThreadGoal | null;
+}): React.JSX.Element | null {
   if (!goal) {
     return null;
   }
@@ -364,7 +380,10 @@ function GoalBreadcrumb({ goal }: { goal?: RoderThreadGoal | null }): React.JSX.
       </span>
       <span
         aria-label={`Goal: ${label}`}
-        className="goal-breadcrumb-indicator min-w-0 max-w-80 truncate font-normal text-muted-foreground"
+        className={cn(
+          "goal-breadcrumb-indicator font-normal text-muted-foreground",
+          constrain ? "min-w-0 basis-1/3 shrink truncate" : "shrink-0 whitespace-nowrap",
+        )}
         title={label}
       >
         {label}
