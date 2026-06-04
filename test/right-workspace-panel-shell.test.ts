@@ -23,6 +23,12 @@ const entries: RightWorkspacePanelEntry[] = [
     description: "Changed files",
     icon: React.createElement("span", null, "R"),
   },
+  {
+    id: "files",
+    title: "Files",
+    description: "Browse workspace",
+    icon: React.createElement("span", null, "F"),
+  },
 ];
 
 test("right workspace panel shell renders an empty selection state", () => {
@@ -32,6 +38,7 @@ test("right workspace panel shell renders an empty selection state", () => {
   expect(html).toContain("Terminal");
   expect(html).toContain("Browser");
   expect(html).toContain("Review");
+  expect(html).toContain("Files");
   expect(html).toContain("Add workspace panel");
 });
 

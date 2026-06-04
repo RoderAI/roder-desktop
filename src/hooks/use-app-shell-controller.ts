@@ -32,7 +32,7 @@ import {
 } from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
 import { useCommandsStore } from "@/stores/commands-store";
-import type { DesktopAttachment } from "@/types/roder";
+import type { DesktopAttachment, WorkspaceRoot } from "@/types/roder";
 
 type AppShellController = {
   appShellContext: AppShellContextValue;
@@ -96,6 +96,10 @@ export function useAppShellController(): AppShellController {
     }),
     [activeThread?.rootId, activeThread?.workspaceId, agent.selectedRootId, agent.selectedWorkspaceId],
   );
+  const activeWorkspaceRoots = useMemo<WorkspaceRoot[]>(() => {
+    const workspace = agent.workspaces.find((candidate) => candidate.id === activeWorkspaceRef.workspaceId);
+    return workspace?.roots ?? [];
+  }, [activeWorkspaceRef.workspaceId, agent.workspaces]);
   const hunkSummary = useThreadHunkSummary(activeThreadId, agent.hunkRevision);
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
@@ -413,6 +417,7 @@ export function useAppShellController(): AppShellController {
       activePanel,
       activeWorkspaceCwd,
       activeWorkspaceRef,
+      activeWorkspaceRoots,
       folderOptions,
       isPluginsRoute,
       hunkSummary,

@@ -2,6 +2,8 @@ import type {
   CommandsListResult,
   CommandsRunResult,
   DesktopAttachment,
+  FileSystemReadDirectoryResult,
+  FileSystemReadFileResult,
   AgentsListResult,
   HunkListResult,
   HunkReadResult,
@@ -203,6 +205,9 @@ export const roderIpc = {
     window.roderDesktop.request("workspace/update", params) as Promise<WorkspaceUpdateResult>,
   forgetWorkspace: (workspaceId: string) =>
     window.roderDesktop.request("workspace/forget", { workspaceId }) as Promise<WorkspaceForgetResult>,
+  readDirectory: (path: string) =>
+    window.roderDesktop.request("fs/readDirectory", { path }) as Promise<FileSystemReadDirectoryResult>,
+  readFile: (path: string) => window.roderDesktop.request("fs/readFile", { path }) as Promise<FileSystemReadFileResult>,
   listThreads: (limit = 100) => window.roderDesktop.request("thread/list", { limit }) as Promise<ThreadListResult>,
   readThread: (threadId: string) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
