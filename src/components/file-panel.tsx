@@ -215,7 +215,7 @@ function OpenFileTabs({
   }
 
   return (
-    <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+    <div className="relative flex min-w-0 flex-1 items-center overflow-hidden">
       <span aria-hidden dangerouslySetInnerHTML={{ __html: filePanelFileIconSpriteSheet }} />
       <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 flex-1 overflow-hidden">
         <TabsList
@@ -257,6 +257,7 @@ function OpenFileTabs({
           ))}
         </TabsList>
       </Tabs>
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-white" />
     </div>
   );
 }
