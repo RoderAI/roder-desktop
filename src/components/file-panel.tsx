@@ -226,6 +226,7 @@ function OpenFileTabs({
           {tabs.map((tab) => (
             <div
               key={tab.key}
+              ref={tab.key === activeKey ? scrollFileTabIntoView : undefined}
               className="group/tab relative flex h-7 min-w-20 max-w-36 shrink-0 items-center overflow-hidden rounded-full text-muted-foreground transition-colors"
               title={tab.state.label}
             >
@@ -267,6 +268,10 @@ function OpenFileTabs({
       />
     </div>
   );
+}
+
+function scrollFileTabIntoView(node: HTMLDivElement | null): void {
+  node?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 function FileTabIcon({ path }: { path: string }): React.JSX.Element {
