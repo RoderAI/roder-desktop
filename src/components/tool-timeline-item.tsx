@@ -1,9 +1,10 @@
 import type { ConversationMessage } from "@/types/roder";
 import { isShellToolName } from "@/lib/tool-display";
+import { toolStatus, toolTextClass, toolTitle } from "@/lib/tool-timeline";
 import { cn } from "@/lib/utils";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 import { ToolShellItem } from "./tool-shell-item";
-import { ShimmerText, toolStatus, toolTextClass, toolTitle } from "./tool-timeline-shared";
+import { ShimmerText } from "./tool-timeline-shared";
 
 type ToolTimelineItemProps = ToolDisclosureControlProps & {
   message: ConversationMessage;
