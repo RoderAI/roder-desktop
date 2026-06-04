@@ -65,6 +65,10 @@ test("file panel resolves relative paths without escaping the selected root", ()
     absolutePath: "/workspace/packages/app/src/index.ts",
     root: roots[1],
   });
+  expect(resolveFilePanelPath(roots, { rootId: "root_b", relativePath: "src/../README.md" })).toEqual({
+    absolutePath: "/workspace/packages/app/README.md",
+    root: roots[1],
+  });
 
   expect(() => resolveFilePanelPath(roots, { rootId: "root_b", relativePath: "../secrets.txt" })).toThrow(
     "outside the workspace root",

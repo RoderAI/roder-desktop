@@ -1,7 +1,7 @@
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTree as FileTreeModel } from "@pierre/trees";
 import { AlertCircle, FileCode2, RefreshCw, X } from "lucide-react";
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFilePanelTree } from "@/hooks/use-file-panel-tree";
@@ -71,20 +71,8 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
   const [openTabs, setOpenTabs] = useState<OpenFileTab[]>([]);
   const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
   const readRequestSeq = useRef(0);
-  const openTabKeysRef = useRef<Set<string> | null>(null);
-  if (!openTabKeysRef.current) {
-    openTabKeysRef.current = new Set<string>();
-  }
-  const openTabKeys = openTabKeysRef.current;
-  openTabKeys.clear();
-  for (const tab of openTabs) {
-    openTabKeys.add(tab.key);
-  }
-  const readRequestSeqByTab = useRef<Map<string, number> | null>(null);
-  if (!readRequestSeqByTab.current) {
-    readRequestSeqByTab.current = new Map<string, number>();
-  }
-  const tabReadRequests = readRequestSeqByTab.current;
+  const openTabKeys = useMemo(() => new Set(openTabs.map((tab) => tab.key)), [openTabs]);
+  const tabReadRequests = useRef(new Map<string, number>()).current;
   const rootItems = useMemo(() => filePanelRootItems(orderedRoots), [orderedRoots]);
   const visibleIndexedPaths = useMemo(
     () => filePanelSearchPaths(orderedRoots, state.indexedPaths, search),
@@ -104,10 +92,9 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
       const title = filePanelTabTitle(selection);
       const tabKey = filePanelSelectionKey(selection);
       setActiveTabKey(tabKey);
-      if (openTabKeys.has(tabKey)) {
+      if (openTabKeys.has(tabKey) || tabReadRequests.has(tabKey)) {
         return;
       }
-      openTabKeys.add(tabKey);
       const requestId = (readRequestSeq.current += 1);
       tabReadRequests.set(tabKey, requestId);
       upsertOpenFileTab(setOpenTabs, { key: tabKey, title, state: { status: "loading", selection, label } });
@@ -155,19 +142,18 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
 
   const closeFileTab = useCallback(
     (tabKey: string) => {
-      openTabKeys.delete(tabKey);
       tabReadRequests.delete(tabKey);
       setOpenTabs((currentTabs) => {
         setActiveTabKey((currentActiveKey) => nextFilePanelActiveTabKey(currentTabs, currentActiveKey, tabKey));
         return currentTabs.filter((tab) => tab.key !== tabKey);
       });
     },
-    [openTabKeys, tabReadRequests],
+    [tabReadRequests],
   );
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-white px-3">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
         <OpenFileTabs tabs={openTabs} activeKey={activeTabKey} onSelect={setActiveTabKey} onClose={closeFileTab} />
         <Button
           variant="ghost"
@@ -221,6 +207,7 @@ function OpenFileTabs({
   onClose: (key: string) => void;
 }): React.JSX.Element {
   const [overflowState, setOverflowState] = useState<FileTabsOverflowState>(emptyFileTabsOverflowState);
+  const tabsListNodeRef = useRef<HTMLElement | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const updateOverflowState = useCallback((node: HTMLElement) => {
     const scrollLeft = Math.max(0, node.scrollLeft);
@@ -235,20 +222,33 @@ function OpenFileTabs({
         : nextState,
     );
   }, []);
-  const tabsListRef = (node: HTMLElement | null) => {
-    resizeObserverRef.current?.disconnect();
-    resizeObserverRef.current = null;
-    if (!node) {
-      return;
+  const tabsListRef = useCallback(
+    (node: HTMLElement | null) => {
+      if (tabsListNodeRef.current === node) {
+        return;
+      }
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+      tabsListNodeRef.current = node;
+      if (!node) {
+        return;
+      }
+      updateOverflowState(node);
+      if (typeof ResizeObserver === "undefined") {
+        return;
+      }
+      const resizeObserver = new ResizeObserver(() => updateOverflowState(node));
+      resizeObserver.observe(node);
+      resizeObserverRef.current = resizeObserver;
+    },
+    [updateOverflowState],
+  );
+  useLayoutEffect(() => {
+    const node = tabsListNodeRef.current;
+    if (node) {
+      updateOverflowState(node);
     }
-    updateOverflowState(node);
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const resizeObserver = new ResizeObserver(() => updateOverflowState(node));
-    resizeObserver.observe(node);
-    resizeObserverRef.current = resizeObserver;
-  };
+  }, [activeKey, tabs.length, updateOverflowState]);
   const updateTabsScrollState = useCallback(
     (event: React.UIEvent<HTMLElement>) => updateOverflowState(event.currentTarget),
     [updateOverflowState],
@@ -307,13 +307,13 @@ function OpenFileTabs({
       {overflowState.canScrollLeft && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent"
+          className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent"
         />
       )}
       {overflowState.canScrollRight && (
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-white"
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-background"
         />
       )}
     </div>
@@ -385,6 +385,10 @@ function FilePanelSidebar({
   directoryErrorCount: number;
   onOpenFile: (path: FilePanelIndexedPath) => void;
 }): React.JSX.Element {
+  const treePaths = useMemo(() => filePanelTreePaths(roots, indexedPaths), [indexedPaths, roots]);
+  const initialExpansion = filePanelTreeInitialExpansion(search);
+  const treeResetKey = `${initialExpansion}:${roots.map((root) => root.id).join("\u0000")}`;
+
   if (state === "unavailable") {
     return <PanelMessage title="Files unavailable">Update the app-server to browse workspace files.</PanelMessage>;
   }
@@ -395,8 +399,6 @@ function FilePanelSidebar({
     return <PanelMessage title="Unable to read files">Refresh or select a different workspace.</PanelMessage>;
   }
 
-  const treePaths = filePanelTreePaths(roots, indexedPaths);
-  const initialExpansion = filePanelTreeInitialExpansion(search);
   if (state === "ready" && treePaths.length === 0) {
     if (directoryErrorCount > 0) {
       return <PanelMessage title="No readable files">Some folders couldn't be read.</PanelMessage>;
@@ -413,7 +415,7 @@ function FilePanelSidebar({
       {directoryErrorCount > 0 && <DirectoryReadWarning count={directoryErrorCount} />}
       <div className="min-h-0 flex-1 pt-1.5">
         <FilePanelTree
-          key={treeKey(treePaths, initialExpansion)}
+          key={treeResetKey}
           roots={roots}
           indexedPaths={indexedPaths}
           initialExpansion={initialExpansion}
@@ -499,7 +501,7 @@ function FileViewer({ state }: { state: FileViewState }): React.JSX.Element {
       {state.status === "error" && <PanelError message={state.error} inline />}
       {state.status === "text" && (
         <HighlightedCodeView
-          key={`${state.selection.rootId}:${state.selection.relativePath}`}
+          key={`${state.selection.rootId}:${state.selection.relativePath}:${fileContentKey(state.content.text)}`}
           path={state.selection.relativePath}
           text={state.content.text}
         />
@@ -600,10 +602,6 @@ function fileSelectionLabel(rootItems: ReturnType<typeof filePanelRootItems>, se
   return root ? `${root.label}/${selection.relativePath}` : selection.relativePath;
 }
 
-function treeKey(paths: string[], initialExpansion: ReturnType<typeof filePanelTreeInitialExpansion>): string {
-  return `${initialExpansion}:${paths.join("\u0000")}`;
-}
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -612,6 +610,14 @@ function formatBytes(bytes: number): string {
     return `${Math.round(bytes / 102.4) / 10} KB`;
   }
   return `${Math.round(bytes / 1024 / 102.4) / 10} MB`;
+}
+
+function fileContentKey(text: string): string {
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) | 0;
+  }
+  return `${text.length}:${hash}`;
 }
 
 function errorMessage(error: unknown): string {
