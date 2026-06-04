@@ -1,0 +1,4 @@
+interface:
+  display_name: "No useEffect"
+  short_description: "Prefer React patterns that avoid effects"
+  default_prompt: "Use $no-use-effect to review this React change and replace unnecessary useEffect calls."
