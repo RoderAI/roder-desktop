@@ -15,6 +15,7 @@ import { useHorizontalResize } from "@/hooks/use-horizontal-resize";
 import {
   reviewActiveFilePath,
   reviewChangedFilesText,
+  reviewFileTreeDefaultVisible,
   reviewDiffPathsToLoad,
   reviewFileTreeStatusLabel,
   reviewFileTreeToggleLabel,
@@ -79,7 +80,7 @@ export function ReviewPanel({
     threadLatestTurnId,
     onSelectedPathChange,
   });
-  const [fileTreeVisible, setFileTreeVisible] = useState(true);
+  const [fileTreeVisible, setFileTreeVisible] = useState(reviewFileTreeDefaultVisible);
   const [fileTreeWidth, setFileTreeWidth] = useState<number>(reviewFileTreeWidthBounds.defaultValue);
   const [fileTreeResizing, setFileTreeResizing] = useState(false);
   const [diffScrollElement, setDiffScrollElement] = useState<HTMLElement | null>(null);

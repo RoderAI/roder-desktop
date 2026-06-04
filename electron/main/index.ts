@@ -21,6 +21,7 @@ import {
   type AppCommand,
 } from "./shortcuts";
 import { rendererZoomFactor, scaleRendererBounds } from "./renderer-scale";
+import { mainPanelMinWidth, mainWindowMinHeight, mainWindowMinWidth } from "./window-options";
 
 const roder = new RoderAppServerClient();
 const terminal = new TerminalManager();
@@ -82,8 +83,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 940,
-    minWidth: 980,
-    minHeight: 680,
+    minWidth: mainWindowMinWidth,
+    minHeight: mainWindowMinHeight,
     title: appName,
     icon: appIcon,
     autoHideMenuBar: process.platform !== "darwin",
@@ -157,6 +158,16 @@ ipcMain.handle("roder:appearance", () => currentAppearance());
 ipcMain.handle("openExternal", (_event, url: string) => openExternalTarget(url));
 ipcMain.handle("roder:request", async (_event, method: string, params: unknown) => {
   return handleRoderRequest(method, params);
+});
+ipcMain.handle("window:setMinWidth", (_event, width: number) => {
+  if (!mainWindow || !Number.isFinite(width)) {
+    return;
+  }
+  // The renderer derives this from the sidebar + readable main column (never the right panel).
+  // Clamp defensively so a bad value can never wedge the window at an unusable size.
+  const clampedWidth = Math.round(Math.min(4000, Math.max(mainPanelMinWidth, width)));
+  const [, currentMinHeight] = mainWindow.getMinimumSize();
+  mainWindow.setMinimumSize(clampedWidth, currentMinHeight || mainWindowMinHeight);
 });
 ipcMain.handle("workspace:openFolder", async (_event, defaultPath?: string) => {
   const options: Electron.OpenDialogOptions = {

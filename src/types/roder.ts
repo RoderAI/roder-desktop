@@ -765,6 +765,7 @@ declare global {
     roderDesktop: {
       platform: NodeJS.Platform;
       request: (method: string, params?: unknown) => Promise<unknown>;
+      setMinWindowWidth: (width: number) => Promise<void>;
       start: () => Promise<RoderStatus>;
       restart: () => Promise<RoderStatus>;
       status: () => Promise<RoderStatus>;

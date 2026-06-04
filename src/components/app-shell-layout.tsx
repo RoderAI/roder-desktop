@@ -15,23 +15,25 @@ import { renderRightWorkspacePanel, rightWorkspacePanelEntries } from "@/compone
 import { RightWorkspacePanelShell } from "@/components/right-workspace-panel-shell";
 import { TopBar, type WorkspacePanel } from "@/components/top-bar";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
-import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import {
+  canShowWorkspacePanelForGroupWidth,
+  clampSidebarWidth,
+  mainPanelMinWidth,
+  nativeWindowMinWidth,
+  shouldRenderWorkspacePanel,
   sidebarWidthBounds,
-  toolPanelWidthBounds,
-  type RouteReviewScope,
-  type RouteWorkspacePanel,
-} from "@/lib/route-search";
+} from "@/lib/app-shell-layout";
+import { getSidebarExtensions } from "@/lib/extension-sidebar";
+import { toolPanelWidthBounds, type RouteReviewScope, type RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
 import type { DesktopAttachment, RoderStatus, RoderThread, RoderThreadGoal } from "@/types/roder";
 
-const sidebarPanelId = "thread-sidebar";
 const contentPanelId = "thread-content";
 const workspacePanelId = "workspace-panel";
-const layoutId = "app-shell-workspace";
-const workspaceLayoutPanelIds = [sidebarPanelId, contentPanelId, workspacePanelId];
-const mainPanelMinSize = "500px";
+// Bumped to invalidate any persisted three-panel layout from when the sidebar lived in the group.
+const layoutId = "app-shell-workspace-v2";
+const workspaceLayoutPanelIds = [contentPanelId, workspacePanelId];
 const shellLayoutAnimationMs = 220;
 const sidebarPanelWidthStorageKey = "roder:app-shell:sidebar-panel-width";
 const resizeHandleClassName =
@@ -58,7 +60,6 @@ export type AppShellLayoutProps = {
   reviewTurnId: string;
   selectedExtensionId: string | null;
   selectedExtensionPanelId: string | null;
-  initialSidebarWidth: number;
   initialWorkspacePanelWidth: number;
   sidebarOpen: boolean;
   status: RoderStatus;
@@ -103,7 +104,6 @@ export function AppShellLayout({
   reviewTurnId,
   selectedExtensionId,
   selectedExtensionPanelId,
-  initialSidebarWidth,
   initialWorkspacePanelWidth,
   sidebarOpen,
   status,
@@ -132,72 +132,158 @@ export function AppShellLayout({
   onToggleSidebar,
 }: AppShellLayoutProps): React.JSX.Element {
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
+  const workspacePanelRequested = shouldRenderWorkspacePanel({ isPluginsRoute, workspacePanelOpen });
   const extensions = useExtensionsStore((state) => state.extensions);
   const extensionSidebarVisible = !isPluginsRoute && getSidebarExtensions(extensions).length > 0;
-  const sidebarPanelRef = usePanelRef();
   const workspacePanelRef = usePanelRef();
   const { defaultLayout, onLayoutChanged: saveLayout } = useDefaultLayout({
     id: layoutId,
     panelIds: workspaceLayoutPanelIds,
   });
-  const [measuredSidebarPanelWidth, setMeasuredSidebarPanelWidth] = useState<number>(() =>
-    readStoredSidebarPanelWidth(initialSidebarWidth),
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() =>
+    readStoredSidebarPanelWidth(sidebarWidthBounds.defaultValue),
   );
   const [measuredWorkspacePanelWidthOverride, setMeasuredWorkspacePanelWidthOverride] = useState<number | null>(null);
   const [shellAnimationState, setShellAnimationState] = useState<ShellAnimationState>({
     animating: false,
     frozenWorkspacePanelWidth: null,
   });
+  const sidebarWidthRef = useRef<number>(sidebarWidth);
   const measuredWorkspacePanelWidthRef = useRef<number>(initialWorkspacePanelWidth);
   const panelToggleInitializedRef = useRef(false);
+  const previousWorkspaceVisibleRef = useRef(false);
   const shellLayoutAnimating = shellAnimationState.animating;
   const measuredWorkspacePanelWidth = measuredWorkspacePanelWidthOverride ?? initialWorkspacePanelWidth;
+  const [appChromeGroupElement, setAppChromeGroupElement] = useState<HTMLDivElement | null>(null);
+  const [appChromeGroupWidth, setAppChromeGroupWidth] = useState<number | null>(() => Math.round(window.innerWidth));
+  // The workspace panel shares the group with the main column; the sidebar does not (it is a fixed
+  // flex item beside the group), so this only depends on the measured group width.
+  const canShowWorkspacePanel =
+    appChromeGroupWidth === null
+      ? true
+      : canShowWorkspacePanelForGroupWidth({
+          groupWidth: appChromeGroupWidth,
+          workspacePanelMinWidth: toolPanelWidthBounds.min,
+        });
+  const workspacePanelVisible = workspacePanelRequested && canShowWorkspacePanel;
+  const workspacePanelToggleVisible = workspacePanelOpen || canShowWorkspacePanel;
 
   useLayoutEffect(() => {
-    const sidebarPanel = sidebarPanelRef.current;
+    if (!appChromeGroupElement) {
+      setAppChromeGroupWidth(null);
+      return;
+    }
+
+    const groupElement = appChromeGroupElement;
+    function syncAppChromeGroupWidth(): void {
+      setAppChromeGroupWidth(Math.round(groupElement.getBoundingClientRect().width));
+    }
+
+    syncAppChromeGroupWidth();
+    const resizeObserver = new ResizeObserver(syncAppChromeGroupWidth);
+    resizeObserver.observe(groupElement);
+    return () => resizeObserver.disconnect();
+  }, [appChromeGroupElement]);
+
+  // Expand/collapse only the workspace panel via the resize library. The sidebar is not in the group
+  // — its open/close is a pure CSS width animation — so toggling the workspace panel cannot touch it
+  // and resizing the window cannot squeeze it. `sidebarOpen` is a dependency only so the shared
+  // animation freeze covers the sidebar's width transition too.
+  useLayoutEffect(() => {
     const workspacePanel = workspacePanelRef.current;
-    const shouldAnimate = panelToggleInitializedRef.current;
-    if (shouldAnimate) {
-      setShellAnimationState({
-        animating: true,
-        frozenWorkspacePanelWidth: measuredWorkspacePanelWidthRef.current,
-      });
-    }
+    const initialized = panelToggleInitializedRef.current;
+    const workspaceChanged = previousWorkspaceVisibleRef.current !== workspacePanelVisible;
+    previousWorkspaceVisibleRef.current = workspacePanelVisible;
 
-    if (sidebarPanel) {
-      if (sidebarOpen) {
-        sidebarPanel.expand();
-      } else {
-        sidebarPanel.collapse();
-      }
-    }
-
-    if (workspacePanel) {
-      if (!isPluginsRoute && workspacePanelOpen) {
+    if (workspacePanel && (!initialized || workspaceChanged)) {
+      if (workspacePanelVisible) {
         workspacePanel.expand();
       } else {
         workspacePanel.collapse();
       }
     }
 
-    if (!shouldAnimate) {
+    if (!initialized) {
       panelToggleInitializedRef.current = true;
       return;
     }
 
+    setShellAnimationState({
+      animating: true,
+      frozenWorkspacePanelWidth: measuredWorkspacePanelWidthRef.current,
+    });
     const animationTimer = window.setTimeout(() => {
       setShellAnimationState({ animating: false, frozenWorkspacePanelWidth: null });
     }, shellLayoutAnimationMs);
     return () => window.clearTimeout(animationTimer);
-  }, [isPluginsRoute, sidebarOpen, sidebarPanelRef, workspacePanelOpen, workspacePanelRef]);
+  }, [sidebarOpen, workspacePanelRef, workspacePanelVisible]);
 
-  function handleSidebarPanelResize(panelSize: PanelSize): void {
-    if (panelSize.inPixels <= 0 || shellLayoutAnimating) {
+  // Keep the native window minimum width at "everything beside the main column + the readable main
+  // minimum". `chromeWidth` (window width minus the group width) is the sidebar + its handle + the
+  // extension rail; it stays constant as the window resizes because only the group (main column)
+  // flexes, so there is no feedback loop and the main column can never be squeezed below its minimum.
+  // The right workspace panel lives in the group and is never reserved, so it yields first.
+  useLayoutEffect(() => {
+    if (appChromeGroupWidth === null) {
       return;
     }
-    const nextWidth = clampPanelWidth(Math.round(panelSize.inPixels), sidebarWidthBounds.min, sidebarWidthBounds.max);
-    setMeasuredSidebarPanelWidth(nextWidth);
+    const chromeWidth = Math.max(0, Math.round(window.innerWidth) - appChromeGroupWidth);
+    const minWidth = nativeWindowMinWidth({ chromeWidth });
+    // Guard against a stale preload bridge (e.g. before a full Electron dev restart) so a missing
+    // method can't throw out of this effect.
+    if (typeof window.roderDesktop.setMinWindowWidth === "function") {
+      void window.roderDesktop.setMinWindowWidth(minWidth);
+    }
+  }, [appChromeGroupWidth, sidebarOpen, sidebarWidth]);
+
+  useLayoutEffect(() => {
+    if (workspacePanelRequested && !canShowWorkspacePanel) {
+      onCloseWorkspacePanelShell();
+    }
+  }, [canShowWorkspacePanel, onCloseWorkspacePanelShell, workspacePanelRequested]);
+
+  function applySidebarWidth(nextWidth: number): void {
+    sidebarWidthRef.current = nextWidth;
+    setSidebarWidth(nextWidth);
     writeStoredSidebarPanelWidth(nextWidth);
+  }
+
+  // Custom drag handle: the sidebar lives outside the resize group, so we drive its width directly.
+  // This makes the sidebar width purely user-controlled and structurally independent of the window
+  // width (flex-shrink-0 keeps it fixed; only the main column flexes).
+  function handleSidebarResizePointerDown(event: React.PointerEvent<HTMLDivElement>): void {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = sidebarWidthRef.current;
+    // Reserve the readable main column plus whatever chrome already sits beside the sidebar (its
+    // handle, the extension rail) so dragging wider can never squeeze the main column below 500px.
+    const chromeBesideSidebar =
+      appChromeGroupWidth === null
+        ? 0
+        : Math.max(0, Math.round(window.innerWidth) - appChromeGroupWidth - startWidth);
+    const maxByWindow = Math.max(
+      sidebarWidthBounds.min,
+      Math.round(window.innerWidth) - chromeBesideSidebar - mainPanelMinWidth,
+    );
+
+    function handlePointerMove(moveEvent: PointerEvent): void {
+      const proposed = startWidth + (moveEvent.clientX - startX);
+      applySidebarWidth(Math.min(clampSidebarWidth(proposed), maxByWindow));
+    }
+    function handlePointerUp(): void {
+      document.body.style.removeProperty("cursor");
+      document.body.style.removeProperty("user-select");
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    }
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
   }
 
   function handleWorkspacePanelResize(panelSize: PanelSize): void {
@@ -210,31 +296,26 @@ export function AppShellLayout({
   }
 
   function handleLayoutChanged(layout: Layout): void {
-    const allRestorablePanelsOpen = sidebarOpen && !isPluginsRoute && workspacePanelOpen;
-    // Keep route-level hide/show state from overwriting the user's last real panel sizes.
-    if (allRestorablePanelsOpen) {
+    // The group only holds the main column and workspace panel; persist their split only while the
+    // workspace panel is open so a collapsed (0px) state never overwrites the user's last real sizes.
+    if (workspacePanelVisible) {
       saveLayout(layout);
     }
   }
 
-  const sidebarPanel = (
-    <Panel
-      id={sidebarPanelId}
-      panelRef={sidebarPanelRef}
-      collapsible
-      collapsedSize="0px"
-      defaultSize={sidebarOpen ? `${measuredSidebarPanelWidth}px` : "0px"}
-      minSize={`${sidebarWidthBounds.min}px`}
-      maxSize={`${sidebarWidthBounds.max}px`}
-      groupResizeBehavior="preserve-pixel-size"
-      onResize={handleSidebarPanelResize}
+  // The sidebar is a fixed flex item beside the resizable group (not inside it). flex-shrink-0 keeps
+  // its width independent of the window; open/close is a CSS width animation between 0 and its width.
+  const sidebarRegion = (
+    <div
+      className="sidebar-shell-region relative shrink-0 overflow-hidden"
       data-shell-toggle={shellLayoutAnimating ? "true" : undefined}
-      className="min-h-0 min-w-0"
+      style={{ width: sidebarOpen ? sidebarWidth : 0 }}
     >
       <div
-        className="sidebar-shell h-full w-full"
+        className="sidebar-shell h-full"
         data-open={sidebarOpen ? "true" : undefined}
         aria-hidden={!sidebarOpen}
+        style={{ width: sidebarWidth }}
       >
         <AppSidebar
           threads={threads}
@@ -250,13 +331,24 @@ export function AppShellLayout({
           onOpenSettings={() => onOpenSettings("general")}
         />
       </div>
-    </Panel>
+    </div>
   );
+
+  const sidebarResizeHandle = sidebarOpen ? (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize thread sidebar"
+      tabIndex={0}
+      className={`${resizeHandleClassName} shrink-0`}
+      onPointerDown={handleSidebarResizePointerDown}
+    />
+  ) : null;
 
   const contentPanel = (
     <Panel
       id={contentPanelId}
-      minSize={mainPanelMinSize}
+      minSize={`${mainPanelMinWidth}px`}
       data-shell-toggle={shellLayoutAnimating ? "true" : undefined}
       className="min-h-0 min-w-0"
     >
@@ -276,6 +368,7 @@ export function AppShellLayout({
                 activeFolderPath={activeWorkspaceCwd}
                 status={status}
                 workspacePanelOpen={workspacePanelOpen}
+                workspacePanelToggleVisible={workspacePanelToggleVisible}
                 extensionSidebarVisible={extensionSidebarVisible}
                 sidebarOpen={sidebarOpen}
                 placement="content"
@@ -305,7 +398,7 @@ export function AppShellLayout({
       panelRef={workspacePanelRef}
       collapsible
       collapsedSize="0px"
-      defaultSize={workspacePanelOpen ? `${initialWorkspacePanelWidth}px` : "0px"}
+      defaultSize={workspacePanelVisible ? `${initialWorkspacePanelWidth}px` : "0px"}
       minSize={`${toolPanelWidthBounds.min}px`}
       maxSize={`${toolPanelWidthBounds.max}px`}
       groupResizeBehavior="preserve-pixel-size"
@@ -314,7 +407,7 @@ export function AppShellLayout({
       className="min-h-0 min-w-0"
     >
       <RightWorkspacePanelShell
-        open={!isPluginsRoute && workspacePanelOpen}
+        open={workspacePanelVisible}
         tabs={panelTabs}
         activePanel={activePanel}
         entries={rightWorkspacePanelEntries}
@@ -354,16 +447,13 @@ export function AppShellLayout({
       id={layoutId}
       orientation="horizontal"
       defaultLayout={defaultLayout}
+      elementRef={setAppChromeGroupElement}
       onLayoutChanged={handleLayoutChanged}
       resizeTargetMinimumSize={{ coarse: 28, fine: 12 }}
       className="min-h-0 min-w-0 flex-1"
     >
-      {sidebarPanel}
-      {sidebarOpen && (
-        <Separator id="thread-sidebar-resize" aria-label="Resize thread sidebar" className={resizeHandleClassName} />
-      )}
       {contentPanel}
-      {!isPluginsRoute && workspacePanelOpen && (
+      {workspacePanelVisible && (
         <Separator id="workspace-panel-resize" aria-label="Resize workspace panel" className={resizeHandleClassName} />
       )}
       {workspacePanel}
@@ -382,6 +472,8 @@ export function AppShellLayout({
   if (!useWindowTopBar) {
     return (
       <div className="relative flex h-screen w-screen overflow-hidden bg-background">
+        {sidebarRegion}
+        {sidebarResizeHandle}
         {appChromeGroup}
         {extensionActivityRail}
       </div>
@@ -398,6 +490,7 @@ export function AppShellLayout({
         activeFolderPath={activeWorkspaceCwd}
         status={status}
         workspacePanelOpen={workspacePanelOpen}
+        workspacePanelToggleVisible={workspacePanelToggleVisible}
         extensionSidebarVisible={extensionSidebarVisible}
         sidebarOpen={sidebarOpen}
         placement="window"
@@ -412,6 +505,8 @@ export function AppShellLayout({
         onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
       />
       <div className="flex min-h-0 flex-1">
+        {sidebarRegion}
+        {sidebarResizeHandle}
         {appChromeGroup}
         {extensionActivityRail}
       </div>
@@ -429,7 +524,7 @@ function readStoredSidebarPanelWidth(fallbackWidth: number): number {
     if (!storedWidth) {
       return fallbackWidth;
     }
-    return clampPanelWidth(Number.parseInt(storedWidth, 10), sidebarWidthBounds.min, sidebarWidthBounds.max);
+    return clampSidebarWidth(Number.parseInt(storedWidth, 10));
   } catch {
     return fallbackWidth;
   }
@@ -441,11 +536,4 @@ function writeStoredSidebarPanelWidth(width: number): void {
   } catch {
     // Layout persistence is best-effort chrome state.
   }
-}
-
-function clampPanelWidth(width: number, min: number, max: number): number {
-  if (!Number.isFinite(width)) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, width));
 }

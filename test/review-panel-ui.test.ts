@@ -3,6 +3,7 @@ import {
   reviewActiveFilePath,
   reviewChangedFilesText,
   reviewDiffPathsToLoad,
+  reviewFileTreeDefaultVisible,
   reviewFileTreeStatusLabel,
   reviewFileTreeToggleLabel,
   reviewFileTreeWidth,
@@ -18,6 +19,10 @@ test("reviewChangedFilesText describes the number of changed files", () => {
 test("reviewFileTreeToggleLabel describes the action for the current file tree state", () => {
   expect(reviewFileTreeToggleLabel(true)).toBe("Hide changed files");
   expect(reviewFileTreeToggleLabel(false)).toBe("Show changed files");
+});
+
+test("review file tree starts hidden by default", () => {
+  expect(reviewFileTreeDefaultVisible).toBe(false);
 });
 
 test("reviewFileTreeWidth clamps the resizable file sidebar to practical bounds", () => {
