@@ -157,7 +157,7 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-white px-3">
         <OpenFileTabs tabs={openTabs} activeKey={activeTabKey} onSelect={setActiveTabKey} onClose={closeFileTab} />
         <Button
           variant="ghost"
