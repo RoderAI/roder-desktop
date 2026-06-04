@@ -173,6 +173,16 @@ export function filePanelTreeInitialExpansion(search: string): FilePanelTreeInit
   return search.trim() ? "open" : 1;
 }
 
+export function filePanelTreeInitialExpandedPaths(
+  paths: readonly string[],
+  initialExpansion: FilePanelTreeInitialExpansion,
+): string[] {
+  if (initialExpansion === "open") {
+    return filePanelTreeDirectoryPaths(paths, Number.POSITIVE_INFINITY);
+  }
+  return filePanelTreeDirectoryPaths(paths, initialExpansion);
+}
+
 export function filePanelSelectionKey(selection: FilePanelSelection): string {
   return `${selection.rootId}\u0000${selection.relativePath}`;
 }
@@ -371,6 +381,20 @@ function isWithinRoot(rootPath: string, absolutePath: string): boolean {
 
 function compareTreePaths(left: string, right: string): number {
   return left.localeCompare(right);
+}
+
+function filePanelTreeDirectoryPaths(paths: readonly string[], maxDepth: number): string[] {
+  const directories = new Set<string>();
+  for (const path of paths) {
+    const segments = path.split("/").filter(Boolean);
+    for (let index = 1; index < segments.length; index += 1) {
+      if (index > maxDepth) {
+        break;
+      }
+      directories.add(segments.slice(0, index).join("/"));
+    }
+  }
+  return [...directories];
 }
 
 function base64ToBytes(dataBase64: string): Uint8Array {

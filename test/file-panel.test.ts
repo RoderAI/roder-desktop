@@ -11,6 +11,7 @@ import {
   filePanelShouldIndexDirectory,
   filePanelSelectionKey,
   filePanelTabTitle,
+  filePanelTreeInitialExpandedPaths,
   filePanelTreeInitialExpansion,
   filePanelTreePaths,
   indexFilePanelWorkspaceRoots,
@@ -95,6 +96,15 @@ test("file panel opens tree results while searching", () => {
   expect(filePanelTreeInitialExpansion("")).toBe(1);
   expect(filePanelTreeInitialExpansion("   ")).toBe(1);
   expect(filePanelTreeInitialExpansion("index")).toBe("open");
+  expect(
+    filePanelTreeInitialExpandedPaths(["app/README.md", "app/src/index.ts", "app/src/components/file-panel.tsx"], 1),
+  ).toEqual(["app"]);
+  expect(
+    filePanelTreeInitialExpandedPaths(
+      ["app/README.md", "app/src/index.ts", "app/src/components/file-panel.tsx"],
+      "open",
+    ),
+  ).toEqual(["app", "app/src", "app/src/components"]);
 });
 
 test("file panel derives stable file tab labels and active tab fallbacks", () => {
