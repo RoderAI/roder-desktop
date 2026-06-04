@@ -19,12 +19,6 @@ export type RouteWorkspacePanel = (typeof workspacePanelValues)[number];
 export type RoutePluginProvider = (typeof pluginProviderValues)[number];
 export type RouteReviewScope = (typeof reviewScopeValues)[number];
 
-export const sidebarWidthBounds = {
-  min: 220,
-  defaultValue: 274,
-  max: 420,
-} as const;
-
 export const toolPanelWidthBounds = {
   min: 360,
   defaultValue: 560,
@@ -50,10 +44,6 @@ export const routeSearchParsers = {
   extension: parseAsString.withDefault(""),
   extensionPanel: parseAsString.withDefault(""),
   sidebar: parseAsBoolean.withDefault(true),
-  // Legacy URL width values are accepted as first-load fallbacks; live resizing is locally persisted.
-  leftWidth: parseAsClampedInteger(sidebarWidthBounds.min, sidebarWidthBounds.max).withDefault(
-    sidebarWidthBounds.defaultValue,
-  ),
   rightWidth: parseAsClampedInteger(toolPanelWidthBounds.min, toolPanelWidthBounds.max).withDefault(
     toolPanelWidthBounds.defaultValue,
   ),
