@@ -419,18 +419,7 @@ export function messagesFromRoderItem(
     ];
   }
   if (item.type === "reasoning") {
-    const phase = "reasoning";
-    return [
-      {
-        id: item.id,
-        threadId,
-        turnId,
-        role: "assistant",
-        text,
-        phase,
-        status: itemMessageStatus(item, turnStatus),
-      },
-    ];
+    return [];
   }
   if (item.type === "error") {
     return [{ id: item.id, threadId, turnId, role: "system", text, status: "failed" }];
@@ -751,9 +740,11 @@ function shellCommand(input: Record<string, unknown>, payload: Record<string, un
     payload.command,
     payload.cmd,
     payload.shell_command,
+    payload.chars,
     input.command,
     input.cmd,
     input.shell_command,
+    input.chars,
   );
 }
 

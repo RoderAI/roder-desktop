@@ -1,6 +1,5 @@
 import type { ActivitySummary, TranscriptToolEntry } from "@/lib/tool-message-groups";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { Search, TerminalSquare } from "lucide-react";
 import { CompactToolGroup } from "./compact-tool-group";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 import { ToolTimelineItem } from "./tool-timeline-item";
@@ -19,19 +18,16 @@ export function ToolActivityGroup({
   getEntryDisclosureControl?: (entry: TranscriptToolEntry) => ToolDisclosureControlProps;
   summary: ActivitySummary;
 } & ToolDisclosureControlProps): React.JSX.Element {
-  const Icon = summary.commands > 0 ? TerminalSquare : Search;
-
   return (
     <Collapsible.Root className="group/tool-activity text-base leading-7" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
-        className="flex min-h-8 w-full min-w-0 items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-8 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
       >
-        <Icon aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 truncate font-medium text-muted-foreground">{summary.label}</span>
         <DisclosureChevron groupName="tool-activity" />
       </Collapsible.Trigger>
-      <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-8 text-base leading-7 text-muted-foreground">
+      <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">
         <div className="py-1">
           {entries.map((entry) => (
             <ToolEntryDetail
