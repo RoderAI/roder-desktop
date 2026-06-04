@@ -7,7 +7,7 @@ import type {
   RoderThreadItemEventKind,
   RoderTurn,
 } from "@/types/roder";
-import { isShellToolName } from "@/lib/tool-display";
+import { canonicalToolName, isShellToolName } from "@/lib/tool-display";
 
 const emptyMessages: ConversationMessage[] = [];
 const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
@@ -546,7 +546,7 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
 }
 
 function toolDetailOutput(toolName: string, detailOutput: string): string | undefined {
-  if (!detailOutput || (!isShellToolName(toolName) && toolName !== "tool")) {
+  if (!detailOutput || (!isShellToolName(toolName) && canonicalToolName(toolName) !== "tool")) {
     return undefined;
   }
   return isShellToolName(toolName) ? stripShellHarnessMetadata(detailOutput) : detailOutput;
@@ -569,24 +569,25 @@ function summarizeTool(
   output: string,
   payload: Record<string, unknown>,
 ): string {
-  if (toolName === "read_file") {
+  const canonicalName = canonicalToolName(toolName);
+  if (canonicalName === "read_file") {
     const path = firstString(payload.path, payload.file, input.path, input.file);
     return path ? toolActionSummary(status, "Read", "Reading", "Failed to read", basename(path)) : "";
   }
 
-  if (toolName === "read_skill") {
+  if (canonicalName === "read_skill") {
     const name = toolSkillName(input, payload);
     return toolActionSummary(status, "Read", "Reading", "Failed to read", name ? `${name} Skill` : "Skill");
   }
 
-  if (toolName === "read_skill_file") {
+  if (canonicalName === "read_skill_file") {
     const skill = toolSkillName(input, payload);
     const fileName = firstString(payload.path, payload.file, input.path, input.file);
     const subject = [skill, fileName ? basename(fileName) : "file"].filter(Boolean).join(" ");
     return toolActionSummary(status, "Read", "Reading", "Failed to read", subject);
   }
 
-  if (toolName === "list_files") {
+  if (canonicalName === "list_files") {
     const path = toolPath(input, payload);
     const suffix = path ? ` in ${path}` : "";
     if (status === "failed") {
@@ -595,29 +596,29 @@ function summarizeTool(
     return status === "running" ? `Listing files${suffix}` : `Listed files${suffix}`;
   }
 
-  if (toolName === "grep" || toolName === "search_files") {
+  if (canonicalName === "grep" || canonicalName === "search_files") {
     const query = firstString(payload.query, payload.pattern, payload.regex, input.query, input.pattern, input.regex);
     const path = toolPath(input, payload);
     return query ? searchSummary(status, query, path) : "";
   }
 
-  if (toolName === "glob") {
+  if (canonicalName === "glob") {
     const pattern = firstString(payload.pattern, payload.glob, input.pattern, input.glob);
     const path = toolPath(input, payload);
     return pattern ? searchSummary(status, pattern, path) : "";
   }
 
-  if (toolName === "write_file") {
+  if (canonicalName === "write_file") {
     const path = toolPath(input, payload);
     return path ? toolActionSummary(status, "Wrote", "Writing", "Failed to write", basename(path)) : "";
   }
 
-  if (toolName === "edit" || toolName === "multi_edit") {
+  if (canonicalName === "edit" || canonicalName === "multi_edit") {
     const path = toolPath(input, payload);
     return path ? toolActionSummary(status, "Edited", "Editing", "Failed to edit", basename(path)) : "";
   }
 
-  if (toolName === "apply_patch") {
+  if (canonicalName === "apply_patch") {
     const path = toolPath(input, payload);
     const suffix = path ? ` to ${basename(path)}` : "";
     if (status === "failed") {
@@ -753,23 +754,24 @@ function toolSubject(
   input: Record<string, unknown>,
   payload: Record<string, unknown>,
 ): string | undefined {
-  if (toolName === "read_file") {
+  const canonicalName = canonicalToolName(toolName);
+  if (canonicalName === "read_file") {
     const path = firstString(payload.path, payload.file, input.path, input.file);
     return path ? basename(path) : undefined;
   }
-  if (toolName === "read_skill") {
+  if (canonicalName === "read_skill") {
     const name = toolSkillName(input, payload);
     return name ? `${name} Skill` : "Skill";
   }
-  if (toolName === "read_skill_file") {
+  if (canonicalName === "read_skill_file") {
     const skill = toolSkillName(input, payload);
     const fileName = firstString(payload.path, payload.file, input.path, input.file);
     return [skill, fileName ? basename(fileName) : "file"].filter(Boolean).join(" ") || undefined;
   }
-  if (toolName === "list_files") {
+  if (canonicalName === "list_files") {
     return toolPath(input, payload);
   }
-  if (toolName === "grep" || toolName === "search_files" || toolName === "glob") {
+  if (canonicalName === "grep" || canonicalName === "search_files" || canonicalName === "glob") {
     const query = firstString(
       payload.query,
       payload.pattern,
@@ -786,7 +788,12 @@ function toolSubject(
     }
     return path ? `${query} in ${path}` : query;
   }
-  if (toolName === "write_file" || toolName === "edit" || toolName === "multi_edit" || toolName === "apply_patch") {
+  if (
+    canonicalName === "write_file" ||
+    canonicalName === "edit" ||
+    canonicalName === "multi_edit" ||
+    canonicalName === "apply_patch"
+  ) {
     const path = toolPath(input, payload);
     return path ? basename(path) : undefined;
   }

@@ -39,14 +39,19 @@ const hiddenTranscriptTools = new Set([
   "verification_review",
 ]);
 
+export function canonicalToolName(toolName: string | undefined): string | undefined {
+  return toolName?.split(".").at(-1);
+}
+
 export function compactToolGroup(toolName: string | undefined): ToolGroupDescriptor | null {
-  if (toolName === "read_file") {
+  const canonicalName = canonicalToolName(toolName);
+  if (canonicalName === "read_file") {
     return { entryKind: "readFileGroup", family: "read_file", kind: "readFile" };
   }
-  if (toolName === "read_skill" || toolName === "read_skill_file") {
+  if (canonicalName === "read_skill" || canonicalName === "read_skill_file") {
     return { entryKind: "readSkillGroup", family: "read_skill", kind: "readSkill" };
   }
-  if (searchActivityTools.has(toolName ?? "")) {
+  if (searchActivityTools.has(canonicalName ?? "")) {
     return { entryKind: "searchGroup", family: "search", kind: "search" };
   }
   return null;
@@ -66,24 +71,25 @@ export function isExplorationActivityTool(toolName: string | undefined): boolean
 }
 
 export function isFileActivityTool(toolName: string | undefined): boolean {
-  return fileActivityTools.has(toolName ?? "");
+  return fileActivityTools.has(canonicalToolName(toolName) ?? "");
 }
 
 export function isSearchActivityTool(toolName: string | undefined): boolean {
-  return searchActivityTools.has(toolName ?? "");
+  return searchActivityTools.has(canonicalToolName(toolName) ?? "");
 }
 
 export function isHiddenTranscriptTool(toolName: string | undefined): boolean {
-  return hiddenTranscriptTools.has(toolName ?? "");
+  return hiddenTranscriptTools.has(canonicalToolName(toolName) ?? "");
 }
 
 export function isShellToolName(toolName: string | undefined): boolean {
+  const canonicalName = canonicalToolName(toolName);
   return (
-    toolName === "shell" ||
-    toolName === "exec_command" ||
-    toolName === "write_stdin" ||
-    toolName === "command" ||
-    toolName === "run_command" ||
+    canonicalName === "shell" ||
+    canonicalName === "exec_command" ||
+    canonicalName === "write_stdin" ||
+    canonicalName === "command" ||
+    canonicalName === "run_command" ||
     toolName === "process.spawn" ||
     toolName?.includes("shell_command") === true ||
     toolName?.includes("exec_command") === true
@@ -91,5 +97,5 @@ export function isShellToolName(toolName: string | undefined): boolean {
 }
 
 export function usesSummaryAsToolTitle(toolName: string | undefined): boolean {
-  return isShellToolName(toolName) || compactSummaryTools.has(toolName ?? "");
+  return isShellToolName(toolName) || compactSummaryTools.has(canonicalToolName(toolName) ?? "");
 }

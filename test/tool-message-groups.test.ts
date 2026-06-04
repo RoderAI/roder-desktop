@@ -167,7 +167,42 @@ test("completed tool runs collapse into one expandable activity group", () => {
   ]);
 });
 
-test("state update tool mechanics are omitted from transcript activity", () => {
+test("namespaced exploration tools collapse into activity groups", () => {
+  const grouped = groupToolMessagesForTranscript([
+    createToolMessage("tool-1", "functions.read_file", "Read README.md"),
+    createToolMessage("tool-2", "functions.grep", 'Searched for "Timeline" in src'),
+    createToolMessage("tool-3", "functions.exec_command", "Ran pnpm test"),
+  ]);
+
+  expect(plain(grouped)).toEqual([
+    {
+      id: "activity-group:tool-1:tool-3",
+      kind: "activityGroup",
+      summary: {
+        commands: 1,
+        files: 1,
+        label: "Explored 1 file, 1 search, ran 1 command",
+        searches: 1,
+      },
+      entries: [
+        {
+          kind: "message",
+          message: createToolMessage("tool-1", "functions.read_file", "Read README.md"),
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-2", "functions.grep", 'Searched for "Timeline" in src'),
+        },
+        {
+          kind: "message",
+          message: createToolMessage("tool-3", "functions.exec_command", "Ran pnpm test"),
+        },
+      ],
+    },
+  ]);
+});
+
+test("goal tool mechanics are omitted from transcript activity", () => {
   const grouped = groupToolMessagesForTranscript([
     createToolMessage("tool-0", "get_goal", "Goal active: Inspect this repo."),
     createToolMessage("tool-1", "create_goal", "Goal active: Inspect this repo."),
