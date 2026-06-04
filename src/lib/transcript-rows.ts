@@ -232,6 +232,7 @@ function messageSearchText(message: ConversationMessage): string {
     message.toolSubject,
     message.toolInput ? `$ ${message.toolInput}` : "",
     message.toolOutput,
+    message.toolPreview,
     message.text,
   ]
     .filter(Boolean)

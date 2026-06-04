@@ -434,22 +434,34 @@ export const useRoderStore = create<RoderStore>()(
             throw new Error("roder app-server did not return a thread");
           }
           const thread = normalizeThreadCwd(result.thread, get().status.cwd);
-          set((state) => ({
-            selectedModelProvider:
-              state.threadControlsByThread[threadId]?.modelProvider ||
-              thread.modelProvider ||
-              state.defaultModelProvider,
-            threadDetails: { ...state.threadDetails, [threadId]: thread },
-            threads: upsertThread(state.threads, thread),
-            threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, goalResult.goal),
-            selectedWorkspaceCwd: thread.cwd,
-            selectedWorkspaceId: thread.workspaceId ?? state.selectedWorkspaceId,
-            selectedRootId: thread.rootId ?? state.selectedRootId,
-            selectedModel: state.threadControlsByThread[threadId]?.model || thread.model || state.defaultModel,
-            selectedReasoning: state.threadControlsByThread[threadId]?.reasoning || state.defaultReasoning,
-            selectedPolicyMode: state.threadControlsByThread[threadId]?.policyMode || state.defaultPolicyMode,
-            workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
-          }));
+          set((state) => {
+            const threadIsActive = threadId === state.activeThreadId;
+            return {
+              selectedModelProvider: threadIsActive
+                ? state.threadControlsByThread[threadId]?.modelProvider ||
+                  thread.modelProvider ||
+                  state.defaultModelProvider
+                : state.selectedModelProvider,
+              threadDetails: { ...state.threadDetails, [threadId]: thread },
+              threads: upsertThread(state.threads, thread),
+              threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, goalResult.goal),
+              selectedWorkspaceCwd: threadIsActive ? thread.cwd : state.selectedWorkspaceCwd,
+              selectedWorkspaceId: threadIsActive
+                ? (thread.workspaceId ?? state.selectedWorkspaceId)
+                : state.selectedWorkspaceId,
+              selectedRootId: threadIsActive ? (thread.rootId ?? state.selectedRootId) : state.selectedRootId,
+              selectedModel: threadIsActive
+                ? state.threadControlsByThread[threadId]?.model || thread.model || state.defaultModel
+                : state.selectedModel,
+              selectedReasoning: threadIsActive
+                ? state.threadControlsByThread[threadId]?.reasoning || state.defaultReasoning
+                : state.selectedReasoning,
+              selectedPolicyMode: threadIsActive
+                ? state.threadControlsByThread[threadId]?.policyMode || state.defaultPolicyMode
+                : state.selectedPolicyMode,
+              workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
+            };
+          });
         } catch (error) {
           set({ error: (error as Error).message });
         }

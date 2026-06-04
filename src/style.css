@@ -143,6 +143,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.terminal-host .xterm,
+.terminal-host .xterm-helpers,
+.terminal-host .xterm-viewport,
+.terminal-host .xterm-screen,
+.terminal-host .xterm-rows,
+.terminal-host .xterm-rows > div {
+  line-height: 0.8 !important;
+}
+
 button,
 input,
 textarea {
@@ -479,6 +488,11 @@ code[data-streamdown="inline-code"] {
 }
 
 .tool-shell-output {
+  content-visibility: auto;
+  contain-intrinsic-size: 8rem;
+}
+
+.tool-edit-preview {
   content-visibility: auto;
   contain-intrinsic-size: 8rem;
 }

@@ -131,6 +131,53 @@ test("common typed tool executions are summarized as compact activity", () => {
   ]);
 });
 
+test("file edit tools expose inline timeline previews", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool("tool-patch-1", "apply_patch", {
+          patch: "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
+        }),
+        tool("tool-write-1", "write_file", { path: "src/app.ts", content: "export const value = 1;\n" }),
+        tool("tool-edit-1", "edit", { path: "src/app.ts", old_string: "value = 1", new_string: "value = 2" }),
+        tool("tool-multi-edit-1", "multi_edit", {
+          path: "src/app.ts",
+          edits: [
+            { old_string: "value = 2", new_string: "value = 3" },
+            { old_string: "name = 'old'", new_string: "name = 'new'" },
+          ],
+        }),
+      ],
+      "inProgress",
+    ),
+  );
+
+  expect(plain(messages.map((message) => message.toolPreview))).toEqual([
+    "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
+    "export const value = 1;\n",
+    "- value = 1\n+ value = 2",
+    "@@ edit 1 @@\n- value = 2\n+ value = 3\n@@ edit 2 @@\n- name = 'old'\n+ name = 'new'",
+  ]);
+});
+
+test("streaming edit tool previews survive completed status updates", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool("tool-edit-1", "edit", { path: "src/app.ts", old_string: "before", new_string: "after" }, "inProgress"),
+        tool("tool-edit-1", "edit", undefined, "completed", "ok"),
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages).toHaveLength(1);
+  expect(messages[0].toolSummary).toBe("Edited app.ts");
+  expect(messages[0].toolPreview).toBe("- before\n+ after");
+});
+
 test("namespaced typed tool executions use compact timeline summaries", () => {
   const messages = messagesFromTurn(
     "thread-1",

@@ -9,6 +9,7 @@ export function DisclosureChevron({ groupName }: { groupName: string }): React.J
       className={cn(
         "size-4 shrink-0 text-muted-foreground transition-transform duration-150",
         groupName === "shell-tool" && "group-data-[open]/shell-tool:rotate-90",
+        groupName === "edit-tool" && "group-data-[open]/edit-tool:rotate-90",
         groupName === "tool-group" && "group-data-[open]/tool-group:rotate-90",
         groupName === "tool-activity" && "group-data-[open]/tool-activity:rotate-90",
       )}

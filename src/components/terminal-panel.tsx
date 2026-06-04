@@ -62,7 +62,7 @@ export function TerminalPanel({ active = true, cwd }: TerminalPanelProps): React
       drawBoldTextInBrightColors: true,
       fontFamily: codeFont,
       fontSize: codeFontSize,
-      lineHeight: 1,
+      lineHeight: 0.8,
       minimumContrastRatio: 1,
       theme: terminalThemeForSettings(terminalThemeSettings),
     });
@@ -109,11 +109,11 @@ export function TerminalPanel({ active = true, cwd }: TerminalPanelProps): React
   }, [codeFont, codeFontSize, terminalThemeSettings]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--terminal-background,#1e1e2e)]">
+    <div className="flex h-full min-h-0 flex-col border-l border-border bg-[var(--terminal-background,#1e1e2e)]">
       <div className="flex h-10 shrink-0 items-center border-b border-border px-3 text-base text-muted-foreground">
         Terminal
       </div>
-      <div ref={hostRef} className="min-h-0 flex-1 p-2" />
+      <div ref={hostRef} className="terminal-host min-h-0 flex-1 p-2" />
     </div>
   );
 }
