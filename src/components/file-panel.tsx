@@ -226,16 +226,20 @@ function OpenFileTabs({
           {tabs.map((tab) => (
             <div
               key={tab.key}
-              className="group/tab relative flex h-7 min-w-20 max-w-36 shrink-0 items-center rounded-full text-muted-foreground transition-colors"
+              className="group/tab relative flex h-7 min-w-20 max-w-36 shrink-0 items-center overflow-hidden rounded-full text-muted-foreground transition-colors"
               title={tab.state.label}
             >
-              <TabsTrigger value={tab.key} aria-label={tab.title} className="min-w-0 flex-1 pl-2 pr-2">
+              <TabsTrigger
+                value={tab.key}
+                aria-label={tab.title}
+                className="min-w-0 flex-1 justify-start overflow-hidden pl-2 pr-2"
+              >
                 <span className="relative flex size-4 shrink-0 items-center justify-center">
                   <span className="flex shrink-0 transition-opacity group-hover/tab:opacity-0 group-focus-within/tab:opacity-0 [&_svg]:size-3.5">
                     <FileTabIcon path={tab.state.selection.relativePath} />
                   </span>
                 </span>
-                <span className="truncate text-sm font-medium">{tab.title}</span>
+                <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{tab.title}</span>
               </TabsTrigger>
               <button
                 type="button"
