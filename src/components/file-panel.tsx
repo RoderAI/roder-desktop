@@ -95,10 +95,7 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
         <FileCode2 className="size-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-base font-medium">Files</div>
-          <div className="truncate text-base text-muted-foreground">{filePanelSubtitle(state.status, rootItems)}</div>
-        </div>
+        <div className="min-w-0 flex-1 truncate text-base font-medium">Files</div>
         <Button
           variant="ghost"
           size="icon-xs"
@@ -345,19 +342,6 @@ function orderWorkspaceRoots(roots: WorkspaceRoot[], selectedRootId: string): Wo
 function fileSelectionLabel(rootItems: ReturnType<typeof filePanelRootItems>, selection: FilePanelSelection): string {
   const root = rootItems.find((candidate) => candidate.id === selection.rootId);
   return root ? `${root.label}/${selection.relativePath}` : selection.relativePath;
-}
-
-function filePanelSubtitle(state: string, roots: ReturnType<typeof filePanelRootItems>): string {
-  if (state === "unavailable") {
-    return "Filesystem browsing unavailable";
-  }
-  if (roots.length === 0) {
-    return "No workspace selected";
-  }
-  if (roots.length === 1) {
-    return roots[0]?.label ?? "Workspace";
-  }
-  return `${roots.length} roots`;
 }
 
 function treeKey(paths: string[]): string {
