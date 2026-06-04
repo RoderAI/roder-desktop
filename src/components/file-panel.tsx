@@ -16,6 +16,7 @@ import {
   filePanelSearchPaths,
   filePanelSelectionKey,
   filePanelTabTitle,
+  filePanelTreeInitialExpandedPaths,
   filePanelTreeInitialExpansion,
   filePanelTreePaths,
   nextFilePanelActiveTabKey,
@@ -454,6 +455,10 @@ function FilePanelTree({
     () => filePanelIndexedPathByTreePath(roots, indexedPaths),
     [indexedPaths, roots],
   );
+  const initialExpandedPaths = useMemo(
+    () => filePanelTreeInitialExpandedPaths(paths, initialExpansion),
+    [initialExpansion, paths],
+  );
   const modelRef = useRef<FileTreeModel | null>(null);
   const { model } = useFileTree({
     id: treeId,
@@ -478,6 +483,9 @@ function FilePanelTree({
     unsafeCSS: filePanelTreeUnsafeCSS,
   });
   modelRef.current = model;
+  useLayoutEffect(() => {
+    model.resetPaths(paths, { initialExpandedPaths });
+  }, [initialExpandedPaths, model, paths]);
 
   return <FileTree model={model} className="block h-full w-full" />;
 }
