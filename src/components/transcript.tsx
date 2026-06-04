@@ -639,10 +639,12 @@ function TurnChangesCard({
   summary: ReviewTurnChangeSummary;
   onReview: () => void;
 }): React.JSX.Element {
+  const hasLineDelta = summary.additions > 0 || summary.deletions > 0;
+
   return (
     <section
       aria-label={reviewTurnChangeLabel(summary)}
-      className="rounded-xl bg-white text-neutral-900 ring-1 ring-border"
+      className="rounded-xl bg-card text-card-foreground ring-1 ring-border"
     >
       <div className="flex items-center gap-3 p-4">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/45 text-muted-foreground">
@@ -650,12 +652,12 @@ function TurnChangesCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{reviewTurnChangeLabel(summary)}</div>
-          <LineDelta additions={summary.additions} deletions={summary.deletions} />
+          {hasLineDelta && <LineDelta additions={summary.additions} deletions={summary.deletions} />}
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="h-10 rounded-lg bg-white px-4 text-neutral-900 ring-1 ring-border hover:bg-accent"
+          className="h-10 rounded-lg bg-background px-4 text-foreground ring-1 ring-border hover:bg-accent hover:text-accent-foreground"
           onClick={onReview}
         >
           Review changes

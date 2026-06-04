@@ -61,14 +61,32 @@ test("right workspace panel shell stays mounted but inert when closed", () => {
   expect(html).toContain('aria-hidden="true"');
   expect(html).toContain("inert=");
   expect(html).not.toContain('data-open="true"');
-  expect(html).toContain("--right-workspace-panel-width:560px");
+  expect(html).not.toContain("--right-workspace-panel-width");
+});
+
+test("right workspace panel shell can freeze layout width while its parent animates", () => {
+  const html = renderShell({
+    tabs: ["browser"],
+    activePanel: "browser",
+    freezeLayout: true,
+    layoutWidth: 720,
+  });
+
+  expect(html).toContain('data-layout-frozen="true"');
+  expect(html).toContain("width:720px");
+  expect(html).toContain("min-width:720px");
 });
 
 function renderShell({
   open = true,
   tabs,
   activePanel,
-}: Pick<React.ComponentProps<typeof RightWorkspacePanelShell>, "tabs" | "activePanel"> & {
+  freezeLayout,
+  layoutWidth,
+}: Pick<
+  React.ComponentProps<typeof RightWorkspacePanelShell>,
+  "tabs" | "activePanel" | "freezeLayout" | "layoutWidth"
+> & {
   open?: boolean;
 }): string {
   return renderToStaticMarkup(
@@ -77,9 +95,9 @@ function renderShell({
       tabs,
       activePanel,
       entries,
-      width: 560,
+      freezeLayout,
+      layoutWidth,
       onAddPanel: () => {},
-      onBeginResize: () => {},
       onClosePanel: () => {},
       onSelectPanel: () => {},
       renderPanel: (entry) => React.createElement("div", null, `Panel content: ${entry.id}`),
