@@ -679,6 +679,8 @@ export type HunkReadResult = {
 
 export type VcsChangeStatus = "modified" | "added" | "deleted" | "renamed" | "untracked" | "provider_native";
 
+export type VcsChangeArea = "committed" | "staged" | "unstaged" | "untracked";
+
 export type WorkspaceChangeSource = "gitReconciled";
 
 export type WorkspaceChangeConfidence = "observedAfterTool";
@@ -712,6 +714,7 @@ export type VcsChangedFile = {
   path: string;
   oldPath?: string | null;
   status: VcsChangeStatus;
+  areas?: VcsChangeArea[];
   additions: number;
   deletions: number;
   binary: boolean;

@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { chromeIconButtonClassNameForState } from "@/components/ui/chrome-icon-button";
 import { cn } from "@/lib/utils";
 import type { RouteWorkspacePanel } from "@/lib/route-search";
 
@@ -85,7 +84,15 @@ export function RightWorkspacePanelShell({
       aria-hidden={!open}
       inert={!open ? true : undefined}
     >
-      <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 px-2 pl-3">
+      <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 border-b border-border px-3">
+        <PanelAddMenu
+          entries={entries}
+          menuOpen={addMenuOpen}
+          openPanel={activePanel}
+          onAddPanel={onAddPanel}
+          onMenuBoundsChange={setAddMenuOcclusion}
+          onMenuOpenChange={setAddMenuOpen}
+        />
         {openEntries.length > 0 ? (
           <>
             <Tabs
@@ -99,28 +106,10 @@ export function RightWorkspacePanelShell({
                 ))}
               </TabsList>
             </Tabs>
-            <PanelAddMenu
-              entries={entries}
-              menuOpen={addMenuOpen}
-              openPanel={activePanel}
-              onAddPanel={onAddPanel}
-              onMenuBoundsChange={setAddMenuOcclusion}
-              onMenuOpenChange={setAddMenuOpen}
-            />
             <div className="min-w-0 flex-1" />
           </>
         ) : (
-          <>
-            <PanelAddMenu
-              entries={entries}
-              menuOpen={addMenuOpen}
-              openPanel={activePanel}
-              onAddPanel={onAddPanel}
-              onMenuBoundsChange={setAddMenuOcclusion}
-              onMenuOpenChange={setAddMenuOpen}
-            />
-            <div className="min-w-0 flex-1" />
-          </>
+          <div className="min-w-0 flex-1" />
         )}
       </div>
       {openEntries.length > 0 && activeEntry ? (
@@ -182,21 +171,26 @@ function WorkspacePanelTab({
   onClosePanel: (panel: RouteWorkspacePanel) => void;
 }): React.JSX.Element {
   return (
-    <div className="group flex h-7 min-w-0 max-w-36 items-center gap-0.5 rounded-full text-muted-foreground transition-colors">
-      <TabsTrigger value={entry.id} aria-label={entry.title} className="min-w-0 flex-1 pl-2 pr-0.5">
-        <span className="shrink-0 [&_svg]:size-3.5">{entry.icon}</span>
+    <div className="group/tab relative flex h-7 min-w-0 max-w-36 items-center rounded-full text-muted-foreground transition-colors">
+      <TabsTrigger value={entry.id} aria-label={entry.title} className="min-w-0 flex-1 pl-2 pr-2">
+        <span className="relative flex size-4 shrink-0 items-center justify-center">
+          <span className="flex shrink-0 transition-opacity group-hover/tab:opacity-0 group-focus-within/tab:opacity-0 [&_svg]:size-3.5">
+            {entry.icon}
+          </span>
+        </span>
         <span className="truncate text-sm font-medium">{entry.title}</span>
       </TabsTrigger>
       <button
         type="button"
-        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-background/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="pointer-events-none absolute left-1 top-1/2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-full bg-muted-foreground/70 text-background opacity-0 outline-none transition-colors hover:bg-muted-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/tab:pointer-events-auto group-hover/tab:opacity-100 group-focus-within/tab:pointer-events-auto group-focus-within/tab:opacity-100"
         aria-label={`Close ${entry.title}`}
         onClick={(event) => {
+          event.preventDefault();
           event.stopPropagation();
           onClosePanel(entry.id);
         }}
       >
-        <X className="size-3.5" />
+        <X className="size-3" />
       </button>
     </div>
   );
@@ -259,10 +253,7 @@ function PanelAddMenu({
   return (
     <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
       <DropdownMenuTrigger
-        className={chromeIconButtonClassNameForState(
-          false,
-          "inline-flex size-7 items-center justify-center rounded-lg [&_svg]:size-4",
-        )}
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4"
         aria-label="Add workspace panel"
         title="Add panel"
       >

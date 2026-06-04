@@ -120,7 +120,7 @@ export function BrowserPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col border-l border-border bg-card">
+    <div className="flex h-full min-h-0 w-full flex-col bg-card">
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
         <ToolbarButton
           label="Back"
