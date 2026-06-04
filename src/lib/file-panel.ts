@@ -70,9 +70,12 @@ export function filePanelTreePaths(
   const pathsByRootId = new Map<string, Set<string>>();
 
   for (const root of rootItems) {
-    pathsByRootId.set(root.id, new Set([root.treePath]));
+    pathsByRootId.set(root.id, new Set());
   }
   for (const indexedPath of indexedPaths) {
+    if (!isFilePanelTreeLeaf(indexedPath)) {
+      continue;
+    }
     const rootTreePath = rootItems.find((root) => root.id === indexedPath.rootId)?.treePath;
     if (!rootTreePath || !indexedPath.relativePath) {
       continue;
@@ -87,6 +90,9 @@ export function filePanelTreePathForIndexedPath(
   roots: readonly WorkspaceRoot[],
   indexedPath: FilePanelIndexedPath,
 ): string | null {
+  if (!isFilePanelTreeLeaf(indexedPath)) {
+    return null;
+  }
   const root = filePanelRootItems(roots).find((candidate) => candidate.id === indexedPath.rootId);
   if (!root || !indexedPath.relativePath) {
     return null;
@@ -228,6 +234,10 @@ function basename(path: string): string {
 
 function searchTokens(query: string): string[] {
   return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function isFilePanelTreeLeaf(indexedPath: FilePanelIndexedPath): boolean {
+  return indexedPath.kind === "file";
 }
 
 function joinAbsolutePath(rootPath: string, relativePath: string): string {
