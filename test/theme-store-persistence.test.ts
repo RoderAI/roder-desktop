@@ -81,6 +81,21 @@ test("theme store migrates old default ui font size to the smaller desktop defau
   expect(useThemeStore.getState().settings.codeFontSize).toBe(defaultThemeSettings.codeFontSize);
 });
 
+test("theme store migrates the previous default code font size", async () => {
+  const storage = installStorageMock();
+  storage.set(
+    "roder-desktop-theme",
+    JSON.stringify({
+      state: { settings: legacyThemeSettings(14) },
+      version: 4,
+    }),
+  );
+
+  const { defaultThemeSettings, useThemeStore } = await loadThemeStore();
+
+  expect(useThemeStore.getState().settings.codeFontSize).toBe(defaultThemeSettings.codeFontSize);
+});
+
 test("theme store preserves custom font sizes during compact density migration", async () => {
   const storage = installStorageMock();
   const settings = {

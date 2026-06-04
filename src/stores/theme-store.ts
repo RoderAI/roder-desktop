@@ -181,10 +181,10 @@ export const defaultThemeSettings: ThemeSettings = {
   },
   pointerCursors: false,
   uiFontSize: 14,
-  codeFontSize: 14,
+  codeFontSize: 13,
 };
 
-const themeStorageVersion = 4;
+const themeStorageVersion = 5;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -267,7 +267,8 @@ function migratePersistedTheme(persisted: unknown, version: number): unknown {
           ? defaultThemeSettings.uiFontSize
           : settings.uiFontSize,
       codeFontSize:
-        version < 2 && (settings.codeFontSize == null || settings.codeFontSize === 13)
+        (version < 2 && (settings.codeFontSize == null || settings.codeFontSize === 13)) ||
+        (version < 5 && settings.codeFontSize === 14)
           ? defaultThemeSettings.codeFontSize
           : settings.codeFontSize,
       terminalTheme: settings.terminalTheme ?? defaultThemeSettings.terminalTheme,
