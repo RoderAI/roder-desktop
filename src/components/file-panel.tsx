@@ -455,6 +455,10 @@ function FilePanelTree({
     () => filePanelIndexedPathByTreePath(roots, indexedPaths),
     [indexedPaths, roots],
   );
+  const indexedPathByTreePathRef = useRef(indexedPathByTreePath);
+  const onOpenFileRef = useRef(onOpenFile);
+  indexedPathByTreePathRef.current = indexedPathByTreePath;
+  onOpenFileRef.current = onOpenFile;
   const initialExpandedPaths = useMemo(
     () => filePanelTreeInitialExpandedPaths(paths, initialExpansion),
     [initialExpansion, paths],
@@ -470,7 +474,7 @@ function FilePanelTree({
     stickyFolders: true,
     onSelectionChange: (selectedPaths) => {
       const selectedTreePath = selectedPaths.at(-1) ?? "";
-      const indexedPath = indexedPathByTreePath.get(selectedTreePath);
+      const indexedPath = indexedPathByTreePathRef.current.get(selectedTreePath);
       if (!indexedPath) {
         return;
       }
@@ -478,7 +482,7 @@ function FilePanelTree({
         modelRef.current?.getItem(selectedTreePath)?.toggleSelect();
         return;
       }
-      onOpenFile(indexedPath);
+      onOpenFileRef.current(indexedPath);
     },
     unsafeCSS: filePanelTreeUnsafeCSS,
   });
