@@ -14,7 +14,6 @@ type AppSidebarProps = {
   threads: RoderThread[];
   activeThreadId: string;
   activeView: "chat" | "plugins";
-  width: number;
   reserveTitlebarSpace: boolean;
   onSelectThread: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
@@ -29,7 +28,6 @@ export function AppSidebar({
   threads,
   activeThreadId,
   activeView,
-  width,
   reserveTitlebarSpace,
   onSelectThread,
   onArchiveThread,
@@ -64,11 +62,10 @@ export function AppSidebar({
   return (
     <aside
       className={cn(
-        "relative z-20 flex shrink-0 flex-col overflow-visible border-r border-border bg-sidebar text-sidebar-foreground",
+        "relative z-20 flex w-full shrink-0 flex-col overflow-visible border-r border-border bg-sidebar text-sidebar-foreground",
         reserveTitlebarSpace && "drag-region",
         reserveTitlebarSpace ? "h-screen" : "h-full",
       )}
-      style={{ width }}
     >
       {reserveTitlebarSpace && <div className="h-(--desktop-header-height)" />}
       <div className="no-drag flex flex-col gap-0.5 px-2">

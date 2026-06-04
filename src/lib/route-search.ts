@@ -50,6 +50,7 @@ export const routeSearchParsers = {
   extension: parseAsString.withDefault(""),
   extensionPanel: parseAsString.withDefault(""),
   sidebar: parseAsBoolean.withDefault(true),
+  // Legacy URL width values are accepted as first-load fallbacks; live resizing is locally persisted.
   leftWidth: parseAsClampedInteger(sidebarWidthBounds.min, sidebarWidthBounds.max).withDefault(
     sidebarWidthBounds.defaultValue,
   ),

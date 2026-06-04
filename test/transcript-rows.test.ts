@@ -138,6 +138,32 @@ test("builds searchable text for review change rows", () => {
   expect(transcriptRowsSearchText(rows)).toContain("+4 -2");
 });
 
+test("omits zero review change deltas from searchable text", () => {
+  const rows = buildTranscriptRows({
+    messages: [createAssistantMessage("Done", "turn-1")],
+    turnChangeSummaries: {
+      "turn-1": {
+        additions: 0,
+        deletions: 0,
+        files: [
+          {
+            path: "src/app.ts",
+            status: "modified",
+            additions: 0,
+            deletions: 0,
+            source: "observed",
+          },
+        ],
+      },
+    },
+  });
+
+  const searchText = transcriptRowsSearchText(rows);
+
+  expect(searchText).toContain("Edited app.ts");
+  expect(searchText).not.toContain("+0 -0");
+});
+
 test("uses a stable working row for an otherwise empty transcript", () => {
   expect(buildTranscriptRows({ messages: [], showWorkingIndicator: true }).map((row) => row.key)).toEqual([
     "thread-working-indicator",
