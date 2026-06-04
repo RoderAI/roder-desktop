@@ -220,7 +220,7 @@ function OpenFileTabs({
       <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 flex-1 overflow-hidden">
         <TabsList
           variant="chrome"
-          className="file-tabs-scroll w-full max-w-full flex-nowrap justify-start overflow-x-auto overflow-y-hidden px-8 scroll-px-8"
+          className="file-tabs-scroll w-full max-w-full flex-nowrap justify-start overflow-x-auto overflow-y-hidden pr-8 scroll-pr-8"
           aria-label="Open files"
         >
           {tabs.map((tab) => (
