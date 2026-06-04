@@ -3,6 +3,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   decodeFileContent,
+  filePanelIndexedPathByTreePath,
   filePanelRootItems,
   filePanelSearchPaths,
   filePanelShouldIndexDirectory,
@@ -31,13 +32,24 @@ test("file panel tree paths preserve duplicate relative paths across roots", () 
     indexedPath("root_b", "src/index.ts"),
   ]);
 
-  expect(paths).toEqual([
-    "app",
-    "app/README.md",
-    "app - packages-app",
-    "app - packages-app/README.md",
-    "app - packages-app/src/index.ts",
+  expect(paths).toEqual(["app/README.md", "app - packages-app/README.md", "app - packages-app/src/index.ts"]);
+});
+
+test("file panel tree paths let the tree library infer directories from files", () => {
+  const paths = filePanelTreePaths(roots, [
+    indexedPath("root_a", "voice-plan-feedback", "directory"),
+    indexedPath("root_a", "voice-plan-feedback/notes.md"),
   ]);
+  const indexedPathByTreePath = filePanelIndexedPathByTreePath(roots, [
+    indexedPath("root_a", "voice-plan-feedback", "directory"),
+    indexedPath("root_a", "voice-plan-feedback/notes.md"),
+  ]);
+
+  expect(paths).toEqual(["app/voice-plan-feedback/notes.md"]);
+  expect(indexedPathByTreePath.has("app/voice-plan-feedback")).toBe(false);
+  expect(indexedPathByTreePath.get("app/voice-plan-feedback/notes.md")).toEqual(
+    expect.objectContaining({ kind: "file", relativePath: "voice-plan-feedback/notes.md" }),
+  );
 });
 
 test("file panel resolves relative paths without escaping the selected root", () => {
@@ -96,8 +108,12 @@ test("file panel renders unavailable and empty workspace states", async () => {
   );
 });
 
-function indexedPath(rootId: string, relativePath: string): FilePanelIndexedPath {
-  return { rootId, relativePath, kind: "file" };
+function indexedPath(
+  rootId: string,
+  relativePath: string,
+  kind: FilePanelIndexedPath["kind"] = "file",
+): FilePanelIndexedPath {
+  return { rootId, relativePath, kind };
 }
 
 async function renderPanel({
