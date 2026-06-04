@@ -25,6 +25,8 @@ export type FilePanelResolvedPath = {
   absolutePath: string;
 };
 
+export type FilePanelTreeInitialExpansion = 1 | "open";
+
 export type DecodedFileContent =
   | { status: "text"; text: string; bytes: number }
   | { status: "binary"; bytes: number }
@@ -129,6 +131,10 @@ export function filePanelSearchPaths(
     return tokens.every((token) => haystack.includes(token));
   });
   return matches.slice(0, limit);
+}
+
+export function filePanelTreeInitialExpansion(search: string): FilePanelTreeInitialExpansion {
+  return search.trim() ? "open" : 1;
 }
 
 export function filePanelShouldIndexDirectory(relativePath: string): boolean {

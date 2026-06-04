@@ -7,6 +7,7 @@ import {
   filePanelRootItems,
   filePanelSearchPaths,
   filePanelShouldIndexDirectory,
+  filePanelTreeInitialExpansion,
   filePanelTreePaths,
   resolveFilePanelPath,
   type FilePanelIndexedPath,
@@ -78,6 +79,12 @@ test("file panel path search includes matching files with root context", () => {
     expect.objectContaining({ rootId: "root_a", relativePath: "README.md" }),
     expect.objectContaining({ rootId: "root_b", relativePath: "README.md" }),
   ]);
+});
+
+test("file panel opens tree results while searching", () => {
+  expect(filePanelTreeInitialExpansion("")).toBe(1);
+  expect(filePanelTreeInitialExpansion("   ")).toBe(1);
+  expect(filePanelTreeInitialExpansion("index")).toBe("open");
 });
 
 test("file panel skips heavy directories while indexing", () => {
