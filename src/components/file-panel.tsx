@@ -3,6 +3,7 @@ import type { FileTree as FileTreeModel } from "@pierre/trees";
 import { AlertCircle, FileCode2, RefreshCw, X } from "lucide-react";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFilePanelTree } from "@/hooks/use-file-panel-tree";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { highlightFileContent, type HighlightedFileContent } from "@/lib/file-syntax-highlight";
@@ -207,48 +208,44 @@ function OpenFileTabs({
   onClose: (key: string) => void;
 }): React.JSX.Element {
   if (tabs.length === 0) {
-    return <div className="min-w-0 flex-1 text-base font-medium text-muted-foreground">Open a file</div>;
+    return <div className="min-w-0 flex-1" />;
   }
 
   return (
-    <div
-      className="workspace-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1"
-      role="tablist"
-      aria-label="Open files"
-    >
-      {tabs.map((tab) => {
-        const active = tab.key === activeKey;
-        return (
-          <div
-            key={tab.key}
-            className={cn(
-              "group flex h-8 max-w-52 shrink-0 items-center rounded-lg text-base font-medium transition-colors",
-              active ? "bg-accent/60 text-foreground" : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-            )}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-l-lg pl-2 pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <div className="flex min-w-0 flex-1 items-center">
+      <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 shrink">
+        <TabsList variant="chrome" className="max-w-full overflow-x-auto" aria-label="Open files">
+          {tabs.map((tab) => (
+            <div
+              key={tab.key}
+              className="group/tab relative flex h-7 min-w-0 max-w-36 items-center rounded-full text-muted-foreground transition-colors"
               title={tab.state.label}
-              onClick={() => onSelect(tab.key)}
             >
-              <FileCode2 className="size-3.5 shrink-0" />
-              <span className="truncate">{tab.title}</span>
-            </button>
-            <button
-              type="button"
-              className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-70 outline-none transition hover:bg-background/70 hover:text-foreground hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Close ${tab.title}`}
-              title={`Close ${tab.title}`}
-              onClick={() => onClose(tab.key)}
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        );
-      })}
+              <TabsTrigger value={tab.key} aria-label={tab.title} className="min-w-0 flex-1 pl-2 pr-2">
+                <span className="relative flex size-4 shrink-0 items-center justify-center">
+                  <span className="flex shrink-0 transition-opacity group-hover/tab:opacity-0 group-focus-within/tab:opacity-0 [&_svg]:size-3.5">
+                    <FileCode2 />
+                  </span>
+                </span>
+                <span className="truncate text-sm font-medium">{tab.title}</span>
+              </TabsTrigger>
+              <button
+                type="button"
+                className="pointer-events-none absolute left-1 top-1/2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded-full bg-muted-foreground/70 text-background opacity-0 outline-none transition-colors hover:bg-muted-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/tab:pointer-events-auto group-hover/tab:opacity-100 group-focus-within/tab:pointer-events-auto group-focus-within/tab:opacity-100"
+                aria-label={`Close ${tab.title}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onClose(tab.key);
+                }}
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
+        </TabsList>
+      </Tabs>
+      <div className="min-w-0 flex-1" />
     </div>
   );
 }
