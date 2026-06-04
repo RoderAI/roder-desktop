@@ -11,6 +11,7 @@ import {
   filePanelIndexedPathByTreePath,
   filePanelRootItems,
   filePanelSearchPaths,
+  filePanelTreeInitialExpansion,
   filePanelTreePaths,
   resolveFilePanelPath,
   type DecodedFileContent,
@@ -159,6 +160,7 @@ function FilePanelSidebar({
   }
 
   const treePaths = filePanelTreePaths(roots, indexedPaths);
+  const initialExpansion = filePanelTreeInitialExpansion(search);
   if (state === "ready" && treePaths.length === 0) {
     return search ? (
       <PanelMessage title="No matches">Try a different file name or path.</PanelMessage>
@@ -170,9 +172,10 @@ function FilePanelSidebar({
   return (
     <div className="min-h-0 flex-1">
       <FilePanelTree
-        key={treeKey(treePaths)}
+        key={treeKey(treePaths, initialExpansion)}
         roots={roots}
         indexedPaths={indexedPaths}
+        initialExpansion={initialExpansion}
         paths={treePaths}
         onOpenFile={onOpenFile}
       />
@@ -183,11 +186,13 @@ function FilePanelSidebar({
 function FilePanelTree({
   roots,
   indexedPaths,
+  initialExpansion,
   paths,
   onOpenFile,
 }: {
   roots: WorkspaceRoot[];
   indexedPaths: FilePanelIndexedPath[];
+  initialExpansion: ReturnType<typeof filePanelTreeInitialExpansion>;
   paths: string[];
   onOpenFile: (path: FilePanelIndexedPath) => void;
 }): React.JSX.Element {
@@ -201,7 +206,7 @@ function FilePanelTree({
     id: treeId,
     paths,
     flattenEmptyDirectories: true,
-    initialExpansion: 1,
+    initialExpansion,
     itemHeight: 32,
     search: false,
     stickyFolders: true,
@@ -344,8 +349,8 @@ function fileSelectionLabel(rootItems: ReturnType<typeof filePanelRootItems>, se
   return root ? `${root.label}/${selection.relativePath}` : selection.relativePath;
 }
 
-function treeKey(paths: string[]): string {
-  return paths.join("\u0000");
+function treeKey(paths: string[], initialExpansion: ReturnType<typeof filePanelTreeInitialExpansion>): string {
+  return `${initialExpansion}:${paths.join("\u0000")}`;
 }
 
 function formatBytes(bytes: number): string {
