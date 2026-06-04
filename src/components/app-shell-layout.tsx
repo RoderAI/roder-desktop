@@ -27,7 +27,7 @@ import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import { toolPanelWidthBounds, type RouteReviewScope, type RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
-import type { DesktopAttachment, RoderStatus, RoderThread, RoderThreadGoal } from "@/types/roder";
+import type { DesktopAttachment, RoderStatus, RoderThread, RoderThreadGoal, WorkspaceRoot } from "@/types/roder";
 
 const contentPanelId = "thread-content";
 const workspacePanelId = "workspace-panel";
@@ -51,6 +51,7 @@ export type AppShellLayoutProps = {
   activePanel: WorkspacePanel;
   activeWorkspaceCwd: string;
   activeWorkspaceRef: { workspaceId: string; rootId: string };
+  activeWorkspaceRoots: WorkspaceRoot[];
   folderOptions: FolderOption[];
   isPluginsRoute: boolean;
   hunkSummary: ThreadHunkSummary;
@@ -95,6 +96,7 @@ export function AppShellLayout({
   activePanel,
   activeWorkspaceCwd,
   activeWorkspaceRef,
+  activeWorkspaceRoots,
   folderOptions,
   isPluginsRoute,
   hunkSummary,
@@ -261,9 +263,7 @@ export function AppShellLayout({
     // Reserve the readable main column plus whatever chrome already sits beside the sidebar (its
     // handle, the extension rail) so dragging wider can never squeeze the main column below 500px.
     const chromeBesideSidebar =
-      appChromeGroupWidth === null
-        ? 0
-        : Math.max(0, Math.round(window.innerWidth) - appChromeGroupWidth - startWidth);
+      appChromeGroupWidth === null ? 0 : Math.max(0, Math.round(window.innerWidth) - appChromeGroupWidth - startWidth);
     const maxByWindow = Math.max(
       sidebarWidthBounds.min,
       Math.round(window.innerWidth) - chromeBesideSidebar - mainPanelMinWidth,
@@ -423,6 +423,7 @@ export function AppShellLayout({
             activeThreadId,
             activeWorkspaceCwd,
             activeWorkspaceRef,
+            activeWorkspaceRoots,
             hunkSummary,
             reviewPath,
             reviewScope,

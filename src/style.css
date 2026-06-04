@@ -40,7 +40,7 @@
   --font-code: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-size-ui: 14px;
   --font-size-composer: 17px;
-  --font-size-code: 14px;
+  --font-size-code: 13px;
   --desktop-header-height: 52px;
   --tool-running: hsl(38 96% 43%);
   --tool-success: hsl(260 60% 56%);
@@ -161,6 +161,153 @@ textarea {
 code {
   font-family: var(--font-code);
   font-size: var(--font-size-code);
+}
+
+.file-code-view .shiki {
+  min-width: 100%;
+  margin: 0;
+  padding: 1rem;
+  overflow: visible;
+  background: var(--color-background) !important;
+  color: var(--shiki-light);
+  font-family: var(--font-code);
+  font-size: var(--font-size-code);
+  font-weight: 400;
+  line-height: calc(var(--font-size-code) + 7px);
+  tab-size: 2;
+}
+
+.file-code-view .shiki code {
+  display: block;
+  min-width: max-content;
+  font-family: inherit;
+}
+
+.file-code-view .shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg, inherit);
+}
+
+:root.dark .file-code-view .shiki {
+  color: var(--shiki-dark);
+}
+
+:root.dark .file-code-view .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg, inherit);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .file-code-view .shiki {
+    color: var(--shiki-dark);
+  }
+
+  :root:not(.light) .file-code-view .shiki span {
+    color: var(--shiki-dark);
+    background-color: var(--shiki-dark-bg, inherit);
+  }
+}
+
+.file-panel-tab-icon {
+  --file-panel-tab-icon-gray: light-dark(#84848a, #adadb1);
+  --file-panel-tab-icon-red: light-dark(#d52c36, #ff6762);
+  --file-panel-tab-icon-vermilion: light-dark(#ff8c5b, #d5512f);
+  --file-panel-tab-icon-orange: light-dark(#d47628, #ffa359);
+  --file-panel-tab-icon-yellow: light-dark(#d5a910, #ffd452);
+  --file-panel-tab-icon-green: light-dark(#199f43, #5ecc71);
+  --file-panel-tab-icon-teal: light-dark(#17a5af, #64d1db);
+  --file-panel-tab-icon-cyan: light-dark(#1ca1c7, #68cdf2);
+  --file-panel-tab-icon-blue: light-dark(#1a85d4, #69b1ff);
+  --file-panel-tab-icon-indigo: light-dark(#693acf, #9d6afb);
+  --file-panel-tab-icon-purple: light-dark(#a631be, #d568ea);
+  --file-panel-tab-icon-pink: light-dark(#d32a61, #ff678d);
+  --file-panel-tab-icon-mauve: light-dark(#594c5b, #79697b);
+  color: var(--file-panel-tab-icon-color, var(--file-panel-tab-icon-gray));
+  fill: currentColor;
+}
+
+.file-panel-tab-icon[data-icon-token="astro"],
+.file-panel-tab-icon[data-icon-token="database"],
+.file-panel-tab-icon[data-icon-token="vite"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-purple);
+}
+
+.file-panel-tab-icon[data-icon-token="babel"],
+.file-panel-tab-icon[data-icon-token="browserslist"],
+.file-panel-tab-icon[data-icon-token="javascript"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-yellow);
+}
+
+.file-panel-tab-icon[data-icon-token="bash"],
+.file-panel-tab-icon[data-icon-token="markdown"],
+.file-panel-tab-icon[data-icon-token="svgo"],
+.file-panel-tab-icon[data-icon-token="vue"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-green);
+}
+
+.file-panel-tab-icon[data-icon-token="biome"],
+.file-panel-tab-icon[data-icon-token="c"],
+.file-panel-tab-icon[data-icon-token="cpp"],
+.file-panel-tab-icon[data-icon-token="docker"],
+.file-panel-tab-icon[data-icon-token="python"],
+.file-panel-tab-icon[data-icon-token="typescript"],
+.file-panel-tab-icon[data-icon-token="vscode"],
+.file-panel-tab-icon[data-icon-token="webpack"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-blue);
+}
+
+.file-panel-tab-icon[data-icon-token="bootstrap"],
+.file-panel-tab-icon[data-icon-token="css"],
+.file-panel-tab-icon[data-icon-token="eslint"],
+.file-panel-tab-icon[data-icon-token="terraform"],
+.file-panel-tab-icon[data-icon-token="wasm"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-indigo);
+}
+
+.file-panel-tab-icon[data-icon-token="bun"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-mauve);
+}
+
+.file-panel-tab-icon[data-icon-token="claude"],
+.file-panel-tab-icon[data-icon-token="html"],
+.file-panel-tab-icon[data-icon-token="json"],
+.file-panel-tab-icon[data-icon-token="rust"],
+.file-panel-tab-icon[data-icon-token="svg"],
+.file-panel-tab-icon[data-icon-token="swift"],
+.file-panel-tab-icon[data-icon-token="zig"],
+.file-panel-tab-icon[data-icon-token="zip"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-orange);
+}
+
+.file-panel-tab-icon[data-icon-token="git"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-vermilion);
+}
+
+.file-panel-tab-icon[data-icon-token="go"],
+.file-panel-tab-icon[data-icon-token="oxc"],
+.file-panel-tab-icon[data-icon-token="react"],
+.file-panel-tab-icon[data-icon-token="tailwind"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-cyan);
+}
+
+.file-panel-tab-icon[data-icon-token="graphql"],
+.file-panel-tab-icon[data-icon-token="image"],
+.file-panel-tab-icon[data-icon-token="sass"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-pink);
+}
+
+.file-panel-tab-icon[data-icon-token="mcp"],
+.file-panel-tab-icon[data-icon-token="prettier"],
+.file-panel-tab-icon[data-icon-token="table"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-teal);
+}
+
+.file-panel-tab-icon[data-icon-token="npm"],
+.file-panel-tab-icon[data-icon-token="postcss"],
+.file-panel-tab-icon[data-icon-token="ruby"],
+.file-panel-tab-icon[data-icon-token="svelte"],
+.file-panel-tab-icon[data-icon-token="yml"] {
+  --file-panel-tab-icon-color: var(--file-panel-tab-icon-red);
 }
 
 .skill-prompt-token {
@@ -986,6 +1133,14 @@ code[data-streamdown="inline-code"] {
 .workspace-scrollbar::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: var(--color-muted-foreground);
+}
+
+.file-tabs-scroll {
+  scrollbar-width: none;
+}
+
+.file-tabs-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .transcript-viewport {
