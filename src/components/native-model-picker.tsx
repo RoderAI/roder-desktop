@@ -31,6 +31,7 @@ export function NativeModelPicker({
   const listboxId = useId();
   const modelOptions = models.length > 0 ? models : fallbackModels(selectedModel, selectedModelProvider);
   const visibleModels = filteredModels(modelOptions, query);
+  const modelGroups = groupedModelsByProvider(visibleModels);
   const activeIndex = boundedModelIndex(highlightedIndex, visibleModels.length);
 
   useEffect(() => {
@@ -93,27 +94,34 @@ export function NativeModelPicker({
 
         <CompletionMenuList id={listboxId} ariaLabel="Model completions">
           {visibleModels.length > 0 ? (
-            visibleModels.map((model, index) => {
-              const active = index === activeIndex;
-              const selectedModelRow = model.id === selectedModel && model.modelProvider === selectedModelProvider;
-              return (
-                <CompletionMenuOption
-                  key={`${model.modelProvider}:${model.id}`}
-                  id={completionOptionId(listboxId, index)}
-                  index={index}
-                  active={active}
-                  className={selectedModelRow ? "text-foreground" : undefined}
-                  onHighlight={setHighlightedIndex}
-                  onClick={() => onSelect(model.id, model.modelProvider)}
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                    <span className="font-medium">{modelName(model)}</span>
-                    <span className="text-muted-foreground"> - {model.modelProvider}</span>
-                  </span>
-                  {selectedModelRow && <Check className="size-4 shrink-0 text-foreground" />}
-                </CompletionMenuOption>
-              );
-            })
+            modelGroups.map((group) => (
+              <div key={group.provider}>
+                <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {providerName(group.provider)}
+                </div>
+                {group.models.map(({ model, index }) => {
+                  const active = index === activeIndex;
+                  const selectedModelRow = model.id === selectedModel && model.modelProvider === selectedModelProvider;
+                  return (
+                    <CompletionMenuOption
+                      key={`${model.modelProvider}:${model.id}`}
+                      id={completionOptionId(listboxId, index)}
+                      index={index}
+                      active={active}
+                      className={selectedModelRow ? "text-foreground" : undefined}
+                      onHighlight={setHighlightedIndex}
+                      onClick={() => onSelect(model.id, model.modelProvider)}
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                        <span className="font-medium">{modelName(model)}</span>
+                        <span className="text-muted-foreground"> - {model.modelProvider}</span>
+                      </span>
+                      {selectedModelRow && <Check className="size-4 shrink-0 text-foreground" />}
+                    </CompletionMenuOption>
+                  );
+                })}
+              </div>
+            ))
           ) : (
             <div className="px-3 py-4 text-base text-muted-foreground">No matching models</div>
           )}
@@ -136,6 +144,25 @@ function filteredModels(models: RoderModel[], query: string): RoderModel[] {
 
 function modelName(model: RoderModel): string {
   return model.name || model.id;
+}
+
+function groupedModelsByProvider(models: RoderModel[]): Array<{
+  provider: string;
+  models: Array<{ model: RoderModel; index: number }>;
+}> {
+  const groups = new Map<string, Array<{ model: RoderModel; index: number }>>();
+  models.forEach((model, index) => {
+    const provider = model.modelProvider || "roder";
+    groups.set(provider, [...(groups.get(provider) ?? []), { model, index }]);
+  });
+  return [...groups.entries()].map(([provider, grouped]) => ({ provider, models: grouped }));
+}
+
+function providerName(provider: string): string {
+  if (provider.toLowerCase() === "openai") {
+    return "OpenAI";
+  }
+  return provider;
 }
 
 function fallbackModels(selectedModel: string, selectedModelProvider: string): RoderModel[] {

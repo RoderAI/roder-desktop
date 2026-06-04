@@ -55,6 +55,23 @@ export function threadSelectionForRoute(input: ThreadSelectionInput): ThreadSele
   return { threadId: input.threadId, pushHistory: false };
 }
 
+export function activeWorkspaceCwdForPathname({
+  pathname,
+  activeThreadCwd,
+  selectedWorkspaceCwd,
+  statusCwd,
+}: {
+  pathname: string;
+  activeThreadCwd?: string;
+  selectedWorkspaceCwd?: string;
+  statusCwd?: string;
+}): string {
+  const stagingNewThread = (pathname.replace(/\/+$/u, "") || "/") === "/new";
+  return stagingNewThread
+    ? selectedWorkspaceCwd || activeThreadCwd || statusCwd || ""
+    : activeThreadCwd || selectedWorkspaceCwd || statusCwd || "";
+}
+
 export function normalizeSettingsSectionParam(section: string | undefined): SettingsSection {
   if (section && validSettingsSections.has(section as SettingsSection)) {
     return section as SettingsSection;

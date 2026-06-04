@@ -65,6 +65,19 @@ test("plans model command behavior", () => {
   });
 });
 
+test("plans model command against visible configured models from any provider", () => {
+  const models: RoderModel[] = [
+    { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+    { id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" },
+  ];
+
+  expect(planNativeCommand(nativeCommandInvocation("model", "claude-code/sonnet")!, models)).toMatchObject({
+    type: "selectModel",
+    modelId: "claude-code/sonnet",
+    modelProvider: "claude-code",
+  });
+});
+
 test("plans process command behavior with explicit destructive confirmation", () => {
   expect(planNativeCommand(nativeCommandInvocation("ps", "")!)).toEqual({ type: "processes", includeCompleted: false });
   expect(planNativeCommand(nativeCommandInvocation("ps", "all")!)).toEqual({
