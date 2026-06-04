@@ -4,8 +4,10 @@
 
 - The Roder app-server API contract is documented in `docs/api.md`.
 - To access the backend code, run `cd ../gode` from this directory.
-- Product UI principles and current desktop design decisions are documented in
-  `docs/design.md`.
+- Product UI defaults and current desktop design decisions are documented in
+  `docs/design.md`. Reference it before making product UI changes, especially
+  when choosing typography, font weight, surfaces, hover states, radius, spacing,
+  borders/rings, or component interaction patterns.
 
 ## Dependency Security
 
@@ -30,23 +32,11 @@ backend contract instead.
 
 ## UI Styling
 
-Use Base UI for headless primitives and local shadcn-style wrappers. Do not add
-or use Radix UI primitives in this project.
+Before changing product UI, read `docs/design.md` and follow its defaults unless
+nearby code establishes a more specific local pattern.
 
-Prefer Tailwind's standard spacing scale for margins, padding, gaps, sizing,
-positioning, and layout measurements. Avoid arbitrary values such as `px-[13px]`,
-`gap-[18px]`, `w-[347px]`, or `z-[80]` unless the value is tied to a real
-external constraint, asset size, or one-off integration requirement.
-
-When a design appears to need a custom value, first choose the nearest Tailwind
-scale token and adjust the surrounding layout to fit the system. If an arbitrary
-value is still necessary, keep it local, document the reason when it is not
-obvious, and avoid spreading similar one-off values across multiple components.
-
-When working on UI that changes state visually, such as showing, hiding,
-expanding, collapsing, or otherwise changing visibility, use the web animation
-/ Interface Craft skills to design and implement the motion. Keep animations
-short, purposeful, and consistent with `docs/design.md`.
+Do not add or use Radix UI primitives in this project. Use Base UI and the local
+shadcn-style wrappers described in `docs/design.md`.
 
 For desktop UI visual verification, do not rely on the in-app browser or other
 plain browser automation against the Vite renderer URL. The renderer depends on
