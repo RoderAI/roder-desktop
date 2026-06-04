@@ -215,14 +215,18 @@ function OpenFileTabs({
   }
 
   return (
-    <div className="flex min-w-0 flex-1 items-center">
+    <div className="flex min-w-0 flex-1 items-center overflow-hidden">
       <span aria-hidden dangerouslySetInnerHTML={{ __html: filePanelFileIconSpriteSheet }} />
-      <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 shrink">
-        <TabsList variant="chrome" className="max-w-full overflow-x-auto" aria-label="Open files">
+      <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 flex-1 overflow-hidden">
+        <TabsList
+          variant="chrome"
+          className="workspace-scrollbar max-w-full justify-start overflow-x-auto overflow-y-hidden"
+          aria-label="Open files"
+        >
           {tabs.map((tab) => (
             <div
               key={tab.key}
-              className="group/tab relative flex h-7 min-w-0 max-w-36 items-center rounded-full text-muted-foreground transition-colors"
+              className="group/tab relative flex h-7 min-w-20 max-w-36 shrink-0 items-center rounded-full text-muted-foreground transition-colors"
               title={tab.state.label}
             >
               <TabsTrigger value={tab.key} aria-label={tab.title} className="min-w-0 flex-1 pl-2 pr-2">
