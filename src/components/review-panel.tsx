@@ -2,9 +2,37 @@ import { FileTree, useFileTree } from "@pierre/trees/react";
 import { Virtualizer as DiffsVirtualizer } from "@pierre/diffs";
 import { PatchDiff, VirtualizerContext } from "@pierre/diffs/react";
 import type { FileTree as FileTreeModel, GitStatus, GitStatusEntry } from "@pierre/trees";
-import { AlertCircle, FileDiff, GitCompareArrows, PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertCircle,
+  ChevronRight,
+  Columns2,
+  Eye,
+  EyeOff,
+  FileDiff,
+  MoreHorizontal,
+  RefreshCw,
+  Rows2,
+} from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type CSSProperties,
+} from "react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   useReviewChanges,
   type ReviewDiffState,
@@ -14,7 +42,9 @@ import {
 import { useHorizontalResize } from "@/hooks/use-horizontal-resize";
 import {
   reviewActiveFilePath,
-  reviewChangedFilesText,
+  reviewBranchAreaFiles,
+  reviewChangedFilesHeadline,
+  reviewChangedFilesTotals,
   reviewFileTreeDefaultVisible,
   reviewDiffPathsToLoad,
   reviewFileTreeStatusLabel,
@@ -22,6 +52,7 @@ import {
   reviewFileTreeWidth,
   reviewFileTreeWidthBounds,
   reviewLatestSelectedFilePath,
+  type ReviewBranchAreaFilter,
 } from "@/lib/review-panel-ui";
 import type { RouteReviewScope } from "@/lib/route-search";
 import { cn } from "@/lib/utils";
@@ -58,6 +89,12 @@ export function ReviewPanel({
   onScopeChange,
   onSelectedPathChange,
 }: ReviewPanelProps): React.JSX.Element {
+  const [diffViewMode, setDiffViewMode] = useState<ReviewDiffViewMode>("split");
+  const [diffsCollapsed, setDiffsCollapsed] = useState(false);
+  const [diffCollapseOverrides, setDiffCollapseOverrides] = useState<Record<string, boolean>>({});
+  const [showWhitespace, setShowWhitespace] = useState(true);
+  const [branchAreaFilter, setBranchAreaFilter] = useState<ReviewBranchAreaFilter>("all");
+  const effectiveBranchAreaFilter = scope === "branch" ? branchAreaFilter : "all";
   const {
     branchReviewAvailable,
     diffStatesByPath,
@@ -72,8 +109,10 @@ export function ReviewPanel({
     workspaceId,
     rootId,
     scope,
+    branchAreaFilter: effectiveBranchAreaFilter,
     turnId,
     selectedPath,
+    ignoreWhitespace: !showWhitespace,
     appServerMethods,
     threadHunks,
     threadObservedChanges,
@@ -97,7 +136,24 @@ export function ReviewPanel({
   const fileTreeToggleLabel = reviewFileTreeToggleLabel(fileTreeVisible);
   const effectiveFileTreeWidth = reviewFileTreeWidth(fileTreeWidth, width);
   const reviewPanelStyle = { "--review-file-tree-width": `${effectiveFileTreeWidth}px` } as ReviewPanelStyle;
-  const diffLoadablePaths = useMemo(() => files.filter((file) => !file.binary).map((file) => file.path), [files]);
+  const reviewFiles = useMemo(
+    () => reviewBranchAreaFiles(files, effectiveBranchAreaFilter),
+    [effectiveBranchAreaFilter, files],
+  );
+  const reviewTotals = reviewChangedFilesTotals(reviewFiles);
+  // PatchDiff treats options identity as input, so keep it stable until the actual renderer settings change.
+  const reviewDiffOptions = useMemo(
+    () =>
+      getReviewDiffOptions({
+        collapsed: diffsCollapsed,
+        diffStyle: diffViewMode,
+      }),
+    [diffViewMode, diffsCollapsed],
+  );
+  const diffLoadablePaths = useMemo(
+    () => reviewFiles.filter((file) => !file.binary).map((file) => file.path),
+    [reviewFiles],
+  );
   const currentNearbyDiffPaths = useMemo(() => {
     const loadablePaths = new Set(diffLoadablePaths);
     return new Set([...nearbyDiffPaths].filter((path) => loadablePaths.has(path)));
@@ -180,7 +236,7 @@ export function ReviewPanel({
       return;
     }
     const viewportRect = scrollContainer.getBoundingClientRect();
-    const sections = files
+    const sections = reviewFiles
       .map((file) => {
         const section = diffSections.get(file.path);
         if (!section) {
@@ -199,7 +255,7 @@ export function ReviewPanel({
       selectionSourceRef.current = "scroll";
       onSelectedPathChange(nextPath);
     }
-  }, [diffSections, files, onSelectedPathChange, selectedPath]);
+  }, [diffSections, onSelectedPathChange, reviewFiles, selectedPath]);
 
   const handleDiffScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) {
@@ -230,7 +286,46 @@ export function ReviewPanel({
       return;
     }
     scrollToReviewFile(selectedPath);
-  }, [files, scrollToReviewFile, selectedPath]);
+  }, [reviewFiles, scrollToReviewFile, selectedPath]);
+
+  function selectReviewScope(nextScope: RouteReviewScope, nextTurnId?: string): void {
+    setBranchAreaFilter("all");
+    onScopeChange(nextScope, nextTurnId);
+  }
+
+  function selectBranchArea(nextFilter: ReviewBranchAreaFilter): void {
+    setBranchAreaFilter(nextFilter);
+    onScopeChange("branch");
+    if (scope !== "branch") {
+      return;
+    }
+    const nextFiles = reviewBranchAreaFiles(files, nextFilter);
+    if (selectedPath && nextFiles.some((file) => file.path === selectedPath)) {
+      return;
+    }
+    onSelectedPathChange(nextFiles[0]?.path ?? "");
+  }
+
+  function refreshReview(): void {
+    void loadFiles();
+    for (const file of reviewFiles) {
+      if (!file.binary) {
+        loadDiff(file.path, { force: true });
+      }
+    }
+  }
+
+  function setAllDiffsCollapsed(collapsed: boolean): void {
+    setDiffsCollapsed(collapsed);
+    setDiffCollapseOverrides({});
+  }
+
+  function setDiffFileCollapsed(path: string, collapsed: boolean): void {
+    setDiffCollapseOverrides((current) => ({
+      ...current,
+      [path]: collapsed,
+    }));
+  }
 
   useEffect(() => {
     for (const path of diffPathsToLoad) {
@@ -239,60 +334,75 @@ export function ReviewPanel({
   }, [diffPathsToLoad, loadDiff]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col border-l border-border bg-card text-foreground">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <GitCompareArrows className="size-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-base font-medium">Changes</div>
-          <div className="flex min-w-0 items-center gap-1.5 text-base text-muted-foreground">
-            <span className="shrink-0">{reviewChangedFilesText(listState.files.length)}</span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="shrink-0 rounded-md text-muted-foreground"
-              aria-controls={fileTreeId}
-              aria-expanded={fileTreeVisible}
-              aria-label={fileTreeToggleLabel}
-              title={fileTreeToggleLabel}
-              onClick={() => setFileTreeVisible((visible) => !visible)}
-            >
-              {fileTreeVisible ? <PanelLeftClose className="size-3.5" /> : <PanelLeftOpen className="size-3.5" />}
-            </Button>
-            <span className="truncate">{reviewScopeContext(scope, listState)}</span>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="shrink-0 rounded-md"
-          aria-label="Refresh changes"
-          title="Refresh changes"
-          disabled={listState.status === "loading"}
-          onClick={() => void loadFiles()}
-        >
-          <RefreshCw className={cn("size-3.5", listState.status === "loading" && "animate-spin")} />
-        </Button>
-      </header>
-
-      <div className="flex shrink-0 gap-1 border-b border-border px-2 py-1.5">
-        <ScopeButton active={scope === "thread"} onClick={() => onScopeChange("thread")}>
+    <div className="flex h-full min-h-0 flex-col bg-card text-foreground">
+      <div className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card px-3">
+        <ScopeButton active={scope === "thread"} onClick={() => selectReviewScope("thread")}>
           Thread
         </ScopeButton>
         <ScopeButton
           active={scope === "turn"}
           disabled={!effectiveTurnId}
-          onClick={() => onScopeChange("turn", effectiveTurnId)}
+          onClick={() => selectReviewScope("turn", effectiveTurnId)}
         >
           Turn
         </ScopeButton>
         <ScopeButton
-          active={scope === "branch"}
+          active={scope === "branch" && branchAreaFilter === "all"}
           disabled={!branchReviewAvailable}
-          onClick={() => onScopeChange("branch")}
+          onClick={() => selectBranchArea("all")}
         >
           Branch
         </ScopeButton>
+        <ScopeButton
+          active={scope === "branch" && branchAreaFilter === "staged"}
+          disabled={!branchReviewAvailable}
+          onClick={() => selectBranchArea("staged")}
+        >
+          Staged
+        </ScopeButton>
+        <ScopeButton
+          active={scope === "branch" && branchAreaFilter === "unstaged"}
+          disabled={!branchReviewAvailable}
+          onClick={() => selectBranchArea("unstaged")}
+        >
+          Unstaged
+        </ScopeButton>
+        <div className="min-w-0 flex-1" />
+        <ReviewOptionsMenu
+          collapsed={diffsCollapsed}
+          diffViewMode={diffViewMode}
+          showWhitespace={showWhitespace}
+          onCollapsedChange={setAllDiffsCollapsed}
+          onDiffViewModeChange={setDiffViewMode}
+          onRefresh={refreshReview}
+          onShowWhitespaceChange={setShowWhitespace}
+        />
       </div>
+
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 rounded-full text-muted-foreground hover:bg-muted/40 hover:text-foreground [&_svg]:size-4"
+          aria-controls={fileTreeId}
+          aria-expanded={fileTreeVisible}
+          aria-label={fileTreeToggleLabel}
+          title={fileTreeToggleLabel}
+          onClick={() => setFileTreeVisible((visible) => !visible)}
+        >
+          <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
+        </Button>
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-base">
+          <span className="shrink-0 font-medium">{reviewChangedFilesHeadline(reviewFiles.length)}</span>
+          <span className="truncate text-muted-foreground">
+            {reviewScopeContext(scope, listState, effectiveBranchAreaFilter)}
+          </span>
+        </div>
+        <span className="flex shrink-0 items-center gap-2 font-mono text-sm">
+          <span className="text-emerald-600">+{reviewTotals.additions}</span>
+          <span className="text-red-600">-{reviewTotals.deletions}</span>
+        </span>
+      </header>
 
       {listState.status === "error" && <PanelError message={listState.error} />}
 
@@ -311,7 +421,7 @@ export function ReviewPanel({
           <div className="h-full min-w-0">
             <ReviewFileTree
               key={reviewFileTreeModelKey}
-              files={files}
+              files={reviewFiles}
               selectedPath={selectedPath}
               onSelectedPathChange={handleSelectedPathChange}
             />
@@ -329,8 +439,12 @@ export function ReviewPanel({
         <DiffVirtualizerScrollArea onScroll={handleDiffScroll} onScrollRootChange={setDiffScrollNode}>
           <DiffStream
             diffStatesByPath={diffStatesByPath}
-            files={files}
+            collapseOverrides={diffCollapseOverrides}
+            diffOptions={reviewDiffOptions}
+            fallbackCollapsed={diffsCollapsed}
+            files={reviewFiles}
             scrollRoot={diffScrollElement}
+            onCollapsedChange={setDiffFileCollapsed}
             onLoadFull={loadFullDiff}
             onRefresh={loadDiff}
             onNearViewportChange={setDiffPathNearViewport}
@@ -345,6 +459,9 @@ export function ReviewPanel({
 type ReviewPanelStyle = CSSProperties & {
   "--review-file-tree-width": string;
 };
+
+type ReviewDiffViewMode = "split" | "unified";
+type ReviewDiffOptions = NonNullable<ComponentProps<typeof PatchDiff>["options"]>;
 
 function DiffVirtualizerScrollArea({
   children,
@@ -554,17 +671,25 @@ function ReviewFileTree({
 }
 
 function DiffStream({
+  collapseOverrides,
   diffStatesByPath,
+  diffOptions,
+  fallbackCollapsed,
   files,
   scrollRoot,
+  onCollapsedChange,
   onRefresh,
   onLoadFull,
   onNearViewportChange,
   onSectionRef,
 }: {
+  collapseOverrides: Record<string, boolean>;
   diffStatesByPath: Record<string, ReviewDiffState>;
+  diffOptions: ReviewDiffOptions;
+  fallbackCollapsed: boolean;
   files: ReviewFile[];
   scrollRoot: HTMLElement | null;
+  onCollapsedChange: (path: string, collapsed: boolean) => void;
   onLoadFull: (path: string) => void;
   onRefresh: (path: string, options?: { force?: boolean }) => void;
   onNearViewportChange: (path: string, nearViewport: boolean) => void;
@@ -579,9 +704,12 @@ function DiffStream({
       {files.map((file) => (
         <DiffFileSection
           key={file.path}
+          collapsed={collapseOverrides[file.path] ?? fallbackCollapsed}
           diffState={diffStatesByPath[file.path] ?? { status: "idle", patch: "" }}
+          diffOptions={diffOptions}
           file={file}
           scrollRoot={scrollRoot}
+          onCollapsedChange={onCollapsedChange}
           onLoadFull={onLoadFull}
           onNearViewportChange={onNearViewportChange}
           onRefresh={onRefresh}
@@ -593,17 +721,23 @@ function DiffStream({
 }
 
 function DiffFileSection({
+  collapsed,
   diffState,
+  diffOptions,
   file,
   scrollRoot,
+  onCollapsedChange,
   onRefresh,
   onLoadFull,
   onNearViewportChange,
   onSectionRef,
 }: {
+  collapsed: boolean;
   diffState: ReviewDiffState;
+  diffOptions: ReviewDiffOptions;
   file: ReviewFile;
   scrollRoot: HTMLElement | null;
+  onCollapsedChange: (path: string, collapsed: boolean) => void;
   onLoadFull: (path: string) => void;
   onRefresh: (path: string, options?: { force?: boolean }) => void;
   onNearViewportChange: (path: string, nearViewport: boolean) => void;
@@ -649,9 +783,12 @@ function DiffFileSection({
       data-review-file-path={file.path}
     >
       <DiffFileBody
+        collapsed={collapsed}
         diffState={diffState}
+        diffOptions={diffOptions}
         file={file}
         onLoadFull={() => onLoadFull(file.path)}
+        onCollapsedChange={() => onCollapsedChange(file.path, !collapsed)}
         onRefresh={() => onRefresh(file.path, { force: true })}
       />
     </section>
@@ -659,16 +796,25 @@ function DiffFileSection({
 }
 
 function DiffFileBody({
+  collapsed,
   diffState,
+  diffOptions,
   file,
+  onCollapsedChange,
   onRefresh,
   onLoadFull,
 }: {
+  collapsed: boolean;
   diffState: ReviewDiffState;
+  diffOptions: ReviewDiffOptions;
   file: ReviewFile;
+  onCollapsedChange: () => void;
   onLoadFull: () => void;
   onRefresh: () => void;
 }): React.JSX.Element {
+  // Preserve options identity for PatchDiff while still allowing each file to override collapse state.
+  const fileDiffOptions = useMemo(() => ({ ...diffOptions, collapsed }), [collapsed, diffOptions]);
+
   if (file.binary) {
     return (
       <>
@@ -721,7 +867,107 @@ function DiffFileBody({
       </>
     );
   }
-  return <PatchDiff patch={diffState.patch} options={diffOptions} disableWorkerPool className="block min-w-full" />;
+  return (
+    <PatchDiff
+      patch={diffState.patch}
+      options={fileDiffOptions}
+      renderHeaderPrefix={() => (
+        <DiffFileCollapseButton collapsed={collapsed} filePath={file.path} onToggle={onCollapsedChange} />
+      )}
+      disableWorkerPool
+      className="block min-w-full"
+    />
+  );
+}
+
+function DiffFileCollapseButton({
+  collapsed,
+  filePath,
+  onToggle,
+}: {
+  collapsed: boolean;
+  filePath: string;
+  onToggle: () => void;
+}): React.JSX.Element {
+  const label = collapsed ? `Expand ${filePath}` : `Collapse ${filePath}`;
+
+  return (
+    <button
+      type="button"
+      className="flex size-7 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={label}
+      title={label}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggle();
+      }}
+    >
+      <ChevronRight className={cn("size-4 transition-transform", !collapsed && "rotate-90")} />
+    </button>
+  );
+}
+
+function ReviewOptionsMenu({
+  collapsed,
+  diffViewMode,
+  showWhitespace,
+  onCollapsedChange,
+  onDiffViewModeChange,
+  onRefresh,
+  onShowWhitespaceChange,
+}: {
+  collapsed: boolean;
+  diffViewMode: ReviewDiffViewMode;
+  showWhitespace: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
+  onDiffViewModeChange: (mode: ReviewDiffViewMode) => void;
+  onRefresh: () => void;
+  onShowWhitespaceChange: (showWhitespace: boolean) => void;
+}): React.JSX.Element {
+  const nextDiffViewMode = diffViewMode === "split" ? "unified" : "split";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[popup-open]:bg-muted/40 data-[popup-open]:text-foreground"
+        aria-label="Review options"
+        title="Review options"
+      >
+        <MoreHorizontal className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="bottom" className="min-w-60">
+        <DropdownMenuGroup>
+          <DropdownMenuItem onSelect={onRefresh}>
+            <RefreshCw className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">Refresh</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDiffViewModeChange(nextDiffViewMode)}>
+            {diffViewMode === "split" ? (
+              <Rows2 className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <Columns2 className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <span className="min-w-0 flex-1">
+              {diffViewMode === "split" ? "Use above/below view" : "Use split view"}
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onCollapsedChange(!collapsed)}>
+            <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground", !collapsed && "rotate-90")} />
+            <span className="min-w-0 flex-1">{collapsed ? "Expand all diffs" : "Collapse all diffs"}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onShowWhitespaceChange(!showWhitespace)}>
+            {showWhitespace ? (
+              <EyeOff className="size-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <Eye className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <span className="min-w-0 flex-1">{showWhitespace ? "Hide whitespace" : "Show whitespace"}</span>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function FallbackFileHeader({ file, loading = false }: { file: ReviewFile; loading?: boolean }): React.JSX.Element {
@@ -754,8 +1000,8 @@ function ScopeButton({
       type="button"
       disabled={disabled}
       className={cn(
-        "h-8 rounded-md px-2.5 text-base font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40",
-        active && "bg-accent text-accent-foreground",
+        "h-7 rounded-full px-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40",
+        active && "bg-accent/60 text-foreground hover:bg-accent/60",
       )}
       onClick={onClick}
     >
@@ -810,14 +1056,21 @@ function fileStats(file: Pick<ReviewFile, "additions" | "deletions">): string {
   return `+${file.additions} -${file.deletions}`;
 }
 
-function reviewScopeContext(scope: RouteReviewScope, listState: ReviewListState): string {
-  if (listState.status === "loading") {
-    return "Loading...";
-  }
+function reviewScopeContext(
+  scope: RouteReviewScope,
+  listState: ReviewListState,
+  branchAreaFilter: ReviewBranchAreaFilter,
+): string {
   if (listState.status === "error") {
     return "Unable to load changes";
   }
   if (scope === "branch" && listState.status === "ready") {
+    if (branchAreaFilter === "staged") {
+      return "staged changes";
+    }
+    if (branchAreaFilter === "unstaged") {
+      return "unstaged changes";
+    }
     const branch = listState.branch ?? "branch";
     const base = listState.baseRef ?? "base";
     return `${branch} compared with ${base}`;
@@ -839,21 +1092,58 @@ function directoryPaths(paths: string[]): string[] {
   return Array.from(directories);
 }
 
-const diffOptions = {
-  diffStyle: "split",
-  hunkSeparators: "line-info-basic",
-  overflow: "scroll",
-  stickyHeader: true,
-  theme: {
-    dark: "pierre-dark-soft",
-    light: "pierre-light",
-  },
-  themeType: "system",
-  unsafeCSS: `
-    :host {
-      --diffs-font-family: var(--font-code);
-      --diffs-font-size: var(--font-size-code);
-      --diffs-line-height: calc(var(--font-size-code) + 7px);
-    }
-  `,
-} as const;
+function getReviewDiffOptions({
+  collapsed,
+  diffStyle,
+}: {
+  collapsed: boolean;
+  diffStyle: ReviewDiffViewMode;
+}): ReviewDiffOptions {
+  return {
+    collapsed,
+    diffStyle,
+    hunkSeparators: "line-info-basic",
+    overflow: "scroll",
+    stickyHeader: true,
+    theme: {
+      dark: "pierre-dark-soft",
+      light: "pierre-light",
+    },
+    themeType: "system",
+    unsafeCSS: `
+      :host {
+        --diffs-header-font-family: var(--font-ui);
+        --diffs-font-family: var(--font-code);
+        --diffs-font-size: var(--font-size-code);
+        --diffs-line-height: calc(var(--font-size-code) + 12px);
+      }
+
+      [data-diffs-header=default] {
+        cursor: default;
+        font-size: var(--font-size-ui);
+        line-height: 1.5;
+        padding-inline: 12px;
+      }
+
+      [data-diffs-header=default] * {
+        cursor: default;
+      }
+
+      [data-change-icon] {
+        box-sizing: border-box;
+        width: 28px;
+        height: 28px;
+        padding: 5px;
+      }
+
+      [data-header-content] slot[name='header-prefix'] + [data-change-icon] {
+        display: none;
+      }
+
+      [data-header-content] [data-title],
+      [data-header-content] [data-prev-name] {
+        font-weight: 500;
+      }
+    `,
+  };
+}
