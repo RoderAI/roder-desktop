@@ -106,3 +106,31 @@ test("review VCS IPC wrappers call live branch change methods", async () => {
     },
   ]);
 });
+
+test("filesystem IPC wrappers call documented read methods", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return method === "fs/readFile"
+      ? { dataBase64: "SGVsbG8=" }
+      : { entries: [{ fileName: "src", isDirectory: true, isFile: false }] };
+  });
+
+  await roderIpc.readDirectory("/workspace");
+  await roderIpc.readFile("/workspace/README.md");
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "fs/readDirectory",
+      params: {
+        path: "/workspace",
+      },
+    },
+    {
+      method: "fs/readFile",
+      params: {
+        path: "/workspace/README.md",
+      },
+    },
+  ]);
+});

@@ -31,7 +31,7 @@ test("route search defaults preserve practical app layout state", () => {
 test("route search rejects unknown literals and clamps workspace panel width", () => {
   expect(
     normalizeRouteSearch({
-      panelTabs: "browser,debugger,review,browser",
+      panelTabs: "browser,debugger,review,files,browser",
       panelActive: "debugger",
       reviewScope: "file",
       reviewTurnId: "turn-1",
@@ -42,7 +42,7 @@ test("route search rejects unknown literals and clamps workspace panel width", (
       categories: "codex,local",
     }),
   ).toEqual({
-    panelTabs: ["browser", "review"],
+    panelTabs: ["browser", "review", "files"],
     panelActive: "browser",
     panelOpen: false,
     reviewScope: "thread",
@@ -61,8 +61,8 @@ test("route search rejects unknown literals and clamps workspace panel width", (
 test("route search accepts supported practical URL state values", () => {
   expect(
     normalizeRouteSearch({
-      panelTabs: "terminal,browser,extensions",
-      panelActive: "extensions",
+      panelTabs: "terminal,browser,files,extensions",
+      panelActive: "files",
       panelOpen: "true",
       reviewScope: "branch",
       reviewPath: "src/review-panel.tsx",
@@ -75,8 +75,8 @@ test("route search accepts supported practical URL state values", () => {
       categories: "developer-tools,automation",
     }),
   ).toEqual({
-    panelTabs: ["terminal", "browser", "extensions"],
-    panelActive: "extensions",
+    panelTabs: ["terminal", "browser", "files", "extensions"],
+    panelActive: "files",
     panelOpen: true,
     reviewScope: "branch",
     reviewTurnId: "",
@@ -151,6 +151,11 @@ test("workspace panel open action appends and focuses without duplicating tabs",
     panelActive: "browser",
     panelOpen: true,
   });
+  expect(openWorkspacePanelTab(current, "files")).toEqual({
+    panelTabs: ["terminal", "browser", "files"],
+    panelActive: "files",
+    panelOpen: true,
+  });
 });
 
 test("workspace panel tab serializer tolerates already serialized tab values", () => {
@@ -181,6 +186,13 @@ test("workspace panel close action selects the nearest remaining tab", () => {
     panelActive: null,
     panelOpen: false,
   });
+  expect(
+    closeWorkspacePanelTab(normalizeRouteSearch({ panelTabs: "browser,files", panelActive: "files" }), "files"),
+  ).toEqual({
+    panelTabs: ["browser"],
+    panelActive: "browser",
+    panelOpen: false,
+  });
 });
 
 test("workspace panel select action only activates open tabs", () => {
@@ -190,6 +202,7 @@ test("workspace panel select action only activates open tabs", () => {
   });
 
   expect(selectWorkspacePanelTab(current, "browser")).toEqual({ panelActive: "browser" });
+  expect(selectWorkspacePanelTab({ panelTabs: ["terminal", "files"] }, "files")).toEqual({ panelActive: "files" });
   expect(selectWorkspacePanelTab(current, "review")).toEqual(null);
 });
 

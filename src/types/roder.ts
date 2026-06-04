@@ -505,6 +505,20 @@ export type Workspace = {
   updatedAt: number;
 };
 
+export type FileSystemDirectoryEntry = {
+  fileName: string;
+  isDirectory: boolean;
+  isFile: boolean;
+};
+
+export type FileSystemReadDirectoryResult = {
+  entries: FileSystemDirectoryEntry[];
+};
+
+export type FileSystemReadFileResult = {
+  dataBase64: string;
+};
+
 export type TerminalSnapshot = {
   id: string;
   pid: number;
