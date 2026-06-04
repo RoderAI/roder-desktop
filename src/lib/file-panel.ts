@@ -1,3 +1,4 @@
+import { createFileTreeIconResolver, getBuiltInSpriteSheet } from "@pierre/trees";
 import type { FileSystemReadDirectoryResult, WorkspaceRoot } from "@/types/roder";
 
 export type FilePanelPathKind = "file" | "directory";
@@ -22,6 +23,15 @@ export type FilePanelSelection = {
 
 export type FilePanelTabIdentity = {
   key: string;
+};
+
+export type FilePanelFileIcon = {
+  height?: number;
+  name: string;
+  remappedFrom?: string;
+  token?: string;
+  viewBox?: string;
+  width?: number;
 };
 
 export type FilePanelResolvedPath = {
@@ -61,6 +71,14 @@ const skippedIndexDirectoryNames = new Set([
   "out",
   "target",
 ]);
+
+const filePanelIconResolver = createFileTreeIconResolver();
+
+export const filePanelFileIconSpriteSheet = getBuiltInSpriteSheet("complete");
+
+export function filePanelFileIcon(path: string): FilePanelFileIcon {
+  return filePanelIconResolver.resolveIcon("file-tree-icon-file", path);
+}
 
 export function filePanelRootItems(roots: readonly WorkspaceRoot[]): FilePanelRootItem[] {
   const duplicateNames = duplicateRootNames(roots);
