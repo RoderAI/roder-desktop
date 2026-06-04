@@ -179,7 +179,7 @@ function FilePanelSidebar({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {directoryErrorCount > 0 && <DirectoryReadWarning count={directoryErrorCount} />}
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 pt-1.5">
         <FilePanelTree
           key={treeKey(treePaths, initialExpansion)}
           roots={roots}
