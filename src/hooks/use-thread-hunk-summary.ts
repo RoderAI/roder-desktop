@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { roderIpc } from "@/lib/roder-ipc";
-import { summarizeReviewChanges } from "@/lib/review-changes";
+import { summarizeReviewChanges, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import type { HunkRecord, WorkspaceChangeObservation } from "@/types/roder";
 
 export type ThreadHunkSummary = {
   fileCount: number;
   latestTurnId: string;
   turnChangeCounts: Record<string, number>;
+  turnChangeSummaries: Record<string, ReviewTurnChangeSummary>;
   hunks: HunkRecord[];
   observedChanges: WorkspaceChangeObservation[];
   loading: boolean;
@@ -17,6 +18,7 @@ const emptySummary: ThreadHunkSummary = {
   fileCount: 0,
   latestTurnId: "",
   turnChangeCounts: {},
+  turnChangeSummaries: {},
   hunks: [],
   observedChanges: [],
   loading: false,

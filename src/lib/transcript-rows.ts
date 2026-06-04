@@ -1,16 +1,12 @@
 import type { ConversationMessage } from "@/types/roder";
+import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { groupToolMessagesForTranscript, type TranscriptMessageEntry } from "@/lib/tool-message-groups";
 
 export type TranscriptRow =
   | TranscriptEntryRow
   | {
-      count: number;
-      key: "thread-review-changes";
-      kind: "threadReviewChanges";
-    }
-  | {
-      count: number;
       key: string;
+      summary: ReviewTurnChangeSummary;
       kind: "turnReviewChanges";
       turnId: string;
     }
@@ -34,8 +30,7 @@ export type TranscriptRowsOptions = {
   activeTurnId?: string;
   messages: ConversationMessage[];
   showWorkingIndicator?: boolean;
-  threadChangeCount?: number;
-  turnChangeCounts?: Record<string, number>;
+  turnChangeSummaries?: Record<string, ReviewTurnChangeSummary>;
 };
 
 export type TranscriptRowsSearchTextOptions = {
@@ -46,20 +41,11 @@ export function buildTranscriptRows({
   activeTurnId,
   messages,
   showWorkingIndicator = false,
-  threadChangeCount = 0,
-  turnChangeCounts = {},
+  turnChangeSummaries = {},
 }: TranscriptRowsOptions): TranscriptRow[] {
   const entries = groupToolMessagesForTranscript(messages, { activeTurnId });
   const turnBoundaryIndexes = findTurnBoundaryIndexes(entries);
   const rows: TranscriptRow[] = [];
-
-  if (threadChangeCount > 0) {
-    rows.push({
-      count: threadChangeCount,
-      key: "thread-review-changes",
-      kind: "threadReviewChanges",
-    });
-  }
 
   entries.forEach((entry, index) => {
     const turnId = transcriptEntryTurnId(entry);
@@ -78,12 +64,12 @@ export function buildTranscriptRows({
 
     rows.push(entryRow);
 
-    const turnChangeCount = turnId ? (turnChangeCounts[turnId] ?? 0) : 0;
-    if (turnId && turnChangeCount > 0 && turnBoundaryIndexes.has(index)) {
+    const turnChangeSummary = turnId ? turnChangeSummaries[turnId] : undefined;
+    if (turnId && turnChangeSummary && turnChangeSummary.files.length > 0 && turnBoundaryIndexes.has(index)) {
       rows.push({
-        count: turnChangeCount,
         key: `turn-review-changes:${turnId}`,
         kind: "turnReviewChanges",
+        summary: turnChangeSummary,
         turnId,
       });
     }
@@ -209,11 +195,8 @@ function transcriptEntryMessages(entry: TranscriptMessageEntry | undefined): Con
 }
 
 function transcriptRowSearchText(row: TranscriptRow): string {
-  if (row.kind === "threadReviewChanges") {
-    return `Changes ${row.count}`;
-  }
   if (row.kind === "turnReviewChanges") {
-    return `Turn changes ${row.count}`;
+    return [reviewTurnChangeLabel(row.summary), `+${row.summary.additions} -${row.summary.deletions}`].join("\n");
   }
   if (row.kind === "working") {
     return "Agent is working";
