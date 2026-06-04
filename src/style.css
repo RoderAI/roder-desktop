@@ -1121,6 +1121,14 @@ code[data-streamdown="inline-code"] {
   background: var(--color-muted-foreground);
 }
 
+.file-tabs-scroll {
+  scrollbar-width: none;
+}
+
+.file-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .transcript-viewport {
   overflow-anchor: none;
   scrollbar-gutter: stable;
