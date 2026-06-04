@@ -9,6 +9,8 @@ import { useMountEffect } from "@/hooks/use-mount-effect";
 import { highlightFileContent, type HighlightedFileContent } from "@/lib/file-syntax-highlight";
 import {
   decodeFileContent,
+  filePanelFileIcon,
+  filePanelFileIconSpriteSheet,
   filePanelIndexedPathByTreePath,
   filePanelRootItems,
   filePanelSearchPaths,
@@ -19,6 +21,7 @@ import {
   nextFilePanelActiveTabKey,
   resolveFilePanelPath,
   type DecodedFileContent,
+  type FilePanelFileIcon,
   type FilePanelIndexedPath,
   type FilePanelSelection,
 } from "@/lib/file-panel";
@@ -213,6 +216,7 @@ function OpenFileTabs({
 
   return (
     <div className="flex min-w-0 flex-1 items-center">
+      <span aria-hidden dangerouslySetInnerHTML={{ __html: filePanelFileIconSpriteSheet }} />
       <Tabs value={activeKey ?? undefined} onValueChange={onSelect} className="min-w-0 shrink">
         <TabsList variant="chrome" className="max-w-full overflow-x-auto" aria-label="Open files">
           {tabs.map((tab) => (
@@ -224,7 +228,7 @@ function OpenFileTabs({
               <TabsTrigger value={tab.key} aria-label={tab.title} className="min-w-0 flex-1 pl-2 pr-2">
                 <span className="relative flex size-4 shrink-0 items-center justify-center">
                   <span className="flex shrink-0 transition-opacity group-hover/tab:opacity-0 group-focus-within/tab:opacity-0 [&_svg]:size-3.5">
-                    <FileCode2 />
+                    <FileTabIcon path={tab.state.selection.relativePath} />
                   </span>
                 </span>
                 <span className="truncate text-sm font-medium">{tab.title}</span>
@@ -247,6 +251,28 @@ function OpenFileTabs({
       </Tabs>
       <div className="min-w-0 flex-1" />
     </div>
+  );
+}
+
+function FileTabIcon({ path }: { path: string }): React.JSX.Element {
+  const icon = filePanelFileIcon(path);
+  return <ResolvedFileIcon icon={icon} className="file-panel-tab-icon shrink-0" />;
+}
+
+function ResolvedFileIcon({ icon, className }: { icon: FilePanelFileIcon; className?: string }): React.JSX.Element {
+  const iconName = icon.name.replace(/^#/, "");
+  return (
+    <svg
+      data-icon-name={icon.remappedFrom ?? icon.name}
+      data-icon-token={icon.token}
+      aria-hidden
+      className={className}
+      viewBox={icon.viewBox ?? `0 0 ${icon.width ?? 16} ${icon.height ?? 16}`}
+      width={icon.width ?? 16}
+      height={icon.height ?? 16}
+    >
+      <use href={`#${iconName}`} />
+    </svg>
   );
 }
 

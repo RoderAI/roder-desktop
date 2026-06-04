@@ -3,6 +3,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   decodeFileContent,
+  filePanelFileIcon,
+  filePanelFileIconSpriteSheet,
   filePanelIndexedPathByTreePath,
   filePanelRootItems,
   filePanelSearchPaths,
@@ -101,6 +103,20 @@ test("file panel derives stable file tab labels and active tab fallbacks", () =>
   expect(nextFilePanelActiveTabKey([first, second, third], second.key, second.key)).toBe(third.key);
   expect(nextFilePanelActiveTabKey([first, second, third], third.key, third.key)).toBe(second.key);
   expect(nextFilePanelActiveTabKey([first, second, third], first.key, second.key)).toBe(first.key);
+});
+
+test("file panel resolves file type icons from the tree icon set", () => {
+  expect(filePanelFileIcon("src/index.ts")).toEqual(
+    expect.objectContaining({
+      name: "file-tree-builtin-typescript",
+      remappedFrom: "file-tree-icon-file",
+      token: "typescript",
+    }),
+  );
+  expect(filePanelFileIcon("src/App.tsx")).toEqual(
+    expect.objectContaining({ name: "file-tree-builtin-react", token: "react" }),
+  );
+  expect(filePanelFileIconSpriteSheet).toContain('id="file-tree-builtin-typescript"');
 });
 
 test("file panel indexing keeps readable paths when a nested directory fails", async () => {
