@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import {
   reviewActiveFilePath,
-  reviewChangedFilesText,
+  reviewBranchAreaFiles,
+  reviewChangedFilesHeadline,
+  reviewChangedFilesTotals,
   reviewDiffPathsToLoad,
   reviewFileTreeDefaultVisible,
   reviewFileTreeStatusLabel,
@@ -10,10 +12,40 @@ import {
   reviewLatestSelectedFilePath,
 } from "../src/lib/review-panel-ui";
 
-test("reviewChangedFilesText describes the number of changed files", () => {
-  expect(reviewChangedFilesText(0)).toBe("0 files changed");
-  expect(reviewChangedFilesText(1)).toBe("1 file changed");
-  expect(reviewChangedFilesText(2)).toBe("2 files changed");
+test("reviewChangedFilesHeadline describes the number of changed files", () => {
+  expect(reviewChangedFilesHeadline(0)).toBe("0 Files Changed");
+  expect(reviewChangedFilesHeadline(1)).toBe("1 File Changed");
+  expect(reviewChangedFilesHeadline(2)).toBe("2 Files Changed");
+});
+
+test("reviewChangedFilesTotals sums changed file stats", () => {
+  expect(
+    reviewChangedFilesTotals([
+      { additions: 3, deletions: 1 },
+      { additions: 5, deletions: 0 },
+      { additions: 0, deletions: 2 },
+    ]),
+  ).toEqual({ additions: 8, deletions: 3 });
+});
+
+test("reviewBranchAreaFiles filters branch files by staged and unstaged areas", () => {
+  const files = [
+    { path: "committed.ts", status: "modified" as const, areas: ["committed" as const] },
+    { path: "staged.ts", status: "modified" as const, areas: ["staged" as const] },
+    { path: "mixed.ts", status: "modified" as const, areas: ["staged" as const, "unstaged" as const] },
+    { path: "dirty.ts", status: "modified" as const, areas: ["unstaged" as const] },
+    { path: "new.ts", status: "untracked" as const, areas: ["untracked" as const] },
+  ];
+
+  expect(reviewBranchAreaFiles(files, "all").map((file) => file.path)).toEqual([
+    "committed.ts",
+    "staged.ts",
+    "mixed.ts",
+    "dirty.ts",
+    "new.ts",
+  ]);
+  expect(reviewBranchAreaFiles(files, "staged").map((file) => file.path)).toEqual(["staged.ts", "mixed.ts"]);
+  expect(reviewBranchAreaFiles(files, "unstaged").map((file) => file.path)).toEqual(["mixed.ts", "dirty.ts", "new.ts"]);
 });
 
 test("reviewFileTreeToggleLabel describes the action for the current file tree state", () => {

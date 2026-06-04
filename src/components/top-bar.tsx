@@ -90,7 +90,7 @@ export function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className={cn(chromeIconButtonClassNameForState(false), "size-7 rounded-lg [&_svg]:size-4")}
+            className={cn(chromeIconButtonClassNameForState(false), "size-7 rounded-full [&_svg]:size-4")}
             aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
             title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
             onClick={onToggleSidebar}
@@ -137,7 +137,7 @@ export function TopBar({
               size="icon"
               className={cn(
                 chromeIconButtonClassNameForState(workspacePanelOpen),
-                "size-7 rounded-lg [&_svg]:size-4",
+                "size-7 rounded-full [&_svg]:size-4",
                 extensionSidebarVisible && "mr-12",
               )}
               aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
@@ -166,7 +166,7 @@ export function TopBar({
         size="icon"
         className={cn(
           chromeIconButtonClassNameForState(false),
-          "fixed left-20 top-[11px] z-40 size-7 translate-x-2 rounded-lg [&_svg]:size-4",
+          "fixed left-20 top-[11px] z-40 size-7 translate-x-2 rounded-full [&_svg]:size-4",
         )}
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
         title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -218,7 +218,7 @@ export function TopBar({
             size="icon"
             className={cn(
               chromeIconButtonClassNameForState(workspacePanelOpen),
-              "fixed right-2 top-[11px] z-40 size-7 rounded-lg [&_svg]:size-4",
+              "fixed right-2 top-[11px] z-40 size-7 rounded-full [&_svg]:size-4",
             )}
             aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
             title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}

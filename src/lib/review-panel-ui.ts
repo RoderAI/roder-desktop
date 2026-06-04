@@ -1,4 +1,11 @@
-import type { VcsChangeStatus } from "@/types/roder";
+import type { VcsChangeArea, VcsChangeStatus } from "@/types/roder";
+
+export type ReviewBranchAreaFilter = "all" | "staged" | "unstaged";
+
+export type ReviewBranchAreaFile = {
+  status: VcsChangeStatus;
+  areas?: readonly VcsChangeArea[];
+};
 
 export type ReviewFileSectionBounds = {
   path: string;
@@ -22,8 +29,47 @@ export type ReviewDiffLoadPlan = {
   diffStatesByPath: Record<string, ReviewDiffLoadState | undefined>;
 };
 
-export function reviewChangedFilesText(count: number): string {
-  return `${count} ${count === 1 ? "file" : "files"} changed`;
+export type ReviewFileTotalsSource = {
+  additions: number;
+  deletions: number;
+};
+
+export function reviewChangedFilesHeadline(count: number): string {
+  return `${count} ${count === 1 ? "File" : "Files"} Changed`;
+}
+
+export function reviewChangedFilesTotals(files: readonly ReviewFileTotalsSource[]): {
+  additions: number;
+  deletions: number;
+} {
+  let additions = 0;
+  let deletions = 0;
+  for (const file of files) {
+    additions += file.additions;
+    deletions += file.deletions;
+  }
+  return { additions, deletions };
+}
+
+export function reviewBranchAreaFiles<T extends ReviewBranchAreaFile>(
+  files: readonly T[],
+  filter: ReviewBranchAreaFilter,
+): T[] {
+  if (filter === "all") {
+    return [...files];
+  }
+  return files.filter((file) => reviewFileMatchesBranchArea(file, filter));
+}
+
+function reviewFileMatchesBranchArea(
+  file: ReviewBranchAreaFile,
+  filter: Exclude<ReviewBranchAreaFilter, "all">,
+): boolean {
+  const areas = file.areas ?? [];
+  if (filter === "staged") {
+    return areas.includes("staged");
+  }
+  return areas.includes("unstaged") || areas.includes("untracked") || (!areas.length && file.status === "untracked");
 }
 
 export function reviewFileTreeToggleLabel(visible: boolean): string {
