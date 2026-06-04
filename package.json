@@ -97,6 +97,7 @@
     "nuqs": "^2.8.9",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-resizable-panels": "4.11.1",
     "rehype-harden": "^1.1.8",
     "streamdown": "^2.5.0",
     "tailwind-merge": "^3.6.0",

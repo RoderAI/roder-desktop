@@ -196,12 +196,19 @@ function transcriptEntryMessages(entry: TranscriptMessageEntry | undefined): Con
 
 function transcriptRowSearchText(row: TranscriptRow): string {
   if (row.kind === "turnReviewChanges") {
-    return [reviewTurnChangeLabel(row.summary), `+${row.summary.additions} -${row.summary.deletions}`].join("\n");
+    return [reviewTurnChangeLabel(row.summary), reviewChangeDeltaText(row.summary)].filter(Boolean).join("\n");
   }
   if (row.kind === "working") {
     return "Agent is working";
   }
   return transcriptEntrySearchText(row.entry);
+}
+
+function reviewChangeDeltaText(summary: ReviewTurnChangeSummary): string | undefined {
+  if (summary.additions === 0 && summary.deletions === 0) {
+    return undefined;
+  }
+  return `+${summary.additions} -${summary.deletions}`;
 }
 
 function transcriptEntrySearchText(entry: TranscriptMessageEntry): string {
