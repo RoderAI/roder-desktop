@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { useMountEffect } from "@/hooks/use-mount-effect";
-import { filePanelShouldIndexDirectory, normalizeRelativePath, type FilePanelIndexedPath } from "@/lib/file-panel";
+import {
+  indexFilePanelWorkspaceRoots,
+  type FilePanelDirectoryReadError,
+  type FilePanelIndexedPath,
+} from "@/lib/file-panel";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { WorkspaceRoot } from "@/types/roder";
 
@@ -10,7 +14,12 @@ export type FilePanelTreeState =
   | { status: "unavailable"; indexedPaths: FilePanelIndexedPath[] }
   | { status: "empty"; indexedPaths: FilePanelIndexedPath[] }
   | { status: "loading"; indexedPaths: FilePanelIndexedPath[] }
-  | { status: "ready"; indexedPaths: FilePanelIndexedPath[]; truncated: boolean }
+  | {
+      status: "ready";
+      indexedPaths: FilePanelIndexedPath[];
+      truncated: boolean;
+      directoryErrors: FilePanelDirectoryReadError[];
+    }
   | { status: "error"; indexedPaths: FilePanelIndexedPath[]; error: string };
 
 export type UseFilePanelTreeParams = {
@@ -41,12 +50,17 @@ export function useFilePanelTree({
     }
 
     setState((current) => ({ status: "loading", indexedPaths: current.indexedPaths }));
-    void indexWorkspaceRoots(roots, indexedPathLimit)
+    void indexFilePanelWorkspaceRoots(roots, indexedPathLimit, roderIpc.readDirectory)
       .then((result) => {
         if (requestSeq.current !== requestId) {
           return;
         }
-        setState({ status: "ready", indexedPaths: result.indexedPaths, truncated: result.truncated });
+        setState({
+          status: "ready",
+          indexedPaths: result.indexedPaths,
+          truncated: result.truncated,
+          directoryErrors: result.directoryErrors,
+        });
       })
       .catch((error: unknown) => {
         if (requestSeq.current !== requestId) {
@@ -71,48 +85,6 @@ function initialTreeState(roots: readonly WorkspaceRoot[], available: boolean): 
     return { status: "empty", indexedPaths: [] };
   }
   return { status: "loading", indexedPaths: [] };
-}
-
-async function indexWorkspaceRoots(
-  roots: readonly WorkspaceRoot[],
-  limit: number,
-): Promise<{ indexedPaths: FilePanelIndexedPath[]; truncated: boolean }> {
-  const indexedPaths: FilePanelIndexedPath[] = [];
-  let truncated = false;
-
-  for (const root of roots) {
-    const queue = [""];
-    while (queue.length > 0) {
-      const relativeDirectoryPath = queue.shift() ?? "";
-      const directoryPath = absolutePathForDirectory(root.path, relativeDirectoryPath);
-      const result = await roderIpc.readDirectory(directoryPath);
-      for (const entry of result.entries) {
-        if (indexedPaths.length >= limit) {
-          truncated = true;
-          return { indexedPaths, truncated };
-        }
-        const relativePath = normalizeRelativePath([relativeDirectoryPath, entry.fileName].filter(Boolean).join("/"));
-        if (!relativePath) {
-          continue;
-        }
-        if (entry.isDirectory) {
-          indexedPaths.push({ rootId: root.id, relativePath, kind: "directory" });
-          if (filePanelShouldIndexDirectory(relativePath)) {
-            queue.push(relativePath);
-          }
-        } else if (entry.isFile) {
-          indexedPaths.push({ rootId: root.id, relativePath, kind: "file" });
-        }
-      }
-    }
-  }
-
-  return { indexedPaths, truncated };
-}
-
-function absolutePathForDirectory(rootPath: string, relativePath: string): string {
-  const root = rootPath.replace(/[\\/]+$/, "");
-  return relativePath ? `${root}/${relativePath}` : root;
 }
 
 function errorMessage(error: unknown): string {

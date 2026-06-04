@@ -1,4 +1,4 @@
-import type { WorkspaceRoot } from "@/types/roder";
+import type { FileSystemReadDirectoryResult, WorkspaceRoot } from "@/types/roder";
 
 export type FilePanelPathKind = "file" | "directory";
 
@@ -26,6 +26,20 @@ export type FilePanelResolvedPath = {
 };
 
 export type FilePanelTreeInitialExpansion = 1 | "open";
+
+export type FilePanelDirectoryReadError = {
+  rootId: string;
+  relativePath: string;
+  error: string;
+};
+
+export type FilePanelWorkspaceIndex = {
+  indexedPaths: FilePanelIndexedPath[];
+  truncated: boolean;
+  directoryErrors: FilePanelDirectoryReadError[];
+};
+
+export type FilePanelReadDirectory = (path: string) => Promise<FileSystemReadDirectoryResult>;
 
 export type DecodedFileContent =
   | { status: "text"; text: string; bytes: number }
@@ -144,6 +158,51 @@ export function filePanelShouldIndexDirectory(relativePath: string): boolean {
     .every((segment) => !skippedIndexDirectoryNames.has(segment));
 }
 
+export async function indexFilePanelWorkspaceRoots(
+  roots: readonly WorkspaceRoot[],
+  limit: number,
+  readDirectory: FilePanelReadDirectory,
+): Promise<FilePanelWorkspaceIndex> {
+  const indexedPaths: FilePanelIndexedPath[] = [];
+  const directoryErrors: FilePanelDirectoryReadError[] = [];
+  let truncated = false;
+
+  for (const root of roots) {
+    const queue = [""];
+    while (queue.length > 0) {
+      const relativeDirectoryPath = queue.shift() ?? "";
+      const directoryPath = absolutePathForDirectory(root.path, relativeDirectoryPath);
+      let result: FileSystemReadDirectoryResult;
+      try {
+        result = await readDirectory(directoryPath);
+      } catch (error) {
+        directoryErrors.push({ rootId: root.id, relativePath: relativeDirectoryPath, error: errorMessage(error) });
+        continue;
+      }
+      for (const entry of result.entries) {
+        if (indexedPaths.length >= limit) {
+          truncated = true;
+          return { indexedPaths, truncated, directoryErrors };
+        }
+        const relativePath = normalizeRelativePath([relativeDirectoryPath, entry.fileName].filter(Boolean).join("/"));
+        if (!relativePath) {
+          continue;
+        }
+        if (entry.isDirectory) {
+          indexedPaths.push({ rootId: root.id, relativePath, kind: "directory" });
+          if (filePanelShouldIndexDirectory(relativePath)) {
+            queue.push(relativePath);
+          }
+        } else if (entry.isFile) {
+          indexedPaths.push({ rootId: root.id, relativePath, kind: "file" });
+        }
+      }
+    }
+  }
+
+  return { indexedPaths, truncated, directoryErrors };
+}
+
 export function resolveFilePanelPath(
   roots: readonly WorkspaceRoot[],
   selection: FilePanelSelection,
@@ -251,6 +310,11 @@ function joinAbsolutePath(rootPath: string, relativePath: string): string {
   return relativePath ? `${root}/${relativePath}` : root;
 }
 
+function absolutePathForDirectory(rootPath: string, relativePath: string): string {
+  const root = rootPath.replace(/[\\/]+$/, "");
+  return relativePath ? `${root}/${relativePath}` : root;
+}
+
 function isWithinRoot(rootPath: string, absolutePath: string): boolean {
   const root = rootPath.replace(/[\\/]+$/, "");
   return absolutePath === root || absolutePath.startsWith(`${root}/`);
@@ -265,4 +329,8 @@ function base64ToBytes(dataBase64: string): Uint8Array {
     return Uint8Array.from(atob(dataBase64), (char) => char.charCodeAt(0));
   }
   return Uint8Array.from(Buffer.from(dataBase64, "base64"));
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unable to read workspace files.";
 }

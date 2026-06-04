@@ -50,6 +50,7 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
     () => filePanelSearchPaths(orderedRoots, state.indexedPaths, search),
     [orderedRoots, search, state.indexedPaths],
   );
+  const directoryErrorCount = state.status === "ready" ? state.directoryErrors.length : 0;
 
   const openFile = useCallback(
     (indexedPath: FilePanelIndexedPath) => {
@@ -127,6 +128,7 @@ export function FilePanel({ roots, selectedRootId, appServerMethods }: FilePanel
             indexedPaths={visibleIndexedPaths}
             search={search}
             state={state.status}
+            directoryErrorCount={directoryErrorCount}
             onOpenFile={openFile}
           />
         </aside>
@@ -141,12 +143,14 @@ function FilePanelSidebar({
   indexedPaths,
   search,
   state,
+  directoryErrorCount,
   onOpenFile,
 }: {
   roots: WorkspaceRoot[];
   indexedPaths: FilePanelIndexedPath[];
   search: string;
   state: string;
+  directoryErrorCount: number;
   onOpenFile: (path: FilePanelIndexedPath) => void;
 }): React.JSX.Element {
   if (state === "unavailable") {
@@ -162,6 +166,9 @@ function FilePanelSidebar({
   const treePaths = filePanelTreePaths(roots, indexedPaths);
   const initialExpansion = filePanelTreeInitialExpansion(search);
   if (state === "ready" && treePaths.length === 0) {
+    if (directoryErrorCount > 0) {
+      return <PanelMessage title="No readable files">Some folders couldn't be read.</PanelMessage>;
+    }
     return search ? (
       <PanelMessage title="No matches">Try a different file name or path.</PanelMessage>
     ) : (
@@ -170,15 +177,27 @@ function FilePanelSidebar({
   }
 
   return (
-    <div className="min-h-0 flex-1">
-      <FilePanelTree
-        key={treeKey(treePaths, initialExpansion)}
-        roots={roots}
-        indexedPaths={indexedPaths}
-        initialExpansion={initialExpansion}
-        paths={treePaths}
-        onOpenFile={onOpenFile}
-      />
+    <div className="flex min-h-0 flex-1 flex-col">
+      {directoryErrorCount > 0 && <DirectoryReadWarning count={directoryErrorCount} />}
+      <div className="min-h-0 flex-1">
+        <FilePanelTree
+          key={treeKey(treePaths, initialExpansion)}
+          roots={roots}
+          indexedPaths={indexedPaths}
+          initialExpansion={initialExpansion}
+          paths={treePaths}
+          onOpenFile={onOpenFile}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DirectoryReadWarning({ count }: { count: number }): React.JSX.Element {
+  return (
+    <div className="flex shrink-0 items-start gap-2 border-b border-border bg-muted/30 px-3 py-2 text-base text-muted-foreground">
+      <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+      <span>{count === 1 ? "A folder couldn't be read." : `${count} folders couldn't be read.`}</span>
     </div>
   );
 }
