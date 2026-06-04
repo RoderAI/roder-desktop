@@ -1,423 +1,184 @@
 # Roder Desktop Design
 
-This document defines the design principles and reusable UI guidance for Roder
-Desktop. It is meant for humans and coding agents making product UI decisions.
-Use it before introducing new surfaces, changing existing interaction patterns,
-or inventing visual language.
-
-This is not a component inventory. Current screens should inform the principles,
-but the principles should travel across the whole app.
-
-## Purpose
-
-Roder Desktop is a local workbench for agentic software work. It should help
-people move between conversation, code, terminal output, browser state, files,
-and tools without losing their place.
-
-The design goal is not to make the app feel minimal for its own sake. The goal
-is to make powerful work feel steady, legible, and close at hand.
-
-## Design Principles
-
-### Local Workbench, Not Web App Chrome
-
-Roder should feel like a desktop working environment. Avoid marketing-page
-composition, oversized hero treatment, decorative sections, and UI that feels
-like a website wrapped in Electron.
-
-Prefer compact, durable surfaces that support long sessions: sidebars,
-resizable panels, stable headers, toolbars, menus, and direct manipulation.
-
-### Conversation Is The Spine
-
-The thread is the primary object. Other UI exists to support the active thread:
-workspace context, tool output, model choice, attachments, navigation, and
-follow-up input.
-
-When adding UI, ask how it relates to the current thread. If it does not affect
-the thread or the user's current work context, it probably belongs in settings,
-a secondary panel, or a dedicated view rather than the main conversation flow.
-
-### Context Stays Visible
-
-Users should usually know three things without hunting:
-
-- What thread they are in.
-- Which workspace or folder it belongs to.
-- Which tools or side panels are active.
-
-Preserve context through compact breadcrumbs, selected states, visible active
-tools, and stable placement. Collapsed states should retain orientation rather
-than hiding all context behind a single generic button.
-
-### Powerful Without Crowding
-
-Roder has many capabilities. The interface should expose them through hierarchy,
-proximity, and progressive disclosure instead of showing everything with equal
-weight.
-
-Put primary work controls near the work. Keep advanced or occasional controls
-available, but quiet. A capable surface can still be calm if the most important
-action is obvious and secondary actions do not compete with it.
-
-### Tools Are Adjacent, Not Dominant
-
-Terminal, browser, canvas, extensions, and future tools should feel attached to
-the current work surface. They should be easy to open, resize, and dismiss, but
-they should not visually overtake the thread unless the user chooses to focus
-them.
-
-Prefer side panels, rails, compact toggles, and contextual attachment flows over
-large modal takeovers.
-
-### Polished, Not Ornamental
-
-Visual polish should come from alignment, spacing, typography, motion, contrast,
-and crisp interaction states. Avoid decoration that does not carry information
-or improve usability.
-
-Good Roder UI feels intentional and quiet. It does not need gradients, floating
-cards, illustrated empty marketing panels, or extra borders to feel finished.
-
-### Respect User Intent
-
-Do not steal focus, reset scroll, collapse panels, or move controls unless the
-user action clearly asked for it. Treat scroll position, active tools, selected
-workspace, typed input, and attachments as valuable state.
-
-When the agent is busy, the UI should make interruption, steering, and
-follow-up feel possible without forcing a mode switch.
-
-## Product Personality
-
-Roder should feel:
-
-- Calm, but not sparse.
-- Capable, but not crowded.
-- Technical, but not hostile.
-- Local and immediate, not cloud-console distant.
-- Precise, but not brittle.
-- Warm through clarity and responsiveness, not through decorative friendliness.
-
-The app can have personality, but it should be felt in the quality of the
-workflow: stable layout, helpful defaults, well-timed motion, readable output,
-and controls that appear where a working developer expects them.
-
-## Foundations
-
-### Color
-
-Use semantic tokens before raw colors. Main content and sidebar surfaces have
-separate token families so navigation can remain visually distinct from the
-work area.
-
-Color should primarily communicate:
-
-- Surface hierarchy.
-- Selection and active state.
-- Muted metadata.
-- Focus and affordance.
-- Status for running, successful, and failed tool activity.
-
-Avoid broad one-note color themes in core UI. Accent color should guide
-attention, not become the whole interface.
-
-### Typography
-
-Text should be optimized for long working sessions.
-
-- Use UI text for controls, labels, metadata, and menus.
-- Use slightly larger, comfortable text for transcript content and composer
-  input.
-- Use monospace for code and compact tool telemetry.
-- Keep headings inside product surfaces modest. A settings panel, sidebar group,
-  menu, or transcript message should not use hero-scale type.
-- Preserve readable line height in conversation content.
-
-### Spacing And Density
-
-Prefer Tailwind's standard spacing scale. Density is part of the product: Roder
-should fit meaningful work on screen without feeling cramped.
-
-When an element is square, prefer Tailwind's `size-*` shorthand over separate
-`h-*` and `w-*` classes. Use individual height and width classes only when the
-dimensions are intentionally different or one axis needs to respond
-independently.
-
-Use spacing to show relationships:
-
-- Tight spacing for controls within the same action group.
-- Moderate spacing between independent controls.
-- Larger spacing between navigation groups or major regions.
-- Consistent horizontal alignment between transcript and composer content.
-- Consistent horizontal alignment between a page header and its primary content.
-
-For full-page tool views with a header and a content grid, the header title,
-toolbar controls, filters, empty states, and first grid column should share the
-same horizontal inset. If the header uses `px-4`, the scrollable grid should use
-`px-4` as well, with vertical spacing adjusted separately using standard scale
-tokens such as `py-6`.
-
-Search, provider, and category filters should live inline with the content they
-affect, usually as the first row of the content grid. Avoid full-width filter
-bars with their own divider unless the filter controls need to remain pinned
-while a long, dense list scrolls underneath.
-
-When filters do need to stay visible during scrolling, keep the inline grid-row
-treatment: make the filter row sticky inside the scroll area, preserve the same
-horizontal inset as the grid, and use a quiet background rather than adding a
-new full-width bordered toolbar. Give sticky filter rows enough vertical padding
-to feel intentional without needing extra borders or elevation.
-
-Avoid arbitrary values unless they come from a concrete platform, asset, or
-interaction constraint.
-
-### Shape
-
-Rounded controls are part of the app language, especially for rows, pills,
-menus, chips, icon buttons, and the composer. Use shape to make interactive
-regions friendly and easy to target.
-
-Do not turn every section into a card. Cards should frame repeated items,
-messages, dialogs, or genuinely contained tools. Full page regions should remain
-layouts, not nested card stacks.
-
-### Borders, Elevation, And Surfaces
-
-Use borders and subtle shadows to clarify containment, not to decorate. A
-surface should earn its frame by holding input, selection, floating menu
-content, or a separate tool context.
-
-Prefer quiet contrast between surfaces. Heavy shadows, bright outlines, and
-stacked borders should be rare.
-
-When a surface has elevation, use a ring for its outline rather than a border.
-This keeps the frame from changing layout and lets shadow and outline blend as
-one material. Use opacity-tuned rings for raised surfaces: `ring-border/70` for
-ordinary app surfaces, `ring-foreground/10` for floating menus and dialogs, and
-stronger `ring-ring` treatments only for focus, drag, or active interaction
-states.
-
-Use borders for structural separators and flat controls: section dividers,
-table or list rules, attachment separators, dashed drop targets, and explicit
-outline variants that do not also carry elevation. If a component combines
-`shadow-*` with `border border-*`, prefer replacing the border with `ring-1`
-and a subtle opacity.
-
-### Motion
-
-Motion should explain state change:
-
-- Panels opening and closing.
-- Overflow content expanding.
-- Hover or focus actions appearing.
-- Menus entering or leaving.
-- Busy or streaming state changing.
-
-Keep motion short and local. Always honor reduced-motion preferences. If timing
-is important to understanding a complex transition, document it near the CSS as
-a small storyboard.
-
-## Interaction Rules
-
-### Selection And Active State
-
-Selected state should be immediately visible but not loud. Use background,
-foreground, and subtle weight changes before introducing badges or extra icons.
-
-Only one thing should look primary inside a local group. If several controls are
-active, distinguish "selected", "available", and "running" states clearly.
-
-### Hover, Focus, And Hidden Actions
-
-Hover-revealed controls are allowed for secondary actions such as archive or
-remove, but they must also be reachable by focus. The default state should still
-communicate enough information for the row or chip to be useful.
-
-Icon-only controls need accessible names. Tooltips are useful when the icon is
-not self-evident or when the action is potentially destructive.
-
-### Scrolling
-
-Scrolling is user intent. Follow streaming output only when the user is already
-near the bottom or explicitly asks to return there. Avoid sudden scroll jumps
-when content updates, tools finish, or side panels change.
-
-Use fades and affordances sparingly to clarify that content continues beneath a
-fixed composer or toolbar.
-
-### Disclosure
-
-Reveal complexity in layers. Use compact rows, menus, segmented controls,
-overflow regions, and side panels before adding large permanent UI.
-
-Disclosure should preserve orientation: "show more" should expand within the
-same context; collapsed navigation should still reveal where the user is.
-
-### Busy And Interruptible Work
-
-Busy state should not freeze the app into a waiting room. Users should be able
-to inspect output, steer the run, stop the run, attach context, switch tools,
-and prepare a follow-up.
-
-Use language that reflects this: prefer prompts that invite steering or
-follow-up over passive loading copy.
-
-### Drag, Drop, And Attachments
-
-Drag-and-drop should highlight the region that will receive files. Attachments
-should appear as compact, removable objects with enough identity to verify the
-selection.
-
-Attached context should feel connected to the composer and thread, not like a
-separate upload workflow.
-
-### Resizing And Layout Control
-
-Resizable regions should have stable limits and obvious handles. Resizing should
-never hide the primary thread or make core controls unreachable.
-
-If a panel can be dismissed, restored, or resized, preserve the user's last
-reasonable choice where practical.
-
-## Layout Patterns
-
-### App Shell
-
-The preferred shell is:
-
-- Left navigation for sessions, workspaces, and durable app areas.
-- Center work surface for the active thread and composer.
-- Optional right-side tools for adjacent context.
-
-This layout supports long-running work because navigation, conversation, and
-tools stay visible together.
-
-### Central Work Surface
-
-The transcript and composer should share a visual axis. The user should feel
-they are writing into the same space where the answer will appear.
-
-Keep the central column readable. Avoid stretching prose, prompt text, and tool
-summaries across the full window width when side panels are closed.
-
-### Sidebar Navigation
-
-Navigation should be optimized for scan and return:
-
-- Group related sessions by meaningful workspace context.
-- Sort by recency where recency reflects likely user intent.
-- Use concise labels and muted metadata.
-- Reveal secondary row actions without making them visually dominant.
-- Keep empty states useful and quiet.
-
-### Tool Panels
-
-Tool panels should use the same foundations as the rest of the app, but can be
-denser when the tool demands it. A terminal, browser, canvas, and extension
-panel have different content needs; their chrome should still feel related.
-
-Prefer attachment or handoff actions that move useful tool context back into the
-thread.
-
-### Composer Zone
-
-The composer is the most important input surface. Keep the prompt primary, with
-model, reasoning, workspace, attachments, stop, and auxiliary actions arranged
-around it by frequency and urgency.
-
-The composer may be visually richer than surrounding chrome because it is the
-place where work is initiated. That richness should support input, not distract
-from it.
-
-## Component Principles
-
-### Buttons And Icons
-
-Use icons for common concrete actions: new, archive, attach, stop, scroll,
-toggle, open, close, search, and settings. Pair icons with text when the action
-is uncommon, ambiguous, or high consequence.
-
-Icon buttons should have stable dimensions so hover, active, loading, or selected
-states do not shift nearby UI.
-
-### Menus And Pickers
-
-Menus should be compact, searchable when lists can grow, and clear about the
-selected item. Put metadata in muted text. Use checkmarks or selected styling,
-not both at maximum emphasis.
-
-Pickers should show the current choice in terms users recognize: model name,
-folder name, thread title, or provider identity.
-
-### Lists And Rows
-
-Rows should be single-purpose and easy to scan. Put the primary label first,
-metadata second, and actions at the edge. Avoid wrapping row labels unless the
-row is designed for rich content.
-
-### Transcript Content
-
-Conversation content should prioritize readability. Assistant prose should not
-need a heavy container. User messages, tool calls, errors, and phase updates can
-use different treatments, but the transcript should remain one continuous work
-log.
-
-Markdown rendering should adapt to the conversation context. Headings inside a
-message should organize the answer, not compete with app-level headings.
-
-### Empty And Error States
-
-Empty states should explain what is absent and provide the next useful action
-when one exists. Keep them brief. Do not use empty states as marketing copy.
-
-Error states should preserve work and offer recovery. If a restart, retry, or
-manual action exists, put it near the error.
-
-## Do And Avoid
-
-Do:
-
-- Start from the user's current thread and workspace.
-- Keep primary actions close to the surface they affect.
-- Use existing tokens, spacing, typography, and row patterns.
-- Make active state and selected context visible.
-- Preserve user state during updates.
-- Prefer compact controls over explanatory text.
-- Verify hover-only actions with keyboard focus.
-
-Avoid:
-
-- Marketing layouts inside the app shell.
-- Decorative cards, gradients, or illustrations in core work surfaces.
-- New arbitrary spacing values without a concrete reason.
-- Multiple competing primary actions in one region.
-- Modal takeovers for workflows that can live in a panel or menu.
-- Source-string tests for visual choices that should be verified by review,
-  typecheck, or browser inspection.
-- Hiding all context in collapsed states.
-
-## Applying This Document
-
-When designing or changing UI:
-
-1. Identify the user job and where it sits relative to the active thread.
-2. Choose the smallest surface that supports the job: inline control, menu,
-   sidebar row, composer affordance, side panel, settings panel, or dedicated
-   view.
-3. Reuse nearby patterns before creating a new one.
-4. Check the foundations: color, type, spacing, shape, motion, and accessibility.
-5. Ask what state must be preserved while the user or agent keeps working.
-6. Verify the result in the app, especially at narrow widths and with active
-   side panels.
-
-For implementation reference, the current core surfaces live in:
-
-- `src/App.tsx`
+Use this when adding or changing product UI in Roder Desktop. It is a working
+contract, not a mood board.
+
+Roder is a desktop workbench for agentic software work. The interface should
+help people move between conversation, code, terminal output, browser state,
+files, and tools without losing their place.
+
+## Defaults
+
+Start here before inventing a new treatment.
+
+- Use the existing Base UI primitives and local shadcn-style wrappers.
+- Use semantic Tailwind tokens before raw colors.
+- Use `text-base` for normal UI text. In this app `text-base` maps to
+  `--font-size-ui`, currently `14px`.
+- Use `font-medium` by default for product UI text.
+- Use `bg-background`, `bg-card`, `bg-popover`, or `bg-white` for primary
+  surfaces. In the light theme these are white.
+- Use lighter grey state fills: `bg-accent/60`, `bg-muted/30`,
+  `bg-muted/40`, `bg-muted/50`, `bg-sidebar-active/20`, and
+  `bg-sidebar-active/25`.
+- Prefer `rounded-lg` for ordinary controls and contained blocks.
+- Prefer `rounded-xl` for app chrome, sidebar rows, settings sections, and
+  larger row hit areas.
+- Use `rounded-md` for compact buttons, inputs, badges, code chips, and dense
+  tool controls.
+- Use `rounded-full` only for pills, toggles, avatars, circular icon buttons,
+  and the composer submit button.
+- Reserve `rounded-2xl` and `rounded-3xl` for deliberately soft surfaces such
+  as the composer, completion popups, dialogs, and marketplace cards.
+- Prefer Tailwind's standard spacing scale. Avoid arbitrary values unless they
+  come from a platform constraint, an asset size, or a measured interaction need.
+
+## Typography
+
+- Default to `text-base`.
+- Use `text-sm` for secondary metadata, timestamps, keyboard hints, and compact
+  status labels.
+- Use `text-xs` rarely, only where space is genuinely constrained.
+- Do not use hero-scale type inside app surfaces. Settings headings, sidebar
+  groups, transcript headings, menus, and panel titles should stay modest.
+- Use `font-normal` only for longer prose, muted descriptions, markdown body
+  text, and places where medium weight creates too much visual noise.
+- Use `font-semibold` sparingly for section titles, important status, and
+  selected states that need more emphasis than a background change.
+- Use `font-mono` with `--font-size-code` for code, terminal output, command
+  telemetry, and file paths.
+- Composer input can use `--font-size-composer` because it is the primary
+  writing surface.
+
+## Color And Surfaces
+
+The default app material is white. Add grey only to show hierarchy, hover,
+selection, disabled state, or muted structure.
+
+- Main work surfaces: `bg-background`.
+- Cards and raised input surfaces: `bg-card` or `bg-card/95`.
+- Floating menus, dialogs, and popovers: `bg-white` or `bg-popover`.
+- Subtle contained areas: `bg-muted/30` through `bg-muted/50`.
+- Hover on white/card surfaces: `hover:bg-accent/60` or `hover:bg-muted/40`.
+- Sidebar row hover: `hover:bg-sidebar-active/20` or
+  `hover:bg-sidebar-active/25`.
+- Lightweight selected state: `bg-muted/50`, `bg-accent/60`, or the matching
+  sidebar active token at low opacity.
+
+Avoid heavy grey blocks that make the interface feel dirty or reduce contrast.
+Use full-strength `bg-muted`, `bg-accent`, or `bg-sidebar-active` only when the
+state needs to be unmistakable.
+
+Accent colors should communicate status or action. They should not become a
+theme wash across ordinary chrome.
+
+## Radius
+
+Use radius to clarify interaction shape. Do not use radius to make every region
+look like a card.
+
+- `rounded-md`: dense controls, toolbar buttons, badges, code chips, compact
+  inputs, keyboard hints.
+- `rounded-lg`: default control radius for rows, inputs, empty-state blocks,
+  small tool panels, and ordinary contained areas.
+- `rounded-xl`: app chrome rows, sidebar rows, settings shells, larger list
+  items, and comfortable hit areas.
+- `rounded-full`: pills, toggles, avatars, circular icon buttons, submit/stop
+  buttons.
+- `rounded-2xl` / `rounded-3xl`: high-emphasis soft surfaces such as the
+  composer, completion popups, large dialogs, marketplace cards, and sketch/canvas
+  tools.
+
+When nesting rounded surfaces, account for padding so the radii align
+optically. As a rule of thumb, the outer radius should be the inner radius plus
+the visible inset between them. If a `rounded-lg` child sits inside a padded
+surface, the parent usually needs a larger radius such as `rounded-xl` or
+`rounded-2xl`.
+
+Avoid new `rounded-[...]` values unless they match an existing nearby component
+or solve a measured visual mismatch.
+
+## Borders, Rings, And Elevation
+
+- Use borders for structural separators, flat controls, attachment dividers,
+  list rules, dashed drop targets, and table-like content.
+- Use `ring-1` for raised surfaces so the frame does not affect layout.
+- Use `ring-border/70` for ordinary raised app surfaces.
+- Use `ring-foreground/10` for floating menus and dialogs.
+- Use `ring-ring` only for focus, drag, active interaction, or validation.
+- Avoid combining `shadow-*` with `border border-*` on the same raised surface;
+  prefer `shadow-* ring-1 ring-border/70`.
+- Keep shadows subtle. Elevation should separate layers, not decorate.
+
+## Spacing And Density
+
+Roder should fit real work on screen without feeling cramped.
+
+- Use tight gaps for controls in the same action group.
+- Use moderate gaps between independent controls.
+- Use larger gaps between major regions.
+- Keep transcript and composer content on the same visual axis.
+- Keep page headers, filters, empty states, and first grid columns aligned.
+- For square buttons or icons, use `size-*` instead of separate `h-*` and `w-*`.
+- Make fixed-format controls stable so hover, active, loading, and selected
+  states do not resize nearby UI.
+
+Filters should usually live inline with the content they affect. If a filter row
+must stay visible while content scrolls, make it sticky inside the scroll area
+with the same horizontal inset as the grid and a quiet white or light grey
+background.
+
+## Motion
+
+When UI appears, hides, expands, collapses, moves, or changes visibility, use
+the web animation and Interface Craft skills for the specific animation design
+and implementation guidance.
+
+In this document, keep only the product intent: motion should explain state
+change, preserve orientation, and avoid slowing down repeated work.
+
+## Component Rules
+
+- Buttons: use icons for concrete common actions; add text for ambiguous,
+  uncommon, or high-consequence actions.
+- Icon buttons: keep stable dimensions across hover, active, loading, and
+  selected states.
+- Icons: balance them optically with adjacent text and their hit area. Center
+  icons by visual weight, choose sizes that feel proportional to the label and
+  control height, and adjust gaps before reaching for a custom icon size.
+- Menus: keep compact, searchable when lists can grow, and clear about the
+  selected item.
+- Pickers: show choices using names users recognize: model, folder, thread, or
+  provider.
+- Rows: primary label first, metadata second, actions at the edge.
+- Empty states: explain what is absent and provide the next useful action when
+  one exists. Keep copy short.
+- Error states: preserve work and put retry, restart, or manual recovery near
+  the error.
+
+## Implementation Checklist
+
+Before finishing UI work:
+
+1. Confirm the job belongs where you placed it relative to the active thread.
+2. Reuse nearby component patterns before introducing a new one.
+3. Check text size, white surface use, grey state strength, radius, spacing,
+   borders/rings, and motion.
+4. Verify hover-only actions with keyboard focus.
+5. Preserve scroll, selection, workspace, typed input, attachments, panel state,
+   and active tool state.
+6. Run typecheck, relevant tests, build, or another verification that matches
+   the risk of the change.
+7. For desktop UI visual verification, ask the user to test in the running
+   Electron app instead of relying on a plain browser against the Vite renderer.
+
+Current reference files:
+
+- `src/components/app-shell-layout.tsx`
 - `src/components/app-sidebar.tsx`
 - `src/components/top-bar.tsx`
 - `src/components/transcript.tsx`
 - `src/components/message-content.tsx`
-- `src/components/tool-timeline-item.tsx`
 - `src/components/composer.tsx`
+- `src/components/right-workspace-panel-shell.tsx`
 - `src/style.css`
