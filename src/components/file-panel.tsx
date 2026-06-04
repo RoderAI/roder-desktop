@@ -253,7 +253,6 @@ function OpenFileTabs({
           ))}
         </TabsList>
       </Tabs>
-      <div className="min-w-0 flex-1" />
     </div>
   );
 }
