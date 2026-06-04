@@ -7,9 +7,12 @@ import {
   filePanelRootItems,
   filePanelSearchPaths,
   filePanelShouldIndexDirectory,
+  filePanelSelectionKey,
+  filePanelTabTitle,
   filePanelTreeInitialExpansion,
   filePanelTreePaths,
   indexFilePanelWorkspaceRoots,
+  nextFilePanelActiveTabKey,
   resolveFilePanelPath,
   type FilePanelIndexedPath,
 } from "../src/lib/file-panel";
@@ -86,6 +89,18 @@ test("file panel opens tree results while searching", () => {
   expect(filePanelTreeInitialExpansion("")).toBe(1);
   expect(filePanelTreeInitialExpansion("   ")).toBe(1);
   expect(filePanelTreeInitialExpansion("index")).toBe("open");
+});
+
+test("file panel derives stable file tab labels and active tab fallbacks", () => {
+  const first = { key: filePanelSelectionKey({ rootId: "root_a", relativePath: "src/index.ts" }) };
+  const second = { key: filePanelSelectionKey({ rootId: "root_a", relativePath: "README.md" }) };
+  const third = { key: filePanelSelectionKey({ rootId: "root_b", relativePath: "src/index.ts" }) };
+
+  expect(first.key).not.toBe(third.key);
+  expect(filePanelTabTitle({ rootId: "root_a", relativePath: "src/index.ts" })).toBe("index.ts");
+  expect(nextFilePanelActiveTabKey([first, second, third], second.key, second.key)).toBe(third.key);
+  expect(nextFilePanelActiveTabKey([first, second, third], third.key, third.key)).toBe(second.key);
+  expect(nextFilePanelActiveTabKey([first, second, third], first.key, second.key)).toBe(first.key);
 });
 
 test("file panel indexing keeps readable paths when a nested directory fails", async () => {
