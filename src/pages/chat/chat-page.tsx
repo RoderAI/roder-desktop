@@ -62,9 +62,6 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const composerGuardStyle = {
     height: composerStackHeight + (canScrollTranscriptToBottom ? composerGuardFadeHeightPx : 0),
   };
-  const openThreadChanges = () => {
-    openReview("thread");
-  };
   const openTurnChanges = (turnId: string) => {
     openReview("turn", turnId);
   };
@@ -159,20 +156,16 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         bottomInsetPx={transcriptBottomInsetPx}
         scrollStateKey={activeThreadId || "new-thread"}
         showWorkingIndicator={showWorkingIndicator}
-        threadChangeCount={hunkSummary.fileCount}
-        turnChangeCounts={hunkSummary.turnChangeCounts}
+        turnChangeSummaries={hunkSummary.turnChangeSummaries}
         onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
-        onReviewThreadChanges={openThreadChanges}
         onReviewTurnChanges={openTurnChanges}
       />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-        <div className="mx-auto w-full max-w-3xl px-8">
-          <div
-            className="chat-composer-guard"
-            data-fade={canScrollTranscriptToBottom ? "true" : undefined}
-            style={composerGuardStyle}
-          />
-        </div>
+      <div className="pointer-events-none absolute bottom-0 left-0 right-2 z-10">
+        <div
+          className="chat-composer-guard"
+          data-fade={canScrollTranscriptToBottom ? "true" : undefined}
+          style={composerGuardStyle}
+        />
       </div>
       <div ref={composerStackRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
         <div className="pointer-events-auto relative">
