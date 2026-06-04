@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { messagesFromThread, messagesFromTurn } from "../src/lib/roder-thread";
 
-test("typed reasoning items hydrate content as assistant thinking messages", () => {
+test("typed reasoning items are kept out of visible transcript messages", () => {
   const messages = messagesFromTurn(
     "thread-1",
     turn(
@@ -17,53 +17,37 @@ test("typed reasoning items hydrate content as assistant thinking messages", () 
     ),
   );
 
+  expect(plain(messages)).toEqual([]);
+});
+
+test("commentary phase agent messages hydrate as visible update messages", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        {
+          id: "turn-1-agent-commentary",
+          type: "agentMessage",
+          text: "I will inspect the transcript first.",
+          phase: "commentary",
+          status: "completed",
+        },
+      ],
+      "completed",
+    ),
+  );
+
   expect(plain(messages)).toEqual([
     {
-      id: "turn-1-agent-reasoning",
+      id: "turn-1-agent-commentary:commentary",
       threadId: "thread-1",
       turnId: "turn-1",
       role: "assistant",
-      text: "Checking the saved context.",
-      phase: "reasoning",
+      text: "I will inspect the transcript first.",
+      phase: "commentary",
       status: "complete",
     },
   ]);
-});
-
-test("typed reasoning item content separates distinct blocks with blank lines", () => {
-  const messages = messagesFromTurn(
-    "thread-1",
-    turn(
-      [
-        {
-          id: "turn-1-agent-reasoning",
-          type: "reasoning",
-          content: ["First thought.", "Second thought."],
-        },
-      ],
-      "completed",
-    ),
-  );
-
-  expect(messages[0].text).toBe("First thought.\n\nSecond thought.");
-});
-
-test("typed reasoning item content does not add blank lines within a streaming block", () => {
-  const messages = messagesFromTurn(
-    "thread-1",
-    turn(
-      [
-        {
-          id: "turn-1-agent-reasoning",
-          type: "reasoning",
-          content: ["First chunk. Continued chunk."],
-        },
-      ],
-      "completed",
-    ),
-  );
-
-  expect(messages[0].text).toBe("First chunk. Continued chunk.");
 });
 
 test("thread snapshots derive messages from canonical typed items only", () => {
@@ -75,6 +59,13 @@ test("thread snapshots derive messages from canonical typed items only", () => {
           { id: "turn-1-user", text: "can you implement a new design?", type: "userMessage" },
           tool("tool-read-1", "read_file", { path: "app.css" }, "completed", "# app css"),
           { id: "turn-1-agent-reasoning", type: "reasoning", content: ["Inspecting styles"], status: "inProgress" },
+          {
+            id: "turn-1-agent-commentary",
+            type: "agentMessage",
+            text: "I will check the style path.",
+            phase: "commentary",
+            status: "completed",
+          },
           {
             id: "turn-1-agent-final_answer",
             type: "agentMessage",
@@ -93,11 +84,11 @@ test("thread snapshots derive messages from canonical typed items only", () => {
     { id: "turn-1-user", role: "user", text: "can you implement a new design?", status: "complete" },
     { id: "tool:tool-read-1", role: "tool", text: "Read app.css", status: "complete" },
     {
-      id: "turn-1-agent-reasoning",
+      id: "turn-1-agent-commentary:commentary",
       role: "assistant",
-      text: "Inspecting styles",
-      phase: "reasoning",
-      status: "streaming",
+      text: "I will check the style path.",
+      phase: "commentary",
+      status: "complete",
     },
     { id: "turn-1-agent-final_answer", role: "assistant", text: "Done", phase: "final_answer", status: "complete" },
   ]);
@@ -161,6 +152,17 @@ test("shell tools summarize the command and keep cleaned output details", () => 
   expect(messages[0].toolSummary).toBe("Ran pnpm test");
   expect(messages[0].toolInput).toBe("pnpm test");
   expect(messages[0].toolOutput).toBe("all tests passed");
+});
+
+test("write stdin tools summarize typed commands like shell commands", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn([tool("tool-stdin-1", "write_stdin", { chars: "pnpm typecheck\n" }, "completed")], "completed"),
+  );
+
+  expect(messages.length).toBe(1);
+  expect(messages[0].toolSummary).toBe("Ran pnpm typecheck");
+  expect(messages[0].toolInput).toBe("pnpm typecheck");
 });
 
 test("failed typed tool executions keep display context", () => {

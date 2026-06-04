@@ -31,7 +31,13 @@ const fileActivityTools = new Set([
 ]);
 
 const searchActivityTools = new Set(["glob", "grep", "search_files"]);
-const goalStateTools = new Set(["get_goal", "create_goal", "update_goal"]);
+const hiddenTranscriptTools = new Set([
+  "get_goal",
+  "create_goal",
+  "update_goal",
+  "update_plan",
+  "verification_review",
+]);
 
 export function compactToolGroup(toolName: string | undefined): ToolGroupDescriptor | null {
   if (toolName === "read_file") {
@@ -67,14 +73,15 @@ export function isSearchActivityTool(toolName: string | undefined): boolean {
   return searchActivityTools.has(toolName ?? "");
 }
 
-export function isGoalStateTool(toolName: string | undefined): boolean {
-  return goalStateTools.has(toolName ?? "");
+export function isHiddenTranscriptTool(toolName: string | undefined): boolean {
+  return hiddenTranscriptTools.has(toolName ?? "");
 }
 
 export function isShellToolName(toolName: string | undefined): boolean {
   return (
     toolName === "shell" ||
     toolName === "exec_command" ||
+    toolName === "write_stdin" ||
     toolName === "command" ||
     toolName === "run_command" ||
     toolName === "process.spawn" ||

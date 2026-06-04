@@ -607,6 +607,7 @@ function TranscriptEntryView({
       ) : isPhaseMessage ? (
         <PhaseMessage
           isStreaming={message.status === "streaming"}
+          phase={message.phase}
           skills={skills}
           text={message.text || (message.status === "streaming" ? " " : "")}
         />
