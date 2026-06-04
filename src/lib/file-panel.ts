@@ -293,8 +293,11 @@ export function normalizeRelativePath(path: string): string {
       continue;
     }
     if (segment === "..") {
-      parts.pop();
-      parts.push("..");
+      if (parts.length > 0 && parts.at(-1) !== "..") {
+        parts.pop();
+      } else {
+        parts.push("..");
+      }
       continue;
     }
     parts.push(segment);

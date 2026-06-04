@@ -21,6 +21,7 @@ import type {
 } from "@/types/roder";
 
 const initialDiffLimit = 20_000;
+const maxDiffCollectionCount = 2;
 const emptyDiffLimitsByPath: Record<string, number> = {};
 
 export type ReviewFile = {
@@ -113,6 +114,8 @@ export function useReviewChanges({
     () => reviewDiffCollectionKey(scope, files, ignoreWhitespace, branchAreaFilter),
     [branchAreaFilter, files, ignoreWhitespace, scope],
   );
+  const activeDiffCollectionKeyRef = useRef(diffCollectionKey);
+  activeDiffCollectionKeyRef.current = diffCollectionKey;
   const activeDiffCollection = diffCollectionsByKey[diffCollectionKey];
   const defaultDiffStatesByPath = useMemo(
     () => Object.fromEntries(files.map((file) => [file.path, { status: "idle", patch: "" } satisfies ReviewDiffState])),
@@ -268,17 +271,18 @@ export function useReviewChanges({
       const requestKey = diffRequestKey(diffCollectionKey, file.path);
       diffRequestsByPath.set(requestKey, requestSeq);
       setDiffCollectionsByKey((collections) => {
-        const currentCollection = collections[diffCollectionKey] ?? emptyDiffCollection(diffCollectionKey);
-        return {
-          ...collections,
-          [diffCollectionKey]: {
+        return updateDiffCollection(
+          collections,
+          diffCollectionKey,
+          activeDiffCollectionKeyRef.current,
+          (currentCollection) => ({
             ...currentCollection,
             statesByPath: {
               ...currentCollection.statesByPath,
               [file.path]: { status: "loading", patch: currentCollection.statesByPath[file.path]?.patch ?? "" },
             },
-          },
-        };
+          }),
+        );
       });
       try {
         const diffState = await readDiffForFile(file, limit);
@@ -286,30 +290,26 @@ export function useReviewChanges({
           return;
         }
         setDiffCollectionsByKey((collections) => {
-          const currentCollection = collections[diffCollectionKey];
-          if (!currentCollection) {
-            return collections;
-          }
-          return {
-            ...collections,
-            [diffCollectionKey]: {
+          return updateExistingDiffCollection(
+            collections,
+            diffCollectionKey,
+            activeDiffCollectionKeyRef.current,
+            (currentCollection) => ({
               ...currentCollection,
               statesByPath: { ...currentCollection.statesByPath, [file.path]: diffState },
-            },
-          };
+            }),
+          );
         });
       } catch (error) {
         if (diffRequestsByPath.get(requestKey) !== requestSeq) {
           return;
         }
         setDiffCollectionsByKey((collections) => {
-          const currentCollection = collections[diffCollectionKey];
-          if (!currentCollection) {
-            return collections;
-          }
-          return {
-            ...collections,
-            [diffCollectionKey]: {
+          return updateExistingDiffCollection(
+            collections,
+            diffCollectionKey,
+            activeDiffCollectionKeyRef.current,
+            (currentCollection) => ({
               ...currentCollection,
               statesByPath: {
                 ...currentCollection.statesByPath,
@@ -319,8 +319,8 @@ export function useReviewChanges({
                   error: errorMessage(error),
                 },
               },
-            },
-          };
+            }),
+          );
         });
       }
     },
@@ -367,14 +367,15 @@ export function useReviewChanges({
       }
       const limit = Math.max(diffState.totalLines, initialDiffLimit);
       setDiffCollectionsByKey((collections) => {
-        const currentCollection = collections[diffCollectionKey] ?? emptyDiffCollection(diffCollectionKey);
-        return {
-          ...collections,
-          [diffCollectionKey]: {
+        return updateDiffCollection(
+          collections,
+          diffCollectionKey,
+          activeDiffCollectionKeyRef.current,
+          (currentCollection) => ({
             ...currentCollection,
             limitsByPath: { ...currentCollection.limitsByPath, [path]: limit },
-          },
-        };
+          }),
+        );
       });
       void loadDiffForFile(file, limit);
     },
@@ -400,7 +401,7 @@ function reviewDiffCollectionKey(
   branchAreaFilter: ReviewBranchAreaFilter,
 ): string {
   // Diff state is only valid for the exact review scope and file identities that produced it.
-  // This key lets stale diff patches fall away without clearing state in a prop-change effect.
+  // The collection map is capped separately so old keys can keep one quick-toggle cache without retaining patches forever.
   return JSON.stringify([
     scope,
     ignoreWhitespace,
@@ -446,6 +447,43 @@ function reviewFileReadArea(file: ReviewFile, branchAreaFilter: ReviewBranchArea
 
 function emptyDiffCollection(key: string): ReviewDiffCollection {
   return { key, limitsByPath: {}, statesByPath: {} };
+}
+
+function updateDiffCollection(
+  collections: ReviewDiffCollectionsByKey,
+  key: string,
+  activeKey: string,
+  update: (collection: ReviewDiffCollection) => ReviewDiffCollection,
+): ReviewDiffCollectionsByKey {
+  const currentCollection = collections[key] ?? emptyDiffCollection(key);
+  const nextCollection = update(currentCollection);
+  const withoutKey = Object.fromEntries(Object.entries(collections).filter(([collectionKey]) => collectionKey !== key));
+  return pruneDiffCollections({ ...withoutKey, [key]: nextCollection }, activeKey);
+}
+
+function updateExistingDiffCollection(
+  collections: ReviewDiffCollectionsByKey,
+  key: string,
+  activeKey: string,
+  update: (collection: ReviewDiffCollection) => ReviewDiffCollection,
+): ReviewDiffCollectionsByKey {
+  if (!collections[key]) {
+    return collections;
+  }
+  return updateDiffCollection(collections, key, activeKey, update);
+}
+
+function pruneDiffCollections(collections: ReviewDiffCollectionsByKey, activeKey: string): ReviewDiffCollectionsByKey {
+  const entries = Object.entries(collections);
+  if (entries.length <= maxDiffCollectionCount) {
+    return collections;
+  }
+  const activeEntry = entries.find(([key]) => key === activeKey);
+  if (!activeEntry) {
+    return Object.fromEntries(entries.slice(-maxDiffCollectionCount));
+  }
+  const recentEntries = entries.filter(([key]) => key !== activeKey).slice(-(maxDiffCollectionCount - 1));
+  return Object.fromEntries([...recentEntries, activeEntry]);
 }
 
 function diffRequestKey(collectionKey: string, path: string): string {
