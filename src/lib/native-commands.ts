@@ -2,7 +2,7 @@ import type { CommandDescriptor, RoderModel } from "@/types/roder";
 import type { NativeCommandOutput } from "@/lib/native-command-formatters";
 import { errorOutput, infoOutput, warningOutput } from "@/lib/native-command-formatters";
 
-export type NativeCommandKind = "model" | "clear" | "retry" | "agents" | "tasks" | "processes";
+export type NativeCommandKind = "model" | "clear" | "retry" | "agents" | "tasks" | "processes" | "goal";
 
 export type NativeCommandDefinition = {
   name: string;
@@ -27,7 +27,8 @@ export type NativeCommandResult =
   | { type: "tasks" }
   | { type: "processes"; includeCompleted: boolean }
   | { type: "stopProcess"; processId: string }
-  | { type: "stopAllProcesses" };
+  | { type: "stopAllProcesses" }
+  | { type: "goal"; objective: string };
 
 export const nativeCommandDefinitions: NativeCommandDefinition[] = [
   {
@@ -59,6 +60,12 @@ export const nativeCommandDefinitions: NativeCommandDefinition[] = [
     description: "List background tasks.",
     argumentHint: null,
     kind: "tasks",
+  },
+  {
+    name: "goal",
+    description: "Set a new goal for the active thread.",
+    argumentHint: "<objective>",
+    kind: "goal",
   },
   {
     name: "ps",
@@ -120,6 +127,8 @@ export function planNativeCommand(invocation: NativeCommandInvocation, models: R
       return { type: "tasks" };
     case "processes":
       return planProcessesCommand(invocation.arguments);
+    case "goal":
+      return planGoalCommand(invocation.arguments);
   }
 }
 
@@ -167,4 +176,15 @@ function planProcessesCommand(argumentsText: string): NativeCommandResult {
     type: "output",
     output: infoOutput("Unknown /ps action", "Use /ps, /ps all, /ps stop <id>, or /ps stop-all --confirm."),
   };
+}
+
+function planGoalCommand(argumentsText: string): NativeCommandResult {
+  const objective = argumentsText.trim();
+  if (!objective) {
+    return {
+      type: "output",
+      output: infoOutput("Goal required", "Use /goal <objective> to set a new goal for this thread."),
+    };
+  }
+  return { type: "goal", objective };
 }

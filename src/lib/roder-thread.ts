@@ -8,6 +8,7 @@ import type {
   RoderTurn,
 } from "@/types/roder";
 import { canonicalToolName, isShellToolName } from "@/lib/tool-display";
+import { normalizedToolPreview } from "@/lib/tool-preview";
 
 const emptyMessages: ConversationMessage[] = [];
 const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
@@ -521,6 +522,7 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
   const toolStatus = toolStatusFromItem(item);
   const output = item.error ?? item.output ?? "";
   const detailOutput = rawString(item.output, item.error) ?? "";
+  const preview = normalizedToolPreview(toolName, toolPreview(toolName, input, payload));
   const summary = summarizeTool(toolName, toolStatus, input, output, payload);
   const command = shellCommand(input, payload);
   if (isShellToolName(toolName) && toolStatus === "running" && !command) {
@@ -540,7 +542,8 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
     toolStatus,
     toolInput: isShellToolName(toolName) ? command : undefined,
     toolOutput: toolDetailOutput(toolName, detailOutput) ?? (detailOutput || undefined),
-    toolPreview: toolPreview(toolName, input, payload),
+    toolPreview: preview?.text,
+    toolPreviewKind: preview?.kind,
     toolSubject: toolSubject(toolName, input, payload),
     toolSummary: summary,
   };
@@ -657,6 +660,7 @@ function mergeMessage(existing: ConversationMessage, incoming: ConversationMessa
     toolInput: incoming.toolInput || existing.toolInput,
     toolOutput: mergedToolOutput(existing, incoming),
     toolPreview: incoming.toolPreview || existing.toolPreview,
+    toolPreviewKind: incoming.toolPreviewKind || existing.toolPreviewKind,
     toolName: mergedToolName(existing, incoming),
     toolSubject: incoming.toolSubject || existing.toolSubject,
     toolCallId: incoming.toolCallId || existing.toolCallId,

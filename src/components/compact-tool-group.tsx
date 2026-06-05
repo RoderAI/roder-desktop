@@ -3,7 +3,7 @@ import type { ToolGroupKind } from "@/lib/tool-display";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
 import { groupStatus, groupStatusLabel, toolTextClass } from "@/lib/tool-timeline";
-import { DisclosureChevron, ShimmerText } from "./tool-timeline-shared";
+import { DisclosureChevron, ShimmerText, ToolFailureDot } from "./tool-timeline-shared";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
 
 export function CompactToolGroup({
@@ -20,12 +20,13 @@ export function CompactToolGroup({
   const Title = status === "running" ? ShimmerText : "span";
 
   return (
-    <Collapsible.Root className="group/tool-group text-base leading-7" onOpenChange={onOpenChange} open={open}>
+    <Collapsible.Root className="group/tool-group pl-5 text-base leading-7" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
         className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
       >
-        <Title className={cn("min-w-0 truncate font-medium", toolTextClass(status))}>{title}</Title>
+        <ToolFailureDot failed={status === "failed"} />
+        <Title className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</Title>
         <DisclosureChevron groupName="tool-group" />
         {status !== "complete" ? (
           <span className="shrink-0 text-muted-foreground">{groupStatusLabel(messages)}</span>

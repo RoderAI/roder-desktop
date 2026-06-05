@@ -3,7 +3,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
 import { toolTextClass, toolTitle } from "@/lib/tool-timeline";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
-import { DisclosureChevron, ShimmerText } from "./tool-timeline-shared";
+import { DisclosureChevron, ShimmerText, ToolFailureDot } from "./tool-timeline-shared";
 
 type ToolShellItemProps = ToolDisclosureControlProps & {
   message: ConversationMessage;
@@ -16,12 +16,13 @@ export function ToolShellItem({ message, onOpenChange, open, status, summary }: 
   const Title = status === "running" ? ShimmerText : "span";
 
   return (
-    <Collapsible.Root className="group/shell-tool text-base leading-7" onOpenChange={onOpenChange} open={open}>
+    <Collapsible.Root className="group/shell-tool pl-5 text-base leading-7" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
         className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
       >
-        <Title className={cn("min-w-0 truncate font-medium", toolTextClass(status))}>{title}</Title>
+        <ToolFailureDot failed={status === "failed"} />
+        <Title className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</Title>
         <DisclosureChevron groupName="shell-tool" />
       </Collapsible.Trigger>
       <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">

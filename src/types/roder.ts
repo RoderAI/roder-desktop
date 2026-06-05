@@ -475,6 +475,7 @@ export type ConversationMessage = {
   toolInput?: string;
   toolOutput?: string;
   toolPreview?: string;
+  toolPreviewKind?: "text" | "patch";
   toolSubject?: string;
   toolSummary?: string;
 };

@@ -66,7 +66,7 @@ export function CompletionMenuShell({
   return (
     <div
       className={cn(
-        "composer-skill-menu overflow-hidden rounded-3xl bg-white text-popover-foreground shadow-md ring-1 ring-foreground/10",
+        "composer-skill-menu overflow-hidden rounded-3xl bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10",
         className,
       )}
     >
