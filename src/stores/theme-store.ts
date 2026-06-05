@@ -40,6 +40,7 @@ export type SettingsSection =
   | "skills"
   | "extensions"
   | "browser"
+  | "computer-use"
   | "terminal"
   | "configuration"
   | "personalization"

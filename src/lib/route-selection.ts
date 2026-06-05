@@ -37,6 +37,7 @@ const validSettingsSections = new Set<SettingsSection>([
   "skills",
   "extensions",
   "browser",
+  "computer-use",
   "terminal",
   "configuration",
   "personalization",
