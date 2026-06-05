@@ -4,6 +4,7 @@ import {
   Braces,
   Cog,
   Component,
+  Cpu,
   Database,
   GitBranch,
   Laptop,
@@ -25,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
 import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { SettingsBrowserPanel } from "@/components/settings-browser-panel";
+import { SettingsComputerUsePanel } from "@/components/settings-computer-use-panel";
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
@@ -114,6 +116,13 @@ export function SettingsView({
             onClick={onSectionChange}
           />
           <SettingsNavItem
+            id="computer-use"
+            active={section === "computer-use"}
+            icon={<Cpu className="size-4" />}
+            label="Computer use"
+            onClick={onSectionChange}
+          />
+          <SettingsNavItem
             id="terminal"
             active={section === "terminal"}
             icon={<TerminalSquare className="size-4" />}
@@ -173,6 +182,8 @@ export function SettingsView({
             <ExtensionsSettingsPanel />
           ) : section === "browser" ? (
             <SettingsBrowserPanel />
+          ) : section === "computer-use" ? (
+            <SettingsComputerUsePanel />
           ) : section === "terminal" ? (
             <TerminalSettingsPanel />
           ) : (
