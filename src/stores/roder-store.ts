@@ -47,6 +47,7 @@ import type {
   WorkspaceFolder,
   WorkspaceRoot,
 } from "@/types/roder";
+import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
 
 type RoderStore = {
   status: RoderStatus;
@@ -85,7 +86,7 @@ type RoderStore = {
   archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
   goForward: () => Promise<void>;
-  newProject: () => Promise<void>;
+  newProject: (params?: WorkspaceCreateParams) => Promise<void>;
   newThread: () => Promise<void>;
   runCommandInvocation: (invocation: CommandInvocation) => Promise<void>;
   sendPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
@@ -527,21 +528,29 @@ export const useRoderStore = create<RoderStore>()(
         await get().selectThread(next.threadId, { pushHistory: false });
       },
 
-      newProject: async () => {
+      newProject: async (params) => {
         set({ error: null });
         try {
           const current = get();
-          const folder = await roderIpc.openWorkspaceFolder(current.selectedWorkspaceCwd || current.status.cwd);
-          if (!folder) {
-            return;
+          let createParams = params;
+          if (!createParams) {
+            const folder = await roderIpc.openWorkspaceFolder(current.selectedWorkspaceCwd || current.status.cwd);
+            if (!folder) {
+              return;
+            }
+            createParams = { roots: [{ path: folder }], defaultRootPath: folder };
+          }
+          const defaultRootPath = createParams.defaultRootPath ?? createParams.roots[0]?.path;
+          if (!defaultRootPath) {
+            throw new Error("Add at least one workspace folder before creating a project");
           }
           set({ busy: true });
-          const created = await roderIpc.createWorkspace({ roots: [{ path: folder }], defaultRootPath: folder });
+          const created = await roderIpc.createWorkspace({ ...createParams, defaultRootPath });
           set((state) => ({
             workspaces: upsertWorkspace(state.workspaces, created.workspace),
             selectedWorkspaceId: created.workspace.id,
             selectedRootId: created.workspace.defaultRootId,
-            selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? folder,
+            selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? defaultRootPath,
           }));
           await startThreadForSelection(set, get);
         } catch (error) {

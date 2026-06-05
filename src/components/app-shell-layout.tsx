@@ -10,6 +10,7 @@ import {
   type PanelSize,
 } from "react-resizable-panels";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ProjectConfigDialog } from "@/components/project-config-dialog";
 import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
 import { renderRightWorkspacePanel, rightWorkspacePanelEntries } from "@/components/right-workspace-panel-registry";
 import { RightWorkspacePanelShell } from "@/components/right-workspace-panel-shell";
@@ -24,6 +25,7 @@ import {
   sidebarWidthBounds,
 } from "@/lib/app-shell-layout";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
+import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
 import { toolPanelWidthBounds, type RouteReviewScope, type RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
@@ -62,6 +64,9 @@ export type AppShellLayoutProps = {
   selectedExtensionId: string | null;
   selectedExtensionPanelId: string | null;
   initialWorkspacePanelWidth: number;
+  projectConfigOpen: boolean;
+  projectCreating: boolean;
+  projectInitialFolders: string[];
   sidebarOpen: boolean;
   status: RoderStatus;
   threadOptions: RoderThread[];
@@ -69,6 +74,8 @@ export type AppShellLayoutProps = {
   workspacePanelOpen: boolean;
   onArchiveThread: (threadId: string) => void;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
+  onCreateProject: (params: WorkspaceCreateParams) => void;
+  onProjectConfigOpenChange: (open: boolean) => void;
   onCloseWorkspacePanel: (panel: RouteWorkspacePanel) => void;
   onCloseWorkspacePanelShell: () => void;
   onNewProject: () => void;
@@ -107,6 +114,9 @@ export function AppShellLayout({
   selectedExtensionId,
   selectedExtensionPanelId,
   initialWorkspacePanelWidth,
+  projectConfigOpen,
+  projectCreating,
+  projectInitialFolders,
   sidebarOpen,
   status,
   threadOptions,
@@ -114,6 +124,8 @@ export function AppShellLayout({
   workspacePanelOpen,
   onArchiveThread,
   onAttachToComposer,
+  onCreateProject,
+  onProjectConfigOpenChange,
   onCloseWorkspacePanel,
   onCloseWorkspacePanelShell,
   onNewProject,
@@ -470,19 +482,35 @@ export function AppShellLayout({
     />
   );
 
+  const projectDialog = (
+    <ProjectConfigDialog
+      open={projectConfigOpen}
+      defaultPath={activeWorkspaceCwd || status.cwd}
+      initialFolders={projectInitialFolders}
+      creating={projectCreating}
+      onOpenChange={onProjectConfigOpenChange}
+      onCreateProject={onCreateProject}
+    />
+  );
+
   if (!useWindowTopBar) {
     return (
-      <div className="relative flex h-screen w-screen overflow-hidden bg-background">
-        {sidebarRegion}
-        {sidebarResizeHandle}
-        {appChromeGroup}
-        {extensionActivityRail}
-      </div>
+      <>
+        {projectDialog}
+        <div className="relative flex h-screen w-screen overflow-hidden bg-background">
+          {sidebarRegion}
+          {sidebarResizeHandle}
+          {appChromeGroup}
+          {extensionActivityRail}
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
+    <>
+      {projectDialog}
+      <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
       <TopBar
         thread={activeThread}
         goal={activeThreadGoal}
@@ -511,7 +539,8 @@ export function AppShellLayout({
         {appChromeGroup}
         {extensionActivityRail}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
