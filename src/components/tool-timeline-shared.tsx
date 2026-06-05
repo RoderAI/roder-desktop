@@ -20,3 +20,12 @@ export function DisclosureChevron({ groupName }: { groupName: string }): React.J
 export function ShimmerText({ className, ...props }: HTMLAttributes<HTMLSpanElement>): React.JSX.Element {
   return <span className={cn("ai-shimmer-text", className)} {...props} />;
 }
+
+export function ToolFailureDot({ failed }: { failed: boolean }): React.JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn("size-1.5 shrink-0 rounded-full", failed ? "bg-destructive" : "bg-transparent")}
+    />
+  );
+}

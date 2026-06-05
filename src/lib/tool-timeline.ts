@@ -27,10 +27,7 @@ export function toolStatus(message: ConversationMessage): "running" | "complete"
   return message.toolStatus ?? (message.status === "failed" ? "failed" : "complete");
 }
 
-export function toolTextClass(status: ConversationMessage["toolStatus"]): string {
-  if (status === "failed") {
-    return "text-destructive";
-  }
+export function toolTextClass(): string {
   return "text-muted-foreground";
 }
 

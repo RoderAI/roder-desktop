@@ -14,6 +14,7 @@ test("projects native commands to command descriptors", () => {
     "retry",
     "agents",
     "tasks",
+    "goal",
     "ps",
   ]);
   expect(nativeCommandDescriptors()[0]).toMatchObject({
@@ -29,13 +30,17 @@ test("merges native commands with app-server commands and lets native names win"
     command({ name: "model", source: "builtin", description: "Prompt model help" }),
   ]);
 
-  expect(commands.map((item) => item.name)).toEqual(["agents", "clear", "model", "ps", "retry", "review", "tasks"]);
+  expect(commands.map((item) => item.name)).toEqual(["agents", "clear", "goal", "model", "ps", "retry", "review", "tasks"]);
   expect(commands.find((item) => item.name === "model")).toMatchObject({
     source: "desktop",
     description: "Show or change the active model.",
   });
   expect(commands.find((item) => item.name === "tasks")).toMatchObject({
     description: "List background tasks.",
+  });
+  expect(commands.find((item) => item.name === "goal")).toMatchObject({
+    source: "desktop",
+    description: "Set a new goal for the active thread.",
   });
 });
 
@@ -94,6 +99,17 @@ test("plans process command behavior with explicit destructive confirmation", ()
   });
   expect(planNativeCommand(nativeCommandInvocation("ps", "stop-all --confirm")!)).toEqual({
     type: "stopAllProcesses",
+  });
+});
+
+test("plans goal command behavior", () => {
+  expect(planNativeCommand(nativeCommandInvocation("goal", "ship desktop goal setting")!)).toEqual({
+    type: "goal",
+    objective: "ship desktop goal setting",
+  });
+  expect(planNativeCommand(nativeCommandInvocation("goal", "")!)).toMatchObject({
+    type: "output",
+    output: { title: "Goal required" },
   });
 });
 

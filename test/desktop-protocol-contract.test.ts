@@ -17,6 +17,7 @@ const documentedDesktopMethods = [
   "turn/start",
   "turn/steer",
   "turn/interrupt",
+  "tools/call",
   "model/list",
   "skills/list",
   "skills/setEnabled",

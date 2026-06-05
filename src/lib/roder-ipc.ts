@@ -112,6 +112,12 @@ export type ThreadGoalGetResult = {
   goal: RoderThreadGoal | null;
 };
 
+export type ToolCallResult = {
+  text: string;
+  data: unknown;
+  is_error: boolean;
+};
+
 export type ModelListResult = {
   models: RoderModel[];
 };
@@ -217,6 +223,12 @@ export const roderIpc = {
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
   threadGoal: (threadId: string) =>
     window.roderDesktop.request("thread/goal/get", { threadId }) as Promise<ThreadGoalGetResult>,
+  createGoal: (threadId: string, objective: string) =>
+    window.roderDesktop.request("tools/call", {
+      thread_id: threadId,
+      tool_name: "create_goal",
+      arguments: { objective },
+    }) as Promise<ToolCallResult>,
   archiveThread: (threadId: string) =>
     window.roderDesktop.request("thread/archive", { threadId }) as Promise<ThreadArchiveResult>,
   startThread: (

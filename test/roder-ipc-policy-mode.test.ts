@@ -60,6 +60,28 @@ test("threadGoal reads the durable goal for a thread", async () => {
   ]);
 });
 
+test("createGoal calls the workflow tool directly for a thread", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return { text: "Goal active", data: {}, is_error: false };
+  });
+
+  const result = await roderIpc.createGoal("thread-1", "Ship desktop /goal");
+
+  expect(result.is_error).toBe(false);
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "tools/call",
+      params: {
+        thread_id: "thread-1",
+        tool_name: "create_goal",
+        arguments: { objective: "Ship desktop /goal" },
+      },
+    },
+  ]);
+});
+
 test("setThreadMode sends the policy mode wire value to the app-server", async () => {
   const calls = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {

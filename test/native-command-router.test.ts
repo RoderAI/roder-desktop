@@ -25,6 +25,31 @@ test("opens the native model picker without command output", async () => {
   expect(outputs).toEqual([null]);
 });
 
+test("goal command creates a durable thread goal without sending a prompt", async () => {
+  const calls: string[] = [];
+  const { actions, outputs } = commandActions(calls);
+
+  await runNativeCommandInvocation({
+    actions,
+    invocation: { name: "goal", arguments: "ship the desktop slash goal flow" },
+    ipc: commandIpc({
+      createGoal: async (threadId, objective) => {
+        calls.push(`create-goal:${threadId}:${objective}`);
+        return { text: "", data: {}, is_error: false };
+      },
+    }),
+    state: commandState({ activeThreadId: "thread-1" }),
+  });
+
+  expect(calls).toEqual([
+    "close-model-picker",
+    "create-goal:thread-1:ship the desktop slash goal flow",
+    "output:Goal set",
+  ]);
+  expect(outputs[0]).toMatchObject({ tone: "success", title: "Goal set" });
+  expect(actions.sendPrompt).not.toHaveBeenCalled();
+});
+
 test("selects a model without success output", async () => {
   const calls: string[] = [];
   const { actions, outputs } = commandActions(calls);
@@ -157,6 +182,7 @@ function commandActions(calls: string[]) {
 
 function commandIpc(
   patch: Partial<{
+    createGoal: (threadId: string, objective: string) => Promise<{ text: string; data: unknown; is_error: boolean }>;
     listAgents: () => Promise<AgentsListResult>;
     listTasks: () => Promise<TasksListResult>;
     listProcesses: (includeCompleted?: boolean) => Promise<ProcessesListResult>;
@@ -165,6 +191,7 @@ function commandIpc(
   }> = {},
 ) {
   return {
+    createGoal: async () => ({ text: "", data: {}, is_error: false }),
     listAgents: async () => ({ agents: [] }),
     listTasks: async () => ({ tasks: [] }),
     listProcesses: async () => ({ processes: [] }),

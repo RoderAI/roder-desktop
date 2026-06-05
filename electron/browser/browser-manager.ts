@@ -20,6 +20,23 @@ export type BrowserCapture = {
   size: number;
 };
 
+export type BrowserPageSnapshot = {
+  visible: boolean;
+  url: string;
+  title: string;
+  text: string;
+  controls: Array<{
+    ref: string;
+    tag: string;
+    text: string;
+    ariaLabel: string | null;
+    role: string | null;
+    type: string | null;
+    selector: string;
+    box: { x: number; y: number; width: number; height: number };
+  }>;
+};
+
 export class BrowserManager {
   #window: BrowserWindow | null = null;
   #view: WebContentsView | null = null;
@@ -43,6 +60,82 @@ export class BrowserManager {
     this.setBounds(bounds);
     if (this.#view!.webContents.getURL() === "") {
       void this.#view!.webContents.loadURL(this.#url);
+    }
+    return this.snapshot();
+  }
+
+  async pageSnapshot(): Promise<BrowserPageSnapshot> {
+    this.#ensureVisible();
+    await this.waitForLoad();
+    return this.#view!.webContents.executeJavaScript(pageSnapshotScript(), true) as Promise<BrowserPageSnapshot>;
+  }
+
+  async evaluate(expression: string): Promise<unknown> {
+    this.#ensureVisible();
+    await this.waitForLoad();
+    return this.#view!.webContents.executeJavaScript(expression, true) as Promise<unknown>;
+  }
+
+  async click(target: { selector?: string; text?: string; ref?: string }): Promise<BrowserSnapshot> {
+    this.#ensureVisible();
+    await this.waitForLoad();
+    const clicked = await this.#view!.webContents.executeJavaScript(clickScript(target), true);
+    if (!clicked) {
+      throw new Error("No matching visible browser element was found to click");
+    }
+    return this.snapshot();
+  }
+
+  async type(target: { text: string; selector?: string; ref?: string; submit?: boolean }): Promise<BrowserSnapshot> {
+    this.#ensureVisible();
+    await this.waitForLoad();
+    const typed = await this.#view!.webContents.executeJavaScript(typeScript(target), true);
+    if (!typed) {
+      throw new Error("No matching editable browser element was found to type into");
+    }
+    return this.snapshot();
+  }
+
+  keypress(key: string): BrowserSnapshot {
+    this.#ensureVisible();
+    this.#view!.webContents.sendInputEvent({ type: "keyDown", keyCode: key });
+    this.#view!.webContents.sendInputEvent({ type: "keyUp", keyCode: key });
+    return this.snapshot();
+  }
+
+  scroll(delta: { dx?: number; dy?: number; selector?: string }): BrowserSnapshot {
+    this.#ensureVisible();
+    if (delta.selector) {
+      void this.#view!.webContents.executeJavaScript(scrollElementScript(delta), true);
+    } else {
+      this.#view!.webContents.sendInputEvent({
+        type: "mouseWheel",
+        x: 10,
+        y: 10,
+        deltaX: delta.dx ?? 0,
+        deltaY: delta.dy ?? 0,
+      });
+    }
+    return this.snapshot();
+  }
+
+  async waitForLoad(): Promise<BrowserSnapshot> {
+    this.#ensureVisible();
+    const webContents = this.#view!.webContents;
+    if (webContents.isLoading()) {
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          webContents.off("did-finish-load", done);
+          webContents.off("did-fail-load", done);
+          resolve();
+        };
+        webContents.once("did-finish-load", done);
+        webContents.once("did-fail-load", done);
+        const timer = setTimeout(done, 5000);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+      });
     }
     return this.snapshot();
   }
@@ -169,6 +262,128 @@ export class BrowserManager {
       return { action: "deny" };
     });
   }
+
+  #ensureVisible(): void {
+    this.#ensureView();
+    if (!this.#visible) {
+      this.show({ x: 0, y: 0, width: 900, height: 640 });
+    }
+  }
+}
+
+function scriptString(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function pageSnapshotScript(): string {
+  return `
+(() => {
+  const visible = (element) => {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return rect.width >= 1 && rect.height >= 1 && rect.bottom >= 0 && rect.right >= 0 && rect.top <= innerHeight && rect.left <= innerWidth && style.visibility !== "hidden" && style.display !== "none";
+  };
+  const selectorFor = (element) => {
+    if (element.id) return "#" + CSS.escape(element.id);
+    const parts = [];
+    let current = element;
+    while (current && current.nodeType === Node.ELEMENT_NODE && parts.length < 4) {
+      let part = current.tagName.toLowerCase();
+      if (current.classList.length) part += "." + Array.from(current.classList).slice(0, 2).map((item) => CSS.escape(item)).join(".");
+      const parent = current.parentElement;
+      if (parent) part += ":nth-child(" + (Array.from(parent.children).indexOf(current) + 1) + ")";
+      parts.unshift(part);
+      current = parent;
+    }
+    return parts.join(" > ");
+  };
+  const candidates = Array.from(document.querySelectorAll('a[href],button,input,textarea,select,[role="button"],[role="link"],[contenteditable="true"]')).filter(visible).slice(0, 120);
+  const controls = candidates.map((element, index) => {
+    const ref = "browser-" + (index + 1);
+    element.setAttribute("data-roder-ref", ref);
+    const rect = element.getBoundingClientRect();
+    return {
+      ref,
+      tag: element.tagName.toLowerCase(),
+      text: (element.innerText || element.value || element.textContent || "").trim().slice(0, 160),
+      ariaLabel: element.getAttribute("aria-label"),
+      role: element.getAttribute("role"),
+      type: element.getAttribute("type"),
+      selector: selectorFor(element),
+      box: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+    };
+  });
+  return { visible: true, url: location.href, title: document.title, text: (document.body?.innerText || "").trim().slice(0, 12000), controls };
+})()
+`;
+}
+
+function clickScript(target: { selector?: string; text?: string; ref?: string }): string {
+  return `
+(() => {
+  const target = ${scriptString(target)};
+  const visible = (element) => {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return rect.width >= 1 && rect.height >= 1 && style.visibility !== "hidden" && style.display !== "none";
+  };
+  let element = null;
+  if (target.ref) element = document.querySelector('[data-roder-ref="' + CSS.escape(target.ref) + '"]');
+  if (!element && target.selector) element = document.querySelector(target.selector);
+  if (!element && target.text) {
+    const needle = String(target.text).toLowerCase();
+    element = Array.from(document.querySelectorAll('a[href],button,[role="button"],[role="link"],input[type="button"],input[type="submit"]')).find((candidate) => visible(candidate) && ((candidate.innerText || candidate.value || candidate.textContent || "").trim().toLowerCase().includes(needle)));
+  }
+  if (!element || !visible(element)) return false;
+  element.scrollIntoView({ block: "center", inline: "center" });
+  element.click();
+  return true;
+})()
+`;
+}
+
+function typeScript(target: { text: string; selector?: string; ref?: string; submit?: boolean }): string {
+  return `
+(() => {
+  const target = ${scriptString(target)};
+  let element = null;
+  if (target.ref) element = document.querySelector('[data-roder-ref="' + CSS.escape(target.ref) + '"]');
+  if (!element && target.selector) element = document.querySelector(target.selector);
+  if (!element) element = document.activeElement;
+  if (!element) return false;
+  element.scrollIntoView?.({ block: "center", inline: "center" });
+  element.focus?.();
+  const text = String(target.text ?? "");
+  if (element.isContentEditable) {
+    element.textContent = text;
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+  } else if ("value" in element) {
+    element.value = text;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  } else {
+    return false;
+  }
+  if (target.submit) {
+    const form = element.form || element.closest?.("form");
+    if (form) form.requestSubmit?.();
+    else element.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  }
+  return true;
+})()
+`;
+}
+
+function scrollElementScript(delta: { dx?: number; dy?: number; selector?: string }): string {
+  return `
+(() => {
+  const delta = ${scriptString(delta)};
+  const element = document.querySelector(delta.selector);
+  if (!element) return false;
+  element.scrollBy({ left: delta.dx || 0, top: delta.dy || 0, behavior: "instant" });
+  return true;
+})()
+`;
 }
 
 function canGoBack(webContents: WebContents): boolean {

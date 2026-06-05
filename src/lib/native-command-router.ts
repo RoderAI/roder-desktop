@@ -42,6 +42,7 @@ export type NativeCommandRouterActions = {
 };
 
 export type NativeCommandRouterIpc = {
+  createGoal: (threadId: string, objective: string) => Promise<{ text: string; data: unknown; is_error: boolean }>;
   listAgents: () => Promise<AgentsListResult>;
   listTasks: () => Promise<TasksListResult>;
   listProcesses: (includeCompleted?: boolean) => Promise<ProcessesListResult>;
@@ -110,6 +111,19 @@ export async function runNativeCommandInvocation({
       case "tasks":
         actions.setCommandOutput(formatTasksOutput((await ipc.listTasks()).tasks));
         return true;
+      case "goal": {
+        if (!state.activeThreadId) {
+          actions.setCommandOutput(errorOutput("No active thread", "Start a thread before setting a goal."));
+          return true;
+        }
+        const created = await ipc.createGoal(state.activeThreadId, result.objective);
+        actions.setCommandOutput(
+          created.is_error
+            ? errorOutput("Goal not set", created.text || "The app-server rejected the goal update.")
+            : successOutput("Goal set", result.objective),
+        );
+        return true;
+      }
       case "processes":
         actions.setCommandOutput(formatProcessesOutput((await ipc.listProcesses(result.includeCompleted)).processes));
         return true;

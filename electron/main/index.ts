@@ -5,6 +5,16 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
+import {
+  browserProviderFromRequestParams,
+  browserToolThreadId,
+  callDesktopBrowserTool,
+  callChromeBrowserToolAlias,
+  desktopBrowserToolName,
+  mergeDesktopBrowserSkill,
+  mergeDesktopBrowserTools,
+  type BrowserToolProvider,
+} from "../browser/browser-tool-proxy";
 import { ChromeBridgeManager } from "../browser/chrome-bridge-manager";
 import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
@@ -28,6 +38,8 @@ const terminal = new TerminalManager();
 const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort, () => sendAppCommand("newThread"));
 const chromeBridge = new ChromeBridgeManager();
+const browserProviderByThread = new Map<string, BrowserToolProvider>();
+let sessionBrowserProvider: BrowserToolProvider = "builtIn";
 let mainWindow: BrowserWindow | null = null;
 let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
@@ -391,10 +403,18 @@ function getExtensionHost(): ExtensionHost {
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
   recordAppServerEvent("request", method, params ?? {});
+  const requestedBrowserProvider = browserProviderFromRequestParams(params);
+  if (requestedBrowserProvider) {
+    sessionBrowserProvider = requestedBrowserProvider;
+    const threadId = browserThreadIdFromParams(params);
+    if (threadId) {
+      browserProviderByThread.set(threadId, requestedBrowserProvider);
+    }
+  }
   if (method === "tools/list") {
     try {
       const baseTools = await roder.request(method, params);
-      const result = mergeExtensionTools(baseTools, await getExtensionCatalog().list());
+      const result = mergeDesktopBrowserTools(mergeExtensionTools(baseTools, await getExtensionCatalog().list()));
       recordAppServerEvent("response", method, result);
       return result;
     } catch (error) {
@@ -403,6 +423,16 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     }
   }
   if (method === "tools/call") {
+    const browserToolName = desktopBrowserToolName(params);
+    if (browserToolName) {
+      const provider = browserProviderForParams(params);
+      const result =
+        provider === "chrome"
+          ? await callChromeBrowserToolAlias((nextMethod, nextParams) => roder.request(nextMethod, nextParams), browserToolName, params)
+          : await callDesktopBrowserTool(browser, browserToolName, params);
+      recordAppServerEvent(result.is_error ? "error" : "response", method, result);
+      return result;
+    }
     const catalog = await getExtensionCatalog().list();
     const toolName = extensionToolName(params, catalog);
     if (toolName) {
@@ -411,14 +441,59 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       return result;
     }
   }
+  if (method === "skills/list") {
+    try {
+      const baseSkills = await roder.request(method, params);
+      const result = mergeDesktopBrowserSkill(baseSkills);
+      recordAppServerEvent("response", method, result);
+      return result;
+    } catch (error) {
+      recordAppServerEvent("error", method, (error as Error).message);
+      throw error;
+    }
+  }
   try {
     const result = await roder.request(method, params);
+    if (method === "thread/start") {
+      rememberStartedThreadBrowserProvider(result, requestedBrowserProvider);
+    }
     recordAppServerEvent("response", method, result);
     return result;
   } catch (error) {
     recordAppServerEvent("error", method, (error as Error).message);
     throw error;
   }
+}
+
+
+function browserProviderForParams(params: unknown): BrowserToolProvider {
+  const threadId = browserToolThreadId(params);
+  return (threadId ? browserProviderByThread.get(threadId) : null) ?? sessionBrowserProvider;
+}
+
+function browserThreadIdFromParams(params: unknown): string | null {
+  if (!isRecord(params)) {
+    return null;
+  }
+  const threadId = params.threadId ?? params.thread_id;
+  return typeof threadId === "string" && threadId.length > 0 ? threadId : null;
+}
+
+function rememberStartedThreadBrowserProvider(
+  result: unknown,
+  requestedBrowserProvider: BrowserToolProvider | null,
+): void {
+  if (!requestedBrowserProvider || !isRecord(result) || !isRecord(result.thread)) {
+    return;
+  }
+  const threadId = result.thread.id;
+  if (typeof threadId === "string" && threadId.length > 0) {
+    browserProviderByThread.set(threadId, requestedBrowserProvider);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
 }
 
 function recordAppServerEvent(kind: AppServerEvent["kind"], method: string | undefined, payload: unknown): void {

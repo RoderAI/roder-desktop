@@ -154,11 +154,12 @@ test("file edit tools expose inline timeline previews", () => {
   );
 
   expect(plain(messages.map((message) => message.toolPreview))).toEqual([
-    "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
+    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old\n+new\n",
     "export const value = 1;\n",
     "- value = 1\n+ value = 2",
     "@@ edit 1 @@\n- value = 2\n+ value = 3\n@@ edit 2 @@\n- name = 'old'\n+ name = 'new'",
   ]);
+  expect(plain(messages.map((message) => message.toolPreviewKind))).toEqual(["patch", "text", "text", "text"]);
 });
 
 test("streaming edit tool previews survive completed status updates", () => {
