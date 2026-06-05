@@ -201,6 +201,7 @@ export const roderIpc = {
   status: () => window.roderDesktop.status(),
   appearance: () => window.roderDesktop.appearance(),
   openWorkspaceFolder: (defaultPath?: string) => window.roderDesktop.openWorkspaceFolder(defaultPath),
+  openWorkspaceFolders: (defaultPath?: string) => window.roderDesktop.openWorkspaceFolders(defaultPath),
   listWorkspaces: () => window.roderDesktop.request("workspace/list", {}) as Promise<WorkspaceListResult>,
   createWorkspace: (params: WorkspaceCreateParams) =>
     window.roderDesktop.request("workspace/create", params) as Promise<WorkspaceCreateResult>,

@@ -37,6 +37,7 @@ async function loadRoderStore(
       })),
       appearance: vi.fn<Window["roderDesktop"]["appearance"]>(async () => "light"),
       openWorkspaceFolder: vi.fn<Window["roderDesktop"]["openWorkspaceFolder"]>(async () => null),
+      openWorkspaceFolders: vi.fn<Window["roderDesktop"]["openWorkspaceFolders"]>(async () => null),
       request,
       onAppearance: () => () => undefined,
       onNotification: () => () => undefined,
@@ -53,6 +54,84 @@ async function loadRoderStore(
   });
   return module.useRoderStore;
 }
+
+test("newProject creates a configured multi-root workspace and starts in the default root", async () => {
+  const workspace = {
+    id: "ws_multi",
+    name: "Monorepo",
+    roots: [
+      { id: "root_app", path: "/workspace/app", name: "app" },
+      { id: "root_api", path: "/workspace/api", name: "api" },
+    ],
+    defaultRootId: "root_api",
+    updatedAt: 1770000200,
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "workspace/create":
+        return { workspace };
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-api",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            createdAt: 1770000200,
+            updatedAt: 1770000200,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: workspace.id,
+            rootId: workspace.defaultRootId,
+            cwd: "/workspace/api",
+            turns: [],
+          },
+          model: "gpt-5.5",
+          reasoning: "medium",
+        };
+      default:
+        return {};
+    }
+  });
+  const openWorkspaceFolder = vi.fn<Window["roderDesktop"]["openWorkspaceFolder"]>(async () => {
+    throw new Error("legacy folder picker should not open for configured projects");
+  });
+  const useRoderStore = await loadRoderStore(request, { openWorkspaceFolder });
+
+  useRoderStore.setState({
+    activeThreadId: "",
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    selectedWorkspaceCwd: "/workspace",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    selectedModel: "gpt-5.5",
+    threadDetails: {},
+    threads: [],
+    workspaces: [],
+  });
+
+  await useRoderStore.getState().newProject({
+    name: "Monorepo",
+    roots: [{ path: "/workspace/app" }, { path: "/workspace/api" }],
+    defaultRootPath: "/workspace/api",
+  });
+
+  expect(openWorkspaceFolder).not.toHaveBeenCalled();
+  expect(request).toHaveBeenCalledWith("workspace/create", {
+    name: "Monorepo",
+    roots: [{ path: "/workspace/app" }, { path: "/workspace/api" }],
+    defaultRootPath: "/workspace/api",
+  });
+  expect(request).toHaveBeenCalledWith(
+    "thread/start",
+    expect.objectContaining({
+      workspaceId: "ws_multi",
+      rootId: "root_api",
+      cwd: "/workspace/api",
+    }),
+  );
+  expect(useRoderStore.getState().selectedWorkspaceCwd).toBe("/workspace/api");
+  expect(useRoderStore.getState().workspaces[0]?.roots).toHaveLength(2);
+});
 
 test("changing selected policy mode applies it to the running thread immediately", async () => {
   const calls: Array<{ method: string; params: unknown }> = [];

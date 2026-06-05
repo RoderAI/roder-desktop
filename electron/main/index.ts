@@ -178,6 +178,15 @@ ipcMain.handle("workspace:openFolder", async (_event, defaultPath?: string) => {
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });
+ipcMain.handle("workspace:openFolders", async (_event, defaultPath?: string) => {
+  const options: Electron.OpenDialogOptions = {
+    title: "Add Workspace Folders",
+    defaultPath,
+    properties: ["openDirectory", "createDirectory", "multiSelections"],
+  };
+  const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+  return result.canceled ? null : result.filePaths;
+});
 ipcMain.handle("terminal:start", (_event, options: { cols?: number; rows?: number; cwd?: string }) =>
   terminal.start({ ...options, cwd: options.cwd || process.cwd() }),
 );

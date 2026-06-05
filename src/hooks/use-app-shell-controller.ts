@@ -10,6 +10,7 @@ import { mergedCommandDescriptors } from "@/lib/native-commands";
 import type { NativeCommandOutput } from "@/lib/native-command-formatters";
 import { runNativeCommandInvocation, type LocalTranscriptOffset } from "@/lib/native-command-router";
 import { roderIpc } from "@/lib/roder-ipc";
+import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
 import { commandInvocation, slashCommandLikeText, type CommandInvocation } from "@/lib/roder-commands";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import {
@@ -75,6 +76,9 @@ export function useAppShellController(): AppShellController {
   const [nativeCommandOutput, setNativeCommandOutput] = useState<NativeCommandOutput | null>(null);
   const [localTranscriptOffset, setLocalTranscriptOffset] = useState<LocalTranscriptOffset | null>(null);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
+  const [projectConfigOpen, setProjectConfigOpen] = useState(false);
+  const [projectInitialFolders, setProjectInitialFolders] = useState<string[]>([]);
+  const [projectCreating, setProjectCreating] = useState(false);
   const activePanel = routeSearch.panelActive;
   const workspacePanelOpen = routeSearch.panelOpen;
   const selectedExtensionId = routeSearch.extension || null;
@@ -164,9 +168,31 @@ export function useAppShellController(): AppShellController {
   );
   const newProject = useCallback(() => {
     followBottom();
-    void navigate({ to: "/new", search: true });
-    void createProjectThread();
-  }, [createProjectThread, followBottom, navigate]);
+    void roderIpc.openWorkspaceFolder(activeWorkspaceCwd || selectedWorkspaceCwd || status.cwd).then((folder) => {
+      if (!folder) {
+        return;
+      }
+      setProjectInitialFolders([folder]);
+      setProjectConfigOpen(true);
+    });
+  }, [activeWorkspaceCwd, followBottom, selectedWorkspaceCwd, status.cwd]);
+  const createConfiguredProject = useCallback(
+    (params: WorkspaceCreateParams) => {
+      followBottom();
+      setProjectCreating(true);
+      void navigate({ to: "/new", search: true });
+      void createProjectThread(params)
+        .then(() => {
+          setProjectConfigOpen(false);
+          setProjectInitialFolders([]);
+          setProjectCreating(false);
+        })
+        .catch(() => {
+          setProjectCreating(false);
+        });
+    },
+    [createProjectThread, followBottom, navigate],
+  );
   useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
       if (appCommand.command === "newProject") {
@@ -433,8 +459,13 @@ export function useAppShellController(): AppShellController {
       threadOptions,
       threads,
       workspacePanelOpen,
+      projectConfigOpen,
+      projectCreating,
+      projectInitialFolders,
       onArchiveThread: archiveThread,
       onAttachToComposer: attachToComposer,
+      onCreateProject: createConfiguredProject,
+      onProjectConfigOpenChange: setProjectConfigOpen,
       onNewProject: newProject,
       onNewThread: newThread,
       onNewThreadInFolder: newThreadInFolder,

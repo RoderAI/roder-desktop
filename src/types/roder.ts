@@ -790,6 +790,7 @@ declare global {
       appearance: () => Promise<SystemAppearance>;
       openExternal: (url: string) => Promise<void>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
+      openWorkspaceFolders: (defaultPath?: string) => Promise<string[] | null>;
       terminalStart: (options?: { cols?: number; rows?: number; cwd?: string }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string) => Promise<void>;
       terminalResize: (cols: number, rows: number) => Promise<void>;

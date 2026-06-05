@@ -105,6 +105,8 @@ const api = {
   openExternal: (url: string) => ipcRenderer.invoke("openExternal", url) as Promise<void>,
   openWorkspaceFolder: (defaultPath?: string) =>
     ipcRenderer.invoke("workspace:openFolder", defaultPath) as Promise<string | null>,
+  openWorkspaceFolders: (defaultPath?: string) =>
+    ipcRenderer.invoke("workspace:openFolders", defaultPath) as Promise<string[] | null>,
   terminalStart: (options?: { cols?: number; rows?: number; cwd?: string }) =>
     ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
   terminalWrite: (data: string) => ipcRenderer.invoke("terminal:write", data) as Promise<void>,
