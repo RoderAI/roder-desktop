@@ -10,7 +10,7 @@ export function NativeCommandOutput({ output }: { output: NativeCommandOutputMod
   return (
     <section
       className={cn(
-        "mx-auto mb-3 w-full max-w-3xl px-8",
+        "mx-auto mb-3 w-full max-w-3xl px-5",
         output.tone === "error" && "text-destructive",
         output.tone === "warning" && "text-amber-700 dark:text-amber-300",
       )}

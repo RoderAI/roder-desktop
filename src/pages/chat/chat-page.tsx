@@ -186,7 +186,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           )}
           <NativeCommandOutput output={nativeCommandOutput} />
           {agent.error && (
-            <div className="mx-auto mb-3 w-full max-w-3xl px-8 text-base text-destructive">{agent.error}</div>
+            <div className="mx-auto mb-3 w-full max-w-3xl px-5 text-base text-destructive">{agent.error}</div>
           )}
           <Composer
             busy={activeThreadBusy}

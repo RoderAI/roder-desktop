@@ -1,4 +1,5 @@
 import type { SettingsSection } from "@/stores/theme-store";
+import type { RoderThread, Workspace, WorkspaceRoot } from "@/types/roder";
 
 type ThreadSelectionInput =
   | {
@@ -24,6 +25,12 @@ export type ArchiveRouteTarget =
   | {
       route: "new";
     };
+
+export type ActiveWorkspaceContext = {
+  cwd: string;
+  ref: { workspaceId: string; rootId: string };
+  roots: WorkspaceRoot[];
+};
 
 export const pluginSectionValues = ["installed", "explore"] as const;
 export type PluginSection = (typeof pluginSectionValues)[number];
@@ -73,6 +80,52 @@ export function activeWorkspaceCwdForPathname({
     : activeThreadCwd || selectedWorkspaceCwd || statusCwd || "";
 }
 
+export function activeWorkspaceContextForRoute({
+  isNewRoute,
+  routeThread,
+  selectedWorkspaceCwd,
+  selectedWorkspaceId,
+  selectedRootId,
+  statusCwd,
+  workspaces,
+}: {
+  isNewRoute: boolean;
+  routeThread?: Pick<RoderThread, "cwd" | "workspaceId" | "rootId">;
+  selectedWorkspaceCwd: string;
+  selectedWorkspaceId: string;
+  selectedRootId: string;
+  statusCwd?: string;
+  workspaces: Workspace[];
+}): ActiveWorkspaceContext {
+  const workspaceSelection = isNewRoute
+    ? resolveWorkspaceSelection(workspaces, {
+        workspaceId: selectedWorkspaceId,
+        rootId: selectedRootId,
+        path: selectedWorkspaceCwd,
+      })
+    : resolveWorkspaceSelection(workspaces, {
+        workspaceId: routeThread?.workspaceId,
+        rootId: routeThread?.rootId,
+        path: routeThread?.cwd,
+      });
+  const workspaceId = isNewRoute
+    ? selectedWorkspaceId || workspaceSelection?.workspace.id || ""
+    : routeThread?.workspaceId || workspaceSelection?.workspace.id || selectedWorkspaceId || "";
+  const rootId = isNewRoute
+    ? selectedRootId || workspaceSelection?.root.id || ""
+    : routeThread?.rootId || workspaceSelection?.root.id || selectedRootId || "";
+  const cwd = isNewRoute
+    ? selectedWorkspaceCwd || workspaceSelection?.root.path || statusCwd || ""
+    : routeThread?.cwd || workspaceSelection?.root.path || selectedWorkspaceCwd || statusCwd || "";
+  const roots = workspaces.find((workspace) => workspace.id === workspaceId)?.roots ?? [];
+
+  return {
+    cwd,
+    ref: { workspaceId, rootId },
+    roots,
+  };
+}
+
 export function normalizeSettingsSectionParam(section: string | undefined): SettingsSection {
   if (section && validSettingsSections.has(section as SettingsSection)) {
     return section as SettingsSection;
@@ -97,6 +150,10 @@ export function isPluginsRoutePath(pathname: string): boolean {
   return normalizedPathname === "/plugins" || normalizedPathname.startsWith("/plugins/");
 }
 
+export function isNewRoutePath(pathname: string): boolean {
+  return (pathname.replace(/\/+$/u, "") || "/") === "/new";
+}
+
 export function archiveRouteAfterThreadRemoval({
   activeThreadId,
   archivedThreadId,
@@ -111,4 +168,35 @@ export function archiveRouteAfterThreadRemoval({
   }
   const nextThread = threads.find((thread) => thread.id !== archivedThreadId);
   return nextThread ? { route: "thread", threadId: nextThread.id } : { route: "new" };
+}
+
+function resolveWorkspaceSelection(
+  workspaces: Workspace[],
+  params: { workspaceId?: string | null; rootId?: string | null; path?: string },
+): { workspace: Workspace; root: WorkspaceRoot } | null {
+  const workspaceById = params.workspaceId ? workspaces.find((workspace) => workspace.id === params.workspaceId) : null;
+  const rootFromWorkspace = workspaceById ? rootForWorkspace(workspaceById, params.rootId || undefined) : null;
+  if (workspaceById && rootFromWorkspace) {
+    return { workspace: workspaceById, root: rootFromWorkspace };
+  }
+
+  const path = (params.path || "").replace(/\/+$/, "");
+  if (!path) {
+    return null;
+  }
+  for (const workspace of workspaces) {
+    for (const root of workspace.roots) {
+      if (root.path.replace(/\/+$/, "") === path) {
+        return { workspace, root };
+      }
+    }
+  }
+  return null;
+}
+
+function rootForWorkspace(workspace: Workspace, rootId?: string): WorkspaceRoot | null {
+  if (rootId) {
+    return workspace.roots.find((root) => root.id === rootId) ?? null;
+  }
+  return workspace.roots[0] ?? null;
 }

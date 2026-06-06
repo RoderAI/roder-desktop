@@ -521,6 +521,77 @@ export type FileSystemReadFileResult = {
   dataBase64: string;
 };
 
+export type WorkspaceFileIndexState = "missing" | "building" | "ready" | "stale" | "failed";
+
+export type WorkspaceFilesStatusRoot = {
+  rootId?: string;
+  id?: string;
+  name?: string;
+  path?: string;
+  state?: WorkspaceFileIndexState;
+  stale?: boolean;
+  fileCount?: number;
+  directoryCount?: number;
+  message?: string | null;
+};
+
+export type WorkspaceFilesStatus = {
+  workspaceId: string;
+  state: WorkspaceFileIndexState;
+  stale: boolean;
+  roots: WorkspaceFilesStatusRoot[];
+  fileCount: number;
+  directoryCount: number;
+  message?: string | null;
+};
+
+export type WorkspaceFileEntry = {
+  rootId: string;
+  rootName: string;
+  path: string;
+  name: string;
+  kind: "file" | "directory";
+  hasChildren: boolean;
+  size?: number | null;
+  modifiedMs?: number | null;
+};
+
+export type WorkspaceFilesStatusResult = {
+  status: WorkspaceFilesStatus;
+};
+
+export type WorkspaceFilesRebuildResult = {
+  status?: WorkspaceFilesStatus;
+};
+
+export type WorkspaceFilesChildrenResult = {
+  status: WorkspaceFilesStatus;
+  entries: WorkspaceFileEntry[];
+};
+
+export type WorkspaceFilesQueryMatch = {
+  entry: WorkspaceFileEntry;
+  score: number;
+  matchPositions: number[];
+};
+
+export type WorkspaceFilesQueryResult = {
+  status: WorkspaceFilesStatus;
+  matches: WorkspaceFilesQueryMatch[];
+  indexedFileCount: number;
+};
+
+export type WorkspaceFilesReadResult = {
+  entry: WorkspaceFileEntry;
+  encoding: "utf8" | "binary" | "unsupported";
+  text?: string;
+  offset: number;
+  limit: number;
+  totalBytes: number;
+  hasMore: boolean;
+  truncated: boolean;
+};
+
 export type TerminalSnapshot = {
   id: string;
   pid: number;

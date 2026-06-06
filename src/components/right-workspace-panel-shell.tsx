@@ -84,7 +84,7 @@ export function RightWorkspacePanelShell({
       aria-hidden={!open}
       inert={!open ? true : undefined}
     >
-      <div className="flex h-(--desktop-header-height) shrink-0 items-center gap-1 border-b border-border px-3">
+      <div className="drag-region flex h-(--desktop-header-height) shrink-0 select-none items-center gap-1 border-b border-border px-3">
         <PanelAddMenu
           entries={entries}
           menuOpen={addMenuOpen}
@@ -98,7 +98,7 @@ export function RightWorkspacePanelShell({
             <Tabs
               value={activeEntry?.id}
               onValueChange={(value) => onSelectPanel(value as RouteWorkspacePanel)}
-              className="min-w-0 shrink"
+              className="no-drag min-w-0 shrink"
             >
               <TabsList variant="chrome" className="max-w-full overflow-x-auto" aria-label="Workspace panel tabs">
                 {openEntries.map((entry) => (
@@ -253,7 +253,7 @@ function PanelAddMenu({
   return (
     <DropdownMenu open={menuOpen} onOpenChange={onMenuOpenChange}>
       <DropdownMenuTrigger
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4"
+        className="no-drag inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4"
         aria-label="Add workspace panel"
         title="Add panel"
       >

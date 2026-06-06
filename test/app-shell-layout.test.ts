@@ -6,6 +6,7 @@ import {
   nativeWindowMinWidth,
   shouldRenderWorkspacePanel,
   sidebarWidthBounds,
+  workspacePanelMaxOpenWidthForGroup,
 } from "../src/lib/app-shell-layout";
 
 test("workspace panel fits only when the group can hold the readable main column and the panel", () => {
@@ -21,8 +22,38 @@ test("workspace panel fit does not depend on the sidebar (it is outside the grou
   // The same group width fits the workspace panel regardless of how wide the sidebar is, because the
   // sidebar occupies space outside the group rather than inside it.
   expect(
-    canShowWorkspacePanelForGroupWidth({ groupWidth: mainPanelMinWidth + workspacePanelMinWidth, workspacePanelMinWidth }),
+    canShowWorkspacePanelForGroupWidth({
+      groupWidth: mainPanelMinWidth + workspacePanelMinWidth,
+      workspacePanelMinWidth,
+    }),
   ).toBe(true);
+});
+
+test("workspace panel opens to the widest size that still preserves the readable main column", () => {
+  const workspacePanelMinWidth = 360;
+  const workspacePanelMaxWidth = 1200;
+
+  expect(
+    workspacePanelMaxOpenWidthForGroup({
+      groupWidth: mainPanelMinWidth + 900,
+      workspacePanelMinWidth,
+      workspacePanelMaxWidth,
+    }),
+  ).toBe(900);
+  expect(
+    workspacePanelMaxOpenWidthForGroup({
+      groupWidth: mainPanelMinWidth + workspacePanelMaxWidth + 300,
+      workspacePanelMinWidth,
+      workspacePanelMaxWidth,
+    }),
+  ).toBe(workspacePanelMaxWidth);
+  expect(
+    workspacePanelMaxOpenWidthForGroup({
+      groupWidth: null,
+      workspacePanelMinWidth,
+      workspacePanelMaxWidth,
+    }),
+  ).toBe(workspacePanelMaxWidth);
 });
 
 test("workspace panel chrome is visible only for non-plugin routes with an open workspace panel", () => {

@@ -23,6 +23,7 @@ import {
   nativeWindowMinWidth,
   shouldRenderWorkspacePanel,
   sidebarWidthBounds,
+  workspacePanelMaxOpenWidthForGroup,
 } from "@/lib/app-shell-layout";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
@@ -165,6 +166,7 @@ export function AppShellLayout({
   const sidebarWidthRef = useRef<number>(sidebarWidth);
   const measuredWorkspacePanelWidthRef = useRef<number>(initialWorkspacePanelWidth);
   const panelToggleInitializedRef = useRef(false);
+  const previousSidebarOpenRef = useRef(sidebarOpen);
   const previousWorkspaceVisibleRef = useRef(false);
   const shellLayoutAnimating = shellAnimationState.animating;
   const measuredWorkspacePanelWidth = measuredWorkspacePanelWidthOverride ?? initialWorkspacePanelWidth;
@@ -181,6 +183,11 @@ export function AppShellLayout({
         });
   const workspacePanelVisible = workspacePanelRequested && canShowWorkspacePanel;
   const workspacePanelToggleVisible = workspacePanelOpen || canShowWorkspacePanel;
+  const workspacePanelMaxOpenWidth = workspacePanelMaxOpenWidthForGroup({
+    groupWidth: appChromeGroupWidth,
+    workspacePanelMinWidth: toolPanelWidthBounds.min,
+    workspacePanelMaxWidth: toolPanelWidthBounds.max,
+  });
 
   useLayoutEffect(() => {
     if (!appChromeGroupElement) {
@@ -206,12 +213,19 @@ export function AppShellLayout({
   useLayoutEffect(() => {
     const workspacePanel = workspacePanelRef.current;
     const initialized = panelToggleInitializedRef.current;
+    const sidebarChanged = previousSidebarOpenRef.current !== sidebarOpen;
     const workspaceChanged = previousWorkspaceVisibleRef.current !== workspacePanelVisible;
+    previousSidebarOpenRef.current = sidebarOpen;
     previousWorkspaceVisibleRef.current = workspacePanelVisible;
 
     if (workspacePanel && (!initialized || workspaceChanged)) {
       if (workspacePanelVisible) {
         workspacePanel.expand();
+        workspacePanel.resize(`${workspacePanelMaxOpenWidth}px`);
+        const appliedWidth = Math.round(workspacePanel.getSize().inPixels);
+        if (appliedWidth > 0) {
+          measuredWorkspacePanelWidthRef.current = appliedWidth;
+        }
       } else {
         workspacePanel.collapse();
       }
@@ -219,6 +233,9 @@ export function AppShellLayout({
 
     if (!initialized) {
       panelToggleInitializedRef.current = true;
+      return;
+    }
+    if (!sidebarChanged && !workspaceChanged) {
       return;
     }
 
@@ -230,7 +247,7 @@ export function AppShellLayout({
       setShellAnimationState({ animating: false, frozenWorkspacePanelWidth: null });
     }, shellLayoutAnimationMs);
     return () => window.clearTimeout(animationTimer);
-  }, [sidebarOpen, workspacePanelRef, workspacePanelVisible]);
+  }, [sidebarOpen, workspacePanelMaxOpenWidth, workspacePanelRef, workspacePanelVisible]);
 
   // Keep the native window minimum width at "everything beside the main column + the readable main
   // minimum". `chromeWidth` (window width minus the group width) is the sidebar + its handle + the
@@ -410,7 +427,7 @@ export function AppShellLayout({
       panelRef={workspacePanelRef}
       collapsible
       collapsedSize="0px"
-      defaultSize={workspacePanelVisible ? `${initialWorkspacePanelWidth}px` : "0px"}
+      defaultSize={workspacePanelVisible ? `${workspacePanelMaxOpenWidth}px` : "0px"}
       minSize={`${toolPanelWidthBounds.min}px`}
       maxSize={`${toolPanelWidthBounds.max}px`}
       groupResizeBehavior="preserve-pixel-size"
@@ -511,34 +528,34 @@ export function AppShellLayout({
     <>
       {projectDialog}
       <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
-      <TopBar
-        thread={activeThread}
-        goal={activeThreadGoal}
-        threads={threadOptions}
-        folders={folderOptions}
-        activeFolderPath={activeWorkspaceCwd}
-        status={status}
-        workspacePanelOpen={workspacePanelOpen}
-        workspacePanelToggleVisible={workspacePanelToggleVisible}
-        extensionSidebarVisible={extensionSidebarVisible}
-        sidebarOpen={sidebarOpen}
-        placement="window"
-        onNewProject={onNewProject}
-        onNewThread={onNewThread}
-        onOpenSettings={() => onOpenSettings("general")}
-        onRestart={onRestart}
-        onToggleSidebar={onToggleSidebar}
-        onSelectFolder={onSelectFolder}
-        onSelectThread={onSelectThread}
-        onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
-        onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
-      />
-      <div className="flex min-h-0 flex-1">
-        {sidebarRegion}
-        {sidebarResizeHandle}
-        {appChromeGroup}
-        {extensionActivityRail}
-      </div>
+        <TopBar
+          thread={activeThread}
+          goal={activeThreadGoal}
+          threads={threadOptions}
+          folders={folderOptions}
+          activeFolderPath={activeWorkspaceCwd}
+          status={status}
+          workspacePanelOpen={workspacePanelOpen}
+          workspacePanelToggleVisible={workspacePanelToggleVisible}
+          extensionSidebarVisible={extensionSidebarVisible}
+          sidebarOpen={sidebarOpen}
+          placement="window"
+          onNewProject={onNewProject}
+          onNewThread={onNewThread}
+          onOpenSettings={() => onOpenSettings("general")}
+          onRestart={onRestart}
+          onToggleSidebar={onToggleSidebar}
+          onSelectFolder={onSelectFolder}
+          onSelectThread={onSelectThread}
+          onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
+          onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
+        />
+        <div className="flex min-h-0 flex-1">
+          {sidebarRegion}
+          {sidebarResizeHandle}
+          {appChromeGroup}
+          {extensionActivityRail}
+        </div>
       </div>
     </>
   );
