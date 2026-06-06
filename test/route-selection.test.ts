@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 import {
+  activeWorkspaceContextForRoute,
   activeWorkspaceCwdForPathname,
   archiveRouteAfterThreadRemoval,
   defaultRouteForHydratedState,
   defaultPluginsRoute,
+  isNewRoutePath,
   isPluginsRoutePath,
   normalizeSettingsSectionParam,
   pluginsRouteForSection,
@@ -40,6 +42,37 @@ test("thread route still reflects the active thread folder", () => {
   ).toBe("/work/active-project");
 });
 
+test("thread route workspace context comes from the route thread instead of draft selection", () => {
+  const context = activeWorkspaceContextForRoute({
+    isNewRoute: false,
+    routeThread: { cwd: "/work/project-b", workspaceId: "ws-b", rootId: "root-b" },
+    selectedWorkspaceCwd: "/work/project-a",
+    selectedWorkspaceId: "ws-a",
+    selectedRootId: "root-a",
+    workspaces: [workspace("ws-a", "root-a", "/work/project-a"), workspace("ws-b", "root-b", "/work/project-b")],
+  });
+
+  expect(context.cwd).toBe("/work/project-b");
+  expect(context.ref).toEqual({ workspaceId: "ws-b", rootId: "root-b" });
+  expect(context.roots).toEqual([{ id: "root-b", path: "/work/project-b", name: "project-b" }]);
+});
+
+test("new route workspace context comes from the draft workspace selection", () => {
+  const context = activeWorkspaceContextForRoute({
+    isNewRoute: true,
+    routeThread: { cwd: "/work/project-b", workspaceId: "ws-b", rootId: "root-b" },
+    selectedWorkspaceCwd: "/work/project-a",
+    selectedWorkspaceId: "ws-a",
+    selectedRootId: "root-a",
+    statusCwd: "/work/default",
+    workspaces: [workspace("ws-a", "root-a", "/work/project-a"), workspace("ws-b", "root-b", "/work/project-b")],
+  });
+
+  expect(context.cwd).toBe("/work/project-a");
+  expect(context.ref).toEqual({ workspaceId: "ws-a", rootId: "root-a" });
+  expect(context.roots).toEqual([{ id: "root-a", path: "/work/project-a", name: "project-a" }]);
+});
+
 test("new route clears active thread selection so prompt send starts a thread", () => {
   expect(threadSelectionForRoute({ route: "new", activeThreadId: "thread-a" })).toEqual({
     threadId: "",
@@ -67,6 +100,9 @@ test("plugins installed and explore views are route-owned pages", () => {
   expect(isPluginsRoutePath("/plugins/installed")).toBe(true);
   expect(isPluginsRoutePath("/plugins/explore")).toBe(true);
   expect(isPluginsRoutePath("/threads/thread-a")).toBe(false);
+  expect(isNewRoutePath("/new")).toBe(true);
+  expect(isNewRoutePath("/new/")).toBe(true);
+  expect(isNewRoutePath("/threads/thread-a")).toBe(false);
 });
 
 test("active archive navigates to the next thread or the new route", () => {
@@ -92,3 +128,14 @@ test("active archive navigates to the next thread or the new route", () => {
     }),
   ).toBeNull();
 });
+
+function workspace(id: string, rootId: string, path: string) {
+  const name = path.split("/").at(-1) ?? id;
+  return {
+    id,
+    name,
+    roots: [{ id: rootId, path, name }],
+    defaultRootId: rootId,
+    updatedAt: 1770000000,
+  };
+}
