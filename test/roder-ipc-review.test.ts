@@ -134,3 +134,83 @@ test("filesystem IPC wrappers call documented read methods", async () => {
     },
   ]);
 });
+
+test("workspace file IPC wrappers call canonical file browser methods", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    if (method === "workspace/files/read") {
+      return {
+        entry: { rootId: "root_1", rootName: "app", path: "README.md", name: "README.md", kind: "file" },
+        encoding: "utf8",
+        text: "Hello",
+        offset: 0,
+        limit: 512,
+        totalBytes: 5,
+        hasMore: false,
+        truncated: false,
+      };
+    }
+    if (method === "workspace/files/query") {
+      return { status: { workspaceId: "ws_1", state: "ready" }, matches: [], indexedFileCount: 0 };
+    }
+    if (method === "workspace/files/children") {
+      return { status: { workspaceId: "ws_1", state: "ready" }, entries: [] };
+    }
+    return { status: { workspaceId: "ws_1", state: "ready" } };
+  });
+
+  await roderIpc.workspaceFilesStatus({ workspaceId: "ws_1" });
+  await roderIpc.rebuildWorkspaceFiles({ workspaceId: "ws_1", rootId: "root_1" });
+  await roderIpc.listWorkspaceFileChildren({ workspaceId: "ws_1", rootId: "root_1", path: "src" });
+  await roderIpc.queryWorkspaceFiles({ workspaceId: "ws_1", query: "read me", limit: 20 });
+  await roderIpc.readWorkspaceFile({
+    workspaceId: "ws_1",
+    rootId: "root_1",
+    path: "README.md",
+    offset: 0,
+    limit: 512,
+  });
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "workspace/files/status",
+      params: {
+        workspaceId: "ws_1",
+      },
+    },
+    {
+      method: "workspace/files/rebuild",
+      params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
+      },
+    },
+    {
+      method: "workspace/files/children",
+      params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
+        path: "src",
+      },
+    },
+    {
+      method: "workspace/files/query",
+      params: {
+        workspaceId: "ws_1",
+        query: "read me",
+        limit: 20,
+      },
+    },
+    {
+      method: "workspace/files/read",
+      params: {
+        workspaceId: "ws_1",
+        rootId: "root_1",
+        path: "README.md",
+        offset: 0,
+        limit: 512,
+      },
+    },
+  ]);
+});
