@@ -312,7 +312,7 @@ export function Composer({
   return (
     <div
       ref={speechLifecycleRef}
-      className="mx-auto w-full max-w-3xl px-8 pb-5 pt-0"
+      className="mx-auto w-full max-w-3xl px-5 pb-5 pt-0"
       onDragEnter={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
           setDragActive(true);

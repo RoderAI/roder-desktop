@@ -41,6 +41,25 @@ export function canShowWorkspacePanelForGroupWidth({
   return Number.isFinite(groupWidth) && groupWidth >= mainMinWidth + workspacePanelMinWidth;
 }
 
+export function workspacePanelMaxOpenWidthForGroup({
+  groupWidth,
+  mainMinWidth = mainPanelMinWidth,
+  workspacePanelMinWidth,
+  workspacePanelMaxWidth,
+}: {
+  groupWidth: number | null;
+  mainMinWidth?: number;
+  workspacePanelMinWidth: number;
+  workspacePanelMaxWidth: number;
+}): number {
+  if (groupWidth === null || !Number.isFinite(groupWidth)) {
+    return workspacePanelMaxWidth;
+  }
+
+  const availableWidth = Math.round(groupWidth) - mainMinWidth;
+  return Math.min(workspacePanelMaxWidth, Math.max(workspacePanelMinWidth, availableWidth));
+}
+
 /**
  * The native window minimum width keeps the readable main column visible alongside whatever
  * horizontal chrome sits outside it (the left sidebar at its current width, its resize handle, and
