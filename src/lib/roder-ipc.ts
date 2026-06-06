@@ -29,6 +29,11 @@ import type {
   SpeechTranscribeResult,
   Workspace,
   WorkspaceChangesListResult,
+  WorkspaceFilesChildrenResult,
+  WorkspaceFilesQueryResult,
+  WorkspaceFilesReadResult,
+  WorkspaceFilesRebuildResult,
+  WorkspaceFilesStatusResult,
   WorkspaceRoot,
 } from "@/types/roder";
 
@@ -95,6 +100,32 @@ export type WorkspaceUpdateResult = {
 
 export type WorkspaceForgetResult = {
   forgotten: boolean;
+};
+
+export type WorkspaceFilesStatusParams = {
+  workspaceId: string;
+  rootId?: string;
+};
+
+export type WorkspaceFilesChildrenParams = {
+  workspaceId: string;
+  rootId?: string;
+  path?: string;
+};
+
+export type WorkspaceFilesQueryParams = {
+  workspaceId: string;
+  rootId?: string;
+  query: string;
+  limit?: number;
+};
+
+export type WorkspaceFilesReadParams = {
+  workspaceId: string;
+  rootId: string;
+  path: string;
+  offset?: number;
+  limit?: number;
 };
 
 export type ProviderSelectResult = {
@@ -218,6 +249,37 @@ export const roderIpc = {
   readDirectory: (path: string) =>
     window.roderDesktop.request("fs/readDirectory", { path }) as Promise<FileSystemReadDirectoryResult>,
   readFile: (path: string) => window.roderDesktop.request("fs/readFile", { path }) as Promise<FileSystemReadFileResult>,
+  workspaceFilesStatus: (params: WorkspaceFilesStatusParams) =>
+    window.roderDesktop.request("workspace/files/status", {
+      workspaceId: params.workspaceId,
+      rootId: params.rootId || undefined,
+    }) as Promise<WorkspaceFilesStatusResult>,
+  rebuildWorkspaceFiles: (params: WorkspaceFilesStatusParams) =>
+    window.roderDesktop.request("workspace/files/rebuild", {
+      workspaceId: params.workspaceId,
+      rootId: params.rootId || undefined,
+    }) as Promise<WorkspaceFilesRebuildResult>,
+  listWorkspaceFileChildren: (params: WorkspaceFilesChildrenParams) =>
+    window.roderDesktop.request("workspace/files/children", {
+      workspaceId: params.workspaceId,
+      rootId: params.rootId || undefined,
+      path: params.path || undefined,
+    }) as Promise<WorkspaceFilesChildrenResult>,
+  queryWorkspaceFiles: (params: WorkspaceFilesQueryParams) =>
+    window.roderDesktop.request("workspace/files/query", {
+      workspaceId: params.workspaceId,
+      rootId: params.rootId || undefined,
+      query: params.query,
+      limit: params.limit,
+    }) as Promise<WorkspaceFilesQueryResult>,
+  readWorkspaceFile: (params: WorkspaceFilesReadParams) =>
+    window.roderDesktop.request("workspace/files/read", {
+      workspaceId: params.workspaceId,
+      rootId: params.rootId,
+      path: params.path,
+      offset: params.offset,
+      limit: params.limit,
+    }) as Promise<WorkspaceFilesReadResult>,
   listThreads: (limit = 100) => window.roderDesktop.request("thread/list", { limit }) as Promise<ThreadListResult>,
   readThread: (threadId: string) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,

@@ -42,7 +42,7 @@ export function NativeModelPicker({
 
   return (
     <section
-      className="pointer-events-auto absolute inset-x-0 bottom-full mb-2 mx-auto w-full max-w-3xl px-8"
+      className="pointer-events-auto absolute inset-x-0 bottom-full mb-2 mx-auto w-full max-w-3xl px-5"
       aria-label="Choose model"
     >
       <CompletionMenuShell>

@@ -119,14 +119,9 @@ export function renderRightWorkspacePanel(
     );
   }
   if (panel === "files") {
-    const workspaceKey = context.activeWorkspaceRoots.map((root) => `${root.id}:${root.path}`).join("|");
-    const filesystemKey =
-      context.appServerMethods.includes("fs/readDirectory") && context.appServerMethods.includes("fs/readFile")
-        ? "fs-ready"
-        : "fs-unavailable";
     return (
       <FilePanel
-        key={`${context.activeWorkspaceRef.workspaceId}:${context.activeWorkspaceRef.rootId}:${workspaceKey}:${filesystemKey}`}
+        workspaceId={context.activeWorkspaceRef.workspaceId}
         roots={context.activeWorkspaceRoots}
         selectedRootId={context.activeWorkspaceRef.rootId}
         appServerMethods={context.appServerMethods}

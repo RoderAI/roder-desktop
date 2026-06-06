@@ -307,6 +307,65 @@ test("staging a new thread keeps the clicked project when a previous thread read
   expect(useRoderStore.getState().selectedRootId).toBe("");
 });
 
+test("switching projects after another thread in the same project updates workspace selection immediately", async () => {
+  let resolveProjectBRead: ((value: unknown) => void) | undefined;
+  const projectAThread1 = storeThread("thread-a-1", "ws-a", "root-a", "/work/project-a");
+  const projectAThread2 = storeThread("thread-a-2", "ws-a", "root-a", "/work/project-a");
+  const projectBThread1 = storeThread("thread-b-1", "ws-b", "root-b", "/work/project-b");
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>((method, params) => {
+    const threadId = (params as { threadId?: string } | undefined)?.threadId;
+    if (method === "thread/read" && threadId === "thread-a-2") {
+      return Promise.resolve({ thread: projectAThread2 });
+    }
+    if (method === "thread/read" && threadId === "thread-b-1") {
+      return new Promise((resolve) => {
+        resolveProjectBRead = resolve;
+      });
+    }
+    if (method === "thread/goal/get") {
+      return Promise.resolve({ goal: null });
+    }
+    return Promise.resolve({});
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: projectAThread1.id,
+    selectedWorkspaceCwd: projectAThread1.cwd,
+    selectedWorkspaceId: projectAThread1.workspaceId ?? "",
+    selectedRootId: projectAThread1.rootId ?? "",
+    threads: [projectAThread1, projectAThread2, projectBThread1],
+    threadDetails: { [projectAThread1.id]: projectAThread1 },
+    workspaces: [
+      {
+        id: "ws-a",
+        name: "project-a",
+        roots: [{ id: "root-a", path: "/work/project-a", name: "project-a" }],
+        defaultRootId: "root-a",
+        updatedAt: 1770000100,
+      },
+      {
+        id: "ws-b",
+        name: "project-b",
+        roots: [{ id: "root-b", path: "/work/project-b", name: "project-b" }],
+        defaultRootId: "root-b",
+        updatedAt: 1770000200,
+      },
+    ],
+  });
+
+  await useRoderStore.getState().selectThread(projectAThread2.id, { pushHistory: false });
+  const selectingProjectB = useRoderStore.getState().selectThread(projectBThread1.id, { pushHistory: false });
+
+  expect(useRoderStore.getState().activeThreadId).toBe(projectBThread1.id);
+  expect(useRoderStore.getState().selectedWorkspaceCwd).toBe(projectBThread1.cwd);
+  expect(useRoderStore.getState().selectedWorkspaceId).toBe("ws-b");
+  expect(useRoderStore.getState().selectedRootId).toBe("root-b");
+
+  resolveProjectBRead?.({ thread: projectBThread1 });
+  await selectingProjectB;
+});
+
 test("bootstrap still loads core app data when workspace listing is unavailable", async () => {
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
     switch (method) {
@@ -925,3 +984,19 @@ test("goal notifications update the thread goal state", async () => {
 
   expect(useRoderStore.getState().threadGoalsByThread).toEqual({});
 });
+
+function storeThread(id: string, workspaceId: string, rootId: string, cwd: string) {
+  return {
+    id,
+    preview: id,
+    modelProvider: "openai",
+    model: "gpt-5.5",
+    createdAt: 1770000100,
+    updatedAt: 1770000100,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    workspaceId,
+    rootId,
+    cwd,
+    turns: [],
+  };
+}

@@ -1,4 +1,4 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useMatch, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryStates, type SetValues } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AppShellContextValue } from "@/components/app-shell-context";
@@ -14,9 +14,10 @@ import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
 import { commandInvocation, slashCommandLikeText, type CommandInvocation } from "@/lib/roder-commands";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import {
-  activeWorkspaceCwdForPathname,
+  activeWorkspaceContextForRoute,
   archiveRouteAfterThreadRemoval,
   defaultPluginsRoute,
+  isNewRoutePath,
   isPluginsRoutePath,
 } from "@/lib/route-selection";
 import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
@@ -33,7 +34,7 @@ import {
 } from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
 import { useCommandsStore } from "@/stores/commands-store";
-import type { DesktopAttachment, WorkspaceRoot } from "@/types/roder";
+import type { DesktopAttachment } from "@/types/roder";
 
 type AppShellController = {
   appShellContext: AppShellContextValue;
@@ -67,6 +68,7 @@ export function useAppShellController(): AppShellController {
     (update, options) => setRawRouteSearch((current) => mergeRouteSearchUpdate(current, update), options),
     [setRawRouteSearch],
   );
+  const threadRouteMatch = useMatch({ from: "/threads/$threadId", shouldThrow: false });
   useExtensionThemes();
   useThemeApplication(appearance);
   const [followSignal, setFollowSignal] = useState(0);
@@ -84,27 +86,37 @@ export function useAppShellController(): AppShellController {
   const selectedExtensionId = routeSearch.extension || null;
   const sidebarOpen = routeSearch.sidebar;
   const isPluginsRoute = isPluginsRoutePath(pathname);
-  const activeThread = threads.find((thread) => thread.id === activeThreadId);
+  const isNewRoute = isNewRoutePath(pathname);
+  const routeThreadId = threadRouteMatch?.params.threadId ?? "";
+  const routeActiveThreadId = routeThreadId || (isNewRoute ? "" : activeThreadId);
+  const activeThread = threads.find((thread) => thread.id === routeActiveThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
   const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
-  const activeWorkspaceCwd = activeWorkspaceCwdForPathname({
-    pathname,
-    activeThreadCwd: activeThread?.cwd,
-    selectedWorkspaceCwd,
-    statusCwd: status.cwd,
-  });
-  const activeWorkspaceRef = useMemo(
-    () => ({
-      workspaceId: activeThread?.workspaceId ?? agent.selectedWorkspaceId ?? "",
-      rootId: activeThread?.rootId ?? agent.selectedRootId ?? "",
-    }),
-    [activeThread?.rootId, activeThread?.workspaceId, agent.selectedRootId, agent.selectedWorkspaceId],
+  const activeWorkspaceContext = useMemo(
+    () =>
+      activeWorkspaceContextForRoute({
+        isNewRoute,
+        routeThread: activeThread,
+        selectedWorkspaceCwd,
+        selectedWorkspaceId: agent.selectedWorkspaceId,
+        selectedRootId: agent.selectedRootId,
+        statusCwd: status.cwd,
+        workspaces: agent.workspaces,
+      }),
+    [
+      activeThread,
+      agent.selectedRootId,
+      agent.selectedWorkspaceId,
+      agent.workspaces,
+      isNewRoute,
+      selectedWorkspaceCwd,
+      status.cwd,
+    ],
   );
-  const activeWorkspaceRoots = useMemo<WorkspaceRoot[]>(() => {
-    const workspace = agent.workspaces.find((candidate) => candidate.id === activeWorkspaceRef.workspaceId);
-    return workspace?.roots ?? [];
-  }, [activeWorkspaceRef.workspaceId, agent.workspaces]);
-  const hunkSummary = useThreadHunkSummary(activeThreadId, agent.hunkRevision);
+  const activeWorkspaceCwd = activeWorkspaceContext.cwd;
+  const activeWorkspaceRef = activeWorkspaceContext.ref;
+  const activeWorkspaceRoots = activeWorkspaceContext.roots;
+  const hunkSummary = useThreadHunkSummary(routeActiveThreadId, agent.hunkRevision);
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
@@ -118,7 +130,7 @@ export function useAppShellController(): AppShellController {
   const archiveThread = useCallback(
     (threadId: string) => {
       const target = archiveRouteAfterThreadRemoval({
-        activeThreadId,
+        activeThreadId: routeActiveThreadId,
         archivedThreadId: threadId,
         threads,
       });
@@ -134,7 +146,7 @@ export function useAppShellController(): AppShellController {
       }
       void archiveAgentThread(threadId);
     },
-    [activeThreadId, archiveAgentThread, navigate, threads],
+    [archiveAgentThread, navigate, routeActiveThreadId, threads],
   );
   const selectFolder = useCallback(
     (path: string) => {
@@ -221,7 +233,7 @@ export function useAppShellController(): AppShellController {
   useEffect(() => {
     setNativeCommandOutput(null);
     setNativeModelPickerOpen(false);
-  }, [activeThreadId]);
+  }, [routeActiveThreadId]);
 
   const hideNativeModelPicker = useCallback(() => {
     setNativeModelPickerOpen(false);
@@ -257,13 +269,13 @@ export function useAppShellController(): AppShellController {
         ipc: roderIpc,
         state: {
           activeThreadBusy,
-          activeThreadId,
+          activeThreadId: routeActiveThreadId,
           messages,
           models,
         },
       });
     },
-    [activeThreadBusy, activeThreadId, hideNativeModelPicker, messages, models, sendAgentPrompt, setSelectedModel],
+    [activeThreadBusy, hideNativeModelPicker, messages, models, routeActiveThreadId, sendAgentPrompt, setSelectedModel],
   );
 
   const runCommandOrNativeInvocation = useCallback(
@@ -438,7 +450,7 @@ export function useAppShellController(): AppShellController {
     appShellContext,
     layoutProps: {
       activeThread,
-      activeThreadId,
+      activeThreadId: routeActiveThreadId,
       activeThreadGoal: agent.activeThreadGoal,
       activePanel,
       activeWorkspaceCwd,

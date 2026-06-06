@@ -54,6 +54,15 @@ test("right workspace panel shell renders opened panel tabs and makes inactive p
   expect(html).toContain("Panel content: browser");
 });
 
+test("right workspace panel shell header can drag the native window without stealing tab controls", () => {
+  const html = renderShell({ tabs: ["files"], activePanel: "files" });
+
+  expect(html).toContain("drag-region");
+  expect(html).toContain("no-drag");
+  expect(html).toContain('aria-label="Add workspace panel"');
+  expect(html).toContain('aria-label="Files"');
+});
+
 test("right workspace panel shell does not pre-render unopened choices as tabs", () => {
   const html = renderShell({ tabs: ["browser"], activePanel: "browser" });
 
