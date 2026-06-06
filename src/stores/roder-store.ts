@@ -193,6 +193,30 @@ function threadForState(state: RoderStore, threadId: string): RoderThread | unde
   return state.threadDetails[threadId] ?? state.threads.find((thread) => thread.id === threadId);
 }
 
+function selectedThreadWorkspacePatch(state: RoderStore, thread: RoderThread | undefined): Partial<RoderStore> {
+  if (!thread) {
+    return {};
+  }
+  const workspaceSelection = resolveWorkspaceSelection(state.workspaces, {
+    workspaceId: thread.workspaceId,
+    rootId: thread.rootId,
+    path: thread.cwd,
+    baseCwd: state.status.cwd,
+  });
+  const selectedWorkspaceCwd = normalizeCwd(thread.cwd || workspaceSelection?.root.path || "", state.status.cwd);
+  const selectedWorkspaceId = thread.workspaceId ?? workspaceSelection?.workspace.id ?? state.selectedWorkspaceId;
+  const selectedRootId = thread.rootId ?? workspaceSelection?.root.id ?? state.selectedRootId;
+
+  return {
+    selectedWorkspaceCwd: selectedWorkspaceCwd || state.selectedWorkspaceCwd,
+    selectedWorkspaceId,
+    selectedRootId,
+    ...(selectedWorkspaceCwd
+      ? { workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, selectedWorkspaceCwd) }
+      : {}),
+  };
+}
+
 function upsertTurn(thread: RoderThread | undefined, incoming: RoderTurn): RoderThread | undefined {
   if (!thread) {
     return thread;
@@ -414,9 +438,12 @@ export const useRoderStore = create<RoderStore>()(
           await syncThreadGoal(threadId, set);
           return;
         }
+        const selectedThread = threadForState(current, threadId);
+        const selectedWorkspacePatch = selectedThreadWorkspacePatch(current, selectedThread);
 
         set({
           activeThreadId: threadId,
+          ...selectedWorkspacePatch,
           backStack:
             options.pushHistory && current.activeThreadId
               ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
