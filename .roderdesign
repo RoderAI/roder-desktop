@@ -1,0 +1,33 @@
+{
+  "version": "0.1",
+  "documentId": "design_b445ac7007d46a7c",
+  "title": "gode-desktop",
+  "createdAt": "2026-06-06T22:24:40.981558Z",
+  "updatedAt": "2026-06-06T22:24:40.981558Z",
+  "nodes": {
+    "frame-root": {
+      "id": "frame-root",
+      "type": "frame",
+      "name": "Frame",
+      "parentId": null,
+      "childIds": [],
+      "x": 0,
+      "y": 0,
+      "width": 800,
+      "height": 600,
+      "visible": true,
+      "fill": {
+        "kind": "color",
+        "value": "#ffffff"
+      }
+    }
+  },
+  "rootIds": [
+    "frame-root"
+  ],
+  "variables": {},
+  "assets": {},
+  "metadata": {
+    "workspaceRoot": "/Users/pz/w/gode-desktop"
+  }
+}

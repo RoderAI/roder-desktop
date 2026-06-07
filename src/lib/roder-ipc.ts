@@ -2,6 +2,16 @@ import type {
   CommandsListResult,
   CommandsRunResult,
   DesktopAttachment,
+  DesignDocumentResult,
+  DesignEditorStateResult,
+  DesignExportNodesResult,
+  DesignGuidelinesResult,
+  DesignPatchOperation,
+  DesignPatchResult,
+  DesignScreenshotResult,
+  DesignSpawnAgentsResult,
+  DesignSnapshotLayoutResult,
+  DesignVariablesResult,
   FileSystemReadDirectoryResult,
   FileSystemReadFileResult,
   AgentsListResult,
@@ -249,6 +259,7 @@ export const roderIpc = {
   readDirectory: (path: string) =>
     window.roderDesktop.request("fs/readDirectory", { path }) as Promise<FileSystemReadDirectoryResult>,
   readFile: (path: string) => window.roderDesktop.request("fs/readFile", { path }) as Promise<FileSystemReadFileResult>,
+
   workspaceFilesStatus: (params: WorkspaceFilesStatusParams) =>
     window.roderDesktop.request("workspace/files/status", {
       workspaceId: params.workspaceId,
@@ -280,6 +291,81 @@ export const roderIpc = {
       offset: params.offset,
       limit: params.limit,
     }) as Promise<WorkspaceFilesReadResult>,
+  readDesign: (workspaceId: string, rootId?: string) =>
+    window.roderDesktop.request("design/read", {
+      workspaceId,
+      rootId: rootId || undefined,
+    }) as Promise<DesignDocumentResult>,
+  patchDesign: (workspaceId: string, rootId: string | undefined, operations: DesignPatchOperation[]) =>
+    window.roderDesktop.request("design/patch", {
+      workspaceId,
+      rootId: rootId || undefined,
+      operations,
+    }) as Promise<DesignPatchResult>,
+  designVariables: (workspaceId: string, rootId?: string) =>
+    window.roderDesktop.request("design/get_variables", {
+      workspaceId,
+      rootId: rootId || undefined,
+    }) as Promise<DesignVariablesResult>,
+  designSetVariables: (
+    workspaceId: string,
+    rootId: string | undefined,
+    variables: Record<string, unknown>,
+    replace = false,
+  ) =>
+    window.roderDesktop.request("design/set_variables", {
+      workspaceId,
+      rootId: rootId || undefined,
+      variables,
+      replace,
+    }) as Promise<DesignPatchResult>,
+  designSetSelection: (workspaceId: string, rootId: string | undefined, selectedNodeIds: string[]) =>
+    window.roderDesktop.request("design/set_selection", {
+      workspaceId,
+      rootId: rootId || undefined,
+      selectedNodeIds,
+    }) as Promise<DesignEditorStateResult>,
+  designSnapshotLayout: (workspaceId: string, rootId?: string) =>
+    window.roderDesktop.request("design/snapshot_layout", {
+      workspaceId,
+      rootId: rootId || undefined,
+    }) as Promise<DesignSnapshotLayoutResult>,
+  designGuidelines: (workspaceId: string, rootId?: string) =>
+    window.roderDesktop.request("design/get_guidelines", {
+      workspaceId,
+      rootId: rootId || undefined,
+    }) as Promise<DesignGuidelinesResult>,
+  designExportNodes: (workspaceId: string, rootId: string | undefined, nodeIds: string[], outputDir?: string) =>
+    window.roderDesktop.request("design/export_nodes", {
+      workspaceId,
+      rootId: rootId || undefined,
+      nodeIds,
+      outputDir: outputDir || undefined,
+      format: "svg",
+    }) as Promise<DesignExportNodesResult>,
+  designGetScreenshot: (workspaceId: string, rootId: string | undefined, nodeId?: string) =>
+    window.roderDesktop.request("design/get_screenshot", {
+      workspaceId,
+      rootId: rootId || undefined,
+      nodeId: nodeId || undefined,
+      format: "svg",
+    }) as Promise<DesignScreenshotResult>,
+  designSpawnAgents: (
+    workspaceId: string,
+    rootId: string | undefined,
+    scopeNodeIds: string[],
+    options: { prompt?: string; allowPatch: boolean; allowExport: boolean; requireReview: boolean },
+  ) =>
+    window.roderDesktop.request("design/spawn_agents", {
+      workspaceId,
+      rootId: rootId || undefined,
+      scopeNodeIds,
+      prompt: options.prompt || undefined,
+      allowPatch: options.allowPatch,
+      allowExport: options.allowExport,
+      requireReview: options.requireReview,
+    }) as Promise<DesignSpawnAgentsResult>,
+
   listThreads: (limit = 100) => window.roderDesktop.request("thread/list", { limit }) as Promise<ThreadListResult>,
   readThread: (threadId: string) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,

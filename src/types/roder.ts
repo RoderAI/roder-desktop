@@ -846,6 +846,133 @@ export type VcsChangesReadResult = {
   binary: boolean;
 };
 
+export type RoderDesignNode = {
+  id: string;
+  type: string;
+  name: string;
+  parentId?: string | null;
+  childIds?: string[];
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number | null;
+  opacity?: number | null;
+  visible?: boolean | null;
+  locked?: boolean | null;
+  fill?: unknown;
+  stroke?: unknown;
+  [key: string]: unknown;
+};
+
+export type RoderDesignDocument = {
+  version: string;
+  documentId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  nodes: Record<string, RoderDesignNode>;
+  rootIds: string[];
+  variables: Record<string, unknown>;
+  assets: Record<string, unknown>;
+  metadata: {
+    workspaceId?: string | null;
+    rootId?: string | null;
+    workspaceRoot?: string | null;
+    selectedNodeIds?: string[];
+  };
+};
+
+export type DesignDocumentResult = {
+  path: string;
+  document: RoderDesignDocument;
+};
+
+export type DesignPatchOperation =
+  | { op: "insert_node"; parentId?: string | null; index?: number; node: RoderDesignNode }
+  | { op: "update_node"; nodeId: string; patch: Partial<RoderDesignNode> }
+  | { op: "delete_node"; nodeId: string; recursive?: boolean }
+  | { op: "reorder_node"; nodeId: string; index: number }
+  | { op: "set_variables"; variables: Record<string, unknown>; replace?: boolean };
+
+export type DesignPatchResult = DesignDocumentResult & {
+  applied: number;
+};
+
+export type DesignLayoutNode = {
+  id: string;
+  type: string;
+  name: string;
+  parentId?: string | null;
+  childIds: string[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  problems: string[];
+};
+
+export type DesignSnapshotLayoutResult = {
+  path: string;
+  nodes: DesignLayoutNode[];
+};
+
+export type DesignVariablesResult = {
+  path: string;
+  variables: Record<string, unknown>;
+};
+
+export type DesignNodeAlias = {
+  alias: string;
+  nodeId: string;
+  name: string;
+  type: string;
+};
+
+export type DesignEditorStateResult = DesignDocumentResult & {
+  selectedNodeIds?: string[];
+  nodeAliases?: DesignNodeAlias[];
+  schema?: unknown;
+  rules?: string | null;
+};
+
+export type DesignBatchGetResult = {
+  path: string;
+  nodes: RoderDesignNode[];
+  nodeAliases?: DesignNodeAlias[];
+};
+
+export type DesignGuidelinesResult = {
+  categories: Array<{ name: string; description: string; guidelines: string[] }>;
+};
+
+export type DesignExportNodesResult = {
+  exported: Array<{ nodeId: string; path: string }>;
+};
+
+export type DesignScreenshotResult = {
+  path: string;
+  nodeId?: string | null;
+  mimeType: string;
+  dataUrl: string;
+};
+
+export type DesignSpawnAgentsResult = {
+  path: string;
+  planned: Array<{
+    alias: string;
+    scopeNodeId: string;
+    scopeName: string;
+    type: string;
+    childCount: number;
+    prompt: string;
+  }>;
+  allowPatch: boolean;
+  allowExport: boolean;
+  requireReview: boolean;
+  instructions: string;
+};
+
 export type AppCommand = {
   command: "newProject" | "newThread" | "openSettings";
 };

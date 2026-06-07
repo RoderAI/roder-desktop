@@ -1,7 +1,8 @@
-import { Files, GitCompareArrows, Globe2, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
+import { Files, GitCompareArrows, Globe2, LayoutTemplate, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
 import type React from "react";
 import { BrowserPanel } from "@/components/browser-panel";
 import { CanvasPanel } from "@/components/canvas-panel";
+import { DesignCanvasPanel } from "@/components/design-canvas/design-canvas-panel";
 import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
 import { FilePanel } from "@/components/file-panel";
 import { ReviewPanel } from "@/components/review-panel";
@@ -29,6 +30,12 @@ export const rightWorkspacePanelEntries: RightWorkspacePanelEntry[] = [
     title: "Canvas",
     description: "Sketch and annotate",
     icon: <Paintbrush />,
+  },
+  {
+    id: "design",
+    title: "Design",
+    description: "AI design canvas",
+    icon: <LayoutTemplate />,
   },
   {
     id: "review",
@@ -68,6 +75,7 @@ export type RightWorkspacePanelRenderContext = {
   onAttachToComposer: (attachment: DesktopAttachment) => void;
   onReviewPathChange: (path: string) => void;
   onReviewScopeChange: (scope: RouteReviewScope, turnId?: string) => void;
+  onSendPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
   onSelectedExtensionPanelChange: (extensionPanel: string) => void;
 };
 
@@ -89,6 +97,19 @@ export function renderRightWorkspacePanel(
   }
   if (panel === "canvas") {
     return <CanvasPanel onAttach={context.onAttachToComposer} />;
+  }
+  if (panel === "design") {
+    const activeRoot = context.activeWorkspaceRoots.find((root) => root.id === context.activeWorkspaceRef.rootId);
+    return (
+      <DesignCanvasPanel
+        workspaceId={context.activeWorkspaceRef.workspaceId}
+        rootId={context.activeWorkspaceRef.rootId}
+        workspaceRootPath={activeRoot?.path ?? context.activeWorkspaceCwd}
+        appServerMethods={context.appServerMethods}
+        onAttach={context.onAttachToComposer}
+        onSendPrompt={context.onSendPrompt}
+      />
+    );
   }
   if (panel === "review") {
     return (

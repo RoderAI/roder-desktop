@@ -269,6 +269,23 @@ Review, hunks, workflow imports, media, memory, and speech:
 | `speech/providers/list`    | Discover available speech transcription providers.          |
 | `speech/transcribe`        | Transcribe an audio recording to text.                      |
 
+Design Canvas:
+
+| Method                    | Purpose                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| `design/read`             | Read or create the `~/.roder/design/<project-slug>-<project-id>.roderdesign` document.              |
+| `design/get_editor_state` | Read document summary, rules, and current editor state.                                             |
+| `design/batch_get`        | Read/search design nodes by ids, patterns, parent, and depth.                                       |
+| `design/patch`            | Apply typed design mutations and persist `~/.roder/design/<project-slug>-<project-id>.roderdesign`. |
+| `design/get_variables`    | Read design variables/tokens.                                                                       |
+| `design/set_variables`    | Merge or replace design variables/tokens.                                                           |
+| `design/set_selection`    | Persist current Design panel selection and notify agents.                                           |
+| `design/snapshot_layout`  | Validate node geometry and return layout diagnostics.                                               |
+| `design/get_guidelines`   | Read agent-facing design guidelines.                                                                |
+| `design/get_screenshot`   | Return an SVG screenshot data URL for the document or node.                                         |
+| `design/export_nodes`     | Export selected nodes as SVG files.                                                                 |
+| `design/spawn_agents`     | Plan scoped design-agent lanes for container node ids.                                              |
+
 ## Detailed Method Reference
 
 ### `initialize`
@@ -616,7 +633,7 @@ Behavior:
 
 - Lists persisted runtime threads sorted by newest `updatedAt` first.
 - Applies `limit` when supplied.
-- Merges in protocol threads that are in memory but not yet persisted.
+- Merges in protocol threads that are in memory but not yet persisted to disk.
 - Cursor fields are currently always null.
 
 ### `thread/read`
@@ -1820,6 +1837,125 @@ Behavior:
   provider/model from config, defaulting to OpenAI
   `text-embedding-3-large`.
 - `memory/provider/set` writes config and emits `memory/providerChanged`.
+
+### Design Canvas methods
+
+Purpose: Read, mutate, validate, export, and agent-orchestrate the structured
+workspace Design Canvas document. These methods operate on the active
+`~/.roder/design/<project-slug>-<project-id>.roderdesign` file and are separate from the freehand `canvas`
+panel.
+
+Common request fields:
+
+```json
+{
+  "workspaceId": "ws_abc123",
+  "rootId": "root_abc123"
+}
+```
+
+Behavior:
+
+- `workspaceId` is required. `rootId` is optional and defaults to the workspace
+  default root.
+- `design/read` creates `~/.roder/design/<project-slug>-<project-id>.roderdesign` when absent and returns
+  `{ "path", "document" }`.
+- `design/get_editor_state` returns a compact document/editor summary,
+  including `selectedNodeIds`, for agents that should inspect state before
+  reading or patching nodes.
+- `design/batch_get` combines explicit `nodeIds`, pattern search, `parentId`,
+  `readDepth`, and `searchDepth` into one bounded node read. Aliases such as `n3` are accepted anywhere a node id is accepted and are returned in `nodeAliases`.
+- `design/patch` accepts typed operations only:
+  `insert_node`, `update_node`, `delete_node`, `reorder_node`, and
+  `set_variables`. It writes the document atomically and returns
+  `{ "path", "document", "applied" }`.
+- `design/get_variables` returns the document token map.
+- `design/set_variables` merges or replaces the document token map and emits the
+  same document-changed notification shape as `design/patch`.
+- `design/set_selection` persists the current selected node ids in document
+  metadata and emits `design/selectionChanged` with `selectedNodeIds`.
+- `design/snapshot_layout` returns one geometry record per node plus layout
+  problems such as invalid sizes or broken parent/child references.
+- `design/get_guidelines` returns agent-facing design guidance categories.
+- `design/get_screenshot` returns `{ "mimeType": "image/svg+xml", "dataUrl" }`
+  for either `nodeId` or the whole document. It is a server-side SVG fallback;
+  renderer-exact raster capture can be layered on later if needed.
+- `design/export_nodes` exports selected nodes to SVG files and returns
+  `{ "exported": [{ "nodeId", "path" }] }`. Successful exports emit
+  `design/exportCompleted` with document/workspace identifiers and the exported
+  node records.
+- `design/spawn_agents` validates frame/container scopes and returns a launch
+  plan for scoped Roder design agents. It does not itself start desktop turns;
+  Desktop uses the result to build safe multi-agent handoffs.
+
+Example `design/patch` request:
+
+```json
+{
+  "workspaceId": "ws_abc123",
+  "rootId": "root_abc123",
+  "operations": [
+    {
+      "op": "insert_node",
+      "parentId": null,
+      "node": {
+        "id": "frame-login",
+        "type": "frame",
+        "name": "Login frame",
+        "childIds": [],
+        "x": 80,
+        "y": 80,
+        "width": 390,
+        "height": 640,
+        "visible": true
+      }
+    }
+  ]
+}
+```
+
+Example `design/spawn_agents` request:
+
+```json
+{
+  "workspaceId": "ws_abc123",
+  "rootId": "root_abc123",
+  "scopeNodeIds": ["frame-login", "frame-dashboard"],
+  "prompt": "Improve visual hierarchy and accessibility.",
+  "allowPatch": true,
+  "allowExport": true,
+  "requireReview": true
+}
+```
+
+Example `design/spawn_agents` response:
+
+```json
+{
+  "path": "/Users/pz/.roder/design/gode-desktop-project_6d8f2a1b9c0e4d31.roderdesign",
+  "planned": [
+    {
+      "scopeNodeId": "frame-login",
+      "scopeName": "Login frame",
+      "type": "frame",
+      "childCount": 6,
+      "prompt": "Improve visual hierarchy and accessibility."
+    }
+  ],
+  "allowPatch": true,
+  "allowExport": true,
+  "requireReview": true,
+  "instructions": "Use design/get_editor_state first, combine reads with design/batch_get, mutate only with typed design/patch operations, and run design/snapshot_layout after structural edits."
+}
+```
+
+Errors:
+
+- Missing or unknown workspace/root resolution returns code `-32000`.
+- Unknown node ids and invalid patch operations return code `-32602` or
+  `-32000` depending on whether decoding or document mutation failed.
+- `design/spawn_agents` rejects non-container scopes. Valid scopes are frames,
+  groups, components, and instances.
 
 ## Streaming and Notifications
 

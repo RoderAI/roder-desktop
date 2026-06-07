@@ -227,6 +227,9 @@ function skillCompletionMatchRank(skill: SkillDescriptor, query: string): number
   if (index.name === query) {
     return 0;
   }
+  if (isDesignModeQuery(query) && skillIsDesignMode(skill, query)) {
+    return 0.25;
+  }
   if (index.name.startsWith(query)) {
     return 1;
   }
@@ -250,6 +253,20 @@ function skillCompletionMatchRank(skill: SkillDescriptor, query: string): number
   }
 
   return index.metadata.includes(query) ? 7 : null;
+}
+
+function isDesignModeQuery(query: string): boolean {
+  return query === "design" || query === "roder" || "roder-design-mode".startsWith(query);
+}
+
+function skillIsDesignMode(skill: SkillDescriptor, query: string): boolean {
+  if (skill.name === "design") {
+    return query === "design";
+  }
+  if (skill.name === "roder-design-mode") {
+    return true;
+  }
+  return (skill.agentMetadata?.dependencies ?? []).some((dependency) => dependency.startsWith("design_"));
 }
 
 function skillSearchIndex(skill: SkillDescriptor): SkillSearchIndex {

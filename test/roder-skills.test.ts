@@ -76,6 +76,31 @@ test("completion matches return every matching skill", () => {
   expect(matchingSkillCompletions(skills, "react").map((item) => item.name)).toHaveLength(12);
 });
 
+test("design mode is prioritized for design and roder skill queries", () => {
+  const skills = [
+    skill({ name: "roder-app-server-docs", shortDescription: "Backend docs" }),
+    skill({ name: "roder-theming", shortDescription: "Desktop theming" }),
+    skill({
+      name: "roder-design-mode",
+      shortDescription: "Design Canvas workflow",
+      agentMetadata: { dependencies: ["design_patch", "design_batch_get"] },
+    }),
+    skill({
+      name: "design",
+      shortDescription: "Alias for Roder Design Mode",
+      agentMetadata: { dependencies: ["design_patch"] },
+    }),
+  ];
+
+  expect(matchingSkillCompletions(skills, "roder")[0]?.name).toBe("roder-design-mode");
+  expect(matchingSkillCompletions(skills, "roder-design")[0]?.name).toBe("roder-design-mode");
+  expect(
+    matchingSkillCompletions(skills, "design")
+      .map((item) => item.name)
+      .slice(0, 2),
+  ).toEqual(["design", "roder-design-mode"]);
+});
+
 test("detects and replaces the current dollar skill token", () => {
   const text = "Please use $ai";
   const token = skillCompletionToken(text, text.length);
