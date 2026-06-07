@@ -368,8 +368,8 @@ export const roderIpc = {
 
   listThreads: (limit = 50, cursor?: string | null) =>
     window.roderDesktop.request("thread/list", { limit, cursor: cursor || undefined }) as Promise<ThreadListResult>,
-  readThread: (threadId: string) =>
-    window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
+  readThread: (threadId: string, includeTurns = true) =>
+    window.roderDesktop.request("thread/read", { threadId, includeTurns }) as Promise<ThreadReadResult>,
   threadGoal: (threadId: string) =>
     window.roderDesktop.request("thread/goal/get", { threadId }) as Promise<ThreadGoalGetResult>,
   createGoal: (threadId: string, objective: string) =>

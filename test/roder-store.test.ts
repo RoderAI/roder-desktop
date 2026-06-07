@@ -161,6 +161,75 @@ test("changing selected policy mode applies it to the running thread immediately
   ]);
 });
 
+
+test("bootstrap does not wait for full active transcript read", async () => {
+  const threadReadParams: unknown[] = [];
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    switch (method) {
+      case "thread/list":
+        return {
+          data: [
+            {
+              id: "thread-active",
+              preview: "Active thread",
+              modelProvider: "openai",
+              model: "gpt-5.5",
+              createdAt: 1770000200,
+              updatedAt: 1770000200,
+              status: { type: "idle", activeTurnId: null, activeFlags: [] },
+              workspaceId: null,
+              rootId: null,
+              cwd: "/workspace",
+            },
+          ],
+          nextCursor: null,
+          backwardsCursor: null,
+        };
+      case "model/list":
+        return { models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }] };
+      case "settings/get":
+        return {
+          default_provider: "openai",
+          default_model: "gpt-5.5",
+          default_reasoning: "medium",
+          default_mode: "accept_all",
+        };
+      case "workspace/list":
+        return { workspaces: [] };
+      case "thread/read":
+        threadReadParams.push(params);
+        return {
+          thread: {
+            id: "thread-active",
+            preview: "Active thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            createdAt: 1770000200,
+            updatedAt: 1770000200,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: null,
+            rootId: null,
+            cwd: "/workspace",
+          },
+        };
+      case "thread/goal/get":
+        return { goal: null };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({ activeThreadId: "", threads: [], threadDetails: {} });
+
+  await expect(useRoderStore.getState().bootstrap()).resolves.toBeUndefined();
+
+  expect(useRoderStore.getState().hydrated).toBe(true);
+  expect(useRoderStore.getState().busy).toBe(false);
+  expect(useRoderStore.getState().activeThreadId).toBe("thread-active");
+  await vi.waitFor(() => expect(threadReadParams.length).toBe(1));
+  expect(threadReadParams[0]).toEqual({ threadId: "thread-active", includeTurns: false });
+});
+
 test("new threads use the current cwd instead of an unmatched stale workspace", async () => {
   const currentCwd = "/Users/example/gode-desktop";
   const staleCwd = "/private/var/folders/example/roder-thread-cwd-123/process-workspace";

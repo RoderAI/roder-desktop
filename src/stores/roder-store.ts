@@ -85,7 +85,7 @@ type RoderStore = {
   bootstrap: () => Promise<void>;
   refreshThreads: () => Promise<void>;
   loadMoreThreads: () => Promise<void>;
-  selectThread: (threadId: string, options?: { pushHistory?: boolean }) => Promise<void>;
+  selectThread: (threadId: string, options?: { pushHistory?: boolean; deferRead?: boolean }) => Promise<void>;
   archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
   goForward: () => Promise<void>;
@@ -422,7 +422,7 @@ export const useRoderStore = create<RoderStore>()(
           });
 
           if (activeThreadId) {
-            await get().selectThread(activeThreadId, { pushHistory: false });
+            void get().selectThread(activeThreadId, { pushHistory: false, deferRead: true });
           }
         } catch (error) {
           set({
@@ -492,7 +492,10 @@ export const useRoderStore = create<RoderStore>()(
         }
 
         try {
-          const [result, goalResult] = await Promise.all([roderIpc.readThread(threadId), readThreadGoal(threadId)]);
+          const [result, goalResult] = await Promise.all([
+            roderIpc.readThread(threadId, !options.deferRead),
+            readThreadGoal(threadId),
+          ]);
           if (!result.thread) {
             throw new Error("roder app-server did not return a thread");
           }
