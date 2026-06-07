@@ -139,6 +139,7 @@ export type RoderThread = {
   rootId?: string | null;
   cwd: string;
   name?: string | null;
+  messageCount?: number | null;
   turns?: RoderTurn[];
 };
 

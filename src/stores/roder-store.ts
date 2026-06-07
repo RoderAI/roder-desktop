@@ -54,6 +54,8 @@ type RoderStore = {
   stderr: string[];
   threads: RoderThread[];
   threadDetails: Record<string, RoderThread>;
+  nextThreadCursor: string | null;
+  loadingMoreThreads: boolean;
   threadGoalsByThread: Record<string, RoderThreadGoal>;
   threadControlsByThread: Record<string, ThreadControlState>;
   hunkRevisionByThread: Record<string, number>;
@@ -82,6 +84,7 @@ type RoderStore = {
   error: string | null;
   bootstrap: () => Promise<void>;
   refreshThreads: () => Promise<void>;
+  loadMoreThreads: () => Promise<void>;
   selectThread: (threadId: string, options?: { pushHistory?: boolean }) => Promise<void>;
   archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
@@ -319,6 +322,8 @@ export const useRoderStore = create<RoderStore>()(
       stderr: [],
       threads: [],
       threadDetails: {},
+      nextThreadCursor: null,
+      loadingMoreThreads: false,
       threadGoalsByThread: {},
       threadControlsByThread: {},
       hunkRevisionByThread: {},
@@ -352,7 +357,7 @@ export const useRoderStore = create<RoderStore>()(
           const readyStatus = await roderIpc.start();
           const [status, threadResult, modelResult, settings, workspaceResult] = await Promise.all([
             roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
-            roderIpc.listThreads(100),
+            roderIpc.listThreads(50),
             roderIpc.listModels(),
             roderIpc.settings(),
             listWorkspacesForBootstrap(),
@@ -393,6 +398,8 @@ export const useRoderStore = create<RoderStore>()(
           set({
             status,
             threads,
+            nextThreadCursor: threadResult.nextCursor ?? null,
+            loadingMoreThreads: false,
             models,
             visibleModelIds,
             defaultModel: currentSelectedModel,
@@ -428,8 +435,36 @@ export const useRoderStore = create<RoderStore>()(
       },
 
       refreshThreads: async () => {
-        const result = await roderIpc.listThreads(100);
-        set({ threads: realThreads(normalizeThreadsCwd(result.data ?? [], get().status.cwd)) });
+        const result = await roderIpc.listThreads(50);
+        set({
+          threads: realThreads(normalizeThreadsCwd(result.data ?? [], get().status.cwd)),
+          nextThreadCursor: result.nextCursor ?? null,
+        });
+      },
+
+      loadMoreThreads: async () => {
+        const { nextThreadCursor, loadingMoreThreads, status } = get();
+        if (!nextThreadCursor || loadingMoreThreads) {
+          return;
+        }
+        set({ loadingMoreThreads: true });
+        try {
+          const result = await roderIpc.listThreads(50, nextThreadCursor);
+          const incoming = realThreads(normalizeThreadsCwd(result.data ?? [], status.cwd));
+          set((state) => {
+            const byId = new Map(state.threads.map((thread) => [thread.id, thread]));
+            for (const thread of incoming) {
+              byId.set(thread.id, thread);
+            }
+            return {
+              threads: realThreads(Array.from(byId.values())),
+              nextThreadCursor: result.nextCursor ?? null,
+              loadingMoreThreads: false,
+            };
+          });
+        } catch (error) {
+          set({ error: (error as Error).message, loadingMoreThreads: false });
+        }
       },
 
       selectThread: async (threadId, options = { pushHistory: true }) => {
