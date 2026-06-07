@@ -52,9 +52,11 @@ export const chromeSkill = {
 
 export function mergeDesktopBrowserTools(baseResult: unknown): ToolsListResult {
   const base = isToolsListResult(baseResult) ? baseResult : {};
+  const desktopTools = desktopBrowserToolSpecs();
+  const desktopToolNames = new Set(desktopTools.map((tool) => tool.name));
   return {
     ...base,
-    tools: [...(base.tools ?? []), ...desktopBrowserToolSpecs()],
+    tools: [...(base.tools ?? []).filter((tool) => !desktopToolNames.has(tool.name)), ...desktopTools],
   };
 }
 
@@ -93,7 +95,21 @@ export function browserToolThreadId(params: unknown): string | null {
 export function desktopBrowserToolName(params: unknown): string | undefined {
   const request = params as ToolsCallParams | undefined;
   const name = request?.tool_name ?? request?.name;
-  return name && desktopBrowserToolSpecs().some((tool) => tool.name === name) ? name : undefined;
+  return canonicalBrowserToolName(name);
+}
+
+export function canonicalBrowserToolName(name: unknown): string | undefined {
+  if (typeof name !== "string") {
+    return undefined;
+  }
+  const chromeAlias = chromeToolAliasByName[name];
+  if (chromeAlias) {
+    return chromeAlias;
+  }
+  if (desktopBrowserToolSpecs().some((tool) => tool.name === name)) {
+    return name;
+  }
+  return undefined;
 }
 
 export async function callDesktopBrowserTool(
@@ -126,8 +142,22 @@ export async function callChromeBrowserToolAlias(
   }
 }
 
+const chromeToolAliasByName: Record<string, string> = {
+  chrome_navigate: "browser_navigate",
+  chrome_tab_open: "browser_navigate",
+  chrome_page_snapshot: "browser_snapshot",
+  chrome_snapshot: "browser_snapshot",
+  chrome_click: "browser_click",
+  chrome_type: "browser_type",
+  chrome_keypress: "browser_keypress",
+  chrome_scroll: "browser_scroll",
+  chrome_eval: "browser_evaluate",
+  chrome_evaluate: "browser_evaluate",
+  chrome_screenshot: "browser_screenshot",
+};
+
 function desktopBrowserToolSpecs(): ToolSpec[] {
-  return [
+  const browserTools: ToolSpec[] = [
     {
       name: "browser_navigate",
       description: "Navigate the built-in Roder Desktop browser to a URL or search query.",
@@ -142,16 +172,25 @@ function desktopBrowserToolSpecs(): ToolSpec[] {
     },
     {
       name: "browser_click",
-      description: "Click a visible element in the built-in Roder Desktop browser by snapshot ref, CSS selector, or text.",
+      description:
+        "Click a visible element in the built-in Roder Desktop browser by snapshot ref, CSS selector, or text.",
       source: "desktop-browser",
-      input_schema: objectSchema({ ref: { type: "string" }, selector: { type: "string" }, text: { type: "string" } }, []),
+      input_schema: objectSchema(
+        { ref: { type: "string" }, selector: { type: "string" }, text: { type: "string" } },
+        [],
+      ),
     },
     {
       name: "browser_type",
       description: "Type text into an editable element in the built-in Roder Desktop browser.",
       source: "desktop-browser",
       input_schema: objectSchema(
-        { text: { type: "string" }, ref: { type: "string" }, selector: { type: "string" }, submit: { type: "boolean" } },
+        {
+          text: { type: "string" },
+          ref: { type: "string" },
+          selector: { type: "string" },
+          submit: { type: "boolean" },
+        },
         ["text"],
       ),
     },
@@ -159,7 +198,10 @@ function desktopBrowserToolSpecs(): ToolSpec[] {
       name: "browser_keypress",
       description: "Send a keyboard key to the built-in Roder Desktop browser.",
       source: "desktop-browser",
-      input_schema: objectSchema({ key: { type: "string", description: "Key name, such as Enter, Escape, or ArrowDown." } }, ["key"]),
+      input_schema: objectSchema(
+        { key: { type: "string", description: "Key name, such as Enter, Escape, or ArrowDown." } },
+        ["key"],
+      ),
     },
     {
       name: "browser_scroll",
@@ -180,9 +222,29 @@ function desktopBrowserToolSpecs(): ToolSpec[] {
       input_schema: objectSchema({}, []),
     },
   ];
+  return [...browserTools, ...desktopChromeAliasToolSpecs(browserTools)];
+}
+
+function desktopChromeAliasToolSpecs(browserTools: ToolSpec[]): ToolSpec[] {
+  const browserToolByName = new Map(browserTools.map((tool) => [tool.name, tool]));
+  return Object.entries(chromeToolAliasByName).flatMap(([chromeName, browserName]) => {
+    const browserTool = browserToolByName.get(browserName);
+    if (!browserTool) {
+      return [];
+    }
+    return [
+      {
+        ...browserTool,
+        name: chromeName,
+        description: `${browserTool.description} This desktop alias is backed by the built-in browser when $browser is active.`,
+        source: "desktop-browser",
+      },
+    ];
+  });
 }
 
 async function execute(browser: BrowserManager, toolName: string, input: JsonObject): Promise<unknown> {
+  browser.ensureVisible();
   switch (toolName) {
     case "browser_navigate": {
       const snapshot = browser.navigate(requiredString(input, "url"));
@@ -194,11 +256,19 @@ async function execute(browser: BrowserManager, toolName: string, input: JsonObj
     case "browser_click":
       return browser.click(optionalTarget(input));
     case "browser_type":
-      return browser.type({ ...optionalTarget(input), text: requiredString(input, "text"), submit: input.submit === true });
+      return browser.type({
+        ...optionalTarget(input),
+        text: requiredString(input, "text"),
+        submit: input.submit === true,
+      });
     case "browser_keypress":
       return browser.keypress(requiredString(input, "key"));
     case "browser_scroll":
-      return browser.scroll({ dx: optionalNumber(input, "dx"), dy: optionalNumber(input, "dy"), selector: optionalString(input, "selector") });
+      return browser.scroll({
+        dx: optionalNumber(input, "dx"),
+        dy: optionalNumber(input, "dy"),
+        selector: optionalString(input, "selector"),
+      });
     case "browser_evaluate":
       return browser.evaluate(requiredString(input, "expression"));
     case "browser_screenshot":
@@ -292,7 +362,11 @@ function optionalNumber(input: JsonObject, key: string): number | undefined {
 }
 
 function optionalTarget(input: JsonObject): { selector?: string; text?: string; ref?: string } {
-  return { selector: optionalString(input, "selector"), text: optionalString(input, "text"), ref: optionalString(input, "ref") };
+  return {
+    selector: optionalString(input, "selector"),
+    text: optionalString(input, "text"),
+    ref: optionalString(input, "ref"),
+  };
 }
 
 function compactObject<T extends Record<string, unknown>>(value: T): Record<string, unknown> {
@@ -304,7 +378,11 @@ function isToolsListResult(value: unknown): value is ToolsListResult {
 }
 
 function isSkillsListResult(value: unknown): value is { skills: unknown[]; diagnostics: unknown[] } {
-  return isRecord(value) && Array.isArray(value.skills) && (Array.isArray(value.diagnostics) || value.diagnostics === undefined);
+  return (
+    isRecord(value) &&
+    Array.isArray(value.skills) &&
+    (Array.isArray(value.diagnostics) || value.diagnostics === undefined)
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

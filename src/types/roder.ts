@@ -975,7 +975,7 @@ export type DesignSpawnAgentsResult = {
 };
 
 export type AppCommand = {
-  command: "newProject" | "newThread" | "openSettings";
+  command: "newProject" | "newThread" | "openSettings" | "openBrowser";
 };
 
 declare global {

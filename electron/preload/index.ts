@@ -91,7 +91,7 @@ export type AppServerEvent = {
 };
 
 export type AppCommand = {
-  command: "newProject" | "newThread" | "openSettings";
+  command: "newProject" | "newThread" | "openSettings" | "openBrowser";
 };
 
 const api = {
