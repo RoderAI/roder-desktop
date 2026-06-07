@@ -5,6 +5,7 @@ import type { IPty } from "node-pty";
 
 const require = createRequire(import.meta.url);
 const nodePty = require("node-pty") as typeof import("node-pty");
+const terminalName = "xterm-direct";
 
 export type TerminalSnapshot = {
   id: string;
@@ -26,15 +27,11 @@ export class TerminalManager extends EventEmitter {
 
     const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "zsh");
     const term = nodePty.spawn(shell, terminalShellArgs(shell, process.platform), {
-      name: "xterm-256color",
+      name: terminalName,
       cols: options.cols ?? 96,
       rows: options.rows ?? 28,
       cwd: options.cwd || process.cwd(),
-      env: {
-        ...process.env,
-        TERM_PROGRAM: "roder-desktop",
-        COLORTERM: "truecolor",
-      },
+      env: terminalEnvironment(),
     });
     const id = "primary";
     this.#session = { id, pty: term };
@@ -72,6 +69,25 @@ export class TerminalManager extends EventEmitter {
     this.#session.pty.kill();
     this.#session = null;
   }
+}
+
+export function terminalEnvironment(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return {
+    ...baseEnv,
+    TERM: terminalName,
+    TERM_PROGRAM: "roder-desktop",
+    COLORTERM: "truecolor",
+    TMUX_RGB: "1",
+    TMUX_TERMINAL_OVERRIDES: terminalOverrides(baseEnv.TMUX_TERMINAL_OVERRIDES),
+  };
+}
+
+export function terminalOverrides(existing?: string): string {
+  const truecolorOverride = `${terminalName}:Tc`;
+  if (!existing?.trim()) {
+    return truecolorOverride;
+  }
+  return existing.split(",").includes(truecolorOverride) ? existing : `${existing},${truecolorOverride}`;
 }
 
 export function terminalShellArgs(shell: string, platform: NodeJS.Platform = process.platform): string[] {

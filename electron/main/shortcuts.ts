@@ -1,6 +1,6 @@
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
-export type AppCommand = "newProject" | "newThread" | "openSettings";
+export type AppCommand = "newProject" | "newThread" | "openSettings" | "openBrowser";
 
 export type ShortcutInput = {
   type: string;

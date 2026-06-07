@@ -217,9 +217,13 @@ export function useAppShellController(): AppShellController {
       }
       if (appCommand.command === "openSettings") {
         void navigate({ to: "/settings/$section", params: { section: "general" }, search: true });
+        return;
+      }
+      if (appCommand.command === "openBrowser") {
+        void setRouteSearch((current) => openWorkspacePanelTab(current, "browser"));
       }
     });
-  }, [navigate, newProject, newThread]);
+  }, [navigate, newProject, newThread, setRouteSearch]);
   const attachToComposer = useCallback(
     (attachment: DesktopAttachment) => {
       setComposerAttachments((attachments) =>

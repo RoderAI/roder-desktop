@@ -55,11 +55,17 @@ export class BrowserManager {
 
   show(bounds: Rectangle): BrowserSnapshot {
     this.#ensureView();
-    this.#visible = true;
-    this.#window?.contentView.addChildView(this.#view!);
-    this.setBounds(bounds);
+    this.#showView(bounds);
     if (this.#view!.webContents.getURL() === "") {
       void this.#view!.webContents.loadURL(this.#url);
+    }
+    return this.snapshot();
+  }
+
+  ensureVisible(bounds?: Rectangle): BrowserSnapshot {
+    this.#ensureView();
+    if (!this.#visible) {
+      this.#showView(bounds ?? defaultBrowserBounds(this.#window));
     }
     return this.snapshot();
   }
@@ -236,6 +242,12 @@ export class BrowserManager {
     this.#visible = false;
   }
 
+  #showView(bounds: Rectangle): void {
+    this.#visible = true;
+    this.#window?.contentView.addChildView(this.#view!);
+    this.setBounds(bounds);
+  }
+
   #ensureView(): void {
     if (this.#view) {
       return;
@@ -384,6 +396,20 @@ function scrollElementScript(delta: { dx?: number; dy?: number; selector?: strin
   return true;
 })()
 `;
+}
+
+function defaultBrowserBounds(window: BrowserWindow | null): Rectangle {
+  const content = window?.getContentBounds();
+  if (!content) {
+    return { x: 0, y: 0, width: 640, height: 480 };
+  }
+  const width = Math.max(360, Math.floor(content.width * 0.4));
+  return {
+    x: Math.max(0, content.width - width),
+    y: 0,
+    width,
+    height: Math.max(240, content.height),
+  };
 }
 
 function canGoBack(webContents: WebContents): boolean {

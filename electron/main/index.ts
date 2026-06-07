@@ -426,9 +426,16 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     const browserToolName = desktopBrowserToolName(params);
     if (browserToolName) {
       const provider = browserProviderForParams(params);
+      if (provider === "builtIn") {
+        sendAppCommand("openBrowser");
+      }
       const result =
         provider === "chrome"
-          ? await callChromeBrowserToolAlias((nextMethod, nextParams) => roder.request(nextMethod, nextParams), browserToolName, params)
+          ? await callChromeBrowserToolAlias(
+              (nextMethod, nextParams) => roder.request(nextMethod, nextParams),
+              browserToolName,
+              params,
+            )
           : await callDesktopBrowserTool(browser, browserToolName, params);
       recordAppServerEvent(result.is_error ? "error" : "response", method, result);
       return result;
@@ -464,7 +471,6 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     throw error;
   }
 }
-
 
 function browserProviderForParams(params: unknown): BrowserToolProvider {
   const threadId = browserToolThreadId(params);
