@@ -59,6 +59,8 @@ export type AppShellLayoutProps = {
   folderOptions: FolderOption[];
   isPluginsRoute: boolean;
   hunkSummary: ThreadHunkSummary;
+  hasMoreThreads: boolean;
+  loadingMoreThreads: boolean;
   panelTabs: RouteWorkspacePanel[];
   reviewPath: string;
   reviewScope: RouteReviewScope;
@@ -75,6 +77,7 @@ export type AppShellLayoutProps = {
   threads: RoderThread[];
   workspacePanelOpen: boolean;
   onArchiveThread: (threadId: string) => void;
+  onLoadMoreThreads: () => void;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
   onCreateProject: (params: WorkspaceCreateParams) => void;
   onProjectConfigOpenChange: (open: boolean) => void;
@@ -110,6 +113,8 @@ export function AppShellLayout({
   folderOptions,
   isPluginsRoute,
   hunkSummary,
+  hasMoreThreads,
+  loadingMoreThreads,
   panelTabs,
   reviewPath,
   reviewScope,
@@ -126,6 +131,7 @@ export function AppShellLayout({
   threads,
   workspacePanelOpen,
   onArchiveThread,
+  onLoadMoreThreads,
   onAttachToComposer,
   onCreateProject,
   onProjectConfigOpenChange,
@@ -385,9 +391,12 @@ export function AppShellLayout({
           threads={threads}
           activeThreadId={activeThreadId}
           activeView={isPluginsRoute ? "plugins" : "chat"}
+          hasMoreThreads={hasMoreThreads}
+          loadingMoreThreads={loadingMoreThreads}
           reserveTitlebarSpace={!useWindowTopBar}
           onSelectThread={onSelectThread}
           onArchiveThread={onArchiveThread}
+          onLoadMoreThreads={onLoadMoreThreads}
           onNewProject={onNewProject}
           onNewThread={onNewThread}
           onNewThreadInFolder={onNewThreadInFolder}

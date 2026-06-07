@@ -366,7 +366,8 @@ export const roderIpc = {
       requireReview: options.requireReview,
     }) as Promise<DesignSpawnAgentsResult>,
 
-  listThreads: (limit = 100) => window.roderDesktop.request("thread/list", { limit }) as Promise<ThreadListResult>,
+  listThreads: (limit = 50, cursor?: string | null) =>
+    window.roderDesktop.request("thread/list", { limit, cursor: cursor || undefined }) as Promise<ThreadListResult>,
   readThread: (threadId: string) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns: true }) as Promise<ThreadReadResult>,
   threadGoal: (threadId: string) =>

@@ -14,9 +14,12 @@ type AppSidebarProps = {
   threads: RoderThread[];
   activeThreadId: string;
   activeView: "chat" | "plugins";
+  hasMoreThreads: boolean;
+  loadingMoreThreads: boolean;
   reserveTitlebarSpace: boolean;
   onSelectThread: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
+  onLoadMoreThreads: () => void;
   onNewProject: () => void;
   onNewThread: () => void;
   onNewThreadInFolder: (path: string) => void;
@@ -28,9 +31,12 @@ export function AppSidebar({
   threads,
   activeThreadId,
   activeView,
+  hasMoreThreads,
+  loadingMoreThreads,
   reserveTitlebarSpace,
   onSelectThread,
   onArchiveThread,
+  onLoadMoreThreads,
   onNewProject,
   onNewThread,
   onNewThreadInFolder,
@@ -42,6 +48,16 @@ export function AppSidebar({
   const projectOrder = sidebarProjectOrder(threads, projectOrderRef.current);
   projectOrderRef.current = projectOrder;
   const threadGroups = useMemo(() => groupThreadsByFolder(threads, projectOrder), [projectOrder, threads]);
+
+  function handleThreadListScroll(event: React.UIEvent<HTMLDivElement>): void {
+    if (!hasMoreThreads || loadingMoreThreads) {
+      return;
+    }
+    const target = event.currentTarget;
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 240) {
+      onLoadMoreThreads();
+    }
+  }
 
   function showMoreForGroup(groupKey: string): void {
     setExpandedGroupKeys((current) => {
@@ -88,7 +104,10 @@ export function AppSidebar({
         </SidebarRowButton>
       </div>
 
-      <div className="sidebar-scroll no-drag mt-5 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4">
+      <div
+        className="sidebar-scroll no-drag mt-5 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4"
+        onScroll={handleThreadListScroll}
+      >
         <div className="flex flex-col gap-5">
           {threadGroups.length > 0 ? (
             threadGroups.map((group) => {
@@ -168,6 +187,15 @@ export function AppSidebar({
           ) : (
             <div className="px-3 py-2 text-base text-sidebar-heading">No sessions yet</div>
           )}
+          {hasMoreThreads || loadingMoreThreads ? (
+            <SidebarRowButton
+              className="text-base text-sidebar-muted hover:text-sidebar-foreground"
+              disabled={loadingMoreThreads}
+              onClick={onLoadMoreThreads}
+            >
+              <span className="min-w-0 flex-1 truncate">{loadingMoreThreads ? "Loading sessions..." : "Load more"}</span>
+            </SidebarRowButton>
+          ) : null}
         </div>
       </div>
       <SidebarAccountMenu onOpenSettings={onOpenSettings} />
