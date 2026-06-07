@@ -11,7 +11,15 @@ import {
   type inferParserType,
 } from "nuqs";
 
-export const workspacePanelValues = ["terminal", "browser", "canvas", "extensions", "review", "files"] as const;
+export const workspacePanelValues = [
+  "terminal",
+  "browser",
+  "canvas",
+  "design",
+  "extensions",
+  "review",
+  "files",
+] as const;
 export const pluginProviderValues = ["all", "anthropic", "cursor", "codex", "local"] as const;
 export const reviewScopeValues = ["thread", "turn", "branch"] as const;
 
@@ -22,7 +30,7 @@ export type RouteReviewScope = (typeof reviewScopeValues)[number];
 export const toolPanelWidthBounds = {
   min: 360,
   defaultValue: 560,
-  max: 1200,
+  max: 2400,
 } as const;
 
 const parseAsWorkspacePanelTabs = createParser({

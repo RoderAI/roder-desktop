@@ -1,4 +1,4 @@
-export const mainPanelMinWidth = 500;
+export const mainPanelMinWidth = 320;
 
 export const sidebarWidthBounds = {
   min: 220,

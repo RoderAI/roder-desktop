@@ -5,6 +5,7 @@ import {
   Panel,
   Separator,
   useDefaultLayout,
+  useGroupRef,
   usePanelRef,
   type Layout,
   type PanelSize,
@@ -94,6 +95,7 @@ export type AppShellLayoutProps = {
   onSelectedExtensionPanelChange: (extensionPanel: string) => void;
   onReviewPathChange: (path: string) => void;
   onReviewScopeChange: (scope: RouteReviewScope, turnId?: string) => void;
+  onSendPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
   onToggleSidebar: () => void;
 };
 
@@ -144,12 +146,14 @@ export function AppShellLayout({
   onSelectedExtensionPanelChange,
   onReviewPathChange,
   onReviewScopeChange,
+  onSendPrompt,
   onToggleSidebar,
 }: AppShellLayoutProps): React.JSX.Element {
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
   const workspacePanelRequested = shouldRenderWorkspacePanel({ isPluginsRoute, workspacePanelOpen });
   const extensions = useExtensionsStore((state) => state.extensions);
   const extensionSidebarVisible = !isPluginsRoute && getSidebarExtensions(extensions).length > 0;
+  const appChromeGroupRef = useGroupRef();
   const workspacePanelRef = usePanelRef();
   const { defaultLayout, onLayoutChanged: saveLayout } = useDefaultLayout({
     id: layoutId,
@@ -272,6 +276,37 @@ export function AppShellLayout({
       onCloseWorkspacePanelShell();
     }
   }, [canShowWorkspacePanel, onCloseWorkspacePanelShell, workspacePanelRequested]);
+
+  useLayoutEffect(() => {
+    const group = appChromeGroupRef.current;
+    if (
+      !group ||
+      !workspacePanelVisible ||
+      appChromeGroupWidth === null ||
+      shellLayoutAnimating ||
+      initialWorkspacePanelWidth === toolPanelWidthBounds.defaultValue
+    ) {
+      return;
+    }
+
+    const nextWorkspaceWidth = Math.min(
+      toolPanelWidthBounds.max,
+      Math.max(toolPanelWidthBounds.min, initialWorkspacePanelWidth),
+      Math.max(toolPanelWidthBounds.min, appChromeGroupWidth - mainPanelMinWidth),
+    );
+    const currentWorkspaceWidth = measuredWorkspacePanelWidthRef.current;
+    if (Math.abs(currentWorkspaceWidth - nextWorkspaceWidth) < 2) {
+      return;
+    }
+
+    const workspacePercent = (nextWorkspaceWidth / appChromeGroupWidth) * 100;
+    group.setLayout({
+      [contentPanelId]: Math.max(0, 100 - workspacePercent),
+      [workspacePanelId]: workspacePercent,
+    });
+    measuredWorkspacePanelWidthRef.current = nextWorkspaceWidth;
+    setMeasuredWorkspacePanelWidthOverride(nextWorkspaceWidth);
+  }, [appChromeGroupRef, appChromeGroupWidth, initialWorkspacePanelWidth, shellLayoutAnimating, workspacePanelVisible]);
 
   function applySidebarWidth(nextWidth: number): void {
     sidebarWidthRef.current = nextWidth;
@@ -464,6 +499,7 @@ export function AppShellLayout({
             onAttachToComposer,
             onReviewPathChange,
             onReviewScopeChange,
+            onSendPrompt,
             onSelectedExtensionPanelChange,
           })
         }
@@ -477,6 +513,7 @@ export function AppShellLayout({
       id={layoutId}
       orientation="horizontal"
       defaultLayout={defaultLayout}
+      groupRef={appChromeGroupRef}
       elementRef={setAppChromeGroupElement}
       onLayoutChanged={handleLayoutChanged}
       resizeTargetMinimumSize={{ coarse: 28, fine: 12 }}

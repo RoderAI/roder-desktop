@@ -333,6 +333,15 @@ export function useAppShellController(): AppShellController {
     },
     [setRouteSearch],
   );
+
+  useEffect(() => {
+    return roderIpc.onNotification((notification) => {
+      if (!isDesignCanvasNotification(notification.method)) {
+        return;
+      }
+      void setRouteSearch((current) => openWorkspacePanelTab(current, "design"), { history: "replace" });
+    });
+  }, [setRouteSearch]);
   const openWorkspacePanelShellOnly = useCallback(() => {
     void setRouteSearch(openWorkspacePanelShell(), { history: "replace" });
   }, [setRouteSearch]);
@@ -495,8 +504,15 @@ export function useAppShellController(): AppShellController {
         void setRouteSearch({ extensionPanel }, { history: "replace" }),
       onReviewPathChange: (reviewPath) => void setRouteSearch({ reviewPath }, { history: "replace" }),
       onReviewScopeChange: changeReviewScope,
+      onSendPrompt: sendPrompt,
       onSelectWorkspacePanel: selectWorkspacePanel,
       onToggleSidebar: () => void setRouteSearch({ sidebar: !sidebarOpen }, { history: "replace" }),
     },
   };
+}
+
+function isDesignCanvasNotification(method: string): boolean {
+  return (
+    method === "design/documentChanged" || method === "design/selectionChanged" || method === "design/exportCompleted"
+  );
 }
