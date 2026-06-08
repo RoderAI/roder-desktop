@@ -142,6 +142,24 @@ export function ComposerAttachMenuItems({
   );
 }
 
+export function ComposerPlanModeMenuItem({
+  enabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <DropdownMenuItem className="h-9 justify-between" selected={enabled} onSelect={onToggle}>
+      <span className="flex min-w-0 items-center gap-2">
+        <ShieldCheck className="size-4 shrink-0" />
+        <span>Plan mode</span>
+      </span>
+      {enabled && <Check className="size-3.5 shrink-0 text-primary" />}
+    </DropdownMenuItem>
+  );
+}
+
 export function ModelPicker({
   models,
   selectedModel,
