@@ -10,7 +10,13 @@ import type {
   SkillDescriptor,
 } from "@/types/roder";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { AttachmentChip, ComposerAttachMenuItems, ModelPicker, PolicyModePicker } from "@/components/composer-controls";
+import {
+  AttachmentChip,
+  ComposerAttachMenuItems,
+  ComposerPlanModeMenuItem,
+  ModelPicker,
+  PolicyModePicker,
+} from "@/components/composer-controls";
 import { CommandCompletionPopup, commandCompletionOptionId } from "@/components/command-completion-popup";
 import { ComposerSketchPad } from "@/components/composer-sketch-pad";
 import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
@@ -32,6 +38,7 @@ import {
   registerSkillPromptSubmit,
   writeSkillPromptEditorText,
 } from "@/lib/lexical-skill-prompt";
+import { isPlanModeToggleKey } from "@/lib/composer-keyboard";
 import { cn } from "@/lib/utils";
 import type { LexicalEditor } from "lexical";
 
@@ -226,10 +233,20 @@ export function Composer({
   }
 
   function handlePromptEditorKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (isPlanModeToggleKey(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      onSelectedPolicyModeChange(selectedPolicyMode === "plan" ? "default" : "plan");
+      return;
+    }
     if (commandCompletion.handleCommandCompletionKeyDown(event)) {
       return;
     }
     skillCompletion.handleSkillCompletionKeyDown(event);
+  }
+
+  function togglePlanMode(): void {
+    onSelectedPolicyModeChange(selectedPolicyMode === "plan" ? "default" : "plan");
   }
 
   function addAttachments(nextAttachments: DesktopAttachment[]): void {
@@ -410,6 +427,7 @@ export function Composer({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-44">
                   <DropdownMenuGroup>
+                    <ComposerPlanModeMenuItem enabled={selectedPolicyMode === "plan"} onToggle={togglePlanMode} />
                     <ComposerAttachMenuItems
                       onOpenSketch={() => setSketchOpen(true)}
                       onUploadFile={() => fileInputRef.current?.click()}

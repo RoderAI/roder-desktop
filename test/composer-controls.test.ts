@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
-import { AttachmentChip, ComposerAttachMenuItems } from "../src/components/composer-controls";
+import { AttachmentChip, ComposerAttachMenuItems, ComposerPlanModeMenuItem } from "../src/components/composer-controls";
 import { DropdownMenu, DropdownMenuGroup } from "../src/components/ui/dropdown-menu";
 
 test("image attachments with an image URL render as thumbnails", () => {
@@ -43,4 +43,24 @@ test("composer attach menu offers upload and sketch actions", () => {
 
   expect(html).toContain("Upload file");
   expect(html).toContain("Sketch");
+});
+
+test("composer add menu exposes a checked plan mode toggle", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(
+      DropdownMenu,
+      null,
+      React.createElement(
+        DropdownMenuGroup,
+        null,
+        React.createElement(ComposerPlanModeMenuItem, {
+          enabled: true,
+          onToggle: () => undefined,
+        }),
+      ),
+    ),
+  );
+
+  expect(html).toContain("Plan mode");
+  expect(html).toContain('aria-selected="true"');
 });
