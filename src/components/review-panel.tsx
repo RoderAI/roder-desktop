@@ -443,6 +443,7 @@ export function ReviewPanel({
             diffOptions={reviewDiffOptions}
             fallbackCollapsed={diffsCollapsed}
             files={reviewFiles}
+            ignoringWhitespace={!showWhitespace}
             scrollRoot={diffScrollElement}
             onCollapsedChange={setDiffFileCollapsed}
             onLoadFull={loadFullDiff}
@@ -676,6 +677,7 @@ function DiffStream({
   diffOptions,
   fallbackCollapsed,
   files,
+  ignoringWhitespace,
   scrollRoot,
   onCollapsedChange,
   onRefresh,
@@ -688,6 +690,7 @@ function DiffStream({
   diffOptions: ReviewDiffOptions;
   fallbackCollapsed: boolean;
   files: ReviewFile[];
+  ignoringWhitespace: boolean;
   scrollRoot: HTMLElement | null;
   onCollapsedChange: (path: string, collapsed: boolean) => void;
   onLoadFull: (path: string) => void;
@@ -708,6 +711,7 @@ function DiffStream({
           diffState={diffStatesByPath[file.path] ?? { status: "idle", patch: "" }}
           diffOptions={diffOptions}
           file={file}
+          ignoringWhitespace={ignoringWhitespace}
           scrollRoot={scrollRoot}
           onCollapsedChange={onCollapsedChange}
           onLoadFull={onLoadFull}
@@ -725,6 +729,7 @@ function DiffFileSection({
   diffState,
   diffOptions,
   file,
+  ignoringWhitespace,
   scrollRoot,
   onCollapsedChange,
   onRefresh,
@@ -736,6 +741,7 @@ function DiffFileSection({
   diffState: ReviewDiffState;
   diffOptions: ReviewDiffOptions;
   file: ReviewFile;
+  ignoringWhitespace: boolean;
   scrollRoot: HTMLElement | null;
   onCollapsedChange: (path: string, collapsed: boolean) => void;
   onLoadFull: (path: string) => void;
@@ -787,6 +793,7 @@ function DiffFileSection({
         diffState={diffState}
         diffOptions={diffOptions}
         file={file}
+        ignoringWhitespace={ignoringWhitespace}
         onLoadFull={() => onLoadFull(file.path)}
         onCollapsedChange={() => onCollapsedChange(file.path, !collapsed)}
         onRefresh={() => onRefresh(file.path, { force: true })}
@@ -800,6 +807,7 @@ function DiffFileBody({
   diffState,
   diffOptions,
   file,
+  ignoringWhitespace,
   onCollapsedChange,
   onRefresh,
   onLoadFull,
@@ -808,6 +816,7 @@ function DiffFileBody({
   diffState: ReviewDiffState;
   diffOptions: ReviewDiffOptions;
   file: ReviewFile;
+  ignoringWhitespace: boolean;
   onCollapsedChange: () => void;
   onLoadFull: () => void;
   onRefresh: () => void;
@@ -846,10 +855,17 @@ function DiffFileBody({
     );
   }
   if (!diffState.patch) {
+    const whitespaceIgnoredForFile = ignoringWhitespace && file.source !== "hunk";
+    const emptyMessage =
+      diffState.status === "ready"
+        ? whitespaceIgnoredForFile
+          ? "No non-whitespace changes to show."
+          : "No diff content to show."
+        : "Loading diff...";
     return (
       <>
         <FallbackFileHeader file={file} />
-        <InlineText>Loading diff…</InlineText>
+        <InlineText>{emptyMessage}</InlineText>
       </>
     );
   }

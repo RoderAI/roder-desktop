@@ -13,6 +13,7 @@ import {
   reviewTurnSummaries,
   summarizeReviewChanges,
   summarizeHunks,
+  trimReviewPatchContext,
 } from "../src/lib/review-changes";
 import type { HunkRecord, PagedHunkDiff, WorkspaceChangeObservation } from "../src/types/roder";
 
@@ -115,6 +116,47 @@ test("hunkPagesToReviewPatch preserves hunk pagination metadata across hunks", (
     totalLines: 3,
     truncated: true,
   });
+});
+
+test("trimReviewPatchContext keeps compact context around actual changes", () => {
+  const patch = [
+    "diff --git a/src/app.ts b/src/app.ts",
+    "--- a/src/app.ts",
+    "+++ b/src/app.ts",
+    "@@ -1,12 +1,12 @@",
+    " one",
+    " two",
+    " three",
+    " four",
+    " five",
+    "-old",
+    "+new",
+    " seven",
+    " eight",
+    " nine",
+    " ten",
+    " eleven",
+    " twelve",
+    "",
+  ].join("\n");
+
+  expect(trimReviewPatchContext(patch)).toBe(
+    [
+      "diff --git a/src/app.ts b/src/app.ts",
+      "--- a/src/app.ts",
+      "+++ b/src/app.ts",
+      "@@ -3,7 +3,7 @@",
+      " three",
+      " four",
+      " five",
+      "-old",
+      "+new",
+      " seven",
+      " eight",
+      " nine",
+      "",
+    ].join("\n"),
+  );
 });
 
 test("groupHunksByFile derives changed file summaries and statuses from recorded hunks", () => {

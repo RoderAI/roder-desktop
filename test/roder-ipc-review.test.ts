@@ -83,7 +83,11 @@ test("review VCS IPC wrappers call live branch change methods", async () => {
   });
 
   await roderIpc.listVcsChanges({ workspaceId: "ws_1", id: "root_1" }, { limit: 250 });
-  await roderIpc.readVcsChange({ workspaceId: "ws_1", id: "root_1" }, "src/app.ts", { offset: 20, limit: 100 });
+  await roderIpc.readVcsChange({ workspaceId: "ws_1", id: "root_1" }, "src/app.ts", {
+    offset: 20,
+    limit: 100,
+    ignoreWhitespace: true,
+  });
 
   expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
@@ -102,6 +106,7 @@ test("review VCS IPC wrappers call live branch change methods", async () => {
         path: "src/app.ts",
         offset: 20,
         limit: 100,
+        ignoreWhitespace: true,
       },
     },
   ]);
