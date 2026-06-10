@@ -1,3 +1,4 @@
+import { trimPatchContext } from "@pierre/diffs";
 import type {
   VcsChangeStatus,
   HunkDiffLine,
@@ -6,6 +7,8 @@ import type {
   WorkspaceChangeObservation,
   WorkspaceObservedFile,
 } from "@/types/roder";
+
+const reviewDiffContextLines = 3;
 
 export type ReviewChangedFile = {
   path: string;
@@ -90,6 +93,13 @@ export function hunkPagesToReviewPatch(pages: PagedHunkDiff[]): ReviewPatch {
     totalLines: pages.reduce((total, page) => total + page.totalLines, 0),
     truncated: pages.some((page) => page.nextOffset != null),
   };
+}
+
+export function trimReviewPatchContext(patch: string): string {
+  if (!patch) {
+    return patch;
+  }
+  return trimPatchContext(patch, reviewDiffContextLines);
 }
 
 export function groupHunksByFile(hunks: HunkRecord[]): ReviewChangedFile[] {

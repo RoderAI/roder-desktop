@@ -8,6 +8,7 @@ import {
   latestChangedTurnId,
   mergeReviewChangedFiles,
   reviewTurnIdCandidate,
+  trimReviewPatchContext,
 } from "@/lib/review-changes";
 import { reviewBranchAreaFiles, type ReviewBranchAreaFilter } from "@/lib/review-panel-ui";
 import type {
@@ -243,7 +244,7 @@ export function useReviewChanges({
           });
           return {
             status: "ready",
-            patch: result.content ?? "",
+            patch: trimReviewPatchContext(result.content ?? ""),
             truncated: result.nextOffset != null,
             totalLines: result.totalLines,
           };
