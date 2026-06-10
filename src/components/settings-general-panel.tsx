@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { selectedModelRecord as resolveSelectedModelRecord, visibleModelsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
-import type { PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
+import type {
+  InferenceRoutingOptionDescriptor,
+  ModelSelectionMode,
+  PolicyMode,
+  ReasoningEffort,
+  RoderModel,
+} from "@/types/roder";
 
 const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
 
@@ -34,12 +40,15 @@ const policyOptions: Array<{ mode: PolicyMode; label: string; description: strin
 
 export function GeneralSettingsPanel(): React.JSX.Element {
   const allModels = useRoderStore((state) => state.models);
+  const routingOptions = useRoderStore((state) => state.routingOptions);
   const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
   const defaultModel = useRoderStore((state) => state.defaultModel);
   const defaultModelProvider = useRoderStore((state) => state.defaultModelProvider);
+  const defaultSelectionMode = useRoderStore((state) => state.defaultSelectionMode);
   const defaultReasoning = useRoderStore((state) => state.defaultReasoning);
   const defaultPolicyMode = useRoderStore((state) => state.defaultPolicyMode);
   const setDefaultModel = useRoderStore((state) => state.setDefaultModel);
+  const setDefaultAutoModel = useRoderStore((state) => state.setDefaultAutoModel);
   const setDefaultReasoning = useRoderStore((state) => state.setDefaultReasoning);
   const setDefaultPolicyMode = useRoderStore((state) => state.setDefaultPolicyMode);
   const saveDefaults = useRoderStore((state) => state.saveDefaults);
@@ -53,10 +62,23 @@ export function GeneralSettingsPanel(): React.JSX.Element {
     [models, defaultModel, defaultModelProvider],
   );
   const modelItems = useMemo(
-    () => Object.fromEntries(models.map((model) => [modelValue(model), modelName(model)])),
-    [models],
+    () =>
+      Object.fromEntries([
+        ...routingOptions.map((option) => [autoModelValue(option), option.label]),
+        ...models.map((model) => [modelValue(model), modelName(model)]),
+      ]),
+    [models, routingOptions],
   );
-  const canSave = Boolean(selectedModelRecord) && !saving;
+  const selectedAutoOption =
+    defaultSelectionMode.type === "auto"
+      ? routingOptions.find((option) => option.id === defaultSelectionMode.optionId)
+      : undefined;
+  const selectedValue = selectedAutoOption
+    ? autoModelValue(selectedAutoOption)
+    : selectedModelRecord
+      ? modelValue(selectedModelRecord)
+      : "";
+  const canSave = Boolean(selectedAutoOption || selectedModelRecord) && !saving;
 
   async function saveDefaultControls(): Promise<void> {
     setSaving(true);
@@ -86,12 +108,17 @@ export function GeneralSettingsPanel(): React.JSX.Element {
       </header>
 
       <div className="divide-y divide-border px-5">
-        <SettingsRow label="Model" description={selectedModelDescription(selectedModelRecord)}>
+        <SettingsRow label="Model" description={selectedModelDescription(defaultSelectionMode, selectedModelRecord)}>
           <Select
             items={modelItems}
-            value={selectedModelRecord ? modelValue(selectedModelRecord) : ""}
-            disabled={models.length === 0}
+            value={selectedValue}
+            disabled={models.length === 0 && routingOptions.length === 0}
             onValueChange={(value) => {
+              const autoOption = routingOptions.find((candidate) => autoModelValue(candidate) === value);
+              if (autoOption) {
+                setDefaultAutoModel(autoOption.id);
+                return;
+              }
               const model = models.find((candidate) => modelValue(candidate) === value);
               setDefaultModel(model?.id ?? "", model?.modelProvider);
             }}
@@ -101,6 +128,11 @@ export function GeneralSettingsPanel(): React.JSX.Element {
             </SelectTrigger>
             <SelectContent className="w-[340px]">
               <SelectGroup>
+                {routingOptions.map((option) => (
+                  <SelectItem key={autoModelValue(option)} value={autoModelValue(option)}>
+                    {option.label}
+                  </SelectItem>
+                ))}
                 {models.map((model) => (
                   <SelectItem key={modelValue(model)} value={modelValue(model)}>
                     {modelName(model)}
@@ -187,10 +219,17 @@ function modelName(model: RoderModel): string {
 }
 
 function modelValue(model: RoderModel): string {
-  return `${model.modelProvider}:${model.id}`;
+  return `model:${model.modelProvider}:${model.id}`;
 }
 
-function selectedModelDescription(model: RoderModel | undefined): string {
+function autoModelValue(option: InferenceRoutingOptionDescriptor): string {
+  return `auto:${option.id}`;
+}
+
+function selectedModelDescription(selectionMode: ModelSelectionMode, model: RoderModel | undefined): string {
+  if (selectionMode.type === "auto") {
+    return selectionMode.label || "Auto routing";
+  }
   if (!model) {
     return "Models will appear after the app-server finishes loading.";
   }

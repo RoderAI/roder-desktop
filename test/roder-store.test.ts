@@ -161,7 +161,6 @@ test("changing selected policy mode applies it to the running thread immediately
   ]);
 });
 
-
 test("bootstrap does not wait for full active transcript read", async () => {
   const threadReadParams: unknown[] = [];
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
@@ -653,6 +652,349 @@ test("new blank threads preserve an explicitly selected project folder", async (
   );
 });
 
+test("new threads preserve the Auto default selection in thread/start", async () => {
+  const workspace = {
+    id: "ws-1",
+    name: "workspace",
+    roots: [{ id: "root-1", path: "/workspace", name: "workspace" }],
+    defaultRootId: "root-1",
+    updatedAt: 1770000200,
+  };
+  const selectionMode = {
+    type: "auto" as const,
+    optionId: "local:coding",
+    routerId: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const wireSelectionMode = {
+    type: "auto",
+    option_id: "local:coding",
+    router_id: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "workspace/create":
+        return { workspace };
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-auto",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            selectionMode: wireSelectionMode,
+            createdAt: 1770000200,
+            updatedAt: 1770000200,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: workspace.id,
+            rootId: workspace.defaultRootId,
+            cwd: "/workspace",
+            turns: [],
+          },
+          model: "gpt-5.5",
+          modelProvider: "openai",
+          reasoning: "medium",
+          selectionMode: wireSelectionMode,
+        };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({
+    activeThreadId: "",
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    selectedWorkspaceCwd: "/workspace",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    defaultModelProvider: "openai",
+    defaultSelectionMode: selectionMode,
+    defaultReasoning: "medium",
+    workspaces: [],
+  });
+
+  await useRoderStore.getState().newThread();
+
+  expect(request).toHaveBeenCalledWith(
+    "thread/start",
+    expect.objectContaining({
+      selection: { type: "auto", option_id: "local:coding" },
+    }),
+  );
+  expect(useRoderStore.getState().selectedSelectionMode).toEqual(selectionMode);
+});
+
+test("new threads do not send malformed Auto defaults without an option id", async () => {
+  const workspace = {
+    id: "ws-1",
+    name: "workspace",
+    roots: [{ id: "root-1", path: "/workspace", name: "workspace" }],
+    defaultRootId: "root-1",
+    updatedAt: 1770000200,
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "workspace/create":
+        return { workspace };
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-manual",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            createdAt: 1770000200,
+            updatedAt: 1770000200,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: workspace.id,
+            rootId: workspace.defaultRootId,
+            cwd: "/workspace",
+            turns: [],
+          },
+          model: "gpt-5.5",
+          modelProvider: "openai",
+          reasoning: "medium",
+        };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({
+    activeThreadId: "",
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    selectedWorkspaceCwd: "/workspace",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    defaultModelProvider: "openai",
+    defaultSelectionMode: {
+      type: "auto",
+      routerId: "local",
+      label: "Auto: Coding",
+      baseline: { provider: "openai", model: "gpt-5.5" },
+    } as never,
+    defaultReasoning: "medium",
+    workspaces: [],
+  });
+
+  await useRoderStore.getState().newThread();
+
+  expect(request).toHaveBeenCalledWith(
+    "thread/start",
+    expect.objectContaining({
+      selection: { type: "manual", provider: "openai", model: "gpt-5.5", reasoning: "medium" },
+    }),
+  );
+  expect(useRoderStore.getState().selectedSelectionMode).toEqual({
+    type: "manual",
+    provider: "openai",
+    model: "gpt-5.5",
+    reasoning: "medium",
+  });
+});
+
+test("saveDefaults saves Auto routing through model/select", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const selectionMode = {
+    type: "auto" as const,
+    optionId: "local:coding",
+    routerId: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const wireSelectionMode = {
+    type: "auto",
+    option_id: "local:coding",
+    router_id: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    calls.push({ method, params });
+    if (method === "model/select") {
+      return {
+        selectionMode: wireSelectionMode,
+        provider: "openai",
+        model: "gpt-5.5",
+        reasoning: "medium",
+      };
+    }
+    if (method === "settings/set_default_mode") {
+      return { default_mode: "accept_all" };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    defaultModelProvider: "openai",
+    defaultSelectionMode: selectionMode,
+    defaultReasoning: "medium",
+    defaultPolicyMode: "accept_all",
+  });
+
+  await useRoderStore.getState().saveDefaults();
+
+  expect(calls).toEqual([
+    {
+      method: "model/select",
+      params: {
+        selection: { type: "auto", option_id: "local:coding" },
+      },
+    },
+    {
+      method: "settings/set_default_mode",
+      params: { mode: "accept_all" },
+    },
+  ]);
+});
+
+test("setSelectedAutoModel applies the canonical app-server selection response", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const selectionMode = {
+    type: "auto" as const,
+    optionId: "local:coding",
+    routerId: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const wireSelectionMode = {
+    type: "auto",
+    option_id: "local:coding",
+    router_id: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    calls.push({ method, params });
+    if (method === "model/select") {
+      return {
+        selectionMode: wireSelectionMode,
+        provider: "openai",
+        model: "gpt-5.5",
+        reasoning: "low",
+      };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "thread-1",
+    selectedReasoning: "low",
+    routingOptions: [
+      {
+        id: "local:coding",
+        label: "Auto: Coding",
+        routerId: "local",
+        baseline: { provider: "openai", model: "gpt-5.5" },
+      },
+    ],
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+  });
+
+  await useRoderStore.getState().setSelectedAutoModel("local:coding");
+
+  expect(calls).toContainEqual({
+    method: "model/select",
+    params: {
+      threadId: "thread-1",
+      selection: { type: "auto", option_id: "local:coding" },
+    },
+  });
+  expect(useRoderStore.getState().selectedSelectionMode).toEqual(selectionMode);
+});
+
+test("sendPrompt starts a blank thread with the selected Auto routing option", async () => {
+  const workspace = {
+    id: "ws-1",
+    name: "workspace",
+    roots: [{ id: "root-1", path: "/workspace", name: "workspace" }],
+    defaultRootId: "root-1",
+    updatedAt: 1770000200,
+  };
+  const selectedSelectionMode = {
+    type: "auto" as const,
+    optionId: "local:coding",
+    routerId: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const wireSelectionMode = {
+    type: "auto",
+    option_id: "local:coding",
+    router_id: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "workspace/create":
+        return { workspace };
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-auto",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            selectionMode: wireSelectionMode,
+            createdAt: 1770000200,
+            updatedAt: 1770000200,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: workspace.id,
+            rootId: workspace.defaultRootId,
+            cwd: "/workspace",
+            turns: [],
+          },
+          model: "gpt-5.5",
+          modelProvider: "openai",
+          reasoning: "low",
+          selectionMode: wireSelectionMode,
+        };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "",
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    selectedWorkspaceCwd: "/workspace",
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    selectedSelectionMode,
+    selectedReasoning: "low",
+    defaultModel: "gpt-5.4-mini",
+    defaultModelProvider: "openai",
+    defaultSelectionMode: {
+      type: "manual",
+      provider: "openai",
+      model: "gpt-5.4-mini",
+      reasoning: "medium",
+    },
+    defaultReasoning: "medium",
+    workspaces: [],
+  });
+
+  await useRoderStore.getState().sendPrompt("route this automatically");
+
+  expect(request).toHaveBeenCalledWith(
+    "thread/start",
+    expect.objectContaining({
+      model: "gpt-5.5",
+      reasoning: "low",
+      selection: { type: "auto", option_id: "local:coding" },
+      initialPrompt: "route this automatically",
+    }),
+  );
+});
+
 test("hunk recorded notifications bump the hunk revision for the changed thread", async () => {
   const useRoderStore = await loadRoderStore();
 
@@ -807,6 +1149,106 @@ test("sendPrompt starts a new turn when a stale activeTurnId is not running", as
       model: "gpt-5.5",
     }),
   );
+});
+
+test("sendPrompt leaves model selection to the app-server when Auto routing is active", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    if (method === "turn/start") {
+      return { turnId: "turn-2" };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+  const selectionMode = {
+    type: "auto" as const,
+    optionId: "local:coding",
+    routerId: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  };
+  const thread = {
+    id: "thread-1",
+    preview: "Auto thread",
+    modelProvider: "openai",
+    model: "gpt-5.5",
+    selectionMode,
+    createdAt: 1770000000,
+    updatedAt: 1770000100,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    cwd: "/workspace",
+    turns: [],
+  };
+
+  useRoderStore.setState({
+    activeThreadId: "thread-1",
+    busy: false,
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    selectedSelectionMode: selectionMode,
+    selectedReasoning: "high",
+    selectedPolicyMode: "plan",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    threadDetails: { "thread-1": thread },
+    threads: [thread],
+  });
+
+  await useRoderStore.getState().sendPrompt("continue from here");
+
+  expect(request).toHaveBeenCalledWith("turn/start", {
+    threadId: "thread-1",
+    input: [{ type: "text", text: "continue from here" }],
+    policyMode: "plan",
+  });
+});
+
+test("sendPrompt sends manual overrides when Auto state is not configured", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    if (method === "turn/start") {
+      return { turnId: "turn-2" };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+  const thread = {
+    id: "thread-1",
+    preview: "Manual thread",
+    modelProvider: "openai",
+    model: "gpt-5.5",
+    createdAt: 1770000000,
+    updatedAt: 1770000100,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    cwd: "/workspace",
+    turns: [],
+  };
+
+  useRoderStore.setState({
+    activeThreadId: "thread-1",
+    busy: false,
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    selectedSelectionMode: {
+      type: "auto",
+      routerId: "local",
+      label: "Auto: Coding",
+      baseline: { provider: "openai", model: "gpt-5.5" },
+    } as never,
+    selectedReasoning: "high",
+    selectedPolicyMode: "plan",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    threadDetails: { "thread-1": thread },
+    threads: [thread],
+  });
+
+  await useRoderStore.getState().sendPrompt("continue from here");
+
+  expect(request).toHaveBeenCalledWith("turn/start", {
+    threadId: "thread-1",
+    input: [{ type: "text", text: "continue from here" }],
+    modelProvider: "openai",
+    model: "gpt-5.5",
+    reasoning: "high",
+    policyMode: "plan",
+  });
 });
 
 test("sendPrompt immediately labels an untitled blank thread from the first prompt", async () => {

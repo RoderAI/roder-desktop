@@ -8,18 +8,21 @@ export function selectedModelProvider(
   return selectedModelRecord(models, selectedModel, preferredProvider)?.modelProvider;
 }
 
+export function modelVisibilityKey(model: RoderModel): string {
+  return `${model.modelProvider}:${model.id}`;
+}
+
 export function visibleModelIdsFor(models: RoderModel[], explicitIds: string[]): string[] {
-  const allIds = models.map((model) => model.id);
+  const allIds = models.map(modelVisibilityKey);
   if (explicitIds.length === 0) {
     return allIds;
   }
-  const available = new Set(allIds);
-  const visibleIds = explicitIds.filter((id) => available.has(id));
+  const visibleIds = explicitIds.flatMap((id) => visibleModelKeysForId(models, id));
   return visibleIds.length > 0 ? visibleIds : allIds;
 }
 
 export function compactVisibleModelIds(models: RoderModel[], visibleIds: string[]): string[] {
-  const allIds = models.map((model) => model.id);
+  const allIds = models.map(modelVisibilityKey);
   if (visibleIds.length === allIds.length && visibleIds.every((id, index) => id === allIds[index])) {
     return [];
   }
@@ -29,7 +32,7 @@ export function compactVisibleModelIds(models: RoderModel[], visibleIds: string[
 export function visibleModelsFor(models: RoderModel[], explicitIds: string[]): RoderModel[] {
   const visibleIds = visibleModelIdsFor(models, explicitIds);
   const visible = new Set(visibleIds);
-  return models.filter((model) => visible.has(model.id));
+  return models.filter((model) => visible.has(modelVisibilityKey(model)));
 }
 
 export function effectiveSelectedModel(
@@ -51,4 +54,12 @@ export function selectedModelRecord(
     models.find((model) => model.id === selectedModel && model.modelProvider === selectedProvider) ??
     models.find((model) => model.id === selectedModel)
   );
+}
+
+function visibleModelKeysForId(models: RoderModel[], id: string): string[] {
+  const explicitMatch = models.find((model) => modelVisibilityKey(model) === id);
+  if (explicitMatch) {
+    return [modelVisibilityKey(explicitMatch)];
+  }
+  return models.flatMap((model) => (model.id === id ? [modelVisibilityKey(model)] : []));
 }
