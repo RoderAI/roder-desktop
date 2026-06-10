@@ -53,6 +53,13 @@ test("commentary phase agent messages hydrate as visible update messages", () =>
 test("thread snapshots derive messages from canonical typed items only", () => {
   const messages = messagesFromThread({
     id: "thread-1",
+    selectionMode: {
+      type: "auto",
+      optionId: "local:coding",
+      routerId: "local",
+      label: "Auto: Coding",
+      baseline: { provider: "codex", model: "gpt-5.5" },
+    },
     turns: [
       turn(
         [
@@ -105,6 +112,118 @@ test("typed tool execution items summarize input and output", () => {
   expect(messages[0].toolName).toBe("list_files");
   expect(messages[0].toolSummary).toBe("Listed files in .");
   expect(messages[0].toolOutput).toBe("src\nCargo.toml");
+});
+
+test("routing decision items hydrate as timeline tool messages", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        {
+          id: "turn-1-routing-decision-0",
+          type: "routingDecision",
+          status: "completed",
+          decision: {
+            threadId: "thread-1",
+            turnId: "turn-1",
+            roundIndex: 0,
+            defaultSelection: { provider: "openai", model: "gpt-5.5" },
+            selectedSelection: { provider: "anthropic", model: "claude-sonnet-5" },
+            decision: {
+              routerId: "local",
+              outcome: "escalated",
+              reasoning: { enabled: true, level: "high" },
+              reason: "Large diff and failing tests",
+            },
+            timestamp: "2026-06-08T12:00:00Z",
+          },
+        },
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages).toHaveLength(1);
+  expect(messages[0]).toMatchObject({
+    id: "routing:turn-1-routing-decision-0",
+    role: "tool",
+    text: "Auto escalated to anthropic / claude-sonnet-5 (High)",
+    toolName: "auto_model_routing",
+    toolSummary: "Auto escalated to anthropic / claude-sonnet-5 (High)",
+    toolSubject: "anthropic / claude-sonnet-5",
+    toolOutput:
+      "Reason: Large diff and failing tests\nDefault: openai / gpt-5.5\nSelected: anthropic / claude-sonnet-5",
+  });
+});
+
+test("thread transcript only shows routing decisions when selected model or thinking changes", () => {
+  const messages = messagesFromThread({
+    id: "thread-1",
+    selectionMode: {
+      type: "auto",
+      optionId: "local:coding",
+      routerId: "local",
+      label: "Auto: Coding",
+      baseline: { provider: "codex", model: "gpt-5.5" },
+    },
+    turns: [
+      turn(
+        [
+          routingDecision("route-1", {
+            selectedModel: "gpt-5.5",
+            thinking: "high",
+            reason: "risk floor signal",
+          }),
+          { id: "turn-1-agent", type: "agentMessage", text: "I will inspect this.", status: "completed" },
+          routingDecision("route-2", {
+            selectedModel: "gpt-5.5",
+            thinking: "high",
+            reason: "recovery signal",
+          }),
+          routingDecision("route-3", {
+            selectedModel: "gpt-5.5",
+            thinking: "medium",
+            reason: "lower risk phase",
+          }),
+          routingDecision("route-4", {
+            selectedModel: "gpt-5.4-mini",
+            thinking: "medium",
+            reason: "cheap follow-up",
+          }),
+        ],
+        "completed",
+      ),
+    ],
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  });
+
+  expect(messages.filter((message) => message.toolName === "auto_model_routing").map((message) => message.id)).toEqual(
+    ["routing:route-1", "routing:route-3", "routing:route-4"],
+  );
+});
+
+test("manual thread transcripts hide routing decision items", () => {
+  const messages = messagesFromThread({
+    id: "thread-1",
+    selectionMode: { type: "manual", provider: "codex", model: "gpt-5.5", reasoning: "high" },
+    turns: [
+      turn(
+        [
+          routingDecision("route-1", {
+            selectedModel: "gpt-5.5",
+            thinking: "high",
+            reason: "risk floor signal",
+          }),
+          { id: "turn-1-agent", type: "agentMessage", text: "I will inspect this.", status: "completed" },
+        ],
+        "completed",
+      ),
+    ],
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  });
+
+  expect(messages.filter((message) => message.toolName === "auto_model_routing")).toEqual([]);
+  expect(messages.map((message) => message.text)).toEqual(["I will inspect this."]);
 });
 
 test("common typed tool executions are summarized as compact activity", () => {
@@ -303,6 +422,28 @@ function tool(id, toolName, input, status = "completed", output, error) {
     input,
     output,
     error,
+  };
+}
+
+function routingDecision(id, { selectedModel, thinking, reason }) {
+  return {
+    id,
+    type: "routingDecision",
+    status: "completed",
+    decision: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      roundIndex: 0,
+      defaultSelection: { provider: "codex", model: "gpt-5.5" },
+      selectedSelection: { provider: "codex", model: selectedModel },
+      decision: {
+        routerId: "local",
+        outcome: "escalated",
+        reasoning: { enabled: true, level: thinking },
+        reason,
+      },
+      timestamp: "2026-06-08T12:00:00Z",
+    },
   };
 }
 

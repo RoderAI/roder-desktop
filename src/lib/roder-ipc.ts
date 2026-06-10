@@ -21,6 +21,10 @@ import type {
   ProcessesListResult,
   ProcessesStopAllResult,
   ProcessesStopResult,
+  ModelSelectChoice,
+  ModelSelectResult,
+  ProviderDescriptor,
+  ProvidersListResult,
   RoderModel,
   RoderStatus,
   RoderThread,
@@ -35,6 +39,7 @@ import type {
   VcsChangeArea,
   VcsChangesListResult,
   VcsChangesReadResult,
+  ModelSelectionMode,
   SpeechProviderDescriptor,
   SpeechTranscribeResult,
   Workspace,
@@ -59,6 +64,7 @@ export type ThreadReadResult = {
 
 export type ThreadStartOptions = {
   initialPrompt?: string;
+  selection?: ModelSelectChoice;
 };
 
 export type ThreadStartWorkspace = {
@@ -78,6 +84,7 @@ export type ThreadStartResult = {
   model: string;
   modelProvider: string;
   reasoning: string;
+  selectionMode?: RoderThread["selectionMode"];
   workspaceId: string;
   rootId: string;
   cwd: string;
@@ -111,6 +118,140 @@ export type WorkspaceUpdateResult = {
 export type WorkspaceForgetResult = {
   forgotten: boolean;
 };
+
+type WireModelSelectionMode =
+  | {
+      type: "manual";
+      provider: string;
+      model: string;
+      reasoning?: string | null;
+    }
+  | {
+      type: "auto";
+      option_id?: string | null;
+      router_id?: string | null;
+      label?: string | null;
+      baseline?: { provider?: string | null; model?: string | null } | null;
+      profile?: string | null;
+      reasoning?: string | null;
+    };
+
+type WireModelSelectChoice =
+  | {
+      type: "manual";
+      provider: string;
+      model: string;
+      reasoning?: string;
+    }
+  | {
+      type: "auto";
+      option_id: string;
+    };
+
+type WireModelSelectResult = Omit<ModelSelectResult, "selectionMode"> & {
+  selectionMode: WireModelSelectionMode;
+};
+
+type WireProviderDescriptor = Omit<ProviderDescriptor, "authType" | "authLabel" | "authDetail" | "sortOrder"> & {
+  auth_type?: string;
+  auth_label?: string | null;
+  auth_detail?: string | null;
+  sort_order?: number;
+};
+
+type WireProvidersListResult = Omit<ProvidersListResult, "providers" | "selectionMode"> & {
+  providers: WireProviderDescriptor[];
+  selectionMode?: WireModelSelectionMode | null;
+};
+
+type WireThread = Omit<RoderThread, "selectionMode"> & {
+  selectionMode?: WireModelSelectionMode | null;
+};
+
+type WireThreadStartResult = Omit<ThreadStartResult, "selectionMode" | "thread"> & {
+  selectionMode?: WireModelSelectionMode | null;
+  thread: WireThread;
+};
+
+function modelSelectChoiceToWire(selection: ModelSelectChoice): WireModelSelectChoice {
+  if (selection.type === "auto") {
+    return {
+      type: "auto",
+      option_id: selection.optionId,
+    };
+  }
+  return selection;
+}
+
+function modelSelectionModeFromWire(selectionMode: WireModelSelectionMode): ModelSelectionMode {
+  if (selectionMode.type === "auto") {
+    if (!selectionMode.option_id) {
+      return {
+        type: "manual",
+        provider: selectionMode.baseline?.provider ?? "",
+        model: selectionMode.baseline?.model ?? "",
+        reasoning: selectionMode.reasoning ?? null,
+      };
+    }
+    const mode: ModelSelectionMode = {
+      type: "auto",
+      optionId: selectionMode.option_id,
+      routerId: selectionMode.router_id ?? "",
+      label: selectionMode.label ?? "Auto",
+      baseline: {
+        provider: selectionMode.baseline?.provider ?? "",
+        model: selectionMode.baseline?.model ?? "",
+      },
+    };
+    if ("profile" in selectionMode) {
+      mode.profile = selectionMode.profile ?? null;
+    }
+    if ("reasoning" in selectionMode) {
+      mode.reasoning = selectionMode.reasoning ?? null;
+    }
+    return mode;
+  }
+  return selectionMode;
+}
+
+function providerDescriptorFromWire(provider: WireProviderDescriptor): ProviderDescriptor {
+  const { auth_type, auth_label, auth_detail, sort_order, ...domainProvider } = provider;
+  return {
+    ...domainProvider,
+    authType: auth_type,
+    authLabel: auth_label,
+    authDetail: auth_detail,
+    sortOrder: sort_order,
+  };
+}
+
+function modelSelectResultFromWire(result: WireModelSelectResult): ModelSelectResult {
+  return {
+    ...result,
+    selectionMode: modelSelectionModeFromWire(result.selectionMode),
+  };
+}
+
+function providersListResultFromWire(result: WireProvidersListResult): ProvidersListResult {
+  return {
+    ...result,
+    providers: result.providers.map(providerDescriptorFromWire),
+    selectionMode: result.selectionMode ? modelSelectionModeFromWire(result.selectionMode) : result.selectionMode,
+  };
+}
+
+function threadStartResultFromWire(result: WireThreadStartResult): ThreadStartResult {
+  const { selectionMode, thread, ...rest } = result;
+  const { selectionMode: threadSelectionMode, ...threadRest } = thread;
+  return {
+    ...rest,
+    selectionMode: selectionMode ? modelSelectionModeFromWire(selectionMode) : selectionMode,
+    thread: {
+      ...threadRest,
+      selectionMode: threadSelectionMode ? modelSelectionModeFromWire(threadSelectionMode) : threadSelectionMode,
+    },
+  };
+}
 
 export type WorkspaceFilesStatusParams = {
   workspaceId: string;
@@ -394,11 +535,21 @@ export const roderIpc = {
       cwd: workspace.cwd || undefined,
       modelProvider,
       reasoning,
+      selection: options.selection ? modelSelectChoiceToWire(options.selection) : undefined,
       ephemeral: false,
       initialPrompt: options.initialPrompt || undefined,
-    }) as Promise<ThreadStartResult>,
+    }).then((result) => threadStartResultFromWire(result as WireThreadStartResult)) as Promise<ThreadStartResult>,
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
     window.roderDesktop.request("providers/select", { provider, model, reasoning }) as Promise<ProviderSelectResult>,
+  listProviders: () =>
+    window.roderDesktop
+      .request("providers/list", {})
+      .then((result) => providersListResultFromWire(result as WireProvidersListResult)) as Promise<ProvidersListResult>,
+  selectModel: (selection: ModelSelectChoice, threadId?: string) =>
+    window.roderDesktop.request("model/select", {
+      ...(threadId ? { threadId } : {}),
+      selection: modelSelectChoiceToWire(selection),
+    }).then((result) => modelSelectResultFromWire(result as WireModelSelectResult)) as Promise<ModelSelectResult>,
   startTurn: (
     threadId: string,
     prompt: string,

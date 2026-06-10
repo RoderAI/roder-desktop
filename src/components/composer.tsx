@@ -4,6 +4,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSPrope
 import type {
   CommandDescriptor,
   DesktopAttachment,
+  InferenceRoutingOptionDescriptor,
+  ModelSelectionMode,
   PolicyMode,
   RoderModel,
   ReasoningEffort,
@@ -66,15 +68,18 @@ type ComposerProps = {
   busy: boolean;
   commands: CommandDescriptor[];
   models: RoderModel[];
+  routingOptions: InferenceRoutingOptionDescriptor[];
   skills: SkillDescriptor[];
   selectedModel: string;
   selectedModelProvider: string;
+  selectedSelectionMode: ModelSelectionMode;
   selectedPolicyMode: PolicyMode;
   selectedReasoning: ReasoningEffort;
   attachments: DesktopAttachment[];
   focusSignal: number;
   showScrollToBottom: boolean;
   onSelectedModelChange: (model: string, provider?: string) => void;
+  onSelectedAutoModelChange: (optionId: string) => void;
   onSelectedPolicyModeChange: (mode: PolicyMode) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
@@ -105,15 +110,18 @@ export function Composer({
   busy,
   commands,
   models,
+  routingOptions,
   skills,
   selectedModel,
   selectedModelProvider,
+  selectedSelectionMode,
   selectedPolicyMode,
   selectedReasoning,
   attachments,
   focusSignal,
   showScrollToBottom,
   onSelectedModelChange,
+  onSelectedAutoModelChange,
   onSelectedPolicyModeChange,
   onSelectedReasoningChange,
   onScrollToBottom,
@@ -455,10 +463,13 @@ export function Composer({
               </Button>
               <ModelPicker
                 models={models}
+                routingOptions={routingOptions}
                 selectedModel={selectedModel}
                 selectedModelProvider={selectedModelProvider}
+                selectedSelectionMode={selectedSelectionMode}
                 selectedReasoning={selectedReasoning}
                 onChange={onSelectedModelChange}
+                onAutoChange={onSelectedAutoModelChange}
                 onReasoningChange={onSelectedReasoningChange}
               />
               <SubmitOrStopButton

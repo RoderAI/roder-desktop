@@ -1,7 +1,14 @@
-import { Check, FileText, FileUp, ImageIcon, PencilLine, Search, ShieldCheck, X } from "lucide-react";
+import { Check, FileText, FileUp, ImageIcon, PencilLine, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { Combobox } from "@base-ui/react/combobox";
 import { useState } from "react";
-import type { DesktopAttachment, PolicyMode, ReasoningEffort, RoderModel } from "@/types/roder";
+import type {
+  DesktopAttachment,
+  InferenceRoutingOptionDescriptor,
+  ModelSelectionMode,
+  PolicyMode,
+  ReasoningEffort,
+  RoderModel,
+} from "@/types/roder";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,50 +169,70 @@ export function ComposerPlanModeMenuItem({
 
 export function ModelPicker({
   models,
+  routingOptions,
   selectedModel,
   selectedModelProvider,
+  selectedSelectionMode,
   selectedReasoning,
   onChange,
+  onAutoChange,
   onReasoningChange,
 }: {
   models: RoderModel[];
+  routingOptions: InferenceRoutingOptionDescriptor[];
   selectedModel: string;
   selectedModelProvider: string;
+  selectedSelectionMode: ModelSelectionMode;
   selectedReasoning: ReasoningEffort;
   onChange: (model: string, provider?: string) => void;
+  onAutoChange: (optionId: string) => void;
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const visibleModels: RoderModel[] =
-    models.length > 0 ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
-  const selected =
+    models.length > 0 || !selectedModel ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
+  const modelItems = visibleModels.map((model): ModelPickerItem => ({ type: "model", model }));
+  const autoItems = routingOptions.map((option) => ({ type: "auto" as const, option }));
+  const items = [...autoItems, ...modelItems];
+  const selectedModelItem =
     visibleModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
     visibleModels.find((model) => model.id === selectedModel) ??
     visibleModels[0];
+  const selectedAutoItem =
+    selectedSelectionMode.type === "auto"
+      ? autoItems.find((item) => item.option.id === selectedSelectionMode.optionId)
+      : undefined;
+  const selected =
+    selectedAutoItem ?? (selectedModelItem ? { type: "model" as const, model: selectedModelItem } : null);
+  const showReasoningPicker = !selectedAutoItem;
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
-      <Combobox.Root<RoderModel>
+      <Combobox.Root<ModelPickerItem>
         open={open}
         onOpenChange={setOpen}
         value={selected}
-        items={visibleModels}
+        items={items}
         limit={10}
-        itemToStringLabel={modelName}
-        itemToStringValue={(model) => `${model.modelProvider}:${model.id}`}
-        isItemEqualToValue={(item, value) => item.id === value.id && item.modelProvider === value.modelProvider}
-        filter={(model, inputValue) => {
-          const haystack = `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase();
+        itemToStringLabel={modelPickerItemName}
+        itemToStringValue={modelPickerItemValue}
+        isItemEqualToValue={(item, value) => modelPickerItemValue(item) === modelPickerItemValue(value)}
+        filter={(item, inputValue) => {
+          const haystack = modelPickerItemSearchText(item).toLowerCase();
           return haystack.includes(inputValue.trim().toLowerCase());
         }}
-        onValueChange={(model) => {
-          if (model) {
-            onChange(model.id, model.modelProvider);
+        onValueChange={(item) => {
+          if (item?.type === "auto") {
+            onAutoChange(item.option.id);
+          } else if (item?.type === "model") {
+            onChange(item.model.id, item.model.modelProvider);
           }
         }}
       >
         <Combobox.Trigger className={cn(dropdownMenuTriggerVariants({ variant: "pill" }))} aria-label="Choose model">
-          <Combobox.Value>{(model: RoderModel | null) => <span>{modelName(model ?? selected)}</span>}</Combobox.Value>
+          <Combobox.Value>
+            {(item: ModelPickerItem | null) => <span>{modelPickerLabel(item ?? selected)}</span>}
+          </Combobox.Value>
           <DropdownTriggerChevron />
         </Combobox.Trigger>
         <Combobox.Portal>
@@ -222,14 +249,18 @@ export function ModelPicker({
                 <div className="px-3.5 py-4 text-base text-muted-foreground">No matching models</div>
               </Combobox.Empty>
               <Combobox.List className="max-h-[286px] overflow-y-auto p-1.5">
-                {(model: RoderModel) => (
+                {(item: ModelPickerItem) => (
                   <Combobox.Item
-                    key={`${model.modelProvider}:${model.id}`}
-                    value={model}
+                    key={modelPickerItemValue(item)}
+                    value={item}
                     className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
                   >
-                    <ProviderLogo provider={model.modelProvider} />
-                    <span className="min-w-0 flex-1 truncate text-foreground">{modelName(model)}</span>
+                    {item.type === "auto" ? (
+                      <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ProviderLogo provider={item.model.modelProvider} />
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-foreground">{modelPickerItemName(item)}</span>
                     <Combobox.ItemIndicator
                       keepMounted
                       className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
@@ -243,28 +274,56 @@ export function ModelPicker({
           </Combobox.Positioner>
         </Combobox.Portal>
       </Combobox.Root>
-      <DropdownMenu>
-        <DropdownMenuTrigger variant="pill" aria-label={`Choose thinking effort: ${reasoningLabel(selectedReasoning)}`}>
-          <span>{reasoningLabel(selectedReasoning)}</span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top" sideOffset={8}>
-          <DropdownMenuGroup>
-            {reasoningOptions.map((reasoning) => (
-              <DropdownMenuItem
-                key={reasoning}
-                selected={reasoning === selectedReasoning}
-                className="h-9 text-base"
-                onSelect={() => onReasoningChange(reasoning)}
-              >
-                <span className="min-w-0 flex-1">{reasoningName(reasoning)}</span>
-                {reasoning === selectedReasoning && <Check className="size-3.5 text-primary" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {showReasoningPicker && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            variant="pill"
+            aria-label={`Choose thinking effort: ${reasoningLabel(selectedReasoning)}`}
+          >
+            <span>{reasoningLabel(selectedReasoning)}</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" sideOffset={8}>
+            <DropdownMenuGroup>
+              {reasoningOptions.map((reasoning) => (
+                <DropdownMenuItem
+                  key={reasoning}
+                  selected={reasoning === selectedReasoning}
+                  className="h-9 text-base"
+                  onSelect={() => onReasoningChange(reasoning)}
+                >
+                  <span className="min-w-0 flex-1">{reasoningName(reasoning)}</span>
+                  {reasoning === selectedReasoning && <Check className="size-3.5 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
+}
+
+type ModelPickerItem =
+  | { type: "auto"; option: InferenceRoutingOptionDescriptor }
+  | { type: "model"; model: RoderModel };
+
+function modelPickerItemName(item: ModelPickerItem): string {
+  return item.type === "auto" ? item.option.label : modelName(item.model);
+}
+
+function modelPickerLabel(item: ModelPickerItem | null): string {
+  return item ? modelPickerItemName(item) : "Select model";
+}
+
+function modelPickerItemValue(item: ModelPickerItem): string {
+  return item.type === "auto" ? `auto:${item.option.id}` : `model:${item.model.modelProvider}:${item.model.id}`;
+}
+
+function modelPickerItemSearchText(item: ModelPickerItem): string {
+  if (item.type === "auto") {
+    return `${item.option.label} ${item.option.id} ${item.option.routerId} auto`;
+  }
+  return `${item.model.name} ${item.model.id} ${item.model.modelProvider}`;
 }
 
 const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];

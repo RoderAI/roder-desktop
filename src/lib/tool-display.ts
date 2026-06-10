@@ -18,6 +18,7 @@ const compactSummaryTools = new Set([
   "edit",
   "multi_edit",
   "apply_patch",
+  "auto_model_routing",
 ]);
 
 const fileActivityTools = new Set([

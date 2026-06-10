@@ -1,5 +1,6 @@
 import type {
   ConversationMessage,
+  InferenceRoutingDecisionEvent,
   RoderItem,
   RoderThread,
   RoderThreadItemDelta,
@@ -306,9 +307,37 @@ export function messagesFromThread(thread: RoderThread | undefined): Conversatio
     return cachedMessages;
   }
 
-  const messages = thread.turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
+  const turns = turnsWithVisibleRoutingDecisions(thread.turns, thread.selectionMode?.type === "auto");
+  const messages = turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
   messagesByThread.set(thread, messages);
   return messages;
+}
+
+function turnsWithVisibleRoutingDecisions(turns: RoderTurn[], showRoutingDecisions: boolean): RoderTurn[] {
+  let lastRoutingSignature: string | null = null;
+  let changed = false;
+  const filteredTurns = turns.map((turn) => {
+    const filteredItems = turn.items.filter((item) => {
+      if (item.type === "routingDecision") {
+        if (!showRoutingDecisions) {
+          changed = true;
+          return false;
+        }
+        const signature = routingDecisionSignature(item.decision);
+        if (signature === lastRoutingSignature) {
+          changed = true;
+          return false;
+        }
+        lastRoutingSignature = signature;
+      }
+      return true;
+    });
+    if (filteredItems.length === turn.items.length) {
+      return turn;
+    }
+    return { ...turn, items: filteredItems };
+  });
+  return changed ? filteredTurns : turns;
 }
 
 export function messagesFromTurn(threadId: string, turn: RoderTurn): ConversationMessage[] {
@@ -511,6 +540,10 @@ function reasoningBlocksText(blocks: string[] | undefined): string {
 }
 
 function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem): ConversationMessage | null {
+  if (item.type === "routingDecision") {
+    return routingDecisionMessageFromItem(threadId, turnId, item);
+  }
+
   if (item.type !== "toolExecution") {
     return null;
   }
@@ -547,6 +580,84 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
     toolSubject: toolSubject(toolName, input, payload),
     toolSummary: summary,
   };
+}
+
+function routingDecisionMessageFromItem(
+  threadId: string,
+  turnId: string,
+  item: Extract<RoderItem, { type: "routingDecision" }>,
+): ConversationMessage {
+  const thinking = routingDecisionThinkingLabel(item.decision);
+  const summary = routingDecisionTitle(item.decision, thinking);
+  const detail = [
+    item.decision.decision.reason ? `Reason: ${item.decision.decision.reason}` : "",
+    `Default: ${selectionLabel(item.decision.defaultSelection)}`,
+    `Selected: ${selectionLabel(item.decision.selectedSelection)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const status = item.status === "failed" ? "failed" : item.status === "inProgress" ? "streaming" : "complete";
+
+  return {
+    id: `routing:${item.id}`,
+    threadId,
+    turnId,
+    role: "tool",
+    text: summary,
+    status,
+    toolName: "auto_model_routing",
+    toolCallId: item.id,
+    toolStatus: status === "streaming" ? "running" : status,
+    toolOutput: detail,
+    toolSubject: selectionLabel(item.decision.selectedSelection),
+    toolSummary: summary,
+  };
+}
+
+function routingDecisionTitle(event: InferenceRoutingDecisionEvent, thinking: string | null): string {
+  const selected = selectionLabel(event.selectedSelection);
+  const suffix = thinking ? ` (${thinking})` : "";
+  if (event.decision.outcome === "abstained") {
+    return `Auto kept ${selected}${suffix}`;
+  }
+  if (event.decision.outcome === "fallback") {
+    return `Auto fell back to ${selected}${suffix}`;
+  }
+  if (event.decision.outcome === "escalated") {
+    return `Auto escalated to ${selected}${suffix}`;
+  }
+  return `Auto selected ${selected}${suffix}`;
+}
+
+function routingDecisionThinkingLabel(event: InferenceRoutingDecisionEvent): string | null {
+  const reasoning = event.decision.reasoning;
+  if (!reasoning) {
+    return null;
+  }
+  if (!reasoning.enabled) {
+    return "Off";
+  }
+  if (!reasoning.level) {
+    return "On";
+  }
+  return reasoningLevelLabel(reasoning.level);
+}
+
+function routingDecisionSignature(event: InferenceRoutingDecisionEvent): string {
+  const reasoning = event.decision.reasoning;
+  const thinking = !reasoning ? "" : reasoning.enabled ? (reasoning.level ?? "on") : "off";
+  return [event.selectedSelection.provider, event.selectedSelection.model, thinking].join("\u0000");
+}
+
+function reasoningLevelLabel(level: string): string {
+  if (level === "xhigh") {
+    return "Extra high";
+  }
+  return level.slice(0, 1).toUpperCase() + level.slice(1);
+}
+
+function selectionLabel(selection: { provider: string; model: string }): string {
+  return `${selection.provider} / ${selection.model}`;
 }
 
 function toolDetailOutput(toolName: string, detailOutput: string): string | undefined {
