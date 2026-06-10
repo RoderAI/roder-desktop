@@ -1,7 +1,7 @@
 import type { ConversationMessage } from "@/types/roder";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { PatchDiff } from "@pierre/diffs/react";
-import { isShellToolName } from "@/lib/tool-display";
+import { canonicalToolName, isShellToolName } from "@/lib/tool-display";
 import { toolStatus, toolTextClass, toolTitle } from "@/lib/tool-timeline";
 import { cn } from "@/lib/utils";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
@@ -17,6 +17,10 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
   const summary = message.toolSummary || message.text;
   const title = toolTitle(message, summary);
   const Title = status === "running" ? ShimmerText : "span";
+
+  if (canonicalToolName(message.toolName) === "auto_model_routing") {
+    return <RoutingDecisionToolItem message={message} onOpenChange={onOpenChange} open={open} title={title} />;
+  }
 
   if (isShellToolName(message.toolName) && (message.toolInput || message.toolOutput)) {
     return (
@@ -38,6 +42,41 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
         </span>
       ) : null}
     </div>
+  );
+}
+
+function RoutingDecisionToolItem({
+  message,
+  onOpenChange,
+  open,
+  title,
+}: ToolDisclosureControlProps & {
+  message: ConversationMessage;
+  title: string;
+}): React.JSX.Element {
+  if (!message.toolOutput) {
+    return (
+      <div className="flex min-h-7 min-w-0 items-center gap-2 pl-5 text-base leading-7">
+        <ToolFailureDot failed={false} />
+        <span className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Collapsible.Root className="group/tool-group pl-5 text-base leading-7" onOpenChange={onOpenChange} open={open}>
+      <Collapsible.Trigger
+        className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        type="button"
+      >
+        <ToolFailureDot failed={false} />
+        <span className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</span>
+        <DisclosureChevron groupName="tool-group" />
+      </Collapsible.Trigger>
+      <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">
+        <pre className="m-0 whitespace-pre-wrap break-words py-1 font-ui text-base leading-7">{message.toolOutput}</pre>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }
 

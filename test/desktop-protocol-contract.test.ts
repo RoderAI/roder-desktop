@@ -19,6 +19,8 @@ const documentedDesktopMethods = [
   "turn/interrupt",
   "tools/call",
   "model/list",
+  "model/select",
+  "providers/list",
   "skills/list",
   "skills/setEnabled",
   "skills/setExposure",
