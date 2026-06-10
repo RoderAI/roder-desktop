@@ -49,6 +49,7 @@ const mockState = vi.hoisted(() => ({
     method: string;
     params: unknown;
   }>,
+  children: [] as MockChildProcess[],
 }));
 
 vi.mock("electron", () => ({
@@ -92,6 +93,7 @@ vi.mock("node:child_process", async (importOriginal) => {
       };
 
       mockState.spawned.push({ command, args, options });
+      mockState.children.push(child);
       return child;
     }),
     spawnSync: vi.fn<SpawnSyncMock>((command, args, options) => {
@@ -109,10 +111,58 @@ beforeEach(() => {
   mockState.spawned.length = 0;
   mockState.spawnSyncCalls.length = 0;
   mockState.requests.length = 0;
+  mockState.children.length = 0;
   Object.defineProperty(process, "resourcesPath", {
     value: "/tmp/roder-test-resources",
     configurable: true,
   });
+});
+
+test("forwards inference routing decision notifications from the app-server", async () => {
+  const { RoderAppServerClient } = await import("../electron/roder/app-server-client");
+
+  const client = new RoderAppServerClient();
+  const notifications: unknown[] = [];
+  client.on("notification", (notification) => notifications.push(notification));
+  await client.start();
+
+  const child = mockState.children[0];
+  child.stdout.emit(
+    "data",
+    `${JSON.stringify({
+      method: "inference/routing/decision",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        defaultSelection: { provider: "openai", model: "gpt-5.5" },
+        selectedSelection: { provider: "anthropic", model: "claude-sonnet-5" },
+        decision: {
+          routerId: "local",
+          outcome: "escalated",
+          reason: "Large diff and test failure signals",
+        },
+        timestamp: "2026-06-08T12:00:00Z",
+      },
+    })}\n`,
+  );
+
+  expect(notifications).toEqual([
+    {
+      method: "inference/routing/decision",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        defaultSelection: { provider: "openai", model: "gpt-5.5" },
+        selectedSelection: { provider: "anthropic", model: "claude-sonnet-5" },
+        decision: {
+          routerId: "local",
+          outcome: "escalated",
+          reason: "Large diff and test failure signals",
+        },
+        timestamp: "2026-06-08T12:00:00Z",
+      },
+    },
+  ]);
 });
 
 test("starts the app-server over stdio and initializes desktop capabilities", async () => {

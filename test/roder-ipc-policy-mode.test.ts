@@ -134,6 +134,145 @@ test("default settings use provider and settings protocol methods", async () => 
   ]);
 });
 
+test("provider list reads routing options without flattening them into models", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    return {
+      active_provider: "openai",
+      active_model: "gpt-5.5",
+      active_reasoning: "medium",
+      selectionMode: {
+        type: "auto",
+        option_id: "local:coding",
+        router_id: "local",
+        label: "Auto: Coding",
+        baseline: { provider: "openai", model: "gpt-5.5" },
+      },
+      routingOptions: [
+        {
+          id: "local:coding",
+          label: "Auto: Coding",
+          routerId: "local",
+          baseline: { provider: "openai", model: "gpt-5.5" },
+        },
+      ],
+      providers: [
+        {
+          id: "openai",
+          name: "OpenAI",
+          authenticated: true,
+          recommended: true,
+          auth_type: "api_key",
+          auth_label: "OPENAI_API_KEY",
+          auth_detail: "Configured",
+          sort_order: 10,
+          models: [],
+        },
+      ],
+    };
+  });
+
+  const result = await roderIpc.listProviders();
+
+  expect(result.routingOptions).toHaveLength(1);
+  expect(result.providers[0]).toMatchObject({
+    id: "openai",
+    authType: "api_key",
+    authLabel: "OPENAI_API_KEY",
+    authDetail: "Configured",
+    sortOrder: 10,
+  });
+  expect(result.providers[0]).not.toHaveProperty("auth_type");
+  expect(result.providers[0]).not.toHaveProperty("auth_label");
+  expect(result.providers[0]).not.toHaveProperty("auth_detail");
+  expect(result.providers[0]).not.toHaveProperty("sort_order");
+  expect(result.selectionMode?.type).toBe("auto");
+  expect(result.selectionMode).toEqual({
+    type: "auto",
+    optionId: "local:coding",
+    routerId: "local",
+    label: "Auto: Coding",
+    baseline: { provider: "openai", model: "gpt-5.5" },
+  });
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "providers/list",
+      params: {},
+    },
+  ]);
+});
+
+test("model selection sends typed manual and auto choices to the app-server", async () => {
+  const calls = [];
+  const roderIpc = await loadRoderIpc(async (method, params) => {
+    calls.push({ method, params });
+    const selectionMode =
+      params.selection.type === "auto"
+        ? {
+            type: "auto",
+            option_id: params.selection.option_id,
+            router_id: "local",
+            label: "Auto: Coding",
+            baseline: { provider: "openai", model: "gpt-5.5" },
+          }
+        : params.selection;
+    return {
+      selectionMode,
+      provider: params.selection.type === "auto" ? "openai" : params.selection.provider,
+      model: params.selection.type === "auto" ? "gpt-5.5" : params.selection.model,
+      reasoning: params.selection.reasoning ?? "medium",
+    };
+  });
+
+  await roderIpc.selectModel({ type: "manual", provider: "openai", model: "gpt-5.5", reasoning: "high" });
+  await roderIpc.selectModel({ type: "auto", optionId: "local:coding" }, "thread-1");
+
+  expect(JSON.parse(JSON.stringify(calls))).toEqual([
+    {
+      method: "model/select",
+      params: {
+        selection: { type: "manual", provider: "openai", model: "gpt-5.5", reasoning: "high" },
+      },
+    },
+    {
+      method: "model/select",
+      params: {
+        threadId: "thread-1",
+        selection: { type: "auto", option_id: "local:coding" },
+      },
+    },
+  ]);
+});
+
+test("model selection treats auto responses without option ids as manual baseline selections", async () => {
+  const roderIpc = await loadRoderIpc(async () => ({
+    selectionMode: {
+      type: "auto",
+      router_id: "local",
+      label: "Auto: Coding",
+      baseline: { provider: "openai", model: "gpt-5.5" },
+    },
+    provider: "openai",
+    model: "gpt-5.5",
+    reasoning: "medium",
+  }));
+
+  const result = await roderIpc.selectModel({
+    type: "manual",
+    provider: "openai",
+    model: "gpt-5.5",
+    reasoning: "medium",
+  });
+
+  expect(result.selectionMode).toEqual({
+    type: "manual",
+    provider: "openai",
+    model: "gpt-5.5",
+    reasoning: null,
+  });
+});
+
 test("startTurn sends selected controls with the next turn", async () => {
   const calls = [];
   const roderIpc = await loadRoderIpc(async (method, params) => {

@@ -1,7 +1,7 @@
 import { Check, RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { visibleModelIdsFor } from "@/lib/roder-models";
+import { modelVisibilityKey, visibleModelIdsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type { RoderModel } from "@/types/roder";
 import { cn } from "@/lib/utils";
@@ -57,15 +57,16 @@ export function ModelsSettingsPanel(): React.JSX.Element {
               <h2 className="mb-2 text-base font-medium text-muted-foreground">{providerName(group.provider)}</h2>
               <div className="space-y-1">
                 {group.models.map((model) => {
-                  const visible = visibleSet.has(model.id);
+                  const key = modelVisibilityKey(model);
+                  const visible = visibleSet.has(key);
                   return (
                     <ModelVisibilityRow
-                      key={model.id}
+                      key={key}
                       model={model}
                       selected={model.id === selectedModel}
                       visible={visible}
                       disabled={visible && visibleIds.length <= 1}
-                      onToggle={() => setModelVisibility(model.id, !visible)}
+                      onToggle={() => setModelVisibility(key, !visible)}
                     />
                   );
                 })}

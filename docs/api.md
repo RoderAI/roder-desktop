@@ -90,8 +90,8 @@ Provider auth is provider-specific:
 
 - `auth/codex/login`, `auth/codex/status`, and `auth/codex/logout` manage the
   Codex OAuth token store through `roder-codex-auth`.
-- `providers/list` reports each provider's `authType`, `authLabel`,
-  `authenticated`, and optional `authDetail`.
+- `providers/list` reports each provider's `auth_type`, `auth_label`,
+  `authenticated`, and optional `auth_detail`.
 - API-key providers rely on environment/config outside this app-server method
   surface.
 
@@ -138,8 +138,8 @@ a child path.
 ```
 
 `item` is a typed visible row or event within a turn. Public item `type` values
-are `userMessage`, `agentMessage`, `reasoning`, `toolExecution`, `compaction`,
-`error`, and `raw`.
+are `userMessage`, `agentMessage`, `reasoning`, `toolExecution`,
+`routingDecision`, `compaction`, `error`, and `raw`.
 
 `provider` is an inference backend. Provider/model notation is exposed as a
 provider id plus model id, for example `openai` and `gpt-5.5`, or provider
@@ -160,6 +160,7 @@ Core:
 | `providers/configure`       | Persist an API key for an API-key provider.                     |
 | `providers/select`          | Select active default provider/model/reasoning.                 |
 | `model/list`                | List desktop model descriptors.                                 |
+| `model/select`              | Select Manual provider/model or Auto routing mode.              |
 | `settings/get`              | Read hosted web search mode and default policy mode.            |
 | `settings/set_web_search`   | Set hosted web search mode.                                     |
 | `settings/set_default_mode` | Set default policy mode.                                        |
@@ -334,6 +335,24 @@ Response:
   "active_provider": "openai",
   "active_model": "gpt-5.5",
   "active_reasoning": "high",
+  "selectionMode": {
+    "type": "manual",
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "reasoning": "high"
+  },
+  "routingOptions": [
+    {
+      "id": "local:coding",
+      "label": "Auto: Coding",
+      "routerId": "local",
+      "baseline": { "provider": "openai", "model": "gpt-5.5" },
+      "profile": "coding",
+      "objective": "cost",
+      "available": true,
+      "metadata": {}
+    }
+  ],
   "providers": [
     {
       "id": "openai",
@@ -355,6 +374,11 @@ Response:
 Behavior:
 
 - Providers are sorted by `sortOrder`, then name.
+- `routingOptions` is a sibling list of selectable Auto modes contributed by
+  registered inference routers. These are not inserted into provider `models`.
+- `selectionMode` describes the current picker selection. Manual mode carries a
+  concrete provider/model/reasoning; Auto mode carries an option id, router id,
+  display label, optional profile/reasoning, and a concrete baseline.
 - OAuth providers report `authenticated` by checking the relevant token store.
 - Model listing failures for an individual provider are treated as an empty
   model list.
@@ -398,6 +422,8 @@ Errors:
 ### `providers/select`
 
 Purpose: Select the active provider, model, and optional reasoning effort.
+This is the legacy Manual-only selection method; new clients should use
+`model/select`.
 
 Request:
 
@@ -429,6 +455,69 @@ Errors:
 
 - Runtime provider/model validation errors return code `-32000` with
   `data.details`.
+
+### `model/select`
+
+Purpose: Select either a concrete Manual model or a configured Auto routing
+option.
+
+Manual request:
+
+```json
+{
+  "selection": {
+    "type": "manual",
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "reasoning": "high"
+  },
+  "threadId": "thread-123"
+}
+```
+
+Auto request:
+
+```json
+{
+  "selection": {
+    "type": "auto",
+    "option_id": "local:coding"
+  },
+  "threadId": "thread-123"
+}
+```
+
+Response:
+
+```json
+{
+  "selectionMode": {
+    "type": "auto",
+    "option_id": "local:coding",
+    "router_id": "local",
+    "label": "Auto: Coding",
+    "baseline": { "provider": "openai", "model": "gpt-5.5" },
+    "profile": "coding",
+    "reasoning": "high"
+  },
+  "provider": "openai",
+  "model": "gpt-5.5",
+  "reasoning": "high",
+  "modelProfile": "OpenAI GPT-5.5"
+}
+```
+
+Behavior:
+
+- Manual selection validates a real provider/model/reasoning and bypasses
+  routing on normal turns.
+- Auto selection validates a configured routing option from `routingOptions`.
+  Normal turns use the option baseline as the default provider/model and invoke
+  the selected router before inference.
+- Passing `threadId` updates that thread's selection mode. Omitting `threadId`
+  updates process-local default picker state.
+- Auto options are selected by `option_id`; they are not fake providers or fake
+  model ids.
 
 ### `settings/get`
 
@@ -552,6 +641,10 @@ Request:
   "model": "gpt-5.5",
   "modelProvider": "openai",
   "reasoning": "high",
+  "selection": {
+    "type": "auto",
+    "option_id": "local:coding"
+  },
   "initialPrompt": "inspect this repo",
   "ephemeral": false
 }
@@ -586,6 +679,9 @@ Behavior:
 
 - Creates a persisted runtime thread with optional provider/model and required
   `workspaceId`.
+- `selection` is optional. When supplied, it preserves typed Manual or Auto
+  model-selection intent for the new thread. When omitted, `model`,
+  `modelProvider`, and `reasoning` are treated as legacy Manual overrides.
 - `rootId` is optional and defaults to the workspace default root.
 - `cwd` is optional. When omitted, it defaults to the selected root path. When
   supplied, it must be the selected root or a child path of that root.
@@ -2180,9 +2276,13 @@ notifications:
 - Memory: `memory/saved`, `memory/updated`, `memory/deleted`,
   `memory/queried`, `memory/recallReady`, `memory/reembedQueued`,
   `memory/providerChanged`, `memory/observationRecorded`.
+- Inference routing: `inference/routing/decision` notifications with the
+  protocol `InferenceRoutingDecisionEvent` payload. Routing decisions are also
+  recorded as typed `routingDecision` items through the item stream so thread
+  history can render the selected model/reasoning after reload.
 
-Payloads for these notifications are the corresponding `roder-api` event
-structs serialized to JSON.
+Payloads for these notifications are the corresponding protocol structs
+serialized to JSON unless the method specifies a more specific payload.
 
 ## Error Model
 
@@ -2232,9 +2332,10 @@ Cancellation and interruption:
 
 - `thread/list` and `thread/read` use persisted threads first and in-memory
   protocol threads as a fallback.
-- `providers/select`, `settings/set_web_search`, and
+- `providers/select`, Manual `model/select`, `settings/set_web_search`, and
   `settings/set_default_mode` persist only when the app-server instance enables
-  user-config persistence.
+  user-config persistence. Auto `model/select` is currently process-local
+  selection state unless a later backend adds durable router policy editing.
 - Workflow import decisions are persisted under `~/.roder/workflow-imports.json`
   unless `RODER_WORKFLOW_IMPORTS_PATH` is set.
 - Media artifact storage is configured by `media.artifacts_dir`,
@@ -2256,7 +2357,8 @@ Cancellation and interruption:
 
 ### Create a Thread and Run a Turn
 
-1. Call `thread/start` with `model`, `modelProvider`, and `cwd`.
+1. Call `thread/start` with either typed `selection` or `model`,
+   `modelProvider`, and `cwd`.
 2. Wait for `thread/started` or use the returned `thread`.
 3. Call `turn/start` with rich text `input`.
 4. Consume notifications until matching `turn/completed`.
@@ -2289,7 +2391,7 @@ Cancellation and interruption:
 ### Provider Login and Selection
 
 1. Call `providers/list`.
-2. If the desired Codex provider has `authType: "oauth"` and
+2. If the desired Codex provider has `auth_type: "oauth"` and
    `authenticated: false`, call `auth/codex/login`.
 3. Call `providers/list` again or `auth/codex/status`.
 4. Call `providers/select` with provider, model, and optional reasoning.

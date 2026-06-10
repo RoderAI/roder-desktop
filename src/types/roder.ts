@@ -128,6 +128,7 @@ export type RoderThread = {
   preview: string;
   modelProvider: string;
   model: string;
+  selectionMode?: ModelSelectionMode | null;
   createdAt: number;
   updatedAt: number;
   status: {
@@ -353,6 +354,13 @@ export type RoderToolExecutionItem = {
   error?: string;
 };
 
+export type RoderRoutingDecisionItem = {
+  id: string;
+  type: "routingDecision";
+  decision: InferenceRoutingDecisionEvent;
+  status?: RoderItemStatus;
+};
+
 export type RoderCompactionItem = {
   id: string;
   type: "compaction";
@@ -379,6 +387,7 @@ export type RoderItem =
   | RoderAgentMessageItem
   | RoderReasoningItem
   | RoderToolExecutionItem
+  | RoderRoutingDecisionItem
   | RoderCompactionItem
   | RoderErrorItem
   | RoderRawItem;
@@ -411,6 +420,126 @@ export type RoderModel = {
   defaultReasoningEffort?: string;
   reasoningEfforts?: string[];
   isDefault?: boolean;
+};
+
+export type ModelSelection = {
+  provider: string;
+  model: string;
+};
+
+export type ModelSelectionMode =
+  | {
+      type: "manual";
+      provider: string;
+      model: string;
+      reasoning?: string | null;
+    }
+  | {
+      type: "auto";
+      optionId: string;
+      routerId?: string | null;
+      label?: string | null;
+      baseline?: ModelSelection | null;
+      profile?: string | null;
+      reasoning?: string | null;
+    };
+
+export type ModelSelectChoice =
+  | {
+      type: "manual";
+      provider: string;
+      model: string;
+      reasoning?: string;
+    }
+  | {
+      type: "auto";
+      optionId: string;
+    };
+
+export type ModelSelectResult = {
+  selectionMode: ModelSelectionMode;
+  provider: string;
+  model: string;
+  reasoning: string;
+  modelProfile?: string | null;
+  modelSwitchSummary?: string | null;
+};
+
+export type ProviderModelDescriptor = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
+export type ProviderDescriptor = {
+  id: string;
+  name: string;
+  description?: string | null;
+  authType?: string;
+  authLabel?: string | null;
+  authenticated: boolean;
+  authDetail?: string | null;
+  recommended: boolean;
+  sortOrder?: number;
+  capabilities?: unknown;
+  models: ProviderModelDescriptor[];
+};
+
+export type InferenceRoutingOptionDescriptor = {
+  id: string;
+  label: string;
+  routerId: string;
+  baseline: ModelSelection;
+  profile?: string | null;
+  objective?: string | null;
+  reasoning?: string | null;
+  available?: boolean;
+  unavailableReason?: string | null;
+  metadata?: unknown;
+};
+
+export type ProvidersListResult = {
+  active_provider: string;
+  active_model: string;
+  active_reasoning: string;
+  providers: ProviderDescriptor[];
+  routingOptions?: InferenceRoutingOptionDescriptor[];
+  selectionMode?: ModelSelectionMode | null;
+};
+
+export type InferenceRoutingOutcome = "selected" | "escalated" | "fallback" | "abstained" | (string & {});
+
+export type ReasoningConfig = {
+  enabled: boolean;
+  level?: string | null;
+};
+
+export type InferenceRoutingDecision = {
+  routerId: string;
+  outcome: InferenceRoutingOutcome;
+  selected?: ModelSelection | null;
+  reasoning?: ReasoningConfig | null;
+  reason: string;
+  confidence?: number | null;
+  matchedSignals?: Array<{
+    key: string;
+    value: string;
+    source?: string | null;
+    weight?: number | null;
+  }>;
+  baseline?: ModelSelection | null;
+  costDelta?: unknown;
+  metadata?: unknown;
+};
+
+export type InferenceRoutingDecisionEvent = {
+  threadId: string;
+  turnId: string;
+  roundIndex?: number | null;
+  defaultSelection: ModelSelection;
+  selectedSelection: ModelSelection;
+  decision: InferenceRoutingDecision;
+  timestamp: string;
 };
 
 export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";

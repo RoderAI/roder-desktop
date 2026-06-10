@@ -192,15 +192,18 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             busy={activeThreadBusy}
             commands={mergedCommands}
             models={agent.models}
+            routingOptions={agent.routingOptions}
             skills={skills}
             selectedModel={agent.selectedModel}
             selectedModelProvider={agent.selectedModelProvider}
+            selectedSelectionMode={agent.selectedSelectionMode}
             selectedPolicyMode={agent.selectedPolicyMode}
             selectedReasoning={agent.selectedReasoning}
             attachments={composerAttachments}
             focusSignal={composerFocusSignal}
             showScrollToBottom={canScrollTranscriptToBottom}
-            onSelectedModelChange={agent.setSelectedModel}
+            onSelectedModelChange={(model, provider) => void agent.setSelectedModel(model, provider)}
+            onSelectedAutoModelChange={(optionId) => void agent.setSelectedAutoModel(optionId)}
             onSelectedPolicyModeChange={(mode) => void agent.setSelectedPolicyMode(mode)}
             onSelectedReasoningChange={agent.setSelectedReasoning}
             onScrollToBottom={followBottom}

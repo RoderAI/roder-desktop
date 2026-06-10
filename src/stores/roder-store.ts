@@ -15,6 +15,8 @@ import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-
 import {
   compactVisibleModelIds,
   effectiveSelectedModel,
+  modelVisibilityKey,
+  selectedModelRecord,
   selectedModelProvider,
   visibleModelIdsFor,
   visibleModelsFor,
@@ -40,6 +42,9 @@ import type {
   RoderThreadItemEvent,
   RoderTurn,
   NavigationEntry,
+  InferenceRoutingOptionDescriptor,
+  ModelSelectChoice,
+  ModelSelectionMode,
   ReasoningEffort,
   SystemAppearance,
   UserInputWaitRequest,
@@ -63,13 +68,16 @@ type RoderStore = {
   backStack: NavigationEntry[];
   forwardStack: NavigationEntry[];
   models: RoderModel[];
+  routingOptions: InferenceRoutingOptionDescriptor[];
   visibleModelIds: string[];
   defaultModel: string;
   defaultModelProvider: string;
+  defaultSelectionMode: ModelSelectionMode;
   defaultReasoning: ReasoningEffort;
   defaultPolicyMode: PolicyMode;
   selectedModel: string;
   selectedModelProvider: string;
+  selectedSelectionMode: ModelSelectionMode;
   selectedReasoning: ReasoningEffort;
   selectedPolicyMode: PolicyMode;
   workspaces: Workspace[];
@@ -96,9 +104,11 @@ type RoderStore = {
   stopTurn: () => Promise<void>;
   restart: () => Promise<void>;
   setDefaultModel: (model: string, provider?: string) => void;
+  setDefaultAutoModel: (optionId: string) => void;
   setDefaultReasoning: (reasoning: ReasoningEffort) => void;
   setDefaultPolicyMode: (mode: PolicyMode) => void;
-  setSelectedModel: (model: string, provider?: string) => void;
+  setSelectedModel: (model: string, provider?: string) => Promise<void>;
+  setSelectedAutoModel: (optionId: string) => Promise<void>;
   setSelectedReasoning: (reasoning: ReasoningEffort) => void;
   setSelectedPolicyMode: (mode: PolicyMode) => Promise<void>;
   saveDefaults: () => Promise<void>;
@@ -120,11 +130,19 @@ type ThreadControlState = {
   modelProvider: string;
   reasoning: ReasoningEffort;
   policyMode: PolicyMode;
+  selectionMode: ModelSelectionMode;
 };
 
 const initialStatus: RoderStatus = {
   state: "starting",
   binary: "unresolved",
+};
+
+const initialManualSelection: ModelSelectionMode = {
+  type: "manual",
+  provider: "",
+  model: "",
+  reasoning: "medium",
 };
 
 function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
@@ -331,13 +349,16 @@ export const useRoderStore = create<RoderStore>()(
       backStack: [],
       forwardStack: [],
       models: [],
+      routingOptions: [],
       visibleModelIds: [],
       defaultModel: "",
       defaultModelProvider: "",
+      defaultSelectionMode: initialManualSelection,
       defaultReasoning: "medium",
       defaultPolicyMode: "accept_all",
       selectedModel: "",
       selectedModelProvider: "",
+      selectedSelectionMode: initialManualSelection,
       selectedReasoning: "medium",
       selectedPolicyMode: "accept_all",
       workspaces: [],
@@ -355,10 +376,11 @@ export const useRoderStore = create<RoderStore>()(
         set({ busy: true, error: null });
         try {
           const readyStatus = await roderIpc.start();
-          const [status, threadResult, modelResult, settings, workspaceResult] = await Promise.all([
+          const [status, threadResult, modelResult, providerResult, settings, workspaceResult] = await Promise.all([
             roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
             roderIpc.listThreads(50),
             roderIpc.listModels(),
+            listProvidersForBootstrap(),
             roderIpc.settings(),
             listWorkspacesForBootstrap(),
           ]);
@@ -394,6 +416,14 @@ export const useRoderStore = create<RoderStore>()(
           const defaultReasoning = normalizeReasoningEffort(
             settings.default_reasoning || currentSelectedModelRecord?.defaultReasoningEffort,
           );
+          const providerSelectionMode =
+            providerResult.selectionMode ??
+            manualSelection(
+              currentSelectedModelProvider,
+              currentSelectedModel,
+              providerResult.active_reasoning || settings.default_reasoning,
+            );
+          const activeSelectionMode = activeThread?.selectionMode ?? providerSelectionMode;
 
           set({
             status,
@@ -401,9 +431,11 @@ export const useRoderStore = create<RoderStore>()(
             nextThreadCursor: threadResult.nextCursor ?? null,
             loadingMoreThreads: false,
             models,
+            routingOptions: providerResult.routingOptions ?? [],
             visibleModelIds,
             defaultModel: currentSelectedModel,
             defaultModelProvider: currentSelectedModelProvider,
+            defaultSelectionMode: providerSelectionMode,
             defaultReasoning,
             defaultPolicyMode,
             selectedWorkspaceCwd,
@@ -413,6 +445,7 @@ export const useRoderStore = create<RoderStore>()(
             workspaceRecents: upsertWorkspaceRecent(current.workspaceRecents, selectedWorkspaceCwd),
             selectedModel: activeThread?.model || currentSelectedModel,
             selectedModelProvider: activeThread?.modelProvider || currentSelectedModelProvider,
+            selectedSelectionMode: activeSelectionMode,
             selectedReasoning: defaultReasoning,
             selectedPolicyMode: defaultPolicyMode,
             activeThreadId,
@@ -508,6 +541,15 @@ export const useRoderStore = create<RoderStore>()(
                   thread.modelProvider ||
                   state.defaultModelProvider
                 : state.selectedModelProvider,
+              selectedSelectionMode: threadIsActive
+                ? state.threadControlsByThread[threadId]?.selectionMode ||
+                  thread.selectionMode ||
+                  manualSelection(
+                    thread.modelProvider || state.defaultModelProvider,
+                    thread.model || state.defaultModel,
+                    state.defaultReasoning,
+                  )
+                : state.selectedSelectionMode,
               threadDetails: { ...state.threadDetails, [threadId]: thread },
               threads: upsertThread(state.threads, thread),
               threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, goalResult.goal),
@@ -762,11 +804,15 @@ export const useRoderStore = create<RoderStore>()(
           );
           const selectedTurnModel = turnModel?.id ?? turnState.selectedModel;
           const started = await roderIpc.startTurn(threadId, text, attachments, {
-            modelProvider:
-              turnModel?.modelProvider ??
-              selectedModelProvider(turnState.models, selectedTurnModel, turnState.selectedModelProvider),
-            model: selectedTurnModel,
-            reasoning: turnState.selectedReasoning,
+            ...(configuredAutoOptionId(turnState.selectedSelectionMode)
+              ? {}
+              : {
+                  modelProvider:
+                    turnModel?.modelProvider ??
+                    selectedModelProvider(turnState.models, selectedTurnModel, turnState.selectedModelProvider),
+                  model: selectedTurnModel,
+                  reasoning: turnState.selectedReasoning,
+                }),
             policyMode: turnState.selectedPolicyMode,
           });
           if (started.turnId) {
@@ -832,27 +878,50 @@ export const useRoderStore = create<RoderStore>()(
             defaultModelProvider ??
             selectedModelProvider(state.models, defaultModel, state.defaultModelProvider) ??
             state.defaultModelProvider,
+          defaultSelectionMode: manualSelection(
+            defaultModelProvider ??
+              selectedModelProvider(state.models, defaultModel, state.defaultModelProvider) ??
+              state.defaultModelProvider,
+            defaultModel,
+            state.defaultReasoning,
+          ),
         })),
+      setDefaultAutoModel: (optionId) =>
+        set((state) => {
+          const option = state.routingOptions.find((candidate) => candidate.id === optionId);
+          if (!option) {
+            return {};
+          }
+          return {
+            defaultModel: option.baseline.model,
+            defaultModelProvider: option.baseline.provider,
+            defaultSelectionMode: autoSelection(option),
+          };
+        }),
       setDefaultReasoning: (defaultReasoning) => set({ defaultReasoning }),
       setDefaultPolicyMode: (defaultPolicyMode) => {
         const mode = normalizePolicyMode(defaultPolicyMode);
         set({ defaultPolicyMode: mode, error: null });
       },
-      setSelectedModel: (selectedModel, selectedModelProviderOverride) =>
-        set((state) => ({
-          selectedModel,
-          selectedModelProvider:
-            selectedModelProviderOverride ??
-            selectedModelProvider(state.models, selectedModel, state.selectedModelProvider) ??
-            state.selectedModelProvider,
-          threadControlsByThread: updateActiveThreadControls(state, {
-            model: selectedModel,
-            modelProvider:
-              selectedModelProviderOverride ??
-              selectedModelProvider(state.models, selectedModel, state.selectedModelProvider) ??
-              state.selectedModelProvider,
-          }),
-        })),
+      setSelectedModel: async (selectedModel, selectedModelProviderOverride) => {
+        const initialState = get();
+        const selectedProvider =
+          selectedModelProviderOverride ??
+          selectedModelProvider(initialState.models, selectedModel, initialState.selectedModelProvider) ??
+          initialState.selectedModelProvider;
+        const selectionMode = manualSelection(selectedProvider, selectedModel, initialState.selectedReasoning);
+        applySelectedModelState(set, selectedModel, selectedProvider, selectionMode);
+        await applyLiveModelSelection(set, get, selectionMode);
+      },
+      setSelectedAutoModel: async (optionId) => {
+        const option = get().routingOptions.find((candidate) => candidate.id === optionId);
+        if (!option) {
+          return;
+        }
+        const selectionMode = autoSelection(option);
+        applySelectedModelState(set, option.baseline.model, option.baseline.provider, selectionMode);
+        await applyLiveModelSelection(set, get, selectionMode);
+      },
       setModelVisibility: (modelId, visible) =>
         set((state) => {
           const currentVisibleIds = visibleModelIdsFor(state.models, state.visibleModelIds);
@@ -862,13 +931,22 @@ export const useRoderStore = create<RoderStore>()(
           } else {
             currentVisible.delete(modelId);
           }
-          const nextVisibleIds = state.models.flatMap((model) => (currentVisible.has(model.id) ? [model.id] : []));
+          const nextVisibleIds = state.models.flatMap((model) =>
+            currentVisible.has(modelVisibilityKey(model)) ? [modelVisibilityKey(model)] : [],
+          );
           if (nextVisibleIds.length === 0) {
             return {};
           }
-          const selectedModel = nextVisibleIds.includes(state.selectedModel)
-            ? state.selectedModel
-            : (nextVisibleIds[0] ?? state.selectedModel);
+          const selectedModelRecordValue = selectedModelRecord(
+            state.models,
+            state.selectedModel,
+            state.selectedModelProvider,
+          );
+          const selectedModel =
+            selectedModelRecordValue && nextVisibleIds.includes(modelVisibilityKey(selectedModelRecordValue))
+              ? state.selectedModel
+              : (state.models.find((model) => modelVisibilityKey(model) === nextVisibleIds[0])?.id ??
+                state.selectedModel);
           const selectedModelProviderValue =
             selectedModel === state.selectedModel
               ? state.selectedModelProvider
@@ -907,7 +985,6 @@ export const useRoderStore = create<RoderStore>()(
           }));
         } catch (error) {
           set({ error: (error as Error).message });
-          throw error;
         }
       },
       saveDefaults: async () => {
@@ -918,9 +995,13 @@ export const useRoderStore = create<RoderStore>()(
           state.defaultModel,
           state.defaultModelProvider,
         );
-        const selectedModel = model?.id ?? state.defaultModel;
+        const selectionMode = state.defaultSelectionMode;
+        const concrete = concreteSelection(selectionMode);
+        const selectedModel = model?.id ?? concrete.model ?? state.defaultModel;
         const selectedProvider =
-          model?.modelProvider ?? selectedModelProvider(state.models, selectedModel, state.defaultModelProvider);
+          model?.modelProvider ??
+          concrete.provider ??
+          selectedModelProvider(state.models, selectedModel, state.defaultModelProvider);
         if (!selectedModel || !selectedProvider) {
           const message = "Select a model before saving defaults";
           set({ error: message });
@@ -929,13 +1010,14 @@ export const useRoderStore = create<RoderStore>()(
 
         set({ error: null });
         const [selection, mode] = await Promise.all([
-          roderIpc.selectProviderDefaults(selectedProvider, selectedModel, state.defaultReasoning),
+          roderIpc.selectModel(modelSelectChoice(selectionMode, state.defaultReasoning)),
           roderIpc.setDefaultMode(state.defaultPolicyMode),
         ]);
 
         set({
           defaultModel: selection.model || selectedModel,
           defaultModelProvider: selection.provider || selectedProvider,
+          defaultSelectionMode: selection.selectionMode,
           defaultReasoning: normalizeReasoningEffort(selection.reasoning || state.defaultReasoning),
           defaultPolicyMode: normalizePolicyMode(mode.default_mode || state.defaultPolicyMode),
         });
@@ -1042,11 +1124,125 @@ function updateActiveThreadControls(
     modelProvider: state.selectedModelProvider,
     reasoning: state.selectedReasoning,
     policyMode: state.selectedPolicyMode,
+    selectionMode: state.selectedSelectionMode,
   };
   return setThreadControls(state.threadControlsByThread, state.activeThreadId, {
     ...currentControls,
     ...patch,
   });
+}
+
+function manualSelection(provider: string, model: string, reasoning?: string | null): ModelSelectionMode {
+  return {
+    type: "manual",
+    provider,
+    model,
+    reasoning: reasoning ?? null,
+  };
+}
+
+function autoSelection(option: InferenceRoutingOptionDescriptor): ModelSelectionMode {
+  return {
+    type: "auto",
+    optionId: option.id,
+    routerId: option.routerId,
+    label: option.label,
+    baseline: option.baseline,
+    profile: option.profile ?? null,
+    reasoning: option.reasoning ?? null,
+  };
+}
+
+function concreteSelection(selectionMode: ModelSelectionMode): { provider: string; model: string } {
+  if (selectionMode.type === "auto") {
+    return {
+      provider: selectionMode.baseline?.provider ?? "",
+      model: selectionMode.baseline?.model ?? "",
+    };
+  }
+  return {
+    provider: selectionMode.provider,
+    model: selectionMode.model,
+  };
+}
+
+function configuredAutoOptionId(selectionMode: ModelSelectionMode): string | null {
+  const optionId = selectionMode.type === "auto" ? selectionMode.optionId : null;
+  return typeof optionId === "string" && optionId !== "" ? optionId : null;
+}
+
+function modelSelectChoice(selectionMode: ModelSelectionMode, reasoning: ReasoningEffort): ModelSelectChoice {
+  const optionId = configuredAutoOptionId(selectionMode);
+  if (selectionMode.type === "auto" && optionId) {
+    return {
+      type: "auto",
+      optionId,
+    };
+  }
+  if (selectionMode.type === "auto") {
+    return {
+      type: "manual",
+      provider: selectionMode.baseline?.provider ?? "",
+      model: selectionMode.baseline?.model ?? "",
+      reasoning,
+    };
+  }
+  return {
+    type: "manual",
+    provider: selectionMode.provider,
+    model: selectionMode.model,
+    reasoning: selectionMode.reasoning ?? reasoning,
+  };
+}
+
+function applySelectedModelState(
+  set: RoderStoreSet,
+  selectedModel: string,
+  selectedModelProviderValue: string,
+  selectedSelectionMode: ModelSelectionMode,
+): void {
+  set((state) => ({
+    selectedModel,
+    selectedModelProvider: selectedModelProviderValue,
+    selectedSelectionMode,
+    threadControlsByThread: updateActiveThreadControls(state, {
+      model: selectedModel,
+      modelProvider: selectedModelProviderValue,
+      selectionMode: selectedSelectionMode,
+    }),
+  }));
+}
+
+async function applyLiveModelSelection(
+  set: RoderStoreSet,
+  get: () => RoderStore,
+  selectionMode: ModelSelectionMode,
+): Promise<void> {
+  const state = get();
+  if (!state.activeThreadId) {
+    return;
+  }
+  try {
+    const result = await roderIpc.selectModel(
+      modelSelectChoice(selectionMode, state.selectedReasoning),
+      state.activeThreadId,
+    );
+    set((state) => ({
+      selectedModel: result.model || state.selectedModel,
+      selectedModelProvider: result.provider || state.selectedModelProvider,
+      selectedSelectionMode: result.selectionMode,
+      selectedReasoning: normalizeReasoningEffort(result.reasoning || state.selectedReasoning),
+      threadControlsByThread: updateActiveThreadControls(state, {
+        model: result.model || state.selectedModel,
+        modelProvider: result.provider || state.selectedModelProvider,
+        reasoning: normalizeReasoningEffort(result.reasoning || state.selectedReasoning),
+        selectionMode: result.selectionMode,
+      }),
+      error: null,
+    }));
+  } catch (error) {
+    set({ error: (error as Error).message });
+  }
 }
 
 function removeThreadControls(
@@ -1138,6 +1334,25 @@ async function listWorkspacesForBootstrap(): Promise<{ workspaces: Workspace[] }
   }
 }
 
+async function listProvidersForBootstrap(): Promise<{
+  active_provider: string;
+  active_model: string;
+  active_reasoning: string;
+  routingOptions?: InferenceRoutingOptionDescriptor[];
+  selectionMode?: ModelSelectionMode | null;
+}> {
+  try {
+    return await roderIpc.listProviders();
+  } catch {
+    return {
+      active_provider: "",
+      active_model: "",
+      active_reasoning: "",
+      routingOptions: [],
+    };
+  }
+}
+
 async function startThreadForSelection(set: RoderStoreSet, get: () => RoderStore): Promise<void> {
   await createThreadForPrompt(set, get, undefined, { recordHistory: true, clearBusy: true });
 }
@@ -1151,27 +1366,60 @@ async function createThreadForPrompt(
   const state = get();
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
   const latestState = get();
-  const model = effectiveSelectedModel(
-    latestState.models,
-    latestState.visibleModelIds,
-    latestState.defaultModel,
-    latestState.defaultModelProvider,
-  );
-  const selectedModel = model?.id ?? latestState.defaultModel;
+  const isBlankThread = initialPrompt === undefined;
+  const selectionSource = isBlankThread
+    ? {
+        selectionMode: latestState.defaultSelectionMode,
+        model: latestState.defaultModel,
+        provider: latestState.defaultModelProvider,
+        reasoning: latestState.defaultReasoning,
+      }
+    : {
+        selectionMode: latestState.selectedSelectionMode,
+        model: latestState.selectedModel,
+        provider: latestState.selectedModelProvider,
+        reasoning: latestState.selectedReasoning,
+      };
+  const selectionMode =
+    selectionSource.selectionMode ??
+    manualSelection(selectionSource.provider, selectionSource.model, selectionSource.reasoning);
+  const concrete = concreteSelection(selectionMode);
+  const selectedModel = concrete.model || selectionSource.model;
   const selectedProvider =
-    model?.modelProvider ?? selectedModelProvider(latestState.models, selectedModel, latestState.defaultModelProvider);
+    concrete.provider ||
+    selectedModelProvider(latestState.models, selectedModel, selectionSource.provider) ||
+    selectionSource.provider;
+  const reasoning = selectionSource.reasoning;
   const result = await roderIpc.startThread(
     selectedModel,
     threadStartWorkspace(workspaceSelection),
     selectedProvider,
-    latestState.defaultReasoning,
-    initialPrompt === undefined ? undefined : { initialPrompt },
+    reasoning,
+    {
+      ...(isBlankThread ? {} : { initialPrompt }),
+      selection: configuredAutoOptionId(selectionMode)
+        ? modelSelectChoice(selectionMode, reasoning)
+        : {
+            type: "manual",
+            provider: selectedProvider,
+            model: selectedModel,
+            reasoning,
+          },
+    },
   );
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
   }
   const thread = normalizeThreadCwd(result.thread, get().status.cwd);
   const threadWithPreview = initialPrompt ? threadWithPromptPreview(thread, initialPrompt) : thread;
+  const resolvedSelectionMode =
+    threadWithPreview.selectionMode ||
+    result.selectionMode ||
+    manualSelection(
+      threadWithPreview.modelProvider || selectedProvider || state.defaultModelProvider,
+      threadWithPreview.model || result.model || selectedModel,
+      result.reasoning || reasoning,
+    );
   set((state) => ({
     threads: upsertThread(state.threads, threadWithPreview),
     threadDetails: { ...state.threadDetails, [threadWithPreview.id]: threadWithPreview },
@@ -1182,13 +1430,15 @@ async function createThreadForPrompt(
     selectedRootId: threadWithPreview.rootId ?? workspaceSelection.root.id,
     selectedModel: threadWithPreview.model || result.model || selectedModel,
     selectedModelProvider: threadWithPreview.modelProvider || selectedProvider || state.defaultModelProvider,
-    selectedReasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+    selectedSelectionMode: resolvedSelectionMode,
+    selectedReasoning: normalizeReasoningEffort(result.reasoning || reasoning),
     selectedPolicyMode: state.defaultPolicyMode,
     threadControlsByThread: setThreadControls(state.threadControlsByThread, threadWithPreview.id, {
       model: threadWithPreview.model || result.model || selectedModel,
       modelProvider: threadWithPreview.modelProvider || selectedProvider || state.defaultModelProvider,
-      reasoning: normalizeReasoningEffort(result.reasoning || state.defaultReasoning),
+      reasoning: normalizeReasoningEffort(result.reasoning || reasoning),
       policyMode: state.defaultPolicyMode,
+      selectionMode: resolvedSelectionMode,
     }),
     workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, threadWithPreview.cwd),
     backStack:
