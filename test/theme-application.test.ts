@@ -24,7 +24,7 @@ test("dark theme keeps stronger runtime borders", () => {
   expect(variables["--color-border"]).toBe("#474747");
 });
 
-test("runtime popover surfaces stay white in both schemes", () => {
+test("runtime popover surfaces follow the active theme", () => {
   const lightVariables = themeVariables(
     defaultThemeSettings.light,
     "light",
@@ -38,8 +38,9 @@ test("runtime popover surfaces stay white in both schemes", () => {
     defaultThemeSettings.codeFontSize,
   );
 
-  expect(lightVariables["--color-popover"]).toBe("#ffffff");
-  expect(lightVariables["--color-popover-foreground"]).toBe("#242424");
-  expect(darkVariables["--color-popover"]).toBe("#ffffff");
-  expect(darkVariables["--color-popover-foreground"]).toBe("#242424");
+  expect(lightVariables["--color-popover"]).toBe(lightVariables["--color-card"]);
+  expect(lightVariables["--color-popover-foreground"]).toBe(lightVariables["--color-foreground"]);
+  expect(darkVariables["--color-popover"]).toBe(darkVariables["--color-card"]);
+  expect(darkVariables["--color-popover-foreground"]).toBe(darkVariables["--color-foreground"]);
+  expect(darkVariables["--color-popover"]).not.toBe("#ffffff");
 });

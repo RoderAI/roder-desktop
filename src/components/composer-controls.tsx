@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { groupModelsByProvider, providerName } from "@/lib/roder-models";
 import { cn } from "@/lib/utils";
 
+export const pickerMenuSurfaceClassName = "bg-card text-card-foreground ring-border/70";
+
 export function PolicyModePicker({
   selectedMode,
   onChange,
@@ -238,7 +240,10 @@ export function ModelPicker({
         </Combobox.Trigger>
         <Combobox.Portal>
           <Combobox.Positioner align="end" side="top" sideOffset={8} className="z-50">
-            <Combobox.Popup className={cn(dropdownMenuContentClassName, "w-[320px] p-0")} aria-label="Choose model">
+            <Combobox.Popup
+              className={cn(dropdownMenuContentClassName, "w-[320px] p-0", pickerMenuSurfaceClassName)}
+              aria-label="Choose model"
+            >
               <div className="flex h-11 items-center gap-2.5 border-b border-border px-3.5">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
                 <Combobox.Input
@@ -315,7 +320,12 @@ export function ModelPicker({
           >
             <span>{reasoningLabel(selectedReasoning)}</span>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" sideOffset={8}>
+          <DropdownMenuContent
+            align="end"
+            side="top"
+            sideOffset={8}
+            className={pickerMenuSurfaceClassName}
+          >
             <DropdownMenuGroup>
               {reasoningOptions.map((reasoning) => (
                 <DropdownMenuItem
@@ -356,7 +366,7 @@ function modelPickerItemSearchText(item: ModelPickerItem): string {
   if (item.type === "auto") {
     return `${item.option.label} ${item.option.id} ${item.option.routerId} auto`;
   }
-  return `${item.model.name} ${item.model.id} ${item.model.modelProvider}`;
+  return `${item.model.displayName ?? ""} ${item.model.name} ${item.model.id} ${item.model.modelProvider}`;
 }
 
 const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
@@ -527,8 +537,8 @@ function containsProviderToken(normalizedProvider: string, token: string): boole
   return normalizedProvider.indexOf(token) !== -1;
 }
 
-function modelName(model: RoderModel | undefined): string {
-  return model?.name || model?.id || "Model";
+function modelName(model: RoderModel): string {
+  return model.displayName || model.name || model.id;
 }
 
 function reasoningLabel(reasoning: ReasoningEffort): string {

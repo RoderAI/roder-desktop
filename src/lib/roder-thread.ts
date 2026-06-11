@@ -549,7 +549,7 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
   }
 
   const payload: Record<string, unknown> = {};
-  const input = asRecord(item.input);
+  const input = toolInputRecord(item.input);
   const toolName = item.toolName || "tool";
   const toolCallId = item.toolCallId || item.id;
   const toolStatus = toolStatusFromItem(item);
@@ -734,7 +734,7 @@ function summarizeTool(
   }
 
   if (canonicalName === "apply_patch") {
-    const patchSummary = summarizeApplyPatch(rawString(payload.patch, input.patch));
+    const patchSummary = summarizeApplyPatch(applyPatchPreview(input, payload));
     const path = toolPath(input, payload) ?? patchSummary?.files[0];
     const fileSummary = patchFileSummary(path, patchSummary?.files.length ?? 0);
     const changeSummary = patchChangeSummary(patchSummary?.additions ?? 0, patchSummary?.deletions ?? 0);
@@ -923,7 +923,7 @@ function toolSubject(
     canonicalName === "multi_edit" ||
     canonicalName === "apply_patch"
   ) {
-    const patchSummary = canonicalName === "apply_patch" ? summarizeApplyPatch(rawString(payload.patch, input.patch)) : null;
+    const patchSummary = canonicalName === "apply_patch" ? summarizeApplyPatch(applyPatchPreview(input, payload)) : null;
     const path = toolPath(input, payload) ?? patchSummary?.files[0];
     return path ? basename(path) : undefined;
   }
@@ -940,7 +940,7 @@ function toolPreview(
 ): string | undefined {
   const canonicalName = canonicalToolName(toolName);
   if (canonicalName === "apply_patch") {
-    return rawString(payload.patch, input.patch);
+    return applyPatchPreview(input, payload);
   }
   if (canonicalName === "write_file") {
     return rawString(payload.content, payload.text, input.content, input.text);
@@ -952,6 +952,20 @@ function toolPreview(
     return multiEditPreview(input, payload);
   }
   return undefined;
+}
+
+function applyPatchPreview(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  return rawString(
+    payload.patch,
+    payload.patchText,
+    payload.patch_text,
+    input.patch,
+    input.patchText,
+    input.patch_text,
+    input.input,
+    input.text,
+    input.content,
+  );
 }
 
 function editPreview(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
@@ -1060,8 +1074,23 @@ function looksLikeResultSummary(value: string): boolean {
   return value.includes("\n") || value.length > 160;
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? value : {};
+function toolInputRecord(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) {
+    return value;
+  }
+  if (typeof value !== "string" || !value.trim()) {
+    return {};
+  }
+  const trimmed = value.trim();
+  if (trimmed.startsWith("*** Begin Patch")) {
+    return { patch: value };
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

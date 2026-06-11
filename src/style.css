@@ -8,7 +8,7 @@
   --color-foreground: hsl(0 0% 14%);
   --color-card: hsl(0 0% 100%);
   --color-card-foreground: hsl(0 0% 14%);
-  --color-popover: #fff;
+  --color-popover: hsl(0 0% 100%);
   --color-popover-foreground: hsl(0 0% 14%);
   --color-primary: hsl(0 0% 11%);
   --color-primary-foreground: hsl(0 0% 98%);
@@ -54,8 +54,8 @@
   --color-foreground: hsl(0 0% 88%);
   --color-card: hsl(0 0% 12%);
   --color-card-foreground: hsl(0 0% 88%);
-  --color-popover: #fff;
-  --color-popover-foreground: hsl(0 0% 14%);
+  --color-popover: hsl(0 0% 12%);
+  --color-popover-foreground: hsl(0 0% 88%);
   --color-primary: hsl(0 0% 92%);
   --color-primary-foreground: hsl(0 0% 8%);
   --color-secondary: hsl(0 0% 20%);
@@ -90,8 +90,8 @@
     --color-foreground: hsl(0 0% 88%);
     --color-card: hsl(0 0% 12%);
     --color-card-foreground: hsl(0 0% 88%);
-    --color-popover: #fff;
-    --color-popover-foreground: hsl(0 0% 14%);
+    --color-popover: hsl(0 0% 12%);
+    --color-popover-foreground: hsl(0 0% 88%);
     --color-primary: hsl(0 0% 92%);
     --color-primary-foreground: hsl(0 0% 8%);
     --color-secondary: hsl(0 0% 20%);

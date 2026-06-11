@@ -415,6 +415,7 @@ export type RoderThreadItemEvent = {
 export type RoderModel = {
   id: string;
   name: string;
+  displayName?: string;
   description?: string;
   modelProvider: string;
   defaultReasoningEffort?: string;
@@ -793,6 +794,13 @@ export type DesktopAttachment = {
   size: number;
   imageUrl?: string;
   source?: "browser" | "canvas" | "clipboard" | "file";
+};
+
+export type QueuedPrompt = {
+  id: string;
+  prompt: string;
+  attachments: DesktopAttachment[];
+  createdAt: number;
 };
 
 export type ResolvedDesktopFile = Omit<DesktopAttachment, "id">;

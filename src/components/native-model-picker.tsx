@@ -46,7 +46,7 @@ export function NativeModelPicker({
       className="pointer-events-auto absolute inset-x-0 bottom-full mb-2 mx-auto w-full max-w-3xl px-5"
       aria-label="Choose model"
     >
-      <CompletionMenuShell>
+      <CompletionMenuShell surface="card" className="ring-border/70">
         <div className="flex h-11 items-center gap-2 border-b border-border/70 px-3">
           <Search className="size-4 shrink-0 text-muted-foreground" />
           <input
@@ -141,12 +141,12 @@ function filteredModels(models: RoderModel[], query: string): RoderModel[] {
     return models;
   }
   return models.filter((model) =>
-    `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase().includes(normalizedQuery),
+    `${model.displayName ?? ""} ${model.name} ${model.id} ${model.modelProvider}`.toLowerCase().includes(normalizedQuery),
   );
 }
 
 function modelName(model: RoderModel): string {
-  return model.name || model.id;
+  return model.displayName || model.name || model.id;
 }
 
 function boundedModelIndex(index: number, itemCount: number): number {

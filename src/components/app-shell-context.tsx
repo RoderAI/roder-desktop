@@ -37,6 +37,7 @@ export type AppShellContextValue = {
   selectNativeCommandModel: (modelId: string, modelProvider?: string) => void;
   sendCommandInvocation: (invocation: CommandInvocation) => Promise<void>;
   sendPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
+  steerPrompt: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
 };
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);

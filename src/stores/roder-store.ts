@@ -15,6 +15,7 @@ import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-
 import {
   compactVisibleModelIds,
   configuredModelsFor,
+  displayModelName,
   effectiveSelectedModel,
   modelKey,
   selectedModelProvider,
@@ -36,6 +37,7 @@ import type {
   ProviderDescriptor,
   ProvidersListResult,
   PlanExitWaitRequest,
+  QueuedPrompt,
   RoderModel,
   RoderNotification,
   RoderStatus,
@@ -65,6 +67,7 @@ type RoderStore = {
   loadingMoreThreads: boolean;
   threadGoalsByThread: Record<string, RoderThreadGoal>;
   threadControlsByThread: Record<string, ThreadControlState>;
+  queuedPromptsByThread: Record<string, QueuedPrompt[]>;
   hunkRevisionByThread: Record<string, number>;
   activeThreadId: string;
   backStack: NavigationEntry[];
@@ -102,8 +105,12 @@ type RoderStore = {
   goForward: () => Promise<void>;
   newProject: (params?: WorkspaceCreateParams) => Promise<void>;
   newThread: () => Promise<void>;
+  stageNewThread: (cwd: string) => void;
   runCommandInvocation: (invocation: CommandInvocation) => Promise<void>;
+  addQueuedPrompt: (threadId: string, prompt: string, attachments?: DesktopAttachment[]) => QueuedPrompt;
+  removeQueuedPrompt: (threadId: string, queuedPromptId: string) => void;
   sendPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
+  steerPrompt: (prompt: string, attachments?: DesktopAttachment[]) => Promise<void>;
   stopTurn: () => Promise<void>;
   restart: () => Promise<void>;
   setDefaultModel: (model: string, provider?: string) => void;
@@ -243,6 +250,21 @@ function selectedThreadWorkspacePatch(state: RoderStore, thread: RoderThread | u
   };
 }
 
+function workspaceSelectionPatchForCwd(state: RoderStore, cwd: string): Partial<RoderStore> {
+  const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
+  const selection = resolveWorkspaceSelection(state.workspaces, {
+    path: selectedWorkspaceCwd,
+    baseCwd: state.status.cwd,
+    preferPath: true,
+  });
+  return {
+    selectedWorkspaceCwd,
+    selectedWorkspaceId: selection?.workspace.id ?? "",
+    selectedRootId: selection?.root.id ?? "",
+    workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, selectedWorkspaceCwd),
+  };
+}
+
 function upsertTurn(thread: RoderThread | undefined, incoming: RoderTurn): RoderThread | undefined {
   if (!thread) {
     return thread;
@@ -349,6 +371,7 @@ export const useRoderStore = create<RoderStore>()(
       loadingMoreThreads: false,
       threadGoalsByThread: {},
       threadControlsByThread: {},
+      queuedPromptsByThread: {},
       hunkRevisionByThread: {},
       activeThreadId: "",
       backStack: [],
@@ -395,7 +418,8 @@ export const useRoderStore = create<RoderStore>()(
           const current = get();
           const providers = providerResult.providers ?? [];
           const providerModels = modelsFromProviders(providers);
-          const models = configuredModelsFor(providerModels.length > 0 ? providerModels : modelResult.models, providers);
+          const fallbackModels = normalizeModelRecords(modelResult.models);
+          const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers);
           const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, current.visibleModelIds));
           const visibleModels = visibleModelsFor(models, visibleModelIds);
           const activeThreadId = threads.some((thread) => thread.id === current.activeThreadId)
@@ -511,6 +535,18 @@ export const useRoderStore = create<RoderStore>()(
 
       selectThread: async (threadId, options = { pushHistory: true }) => {
         const current = get();
+        if (!threadId) {
+          set({
+            activeThreadId: "",
+            backStack:
+              options.pushHistory && current.activeThreadId
+                ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
+                : current.backStack,
+            forwardStack: options.pushHistory ? [] : current.forwardStack,
+            error: null,
+          });
+          return;
+        }
         if (threadId === current.activeThreadId && current.threadDetails[threadId]) {
           await syncThreadGoal(threadId, set);
           return;
@@ -598,11 +634,13 @@ export const useRoderStore = create<RoderStore>()(
           set((state) => {
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
             const { [threadId]: _archivedGoal, ...threadGoalsByThread } = state.threadGoalsByThread;
+            const { [threadId]: _archivedQueue, ...queuedPromptsByThread } = state.queuedPromptsByThread;
             const { [threadId]: _archivedHunkRevision, ...hunkRevisionByThread } = state.hunkRevisionByThread;
             return {
               threads: state.threads.filter((thread) => thread.id !== threadId),
               threadDetails,
               threadGoalsByThread,
+              queuedPromptsByThread,
               threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
               hunkRevisionByThread,
               activeThreadId: nextActiveThreadId,
@@ -681,6 +719,14 @@ export const useRoderStore = create<RoderStore>()(
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
         }
+      },
+
+      stageNewThread: (cwd) => {
+        set((state) => ({
+          activeThreadId: "",
+          ...workspaceSelectionPatchForCwd(state, cwd),
+          error: null,
+        }));
       },
 
       runCommandInvocation: async (invocation) => {
@@ -768,6 +814,31 @@ export const useRoderStore = create<RoderStore>()(
         }
       },
 
+      addQueuedPrompt: (threadId, prompt, attachments = []) => {
+        const text = prompt.trim();
+        const queueKey = queueKeyForThread(threadId);
+        const queuedPrompt: QueuedPrompt = {
+          id: crypto.randomUUID(),
+          prompt: text,
+          attachments,
+          createdAt: Date.now(),
+        };
+        set((state) => ({
+          queuedPromptsByThread: {
+            ...state.queuedPromptsByThread,
+            [queueKey]: [...(state.queuedPromptsByThread[queueKey] ?? []), queuedPrompt],
+          },
+        }));
+        return queuedPrompt;
+      },
+
+      removeQueuedPrompt: (threadId, queuedPromptId) => {
+        const queueKey = queueKeyForThread(threadId);
+        set((state) => ({
+          queuedPromptsByThread: removeQueuedPrompt(state.queuedPromptsByThread, queueKey, queuedPromptId),
+        }));
+      },
+
       sendPrompt: async (prompt, attachments = []) => {
         const text = prompt.trim();
         if (!text && attachments.length === 0) {
@@ -853,6 +924,26 @@ export const useRoderStore = create<RoderStore>()(
                 })
               : state.threadDetails,
           }));
+        }
+      },
+
+      steerPrompt: async (prompt, attachments = []) => {
+        const text = prompt.trim();
+        if (!text && attachments.length === 0) {
+          return;
+        }
+        const state = get();
+        const threadId = state.activeThreadId;
+        const activeThread = state.threadDetails[threadId] ?? state.threads.find((thread) => thread.id === threadId);
+        const activeTurnId = activeTurnIdForThread(activeThread);
+        if (!threadId || !activeTurnId || !isThreadRunning(activeThread)) {
+          return;
+        }
+        try {
+          await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
+        } catch (error) {
+          set({ error: (error as Error).message });
+          throw error;
         }
       },
 
@@ -1040,20 +1131,7 @@ export const useRoderStore = create<RoderStore>()(
           defaultPolicyMode: normalizePolicyMode(mode.default_mode || state.defaultPolicyMode),
         });
       },
-      setSelectedWorkspaceCwd: (cwd) =>
-        set((state) => {
-          const selectedWorkspaceCwd = normalizeCwd(cwd, state.status.cwd);
-          const selection = resolveWorkspaceSelection(state.workspaces, {
-            path: selectedWorkspaceCwd,
-            baseCwd: state.status.cwd,
-          });
-          return {
-            selectedWorkspaceCwd,
-            selectedWorkspaceId: selection?.workspace.id ?? "",
-            selectedRootId: selection?.root.id ?? "",
-            workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, selectedWorkspaceCwd),
-          };
-        }),
+      setSelectedWorkspaceCwd: (cwd) => set((state) => workspaceSelectionPatchForCwd(state, cwd)),
       openWorkspaceFolder: async () => {
         const state = get();
         const folder = await roderIpc.openWorkspaceFolder(state.selectedWorkspaceCwd || state.status.cwd);
@@ -1112,6 +1190,7 @@ export const useRoderStore = create<RoderStore>()(
         selectedRootId: state.selectedRootId,
         selectedWorkspaceCwd: state.selectedWorkspaceCwd,
         workspaceRecents: state.workspaceRecents,
+        queuedPromptsByThread: state.queuedPromptsByThread,
       }),
     },
   ),
@@ -1327,6 +1406,26 @@ function removeThreadGoal(
   return remaining;
 }
 
+function queueKeyForThread(threadId: string): string {
+  return threadId || "new-thread";
+}
+
+function removeQueuedPrompt(
+  queuedPromptsByThread: Record<string, QueuedPrompt[]>,
+  threadId: string,
+  queuedPromptId: string,
+): Record<string, QueuedPrompt[]> {
+  const nextQueue = (queuedPromptsByThread[threadId] ?? []).filter((queuedPrompt) => queuedPrompt.id !== queuedPromptId);
+  if (nextQueue.length === 0) {
+    const { [threadId]: _removed, ...remaining } = queuedPromptsByThread;
+    return remaining;
+  }
+  return {
+    ...queuedPromptsByThread,
+    [threadId]: nextQueue,
+  };
+}
+
 function roderThreadGoalParam(value: unknown): RoderThreadGoal | null {
   if (!isRecord(value) || typeof value.threadId !== "string" || typeof value.objective !== "string") {
     return null;
@@ -1369,7 +1468,7 @@ async function listProvidersForBootstrap(): Promise<ProvidersListResult> {
 
 function modelsFromProviders(providers: ProviderDescriptor[]): RoderModel[] {
   return providers.flatMap((provider) =>
-    (provider.models ?? []).map((model) => ({
+    (provider.models ?? []).map((model) => normalizeModelRecord({
       id: model.id,
       name: model.name || model.id,
       description: model.description ?? undefined,
@@ -1381,13 +1480,29 @@ function modelsFromProviders(providers: ProviderDescriptor[]): RoderModel[] {
   );
 }
 
+function normalizeModelRecords(models: RoderModel[]): RoderModel[] {
+  return models.map(normalizeModelRecord);
+}
+
+function normalizeModelRecord(model: RoderModel): RoderModel {
+  const normalizedModel = {
+    ...model,
+    name: model.name || model.id,
+  };
+  return {
+    ...normalizedModel,
+    displayName: displayModelName(normalizedModel),
+  };
+}
+
 function applyProviderCatalog(
   state: RoderStore,
   providerResult: { providers?: ProviderDescriptor[]; routingOptions?: InferenceRoutingOptionDescriptor[] },
 ): Partial<RoderStore> {
   const providers = providerResult.providers ?? [];
   const providerModels = modelsFromProviders(providers);
-  const models = configuredModelsFor(providerModels.length > 0 ? providerModels : state.models, providers);
+  const fallbackModels = normalizeModelRecords(state.models);
+  const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers);
   const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, state.visibleModelIds));
   const visibleModels = visibleModelsFor(models, visibleModelIds);
   const defaultModelRecord = selectedModelRecordOrDefault(visibleModels, state.defaultModel, state.defaultModelProvider);
@@ -1523,6 +1638,7 @@ async function ensureWorkspaceSelection(state: RoderStore, set: RoderStoreSet): 
     rootId: state.selectedRootId,
     path: state.selectedWorkspaceCwd || state.status.cwd || "",
     baseCwd: state.status.cwd,
+    preferPath: Boolean(state.selectedWorkspaceCwd),
   });
   if (existing) {
     return existing;
@@ -1553,28 +1669,35 @@ function threadStartWorkspace(selection: WorkspaceSelection): { workspaceId: str
 
 function resolveWorkspaceSelection(
   workspaces: Workspace[],
-  params: { workspaceId?: string | null; rootId?: string | null; path?: string; baseCwd?: string },
+  params: { workspaceId?: string | null; rootId?: string | null; path?: string; baseCwd?: string; preferPath?: boolean },
 ): WorkspaceSelection | null {
+  const path = normalizeCwd(params.path || "", params.baseCwd).replace(/\/+$/, "");
+  const rootByPath = path ? workspaceRootByPath(workspaces, path) : null;
+  if (params.preferPath && rootByPath) {
+    return rootByPath;
+  }
+
   const workspaceById = params.workspaceId ? workspaces.find((workspace) => workspace.id === params.workspaceId) : null;
   const rootFromWorkspace = workspaceById ? rootForWorkspace(workspaceById, params.rootId || undefined) : null;
   if (workspaceById && rootFromWorkspace) {
     return { workspace: workspaceById, root: rootFromWorkspace };
   }
 
-  const path = normalizeCwd(params.path || "", params.baseCwd).replace(/\/+$/, "");
-  if (path) {
-    const rootByPath = new Map<string, { workspace: Workspace; root: WorkspaceRoot }>();
-    for (const workspace of workspaces) {
-      for (const root of workspace.roots) {
-        rootByPath.set(root.path.replace(/\/+$/, ""), { workspace, root });
-      }
-    }
-    const match = rootByPath.get(path);
-    if (match) {
-      return match;
-    }
+  if (rootByPath) {
+    return rootByPath;
   }
 
+  return null;
+}
+
+function workspaceRootByPath(workspaces: Workspace[], path: string): WorkspaceSelection | null {
+  for (const workspace of workspaces) {
+    for (const root of workspace.roots) {
+      if (root.path.replace(/\/+$/, "") === path) {
+        return { workspace, root };
+      }
+    }
+  }
   return null;
 }
 

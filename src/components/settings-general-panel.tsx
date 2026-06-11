@@ -215,7 +215,7 @@ function SettingsRow({
 }
 
 function modelName(model: RoderModel): string {
-  return model.name || model.id;
+  return model.displayName || model.name || model.id;
 }
 
 function modelValue(model: RoderModel): string {

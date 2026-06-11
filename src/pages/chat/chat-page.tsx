@@ -37,6 +37,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     selectNativeCommandModel,
     sendCommandInvocation,
     sendPrompt,
+    steerPrompt,
     localTranscriptOffset,
   } = shell;
   const commands = useCommandsStore((state) => state.commands);
@@ -189,6 +190,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             <div className="mx-auto mb-3 w-full max-w-3xl px-5 text-base text-destructive">{agent.error}</div>
           )}
           <Composer
+            activeThreadId={activeThreadId}
             busy={activeThreadBusy}
             commands={mergedCommands}
             models={agent.models}
@@ -200,6 +202,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             selectedPolicyMode={agent.selectedPolicyMode}
             selectedReasoning={agent.selectedReasoning}
             attachments={composerAttachments}
+            queuedPrompts={agent.queuedPrompts}
             focusSignal={composerFocusSignal}
             showScrollToBottom={canScrollTranscriptToBottom}
             onSelectedModelChange={(model, provider) => void agent.setSelectedModel(model, provider)}
@@ -208,8 +211,11 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onSelectedReasoningChange={agent.setSelectedReasoning}
             onScrollToBottom={followBottom}
             onAttachmentsChange={setComposerAttachments}
+            onQueuePrompt={agent.addQueuedPrompt}
+            onRemoveQueuedPrompt={agent.removeQueuedPrompt}
             onCommandSubmit={sendCommandInvocation}
             onSend={sendPrompt}
+            onSteer={steerPrompt}
             onStop={agent.stopTurn}
           />
         </div>

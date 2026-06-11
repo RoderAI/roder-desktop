@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   configuredModelsFor,
+  displayModelName,
   effectiveSelectedModel,
   groupModelsByProvider,
   modelVisibilityKey,
@@ -21,6 +22,24 @@ test("resolves duplicate model ids with the preferred provider", () => {
     id: "gpt-5.5",
     modelProvider: "opencode",
   });
+});
+
+test("formats model display names without duplicating the provider name", () => {
+  expect(
+    displayModelName({
+      id: "claude-code/sonnet",
+      name: "Claude Code Sonnet 4.7",
+      displayName: "Sonnet 4.7",
+      modelProvider: "claude-code",
+    }),
+  ).toBe("Sonnet 4.7");
+  expect(
+    displayModelName({ id: "claude-code/sonnet", name: "Claude Code Sonnet 4.7", modelProvider: "claude-code" }),
+  ).toBe("Sonnet 4.7");
+  expect(displayModelName({ id: "claude-code/fable", name: "Claude Code Fable 5", modelProvider: "claude-code" })).toBe(
+    "Fable 5",
+  );
+  expect(displayModelName({ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" })).toBe("GPT-5.5");
 });
 
 test("filters mock and unconfigured providers from selectable models", () => {

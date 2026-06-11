@@ -229,6 +229,56 @@ test("bootstrap does not wait for full active transcript read", async () => {
   expect(threadReadParams[0]).toEqual({ threadId: "thread-active", includeTurns: false });
 });
 
+test("bootstrap stores display names for provider models", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    switch (method) {
+      case "thread/list":
+        return { data: [], nextCursor: null, backwardsCursor: null };
+      case "model/list":
+        return { models: [] };
+      case "providers/list":
+        return {
+          active_provider: "claude-code",
+          active_model: "claude-code/sonnet",
+          active_reasoning: "medium",
+          routingOptions: [],
+          selectionMode: null,
+          providers: [
+            {
+              id: "claude-code",
+              name: "Claude Code",
+              authType: "none",
+              authenticated: true,
+              models: [{ id: "claude-code/sonnet", name: "Claude Code Sonnet 4.7" }],
+            },
+          ],
+        };
+      case "settings/get":
+        return {
+          default_provider: "claude-code",
+          default_model: "claude-code/sonnet",
+          default_reasoning: "medium",
+          default_mode: "accept_all",
+        };
+      case "workspace/list":
+        return { workspaces: [] };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({ activeThreadId: "", threads: [], threadDetails: {} });
+
+  await useRoderStore.getState().bootstrap();
+
+  expect(useRoderStore.getState().models[0]).toMatchObject({
+    id: "claude-code/sonnet",
+    name: "Claude Code Sonnet 4.7",
+    displayName: "Sonnet 4.7",
+    modelProvider: "claude-code",
+  });
+});
+
 test("new threads use the current cwd instead of an unmatched stale workspace", async () => {
   const currentCwd = "/Users/example/gode-desktop";
   const staleCwd = "/private/var/folders/example/roder-thread-cwd-123/process-workspace";
@@ -373,6 +423,97 @@ test("staging a new thread keeps the clicked project when a previous thread read
   expect(useRoderStore.getState().selectedWorkspaceCwd).toBe("/work/clicked-project");
   expect(useRoderStore.getState().selectedWorkspaceId).toBe("");
   expect(useRoderStore.getState().selectedRootId).toBe("");
+});
+
+test("new agent in clicked project starts in that project on the first send", async () => {
+  const godeDesktopWorkspace = {
+    id: "ws-desktop",
+    name: "gode-desktop",
+    roots: [{ id: "root-desktop", path: "/Users/pz/w/gode-desktop", name: "gode-desktop" }],
+    defaultRootId: "root-desktop",
+    updatedAt: 1770000100,
+  };
+  const godeWorkspace = {
+    id: "ws-gode",
+    name: "gode",
+    roots: [{ id: "root-gode", path: "/Users/pz/w/gode", name: "gode" }],
+    defaultRootId: "root-gode",
+    updatedAt: 1770000200,
+  };
+  const threadStartParams: unknown[] = [];
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    if (method === "thread/start") {
+      threadStartParams.push(params);
+      return {
+        thread: {
+          id: "thread-gode",
+          preview: "Untitled thread",
+          modelProvider: "openai",
+          model: "gpt-5.5",
+          createdAt: 1770000300,
+          updatedAt: 1770000300,
+          status: { type: "idle", activeTurnId: null, activeFlags: [] },
+          workspaceId: "ws-gode",
+          rootId: "root-gode",
+          cwd: "/Users/pz/w/gode",
+          turns: [],
+        },
+        model: "gpt-5.5",
+        reasoning: "medium",
+      };
+    }
+    if (method === "turn/start") {
+      return { turnId: "turn-gode" };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "thread-desktop",
+    status: { state: "ready", binary: "test", cwd: "/Users/pz/w/gode-desktop" },
+    selectedWorkspaceCwd: "/Users/pz/w/gode-desktop",
+    selectedWorkspaceId: "ws-desktop",
+    selectedRootId: "root-desktop",
+    workspaces: [godeDesktopWorkspace, godeWorkspace],
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    defaultModelProvider: "openai",
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    threads: [
+      {
+        id: "thread-desktop",
+        preview: "Desktop thread",
+        modelProvider: "openai",
+        model: "gpt-5.5",
+        createdAt: 1770000100,
+        updatedAt: 1770000200,
+        status: { type: "idle", activeTurnId: null, activeFlags: [] },
+        workspaceId: "ws-desktop",
+        rootId: "root-desktop",
+        cwd: "/Users/pz/w/gode-desktop",
+        turns: [],
+      },
+    ],
+    threadDetails: {},
+  });
+
+  useRoderStore.getState().stageNewThread("/Users/pz/w/gode");
+  await useRoderStore.getState().selectThread("", { pushHistory: false });
+  await useRoderStore.getState().sendPrompt("start in gode");
+
+  expect(useRoderStore.getState().selectedWorkspaceCwd).toBe("/Users/pz/w/gode");
+  expect(useRoderStore.getState().selectedWorkspaceId).toBe("ws-gode");
+  expect(useRoderStore.getState().selectedRootId).toBe("root-gode");
+  expect(threadStartParams).toEqual([
+    expect.objectContaining({
+      workspaceId: "ws-gode",
+      rootId: "root-gode",
+      cwd: "/Users/pz/w/gode",
+    }),
+  ]);
+  expect(request).toHaveBeenCalledWith("turn/start", expect.objectContaining({ threadId: "thread-gode" }));
 });
 
 test("switching projects after another thread in the same project updates workspace selection immediately", async () => {
@@ -1083,7 +1224,7 @@ test("observed workspace change notifications refresh review summaries", async (
   });
 });
 
-test("sendPrompt ignores active running turns instead of steering them", async () => {
+test("sendPrompt ignores active running turns so the composer can queue them", async () => {
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async () => ({}));
   const useRoderStore = await loadRoderStore(request);
   const thread = {
@@ -1109,6 +1250,78 @@ test("sendPrompt ignores active running turns instead of steering them", async (
 
   expect(request).not.toHaveBeenCalledWith("turn/steer", expect.anything());
   expect(request).not.toHaveBeenCalledWith("turn/start", expect.anything());
+});
+
+test("steerPrompt sends queued input to the active running turn", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async () => ({}));
+  const useRoderStore = await loadRoderStore(request);
+  const thread = {
+    id: "thread-1",
+    preview: "Active thread",
+    modelProvider: "codex",
+    model: "gpt-5.5",
+    createdAt: 1770000000,
+    updatedAt: 1770000100,
+    status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
+    cwd: "/workspace",
+    turns: [{ id: "turn-1", items: [], itemsView: "default", status: "inProgress" }],
+  };
+
+  useRoderStore.setState({
+    activeThreadId: "thread-1",
+    busy: true,
+    threadDetails: { "thread-1": thread },
+    threads: [thread],
+  });
+
+  await useRoderStore.getState().steerPrompt("one more thing");
+
+  expect(request).toHaveBeenCalledWith("turn/steer", {
+    threadId: "thread-1",
+    expectedTurnId: "turn-1",
+    input: [{ type: "text", text: "one more thing" }],
+  });
+});
+
+test("queued prompts are stored per thread and persisted", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-06-11T12:00:00Z"));
+  try {
+    const useRoderStore = await loadRoderStore();
+    const attachment = {
+      id: "attachment-1",
+      name: "notes.md",
+      path: "/workspace/notes.md",
+      type: "text/markdown",
+      size: 42,
+      source: "file" as const,
+    };
+
+    const first = useRoderStore.getState().addQueuedPrompt("thread-1", "follow up one", [attachment]);
+    const second = useRoderStore.getState().addQueuedPrompt("thread-2", "follow up two");
+
+    expect(useRoderStore.getState().queuedPromptsByThread).toMatchObject({
+      "thread-1": [{ id: first.id, prompt: "follow up one", attachments: [attachment] }],
+      "thread-2": [{ id: second.id, prompt: "follow up two", attachments: [] }],
+    });
+
+    useRoderStore.getState().removeQueuedPrompt("thread-1", first.id);
+
+    expect(useRoderStore.getState().queuedPromptsByThread).toEqual({
+      "thread-2": [second],
+    });
+
+    const setItem = vi.mocked(globalThis.localStorage.setItem);
+    const lastPersistedNavigation = [...setItem.mock.calls]
+      .reverse()
+      .find(([key]) => key === "roder-desktop-navigation");
+    expect(lastPersistedNavigation).toBeDefined();
+    expect(JSON.parse(lastPersistedNavigation?.[1] ?? "{}").state.queuedPromptsByThread).toEqual({
+      "thread-2": [second],
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("sendPrompt starts a new turn when a stale activeTurnId is not running", async () => {
