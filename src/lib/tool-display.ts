@@ -32,13 +32,7 @@ const fileActivityTools = new Set([
 ]);
 
 const searchActivityTools = new Set(["glob", "grep", "search_files"]);
-const hiddenTranscriptTools = new Set([
-  "get_goal",
-  "create_goal",
-  "update_goal",
-  "update_plan",
-  "verification_review",
-]);
+const hiddenTranscriptTools = new Set(["get_goal", "create_goal", "update_goal", "update_plan", "verification_review"]);
 
 export function canonicalToolName(toolName: string | undefined): string | undefined {
   return toolName?.split(".").at(-1);
