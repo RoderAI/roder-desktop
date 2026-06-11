@@ -249,7 +249,9 @@ test("runCommandInvocation ignores commands while the active thread is running",
     threads: [thread],
   });
 
-  await useRoderStore.getState().runCommandInvocation({ name: "review", arguments: "" });
+  await expect(useRoderStore.getState().runCommandInvocation({ name: "review", arguments: "" })).rejects.toThrow(
+    "Thread is still running",
+  );
 
   expect(request).not.toHaveBeenCalled();
 });
@@ -270,7 +272,9 @@ test("runCommandInvocation restores idle status when command execution fails", a
     threads: [thread],
   });
 
-  await useRoderStore.getState().runCommandInvocation({ name: "review", arguments: "" });
+  await expect(useRoderStore.getState().runCommandInvocation({ name: "review", arguments: "" })).rejects.toThrow(
+    "command disabled",
+  );
 
   expect(useRoderStore.getState().busy).toBe(false);
   expect(useRoderStore.getState().error).toBe("command disabled");
@@ -297,7 +301,9 @@ test("runCommandInvocation restores idle status when command execution omits a t
     threads: [thread],
   });
 
-  await useRoderStore.getState().runCommandInvocation({ name: "review", arguments: "" });
+  await expect(useRoderStore.getState().runCommandInvocation({ name: "review", arguments: "" })).rejects.toThrow(
+    "roder app-server did not return a command turn",
+  );
 
   expect(useRoderStore.getState().busy).toBe(false);
   expect(useRoderStore.getState().error).toBe("roder app-server did not return a command turn");

@@ -745,7 +745,7 @@ export const useRoderStore = create<RoderStore>()(
           return;
         }
         if (threadId !== "" && isThreadRunning(activeThread)) {
-          return;
+          throw new Error("Thread is still running");
         }
 
         set({ busy: true, error: null });
@@ -811,6 +811,7 @@ export const useRoderStore = create<RoderStore>()(
                 })
               : state.threadDetails,
           }));
+          throw error;
         }
       },
 
@@ -850,7 +851,7 @@ export const useRoderStore = create<RoderStore>()(
         let markedTurnStarting = false;
 
         if (threadId !== "" && isThreadRunning(activeThread)) {
-          return;
+          throw new Error("Thread is still running");
         }
 
         set({ busy: true, error: null });
@@ -895,20 +896,21 @@ export const useRoderStore = create<RoderStore>()(
                 }),
             policyMode: turnState.selectedPolicyMode,
           });
-          if (started.turnId) {
-            set((state) => ({
-              threads: markThreadStatus(state.threads, threadId, {
-                type: "running",
-                activeTurnId: started.turnId,
-                activeFlags: [],
-              }),
-              threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
-                type: "running",
-                activeTurnId: started.turnId,
-                activeFlags: [],
-              }),
-            }));
+          if (!started.turnId) {
+            throw new Error("roder app-server did not return a turn");
           }
+          set((state) => ({
+            threads: markThreadStatus(state.threads, threadId, {
+              type: "running",
+              activeTurnId: started.turnId,
+              activeFlags: [],
+            }),
+            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
+              type: "running",
+              activeTurnId: started.turnId,
+              activeFlags: [],
+            }),
+          }));
         } catch (error) {
           set((state) => ({
             busy: false,
@@ -924,6 +926,7 @@ export const useRoderStore = create<RoderStore>()(
                 })
               : state.threadDetails,
           }));
+          throw error;
         }
       },
 
@@ -1426,6 +1429,22 @@ function removeQueuedPrompt(
   };
 }
 
+function moveNewThreadQueuedPrompts(
+  queuedPromptsByThread: Record<string, QueuedPrompt[]>,
+  threadId: string,
+): Record<string, QueuedPrompt[]> {
+  const queuedPrompts = queuedPromptsByThread[queueKeyForThread("")] ?? [];
+  if (!threadId || queuedPrompts.length === 0) {
+    return queuedPromptsByThread;
+  }
+
+  const { [queueKeyForThread("")]: _removed, ...remaining } = queuedPromptsByThread;
+  return {
+    ...remaining,
+    [threadId]: [...(remaining[threadId] ?? []), ...queuedPrompts],
+  };
+}
+
 function roderThreadGoalParam(value: unknown): RoderThreadGoal | null {
   if (!isRecord(value) || typeof value.threadId !== "string" || typeof value.objective !== "string") {
     return null;
@@ -1600,6 +1619,7 @@ async function createThreadForPrompt(
     threads: upsertThread(state.threads, threadWithPreview),
     threadDetails: { ...state.threadDetails, [threadWithPreview.id]: threadWithPreview },
     threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadWithPreview.id),
+    queuedPromptsByThread: moveNewThreadQueuedPrompts(state.queuedPromptsByThread, threadWithPreview.id),
     activeThreadId: threadWithPreview.id,
     selectedWorkspaceCwd: threadWithPreview.cwd,
     selectedWorkspaceId: threadWithPreview.workspaceId ?? workspaceSelection.workspace.id,

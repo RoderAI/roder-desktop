@@ -840,6 +840,8 @@ test("new threads preserve the Auto default selection in thread/start", async ()
           reasoning: "medium",
           selectionMode: wireSelectionMode,
         };
+      case "turn/start":
+        return { turnId: "turn-auto" };
       default:
         return {};
     }
@@ -1097,6 +1099,8 @@ test("sendPrompt starts a blank thread with the selected Auto routing option", a
           reasoning: "low",
           selectionMode: wireSelectionMode,
         };
+      case "turn/start":
+        return { turnId: "turn-auto" };
       default:
         return {};
     }
@@ -1246,10 +1250,49 @@ test("sendPrompt ignores active running turns so the composer can queue them", a
     threads: [thread],
   });
 
-  await useRoderStore.getState().sendPrompt("did you set a goal?");
+  await expect(useRoderStore.getState().sendPrompt("did you set a goal?")).rejects.toThrow("Thread is still running");
 
   expect(request).not.toHaveBeenCalledWith("turn/steer", expect.anything());
   expect(request).not.toHaveBeenCalledWith("turn/start", expect.anything());
+});
+
+test("sendPrompt rejects when the app-server does not start a turn", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    if (method === "turn/start") {
+      return {};
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+  const thread = {
+    id: "thread-1",
+    preview: "Idle thread",
+    modelProvider: "codex",
+    model: "gpt-5.5",
+    createdAt: 1770000000,
+    updatedAt: 1770000100,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    cwd: "/workspace",
+    turns: [],
+  };
+
+  useRoderStore.setState({
+    activeThreadId: "thread-1",
+    busy: false,
+    threadDetails: { "thread-1": thread },
+    threads: [thread],
+  });
+
+  await expect(useRoderStore.getState().sendPrompt("follow up")).rejects.toThrow(
+    "roder app-server did not return a turn",
+  );
+
+  expect(useRoderStore.getState().error).toBe("roder app-server did not return a turn");
+  expect(useRoderStore.getState().threadDetails["thread-1"].status).toEqual({
+    type: "idle",
+    activeTurnId: null,
+    activeFlags: [],
+  });
 });
 
 test("steerPrompt sends queued input to the active running turn", async () => {
@@ -1322,6 +1365,64 @@ test("queued prompts are stored per thread and persisted", async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("queued prompts staged on the new-thread route move to the created thread", async () => {
+  const workspace = {
+    id: "ws-1",
+    name: "workspace",
+    roots: [{ id: "root-1", path: "/workspace", name: "workspace" }],
+    defaultRootId: "root-1",
+    updatedAt: 1770000000,
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    if (method === "workspace/create") {
+      return { workspace };
+    }
+    if (method === "thread/start") {
+      return {
+        thread: {
+          id: "thread-created",
+          preview: "First prompt",
+          modelProvider: "codex",
+          model: "gpt-5.5",
+          createdAt: 1770000000,
+          updatedAt: 1770000100,
+          status: { type: "idle", activeTurnId: null, activeFlags: [] },
+          workspaceId: "ws-1",
+          rootId: "root-1",
+          cwd: "/workspace",
+          turns: [],
+        },
+        model: "gpt-5.5",
+        reasoning: "medium",
+      };
+    }
+    if (method === "turn/start") {
+      return { turnId: "turn-created" };
+    }
+    return {};
+  });
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({
+    activeThreadId: "",
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    selectedWorkspaceCwd: "/workspace",
+    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "codex", isDefault: true }],
+    defaultModel: "gpt-5.5",
+    selectedModel: "gpt-5.5",
+    threadDetails: {},
+    threads: [],
+    workspaces: [],
+  });
+
+  const queuedPrompt = useRoderStore.getState().addQueuedPrompt("", "second prompt");
+  await useRoderStore.getState().sendPrompt("first prompt");
+
+  expect(useRoderStore.getState().activeThreadId).toBe("thread-created");
+  expect(useRoderStore.getState().queuedPromptsByThread).toEqual({
+    "thread-created": [queuedPrompt],
+  });
 });
 
 test("sendPrompt starts a new turn when a stale activeTurnId is not running", async () => {
