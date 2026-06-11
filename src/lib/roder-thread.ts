@@ -9,7 +9,7 @@ import type {
   RoderTurn,
 } from "@/types/roder";
 import { canonicalToolName, isShellToolName } from "@/lib/tool-display";
-import { normalizedToolPreview } from "@/lib/tool-preview";
+import { normalizedToolPreview, summarizeApplyPatch } from "@/lib/tool-preview";
 
 const emptyMessages: ConversationMessage[] = [];
 const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
@@ -734,12 +734,17 @@ function summarizeTool(
   }
 
   if (canonicalName === "apply_patch") {
-    const path = toolPath(input, payload);
-    const suffix = path ? ` to ${basename(path)}` : "";
+    const patchSummary = summarizeApplyPatch(rawString(payload.patch, input.patch));
+    const path = toolPath(input, payload) ?? patchSummary?.files[0];
+    const fileSummary = patchFileSummary(path, patchSummary?.files.length ?? 0);
+    const changeSummary = patchChangeSummary(patchSummary?.additions ?? 0, patchSummary?.deletions ?? 0);
     if (status === "failed") {
-      return `Failed to apply patch${suffix}`;
+      return `Failed to apply patch${fileSummary ? ` to ${fileSummary}` : ""}`;
     }
-    return status === "running" ? `Applying patch${suffix}` : `Applied patch${suffix}`;
+    if (status === "running") {
+      return `Editing${changeSummary ? ` ${changeSummary}` : ""}${fileSummary ? ` in ${fileSummary}` : ""}`;
+    }
+    return `Applied patch${fileSummary ? ` to ${fileSummary}` : ""}${changeSummary ? ` (${changeSummary})` : ""}`;
   }
 
   if (isShellToolName(toolName)) {
@@ -918,7 +923,8 @@ function toolSubject(
     canonicalName === "multi_edit" ||
     canonicalName === "apply_patch"
   ) {
-    const path = toolPath(input, payload);
+    const patchSummary = canonicalName === "apply_patch" ? summarizeApplyPatch(rawString(payload.patch, input.patch)) : null;
+    const path = toolPath(input, payload) ?? patchSummary?.files[0];
     return path ? basename(path) : undefined;
   }
   if (isShellToolName(toolName)) {
@@ -1013,6 +1019,21 @@ function toolSkillName(input: Record<string, unknown>, payload: Record<string, u
 
 function toolPath(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
   return firstString(payload.path, payload.dir, payload.directory, input.path, input.dir, input.directory);
+}
+
+function patchFileSummary(path: string | undefined, fileCount: number): string {
+  if (!path) {
+    return fileCount > 0 ? `${fileCount} files` : "";
+  }
+  const suffix = fileCount > 1 ? ` +${fileCount - 1} more` : "";
+  return `${basename(path)}${suffix}`;
+}
+
+function patchChangeSummary(additions: number, deletions: number): string {
+  if (additions === 0 && deletions === 0) {
+    return "";
+  }
+  return `+${additions} -${deletions}`;
 }
 
 function searchSummary(status: "running" | "complete" | "failed", query: string, path: string | undefined): string {

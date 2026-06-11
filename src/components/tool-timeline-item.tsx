@@ -1,7 +1,9 @@
 import type { ConversationMessage } from "@/types/roder";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { PatchDiff } from "@pierre/diffs/react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { canonicalToolName, isShellToolName } from "@/lib/tool-display";
+import { splitUnifiedDiffFiles } from "@/lib/tool-preview";
 import { toolStatus, toolTextClass, toolTitle } from "@/lib/tool-timeline";
 import { cn } from "@/lib/utils";
 import type { ToolDisclosureControlProps } from "./tool-disclosure-control";
@@ -80,8 +82,66 @@ function RoutingDecisionToolItem({
   );
 }
 
+export function SafePatchPreview({ patch }: { patch: string }): React.JSX.Element {
+  const filePatches = splitUnifiedDiffFiles(patch);
+  if (filePatches.length === 0) {
+    return <PatchPreviewFallback patch={patch} />;
+  }
+
+  return (
+    <PatchPreviewErrorBoundary patch={patch}>
+      <div className="space-y-2">
+        {filePatches.map((filePatch) => (
+          <PatchDiff key={patchPreviewKey(filePatch)} patch={filePatch} options={toolPreviewDiffOptions} disableWorkerPool />
+        ))}
+      </div>
+    </PatchPreviewErrorBoundary>
+  );
+}
+
+function patchPreviewKey(filePatch: string): string {
+  let hash = 0;
+  for (let index = 0; index < filePatch.length; index += 1) {
+    hash = (hash * 31 + filePatch.charCodeAt(index)) | 0;
+  }
+  return `${filePatch.split("\n", 1)[0]}:${hash}`;
+}
+
+function PatchPreviewFallback({ patch }: { patch: string }): React.JSX.Element {
+  return <pre className="m-0 whitespace-pre-wrap break-words text-foreground">{patch}</pre>;
+}
+
+type PatchPreviewErrorBoundaryProps = {
+  children: ReactNode;
+  patch: string;
+};
+
+type PatchPreviewErrorBoundaryState = {
+  failed: boolean;
+};
+
+class PatchPreviewErrorBoundary extends Component<PatchPreviewErrorBoundaryProps, PatchPreviewErrorBoundaryState> {
+  state: PatchPreviewErrorBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): PatchPreviewErrorBoundaryState {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.warn("Patch preview failed to render", error, errorInfo);
+  }
+
+  render(): ReactNode {
+    if (this.state.failed) {
+      return <PatchPreviewFallback patch={this.props.patch} />;
+    }
+    return this.props.children;
+  }
+}
+
 const toolPreviewDiffOptions = {
   diffStyle: "unified",
+  disableLineNumbers: true,
   hunkSeparators: "line-info-basic",
   overflow: "scroll",
   stickyHeader: false,
@@ -129,7 +189,7 @@ function ToolEditItem({ message, onOpenChange, open, status, summary }: ToolEdit
       <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">
         <div className="tool-edit-preview py-1 font-mono text-base leading-7">
           {message.toolPreviewKind === "patch" ? (
-            <PatchDiff patch={message.toolPreview ?? ""} options={toolPreviewDiffOptions} disableWorkerPool />
+            <SafePatchPreview patch={message.toolPreview ?? ""} />
           ) : (
             <pre className="m-0 whitespace-pre-wrap break-words text-foreground">{message.toolPreview}</pre>
           )}

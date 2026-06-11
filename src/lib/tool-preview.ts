@@ -1,5 +1,35 @@
 import { canonicalToolName } from "@/lib/tool-display";
 
+export type ApplyPatchSummary = {
+  files: string[];
+  additions: number;
+  deletions: number;
+};
+
+export function summarizeApplyPatch(patch: string | undefined): ApplyPatchSummary | null {
+  if (!patch) {
+    return null;
+  }
+
+  const files: string[] = [];
+  let additions = 0;
+  let deletions = 0;
+  for (const line of patch.replace(/\r\n/g, "\n").split("\n")) {
+    const fileHeader = parsePatchFileHeader(line);
+    if (fileHeader) {
+      files.push(fileHeader.newPath || fileHeader.oldPath);
+      continue;
+    }
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      additions += 1;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      deletions += 1;
+    }
+  }
+
+  return files.length > 0 || additions > 0 || deletions > 0 ? { files: uniqueStrings(files), additions, deletions } : null;
+}
+
 export type ToolPreviewKind = "text" | "patch";
 
 export type ToolPreview = {
@@ -50,6 +80,26 @@ export function normalizeApplyPatchPreview(patch: string): string | undefined {
   }
 
   return normalized.length > 0 ? `${normalized.join("\n")}\n` : undefined;
+}
+
+export function splitUnifiedDiffFiles(patch: string): string[] {
+  const lines = patch.replace(/\r\n/g, "\n").split("\n");
+  const files: string[] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("diff --git ")) {
+      pushCurrentUnifiedDiffFile(files, current);
+      current = [line];
+      continue;
+    }
+    if (current.length > 0) {
+      current.push(line);
+    }
+  }
+
+  pushCurrentUnifiedDiffFile(files, current);
+  return files;
 }
 
 type PatchFileHeader = {
@@ -104,5 +154,16 @@ function normalizeApplyPatchBody(lines: string[]): string[] {
 }
 
 function normalizeHunkHeader(line: string): string {
-  return /^@@(?:\s|$)/.test(line) ? "@@ -1,1 +1,1 @@" : line;
+  return line.trim() === "@@" ? "@@ -0,0 +0,0 @@" : line;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function pushCurrentUnifiedDiffFile(files: string[], current: string[]): void {
+  const text = current.join("\n").trimEnd();
+  if (text) {
+    files.push(`${text}\n`);
+  }
 }

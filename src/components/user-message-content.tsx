@@ -11,7 +11,7 @@ const emptyImages: Array<{ imageUrl: string }> = [];
 
 export function UserMessageContent({ images = emptyImages, skills, text }: UserMessageContentProps): React.JSX.Element {
   return (
-    <div className="space-y-3 font-medium text-base leading-7">
+    <div className="space-y-3 font-medium text-base leading-[1.45]">
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {images.map((image, index) => (
