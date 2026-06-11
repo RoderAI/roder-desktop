@@ -39,7 +39,7 @@ test("file search command renders unavailable and error states", async () => {
 });
 
 test("file search display status preserves results while the dialog closes", async () => {
-  const { fileSearchDisplayStatus } = await import("../src/components/file-search-dialog");
+  const { fileSearchDisplayStatus } = await import("../src/lib/file-panel");
   const status = { state: "ready", results: [result("src/index.ts", "file")] } as const;
 
   expect(

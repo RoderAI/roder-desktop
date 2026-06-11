@@ -11,6 +11,17 @@ export type FilePanelSearchLauncherResult = {
   indexedPath: FilePanelIndexedPath;
 };
 
+export type FilePanelSearchStatus =
+  | { state: "idle" }
+  | { state: "loading"; results: FilePanelSearchLauncherResult[] }
+  | { state: "ready"; results: FilePanelSearchLauncherResult[] }
+  | { state: "error"; message: string };
+
+export type FilePanelSearchDisplayStatus =
+  | FilePanelSearchStatus
+  | { state: "unavailable" }
+  | { state: "empty-workspace" };
+
 export function filePanelSearchLauncherResults(
   roots: readonly WorkspaceRoot[],
   matches: readonly WorkspaceFilesQueryMatch[],
@@ -37,6 +48,26 @@ export function filePanelSearchLauncherResults(
       },
     ];
   });
+}
+
+export function fileSearchDisplayStatus({
+  filesystemAvailable,
+  workspaceId,
+  roots,
+  status,
+}: {
+  filesystemAvailable: boolean;
+  workspaceId: string;
+  roots: readonly WorkspaceRoot[];
+  status: FilePanelSearchStatus;
+}): FilePanelSearchDisplayStatus {
+  if (!filesystemAvailable) {
+    return { state: "unavailable" };
+  }
+  if (!workspaceId || roots.length === 0) {
+    return { state: "empty-workspace" };
+  }
+  return status;
 }
 
 function launcherResultTitle(rootItem: FilePanelRootItem, indexedPath: FilePanelIndexedPath): string {

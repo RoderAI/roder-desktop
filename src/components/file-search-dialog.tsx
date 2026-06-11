@@ -5,7 +5,10 @@ import { fileSearchResultLimit } from "@/components/file-panel/constants";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   filePanelSearchLauncherResults,
+  fileSearchDisplayStatus,
   type FilePanelIndexedPath,
+  type FilePanelSearchDisplayStatus,
+  type FilePanelSearchStatus,
   type FilePanelSearchLauncherResult,
 } from "@/lib/file-panel";
 import { roderIpc } from "@/lib/roder-ipc";
@@ -20,14 +23,6 @@ type FileSearchDialogProps = {
   onSelect: (indexedPath: FilePanelIndexedPath) => void;
 };
 
-type FileSearchStatus =
-  | { state: "idle" }
-  | { state: "loading"; results: FilePanelSearchLauncherResult[] }
-  | { state: "ready"; results: FilePanelSearchLauncherResult[] }
-  | { state: "error"; message: string };
-
-type FileSearchDisplayStatus = FileSearchStatus | { state: "unavailable" } | { state: "empty-workspace" };
-
 export function FileSearchDialog({
   open,
   workspaceId,
@@ -37,12 +32,13 @@ export function FileSearchDialog({
   onSelect,
 }: FileSearchDialogProps): React.JSX.Element {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<FileSearchStatus>({ state: "idle" });
+  const [status, setStatus] = useState<FilePanelSearchStatus>({ state: "idle" });
   const requestSeq = useRef(0);
 
   function selectResult(result: FilePanelSearchLauncherResult): void {
+    requestSeq.current += 1;
     onSelect(result.indexedPath);
-    changeOpen(false);
+    onOpenChange(false);
   }
 
   function changeOpen(nextOpen: boolean): void {
@@ -120,7 +116,7 @@ export function FileSearchCommandContent({
   onSelect,
 }: {
   query: string;
-  status: FileSearchDisplayStatus;
+  status: FilePanelSearchDisplayStatus;
   onQueryChange: (query: string) => void;
   onSelect: (result: FilePanelSearchLauncherResult) => void;
 }): React.JSX.Element {
@@ -187,7 +183,7 @@ function FileSearchResultItem({
   );
 }
 
-function FileSearchMessage({ status }: { status: FileSearchDisplayStatus }): React.JSX.Element {
+function FileSearchMessage({ status }: { status: FilePanelSearchDisplayStatus }): React.JSX.Element {
   if (status.state === "loading") {
     return <CommandEmptyMessage>Searching files.</CommandEmptyMessage>;
   }
@@ -212,26 +208,6 @@ function CommandEmptyMessage({ children }: { children: React.ReactNode }): React
       {children}
     </CommandEmpty>
   );
-}
-
-export function fileSearchDisplayStatus({
-  filesystemAvailable,
-  workspaceId,
-  roots,
-  status,
-}: {
-  filesystemAvailable: boolean;
-  workspaceId: string;
-  roots: readonly WorkspaceRoot[];
-  status: FileSearchStatus;
-}): FileSearchDisplayStatus {
-  if (!filesystemAvailable) {
-    return { state: "unavailable" };
-  }
-  if (!workspaceId || roots.length === 0) {
-    return { state: "empty-workspace" };
-  }
-  return status;
 }
 
 function errorMessage(error: unknown): string {
