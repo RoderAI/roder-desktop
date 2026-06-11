@@ -11,6 +11,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       external: [...external, "electron/renderer"],
+      output: {
+        entryFileNames: "preload.cjs",
+        chunkFileNames: "preload.cjs",
+      },
     },
   },
 });
