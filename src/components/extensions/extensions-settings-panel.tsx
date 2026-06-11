@@ -204,6 +204,7 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
                 {preference.type === "checkbox" ? (
                   <input
                     type="checkbox"
+                    aria-label={preference.title}
                     checked={Boolean(extension.preferences[preference.key])}
                     onChange={(event) =>
                       void updatePreference(extension.id, preference.key, event.currentTarget.checked)
@@ -212,6 +213,7 @@ function ExtensionCard({ extension }: { extension: ExtensionCatalogRecord }): Re
                 ) : (
                   <input
                     className="h-8 w-64 rounded-lg border border-border bg-muted px-3 text-base text-foreground outline-none"
+                    aria-label={preference.title}
                     value={String(extension.preferences[preference.key] ?? "")}
                     onChange={(event) => void updatePreference(extension.id, preference.key, event.currentTarget.value)}
                   />

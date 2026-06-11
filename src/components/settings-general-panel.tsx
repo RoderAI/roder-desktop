@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { selectedModelRecord as resolveSelectedModelRecord, visibleModelsFor } from "@/lib/roder-models";
+import { modelKey, providerName, selectedModelRecord as resolveSelectedModelRecord, visibleModelsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type {
   InferenceRoutingOptionDescriptor,
@@ -219,7 +219,7 @@ function modelName(model: RoderModel): string {
 }
 
 function modelValue(model: RoderModel): string {
-  return `model:${model.modelProvider}:${model.id}`;
+  return modelKey(model);
 }
 
 function autoModelValue(option: InferenceRoutingOptionDescriptor): string {
@@ -234,13 +234,6 @@ function selectedModelDescription(selectionMode: ModelSelectionMode, model: Rode
     return "Models will appear after the app-server finishes loading.";
   }
   return `${providerName(model.modelProvider)} / ${model.id}`;
-}
-
-function providerName(provider: string): string {
-  if (provider.toLowerCase() === "openai") {
-    return "OpenAI";
-  }
-  return provider.slice(0, 1).toUpperCase() + provider.slice(1);
 }
 
 function reasoningLabel(reasoning: ReasoningEffort): string {

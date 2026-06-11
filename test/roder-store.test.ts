@@ -1352,6 +1352,101 @@ test("prompt-created threads use the first prompt as an immediate optimistic tit
   expect(useRoderStore.getState().threadDetails["thread-new"]?.preview).toBe("summarize the project architecture");
 });
 
+test("prompt-created threads use the submission picker model instead of defaults", async () => {
+  const calls: Array<{ method: string; params: unknown }> = [];
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    calls.push({ method, params });
+    switch (method) {
+      case "thread/start":
+        return {
+          thread: {
+            id: "thread-new",
+            preview: "Untitled thread",
+            modelProvider: "openai",
+            model: "gpt-5.5",
+            createdAt: 1770000000,
+            updatedAt: 1770000100,
+            status: { type: "idle", activeTurnId: null, activeFlags: [] },
+            workspaceId: "ws_1",
+            rootId: "root_1",
+            cwd: "/workspace",
+            turns: [],
+          },
+          model: "gpt-5.5",
+          reasoning: "high",
+        };
+      case "turn/start":
+        return { turnId: "turn-1" };
+      default:
+        return {};
+    }
+  });
+  const useRoderStore = await loadRoderStore(request);
+
+  useRoderStore.setState({
+    activeThreadId: "",
+    busy: false,
+    selectedWorkspaceId: "ws_1",
+    selectedRootId: "root_1",
+    selectedWorkspaceCwd: "/workspace",
+    defaultModel: "gpt-5.3",
+    defaultModelProvider: "openai",
+    defaultReasoning: "medium",
+    defaultPolicyMode: "accept_all",
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    selectedReasoning: "high",
+    selectedPolicyMode: "accept_all",
+    models: [
+      { id: "gpt-5.3", name: "GPT-5.3", modelProvider: "openai", isDefault: true },
+      { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+    ],
+    workspaces: [
+      {
+        id: "ws_1",
+        name: "workspace",
+        roots: [{ id: "root_1", path: "/workspace", name: "workspace" }],
+        defaultRootId: "root_1",
+        updatedAt: 1770000000,
+      },
+    ],
+    threads: [],
+    threadDetails: {},
+  });
+
+  await useRoderStore.getState().sendPrompt("use the selected model");
+
+  expect(calls).toContainEqual({
+    method: "thread/start",
+    params: expect.objectContaining({
+      model: "gpt-5.5",
+      modelProvider: "openai",
+      reasoning: "high",
+      initialPrompt: "use the selected model",
+    }),
+  });
+});
+
+test("model visibility can hide one provider when duplicate model ids exist", async () => {
+  const useRoderStore = await loadRoderStore();
+
+  useRoderStore.setState({
+    selectedModel: "gpt-5.5",
+    selectedModelProvider: "openai",
+    models: [
+      { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+      { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "opencode" },
+      { id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" },
+    ],
+    visibleModelIds: [],
+  });
+
+  useRoderStore.getState().setModelVisibility("opencode:gpt-5.5", false);
+
+  expect(useRoderStore.getState().visibleModelIds).toEqual(["openai:gpt-5.5", "claude-code:claude-code/sonnet"]);
+  expect(useRoderStore.getState().selectedModelProvider).toBe("openai");
+});
+
 test("untitled thread notifications do not clobber an optimistic first-prompt title", async () => {
   const useRoderStore = await loadRoderStore();
   const optimisticThread = {

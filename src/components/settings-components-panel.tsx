@@ -537,6 +537,7 @@ function TuningSlider({
       <input
         id={inputId}
         className="h-2 w-full accent-foreground"
+        aria-label={label}
         max={max}
         min={min}
         step={step}

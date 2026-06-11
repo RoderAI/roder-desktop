@@ -15,8 +15,7 @@ import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-
 import {
   compactVisibleModelIds,
   effectiveSelectedModel,
-  modelVisibilityKey,
-  selectedModelRecord,
+  modelKey,
   selectedModelProvider,
   visibleModelIdsFor,
   visibleModelsFor,
@@ -926,31 +925,31 @@ export const useRoderStore = create<RoderStore>()(
         set((state) => {
           const currentVisibleIds = visibleModelIdsFor(state.models, state.visibleModelIds);
           const currentVisible = new Set(currentVisibleIds);
+          const targetKeys = state.models.flatMap((model) => (model.id === modelId ? [modelKey(model)] : []));
+          const keysToUpdate = targetKeys.length > 0 ? targetKeys : [modelId];
           if (visible) {
-            currentVisible.add(modelId);
+            for (const key of keysToUpdate) {
+              currentVisible.add(key);
+            }
           } else {
-            currentVisible.delete(modelId);
+            for (const key of keysToUpdate) {
+              currentVisible.delete(key);
+            }
           }
-          const nextVisibleIds = state.models.flatMap((model) =>
-            currentVisible.has(modelVisibilityKey(model)) ? [modelVisibilityKey(model)] : [],
-          );
+          const nextVisibleModels = state.models.filter((model) => currentVisible.has(modelKey(model)));
+          const nextVisibleIds = nextVisibleModels.map(modelKey);
           if (nextVisibleIds.length === 0) {
             return {};
           }
-          const selectedModelRecordValue = selectedModelRecord(
-            state.models,
-            state.selectedModel,
-            state.selectedModelProvider,
+          const selectedVisible = nextVisibleModels.some(
+            (model) => model.id === state.selectedModel && model.modelProvider === state.selectedModelProvider,
           );
-          const selectedModel =
-            selectedModelRecordValue && nextVisibleIds.includes(modelVisibilityKey(selectedModelRecordValue))
-              ? state.selectedModel
-              : (state.models.find((model) => modelVisibilityKey(model) === nextVisibleIds[0])?.id ??
-                state.selectedModel);
+          const nextSelectedModel = nextVisibleModels[0];
+          const selectedModel = selectedVisible ? state.selectedModel : (nextSelectedModel?.id ?? state.selectedModel);
           const selectedModelProviderValue =
-            selectedModel === state.selectedModel
+            selectedVisible
               ? state.selectedModelProvider
-              : (selectedModelProvider(state.models, selectedModel, state.selectedModelProvider) ??
+              : (nextSelectedModel?.modelProvider ?? selectedModelProvider(state.models, selectedModel, state.selectedModelProvider) ??
                 state.selectedModelProvider);
           return {
             visibleModelIds: compactVisibleModelIds(state.models, nextVisibleIds),
@@ -1366,47 +1365,43 @@ async function createThreadForPrompt(
   const state = get();
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
   const latestState = get();
-  const isBlankThread = initialPrompt === undefined;
-  const selectionSource = isBlankThread
+  const usePromptControls = initialPrompt !== undefined;
+  const selectionSource = usePromptControls
     ? {
+        selectionMode: latestState.selectedSelectionMode,
+        model: latestState.selectedModel || latestState.defaultModel,
+        provider: latestState.selectedModelProvider || latestState.defaultModelProvider,
+        reasoning: latestState.selectedReasoning,
+      }
+    : {
         selectionMode: latestState.defaultSelectionMode,
         model: latestState.defaultModel,
         provider: latestState.defaultModelProvider,
         reasoning: latestState.defaultReasoning,
-      }
-    : {
-        selectionMode: latestState.selectedSelectionMode,
-        model: latestState.selectedModel,
-        provider: latestState.selectedModelProvider,
-        reasoning: latestState.selectedReasoning,
       };
   const selectionMode =
-    selectionSource.selectionMode ??
-    manualSelection(selectionSource.provider, selectionSource.model, selectionSource.reasoning);
+    selectionSource.selectionMode ?? manualSelection(selectionSource.provider, selectionSource.model, selectionSource.reasoning);
   const concrete = concreteSelection(selectionMode);
-  const selectedModel = concrete.model || selectionSource.model;
+  const requestedModel = concrete.model || selectionSource.model;
+  const requestedProvider = concrete.provider || selectionSource.provider;
+  const model = effectiveSelectedModel(latestState.models, latestState.visibleModelIds, requestedModel, requestedProvider);
+  const selectedModel = model?.id ?? requestedModel;
   const selectedProvider =
-    concrete.provider ||
-    selectedModelProvider(latestState.models, selectedModel, selectionSource.provider) ||
-    selectionSource.provider;
+    model?.modelProvider ??
+    selectedModelProvider(latestState.models, selectedModel, requestedProvider) ??
+    requestedProvider;
   const reasoning = selectionSource.reasoning;
-  const result = await roderIpc.startThread(
-    selectedModel,
-    threadStartWorkspace(workspaceSelection),
-    selectedProvider,
-    reasoning,
-    {
-      ...(isBlankThread ? {} : { initialPrompt }),
-      selection: configuredAutoOptionId(selectionMode)
-        ? modelSelectChoice(selectionMode, reasoning)
-        : {
-            type: "manual",
-            provider: selectedProvider,
-            model: selectedModel,
-            reasoning,
-          },
-    },
-  );
+  const result = await roderIpc.startThread(selectedModel, threadStartWorkspace(workspaceSelection), selectedProvider, reasoning, {
+    ...(initialPrompt === undefined ? {} : { initialPrompt }),
+    selection: configuredAutoOptionId(selectionMode)
+      ? modelSelectChoice(selectionMode, reasoning)
+      : {
+          type: "manual",
+          provider: selectedProvider,
+          model: selectedModel,
+          reasoning,
+        },
+  });
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
   }
