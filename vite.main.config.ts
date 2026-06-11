@@ -1,5 +1,6 @@
 import { builtinModules } from "node:module";
 import { defineConfig } from "vite";
+import type { ConfigEnv } from "vite";
 
 const external = [
   "electron",
@@ -7,10 +8,21 @@ const external = [
   ...builtinModules.flatMap((moduleName) => [moduleName, `node:${moduleName}`]),
 ];
 
-export default defineConfig({
+type ForgeBuildEnv = ConfigEnv<"build"> & {
+  forgeConfigSelf: {
+    entry: string;
+  };
+};
+
+export default defineConfig((env) => ({
   build: {
+    lib: {
+      entry: (env as ForgeBuildEnv).forgeConfigSelf.entry,
+      fileName: () => "[name].cjs",
+      formats: ["cjs"],
+    },
     rollupOptions: {
       external: [...external, "electron/main"],
     },
   },
-});
+}));
