@@ -27,6 +27,8 @@ test("advertises direct truecolour support to shells and tmux", () => {
 });
 
 test("preserves existing tmux terminal overrides", () => {
-  expect(terminalOverrides("alacritty:Tc,screen-256color:RGB")).toBe("alacritty:Tc,screen-256color:RGB,xterm-direct:Tc");
+  expect(terminalOverrides("alacritty:Tc,screen-256color:RGB")).toBe(
+    "alacritty:Tc,screen-256color:RGB,xterm-direct:Tc",
+  );
   expect(terminalOverrides("xterm-direct:Tc")).toBe("xterm-direct:Tc");
 });

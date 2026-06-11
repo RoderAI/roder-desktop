@@ -25,6 +25,7 @@ import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
 import {
   createApplicationMenuTemplate,
+  installOpenFileSearchShortcut,
   installNewProjectShortcut,
   installNewThreadShortcut,
   installOpenSettingsShortcut,
@@ -131,6 +132,7 @@ function createWindow(): void {
   installNewProjectShortcut(mainWindow.webContents, () => sendAppCommand("newProject"));
   installNewThreadShortcut(mainWindow.webContents, () => sendAppCommand("newThread"));
   installOpenSettingsShortcut(mainWindow.webContents, () => sendAppCommand("openSettings"));
+  installOpenFileSearchShortcut(mainWindow.webContents, () => sendAppCommand("openFileSearch"));
 
   mainWindow.on("closed", () => {
     browser.destroy();

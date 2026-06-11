@@ -8,6 +8,7 @@ import {
   openWorkspacePanelTab,
   routeSearchParsers,
   selectWorkspacePanelTab,
+  toggleWorkspacePanelShell,
 } from "../src/lib/route-search";
 
 test("route search defaults preserve practical app layout state", () => {
@@ -212,5 +213,14 @@ test("workspace panel shell can open without tabs for the add state", () => {
   });
   expect(closeWorkspacePanelShell()).toEqual({
     panelOpen: false,
+  });
+});
+
+test("workspace panel shell toggle flips the current open state", () => {
+  expect(toggleWorkspacePanelShell(normalizeRouteSearch({ panelOpen: "true" }))).toEqual({
+    panelOpen: false,
+  });
+  expect(toggleWorkspacePanelShell(normalizeRouteSearch({ panelOpen: "false" }))).toEqual({
+    panelOpen: true,
   });
 });

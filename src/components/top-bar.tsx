@@ -22,6 +22,12 @@ import {
 
 export type WorkspacePanel = RouteWorkspacePanel | null;
 
+type WorkspacePanelToggleButtonProps = {
+  open: boolean;
+  className?: string;
+  onToggle: () => void;
+};
+
 type TopBarProps = {
   thread?: RoderThread;
   goal?: RoderThreadGoal | null;
@@ -41,8 +47,7 @@ type TopBarProps = {
   onToggleSidebar: () => void;
   onSelectFolder: (path: string) => void;
   onSelectThread: (threadId: string) => void;
-  onCloseWorkspacePanelShell: () => void;
-  onOpenWorkspacePanelShell: () => void;
+  onToggleWorkspacePanelShell: () => void;
 };
 
 export function TopBar({
@@ -64,8 +69,7 @@ export function TopBar({
   onToggleSidebar,
   onSelectFolder,
   onSelectThread,
-  onCloseWorkspacePanelShell,
-  onOpenWorkspacePanelShell,
+  onToggleWorkspacePanelShell,
 }: TopBarProps): React.JSX.Element {
   const activeFolder = folders.find(
     (folder) => normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(activeFolderPath),
@@ -79,7 +83,7 @@ export function TopBar({
   if (workspacePanelToggleVisible) {
     viewMenuItems.push({
       label: workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel",
-      onSelect: workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell,
+      onSelect: onToggleWorkspacePanelShell,
     });
   }
 
@@ -132,20 +136,11 @@ export function TopBar({
             </Button>
           )}
           {workspacePanelToggleVisible && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                chromeIconButtonClassNameForState(workspacePanelOpen),
-                "size-7 rounded-full [&_svg]:size-4",
-                extensionSidebarVisible && "mr-12",
-              )}
-              aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-              title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-              onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
-            >
-              <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
-            </Button>
+            <WorkspacePanelToggleButton
+              open={workspacePanelOpen}
+              className={cn("size-7 rounded-full [&_svg]:size-4", extensionSidebarVisible && "mr-12")}
+              onToggle={onToggleWorkspacePanelShell}
+            />
           )}
         </div>
       </header>
@@ -213,22 +208,33 @@ export function TopBar({
           </Button>
         )}
         {workspacePanelToggleVisible && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              chromeIconButtonClassNameForState(workspacePanelOpen),
-              "fixed right-2 top-[11px] z-40 size-7 rounded-full [&_svg]:size-4",
-            )}
-            aria-label={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-            title={workspacePanelOpen ? "Hide workspace panel" : "Show workspace panel"}
-            onClick={workspacePanelOpen ? onCloseWorkspacePanelShell : onOpenWorkspacePanelShell}
-          >
-            <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
-          </Button>
+          <WorkspacePanelToggleButton
+            open={workspacePanelOpen}
+            className="fixed right-2 top-[11px] z-[100] size-7 rounded-full pointer-events-auto [&_svg]:size-4"
+            onToggle={onToggleWorkspacePanelShell}
+          />
         )}
       </div>
     </header>
+  );
+}
+
+export function WorkspacePanelToggleButton({
+  open,
+  className,
+  onToggle,
+}: WorkspacePanelToggleButtonProps): React.JSX.Element {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn(chromeIconButtonClassNameForState(open), className)}
+      aria-label={open ? "Hide workspace panel" : "Show workspace panel"}
+      title={open ? "Hide workspace panel" : "Show workspace panel"}
+      onClick={onToggle}
+    >
+      <HugeiconsIcon icon={LayoutAlignLeftIcon} className="rotate-180" strokeWidth={1.7} />
+    </Button>
   );
 }
 
