@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   filePanelFileIcon,
   filePanelFileIconSpriteSheet,
+  filePanelDirectoryChain,
   filePanelIndexedPathByTreePath,
   filePanelReloadableDirectoryPaths,
   filePanelRootItems,
@@ -59,6 +60,21 @@ test("file panel tree paths include explicit directories from workspace entries"
   expect(indexedPathByTreePath.get("app/voice-plan-feedback/notes.md")).toEqual(
     expect.objectContaining({ kind: "file", relativePath: "voice-plan-feedback/notes.md" }),
   );
+});
+
+test("file panel directory chain expands ancestors before a nested folder", () => {
+  expect(
+    filePanelDirectoryChain({
+      rootId: "root_a",
+      relativePath: "src/components/ui",
+      kind: "directory",
+      hasChildren: false,
+    }),
+  ).toEqual([
+    { rootId: "root_a", relativePath: "src", kind: "directory", hasChildren: true },
+    { rootId: "root_a", relativePath: "src/components", kind: "directory", hasChildren: true },
+    { rootId: "root_a", relativePath: "src/components/ui", kind: "directory", hasChildren: false },
+  ]);
 });
 
 test("file panel path search includes matching files with root context", () => {

@@ -6,13 +6,16 @@ import { FileViewer } from "@/components/file-panel/file-viewer";
 import { useFilePanelSearch } from "@/components/file-panel/use-file-panel-search";
 import { useOpenFileTabs } from "@/components/file-panel/use-open-file-tabs";
 import { Button } from "@/components/ui/button";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { useFilePanelTree } from "@/hooks/use-file-panel-tree";
 import {
+  filePanelDirectoryChain,
   filePanelRootItems,
   filePanelTreePathForIndexedPath,
   filePanelWorkspaceFilesAvailable,
   filePanelWorkspaceKey,
   type FilePanelIndexedPath,
+  type FilePanelSelectionIntent,
 } from "@/lib/file-panel";
 import { cn } from "@/lib/utils";
 import type { WorkspaceRoot } from "@/types/roder";
@@ -24,12 +27,20 @@ export type FilePanelProps = {
   roots: WorkspaceRoot[];
   selectedRootId: string;
   appServerMethods: string[];
+  selectionIntent?: FilePanelSelectionIntent | null;
 };
 
-export function FilePanel({ workspaceId, roots, selectedRootId, appServerMethods }: FilePanelProps): React.JSX.Element {
+export function FilePanel({
+  workspaceId,
+  roots,
+  selectedRootId,
+  appServerMethods,
+  selectionIntent = null,
+}: FilePanelProps): React.JSX.Element {
   const filesystemAvailable = filePanelWorkspaceFilesAvailable(appServerMethods);
   const orderedRoots = orderWorkspaceRoots(roots, selectedRootId);
   const workspaceKey = filePanelWorkspaceKey(workspaceId, orderedRoots, selectedRootId, filesystemAvailable);
+  const scopedSelectionIntent = selectionIntent?.workspaceId === workspaceId ? selectionIntent : null;
 
   return (
     <FilePanelSession
@@ -37,6 +48,7 @@ export function FilePanel({ workspaceId, roots, selectedRootId, appServerMethods
       workspaceId={workspaceId}
       roots={orderedRoots}
       filesystemAvailable={filesystemAvailable}
+      selectionIntent={scopedSelectionIntent}
     />
   );
 }
@@ -45,10 +57,12 @@ function FilePanelSession({
   workspaceId,
   roots,
   filesystemAvailable,
+  selectionIntent,
 }: {
   workspaceId: string;
   roots: WorkspaceRoot[];
   filesystemAvailable: boolean;
+  selectionIntent: FilePanelSelectionIntent | null;
 }): React.JSX.Element {
   const { state, refresh, loadDirectory } = useFilePanelTree({ workspaceId, roots, available: filesystemAvailable });
   const rootItems = filePanelRootItems(roots);
@@ -60,17 +74,26 @@ function FilePanelSession({
   const directoryErrorCount = state.status === "ready" ? state.directoryErrors.length : 0;
 
   function openDirectory(indexedPath: FilePanelIndexedPath): void {
-    const treePath = filePanelTreePathForIndexedPath(roots, indexedPath);
-    if (treePath) {
-      setExpandedTreePaths((currentPaths) =>
-        currentPaths.includes(treePath) ? currentPaths : [...currentPaths, treePath],
-      );
+    const directoryChain = filePanelDirectoryChain(indexedPath);
+    const treePaths = directoryChain.flatMap(
+      (directoryPath) => filePanelTreePathForIndexedPath(roots, directoryPath) ?? [],
+    );
+    if (treePaths.length > 0) {
+      setExpandedTreePaths((currentPaths) => [...new Set([...currentPaths, ...treePaths])]);
     }
-    void loadDirectory(indexedPath);
+    void loadDirectoryChain(directoryChain, loadDirectory);
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+      {selectionIntent && (
+        <FilePanelSelectionIntentConsumer
+          key={selectionIntent.id}
+          intent={selectionIntent}
+          onOpenFile={fileTabs.openFile}
+          onOpenDirectory={openDirectory}
+        />
+      )}
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
         <OpenFileTabs
           tabs={fileTabs.openTabs}
@@ -123,6 +146,34 @@ function FilePanelSession({
       </div>
     </div>
   );
+}
+
+function FilePanelSelectionIntentConsumer({
+  intent,
+  onOpenFile,
+  onOpenDirectory,
+}: {
+  intent: FilePanelSelectionIntent;
+  onOpenFile: (indexedPath: FilePanelIndexedPath) => void;
+  onOpenDirectory: (indexedPath: FilePanelIndexedPath) => void;
+}): null {
+  useMountEffect(() => {
+    if (intent.indexedPath.kind === "directory") {
+      onOpenDirectory(intent.indexedPath);
+      return;
+    }
+    onOpenFile(intent.indexedPath);
+  });
+  return null;
+}
+
+async function loadDirectoryChain(
+  directoryChain: readonly FilePanelIndexedPath[],
+  loadDirectory: (indexedPath: FilePanelIndexedPath) => Promise<void>,
+): Promise<void> {
+  for (const directoryPath of directoryChain) {
+    await loadDirectory(directoryPath);
+  }
 }
 
 function orderWorkspaceRoots(roots: WorkspaceRoot[], selectedRootId: string): WorkspaceRoot[] {

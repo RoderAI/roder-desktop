@@ -6,6 +6,7 @@ import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import type { FilePanelIndexedPath, FilePanelSelectionIntent } from "@/lib/file-panel";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
 import type { NativeCommandOutput } from "@/lib/native-command-formatters";
 import { runNativeCommandInvocation, type LocalTranscriptOffset } from "@/lib/native-command-router";
@@ -25,10 +26,10 @@ import {
   closeWorkspacePanelShell,
   closeWorkspacePanelTab,
   mergeRouteSearchUpdate,
-  openWorkspacePanelShell,
   openWorkspacePanelTab,
   routeSearchParsers,
   selectWorkspacePanelTab,
+  toggleWorkspacePanelShell,
   type RouteReviewScope,
   type RouteWorkspacePanel,
 } from "@/lib/route-search";
@@ -81,6 +82,8 @@ export function useAppShellController(): AppShellController {
   const [projectConfigOpen, setProjectConfigOpen] = useState(false);
   const [projectInitialFolders, setProjectInitialFolders] = useState<string[]>([]);
   const [projectCreating, setProjectCreating] = useState(false);
+  const [fileSearchOpen, setFileSearchOpen] = useState(false);
+  const [fileSearchSelectionIntent, setFileSearchSelectionIntent] = useState<FilePanelSelectionIntent | null>(null);
   const activePanel = routeSearch.panelActive;
   const workspacePanelOpen = routeSearch.panelOpen;
   const selectedExtensionId = routeSearch.extension || null;
@@ -221,6 +224,10 @@ export function useAppShellController(): AppShellController {
       }
       if (appCommand.command === "openBrowser") {
         void setRouteSearch((current) => openWorkspacePanelTab(current, "browser"));
+        return;
+      }
+      if (appCommand.command === "openFileSearch") {
+        setFileSearchOpen(true);
       }
     });
   }, [navigate, newProject, newThread, setRouteSearch]);
@@ -337,6 +344,17 @@ export function useAppShellController(): AppShellController {
     },
     [setRouteSearch],
   );
+  const selectFileSearchPath = useCallback(
+    (indexedPath: FilePanelIndexedPath) => {
+      setFileSearchSelectionIntent((current) => ({
+        id: (current?.id ?? 0) + 1,
+        workspaceId: activeWorkspaceRef.workspaceId,
+        indexedPath,
+      }));
+      void setRouteSearch((current) => openWorkspacePanelTab(current, "files"), { history: "replace" });
+    },
+    [activeWorkspaceRef.workspaceId, setRouteSearch],
+  );
 
   useEffect(() => {
     return roderIpc.onNotification((notification) => {
@@ -346,8 +364,8 @@ export function useAppShellController(): AppShellController {
       void setRouteSearch((current) => openWorkspacePanelTab(current, "design"), { history: "replace" });
     });
   }, [setRouteSearch]);
-  const openWorkspacePanelShellOnly = useCallback(() => {
-    void setRouteSearch(openWorkspacePanelShell(), { history: "replace" });
+  const toggleWorkspacePanelShellOnly = useCallback(() => {
+    void setRouteSearch((current) => toggleWorkspacePanelShell(current), { history: "replace" });
   }, [setRouteSearch]);
   const closeWorkspacePanelShellOnly = useCallback(() => {
     void setRouteSearch(closeWorkspacePanelShell(), { history: "replace" });
@@ -478,6 +496,8 @@ export function useAppShellController(): AppShellController {
       reviewScope: routeSearch.reviewScope,
       reviewTurnId: routeSearch.reviewTurnId,
       panelTabs: routeSearch.panelTabs,
+      fileSearchOpen,
+      fileSearchSelectionIntent,
       selectedExtensionId,
       selectedExtensionPanelId: routeSearch.extensionPanel || null,
       initialWorkspacePanelWidth: routeSearch.rightWidth,
@@ -493,13 +513,15 @@ export function useAppShellController(): AppShellController {
       onLoadMoreThreads: agent.loadMoreThreads,
       onAttachToComposer: attachToComposer,
       onCreateProject: createConfiguredProject,
+      onFileSearchOpenChange: setFileSearchOpen,
+      onFileSearchSelect: selectFileSearchPath,
       onProjectConfigOpenChange: setProjectConfigOpen,
       onNewProject: newProject,
       onNewThread: newThread,
       onNewThreadInFolder: newThreadInFolder,
       onOpenPlugins: openPlugins,
       onOpenWorkspacePanel: openWorkspacePanel,
-      onOpenWorkspacePanelShell: openWorkspacePanelShellOnly,
+      onToggleWorkspacePanelShell: toggleWorkspacePanelShellOnly,
       onCloseWorkspacePanel: closeWorkspacePanel,
       onCloseWorkspacePanelShell: closeWorkspacePanelShellOnly,
       onOpenSettings: openSettings,
