@@ -167,13 +167,14 @@ function FilePanelSelectionIntentConsumer({
   return null;
 }
 
-async function loadDirectoryChain(
+function loadDirectoryChain(
   directoryChain: readonly FilePanelIndexedPath[],
   loadDirectory: (indexedPath: FilePanelIndexedPath) => Promise<void>,
 ): Promise<void> {
-  for (const directoryPath of directoryChain) {
-    await loadDirectory(directoryPath);
-  }
+  return directoryChain.reduce<Promise<void>>(
+    (chain, directoryPath) => chain.then(() => loadDirectory(directoryPath)),
+    Promise.resolve(),
+  );
 }
 
 function orderWorkspaceRoots(roots: WorkspaceRoot[], selectedRootId: string): WorkspaceRoot[] {
