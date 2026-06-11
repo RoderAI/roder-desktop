@@ -112,6 +112,12 @@ export function closeWorkspacePanelShell(): Pick<RouteSearchState, "panelOpen"> 
   return { panelOpen: false };
 }
 
+export function toggleWorkspacePanelShell(
+  current: Pick<RouteSearchState, "panelOpen">,
+): Pick<RouteSearchState, "panelOpen"> {
+  return { panelOpen: !current.panelOpen };
+}
+
 export function openWorkspacePanelTab(
   current: Pick<RouteSearchState, "panelTabs">,
   panel: RouteWorkspacePanel,
