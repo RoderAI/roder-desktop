@@ -5,6 +5,9 @@ import { activeTurnIdForThread, messagesFromThread } from "@/lib/roder-thread";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
+import type { QueuedPrompt } from "@/types/roder";
+
+const emptyQueuedPrompts: QueuedPrompt[] = [];
 
 export function useRoderAgent() {
   useRoderStoreBootstrap();
@@ -62,7 +65,7 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     loadingMoreThreads: state.loadingMoreThreads,
     activeThreadId: state.activeThreadId,
     activeThreadGoal: activeThreadGoal?.threadId === state.activeThreadId ? activeThreadGoal : null,
-    queuedPrompts: state.queuedPromptsByThread[state.activeThreadId || "new-thread"] ?? [],
+    queuedPrompts: state.queuedPromptsByThread[state.activeThreadId || "new-thread"] ?? emptyQueuedPrompts,
     messages,
     allModels: state.models,
     routingOptions: state.routingOptions,
