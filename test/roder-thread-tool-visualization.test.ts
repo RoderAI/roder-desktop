@@ -257,7 +257,7 @@ test("file edit tools expose inline timeline previews", () => {
       [
         tool("tool-patch-1", "apply_patch", {
           patch: "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
-        }),
+        }, "inProgress"),
         tool("tool-write-1", "write_file", { path: "src/app.ts", content: "export const value = 1;\n" }),
         tool("tool-edit-1", "edit", { path: "src/app.ts", old_string: "value = 1", new_string: "value = 2" }),
         tool("tool-multi-edit-1", "multi_edit", {
@@ -273,12 +273,48 @@ test("file edit tools expose inline timeline previews", () => {
   );
 
   expect(plain(messages.map((message) => message.toolPreview))).toEqual([
-    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old\n+new\n",
+    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -0,0 +0,0 @@\n-old\n+new\n",
     "export const value = 1;\n",
     "- value = 1\n+ value = 2",
     "@@ edit 1 @@\n- value = 2\n+ value = 3\n@@ edit 2 @@\n- name = 'old'\n+ name = 'new'",
   ]);
   expect(plain(messages.map((message) => message.toolPreviewKind))).toEqual(["patch", "text", "text", "text"]);
+  expect(messages[0].toolSummary).toBe("Editing +1 -1 in app.ts");
+});
+
+test("completed apply_patch summaries include edited file and change counts", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool(
+          "tool-patch-1",
+          "apply_patch",
+          {
+            patch: [
+              "*** Begin Patch",
+              "*** Update File: src/app.ts",
+              "@@",
+              "-old",
+              "+new",
+              "+newer",
+              "*** Update File: src/lib/util.ts",
+              "@@",
+              "-before",
+              "+after",
+              "*** End Patch",
+            ].join("\n"),
+          },
+          "completed",
+          "ok",
+        ),
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages[0].toolSummary).toBe("Applied patch to app.ts +1 more (+3 -2)");
+  expect(messages[0].toolSubject).toBe("app.ts");
 });
 
 test("streaming edit tool previews survive completed status updates", () => {

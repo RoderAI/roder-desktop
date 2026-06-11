@@ -7,7 +7,7 @@
   "scripts": {
     "bundle:roder": "node scripts/bundle-roder.mjs",
     "dev": "pnpm bundle:roder && electron-forge start",
-    "build": "pnpm bundle:roder && pnpm typecheck && electron-forge package",
+    "build": "pnpm typecheck && electron-forge package",
     "dist": "pnpm make",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
@@ -19,7 +19,7 @@
     "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck && pnpm --filter aurora-theme-extension typecheck",
     "doctor": "react-doctor",
     "package": "pnpm build",
-    "make": "pnpm bundle:roder && pnpm typecheck && electron-forge make"
+    "make": "pnpm typecheck && electron-forge make"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",

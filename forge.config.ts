@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerDMG } from "@electron-forge/maker-dmg";
@@ -18,6 +19,21 @@ const config: ForgeConfig = {
     extraResource: ["resources/bin", "resources/icon.png", "resources/wordmark.png"],
   },
   rebuildConfig: {},
+  hooks: {
+    async prePackage() {
+      const result = spawnSync(process.execPath, ["scripts/install-roder-for-build.mjs"], {
+        stdio: "inherit",
+        env: process.env,
+      });
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        throw new Error(`install-roder-for-build failed with status ${result.status ?? "unknown"}`);
+      }
+    },
+  },
   makers: [
     new MakerSquirrel({ setupIcon: "resources/icon.ico" }, ["win32"]),
     new MakerDMG({ icon: "resources/icon.icns" }, ["darwin"]),

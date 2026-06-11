@@ -549,7 +549,7 @@ function SkillPromptEditor({
   return (
     <div className="relative">
       {value.length === 0 && (
-        <div className="pointer-events-none absolute left-1 top-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-7 text-muted-foreground">
+        <div className="pointer-events-none absolute left-1 top-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-muted-foreground">
           {placeholder}
         </div>
       )}
@@ -565,7 +565,7 @@ function SkillPromptEditor({
         suppressContentEditableWarning
         spellCheck={false}
         tabIndex={0}
-        className="skill-prompt-editor relative min-h-16 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-7 text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-7"
+        className="skill-prompt-editor relative min-h-16 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-[1.45em]"
         onKeyDownCapture={onKeyDownCapture}
         onPaste={onPaste}
       />
