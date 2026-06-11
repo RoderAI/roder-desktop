@@ -465,24 +465,29 @@ export type ModelSelectResult = {
   modelSwitchSummary?: string | null;
 };
 
+export type ProviderAuthType = "none" | "api_key" | "oauth" | string;
+
 export type ProviderModelDescriptor = {
   id: string;
   name: string;
   description?: string | null;
+  defaultReasoningEffort?: string;
+  reasoningEfforts?: string[];
+  isDefault?: boolean;
 };
 
 export type ProviderDescriptor = {
   id: string;
   name: string;
   description?: string | null;
-  authType?: string;
+  authType?: ProviderAuthType;
   authLabel?: string | null;
-  authenticated: boolean;
+  authenticated?: boolean;
   authDetail?: string | null;
-  recommended: boolean;
+  recommended?: boolean;
   sortOrder?: number;
-  capabilities?: unknown;
-  models: ProviderModelDescriptor[];
+  capabilities?: Record<string, unknown>;
+  models?: ProviderModelDescriptor[];
 };
 
 export type InferenceRoutingOptionDescriptor = {

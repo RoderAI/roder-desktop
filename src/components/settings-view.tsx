@@ -7,6 +7,7 @@ import {
   Cpu,
   Database,
   GitBranch,
+  KeyRound,
   Laptop,
   Monitor,
   Moon,
@@ -29,6 +30,7 @@ import { SettingsBrowserPanel } from "@/components/settings-browser-panel";
 import { SettingsComputerUsePanel } from "@/components/settings-computer-use-panel";
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
+import { ProvidersSettingsPanel } from "@/components/settings-providers-panel";
 import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
 import { parseTerminalThemeJson, terminalThemeForSettings, terminalThemePresets } from "@/lib/terminal-theme";
 import {
@@ -85,6 +87,13 @@ export function SettingsView({
             active={section === "components"}
             icon={<Component className="size-4" />}
             label="Components"
+            onClick={onSectionChange}
+          />
+          <SettingsNavItem
+            id="providers"
+            active={section === "providers"}
+            icon={<KeyRound className="size-4" />}
+            label="Providers"
             onClick={onSectionChange}
           />
           <SettingsNavItem
@@ -174,6 +183,8 @@ export function SettingsView({
             <AppearancePanel onReset={resetTheme} />
           ) : section === "components" ? (
             <ComponentsSettingsPanel />
+          ) : section === "providers" ? (
+            <ProvidersSettingsPanel />
           ) : section === "models" ? (
             <ModelsSettingsPanel />
           ) : section === "skills" ? (

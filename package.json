@@ -3,13 +3,12 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "main": "out/main/index.js",
+  "main": ".vite/build/index.js",
   "scripts": {
     "bundle:roder": "node scripts/bundle-roder.mjs",
-    "dev": "pnpm bundle:roder && electron-vite dev",
-    "build": "pnpm bundle:roder && pnpm typecheck && electron-vite build",
-    "preview": "electron-vite preview",
-    "dist": "pnpm build && electron-builder",
+    "dev": "pnpm bundle:roder && electron-forge start",
+    "build": "pnpm bundle:roder && pnpm typecheck && electron-forge package",
+    "dist": "pnpm make",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint --max-warnings 0",
@@ -18,42 +17,19 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "pnpm --filter @roderai/extension-api build && pnpm --filter @roderai/extension-packager build && tsc --noEmit && pnpm --filter @roderai/extension-api typecheck && pnpm --filter @roderai/extension-packager typecheck && pnpm --filter hello-roder-extension typecheck && pnpm --filter aurora-theme-extension typecheck",
-    "doctor": "react-doctor"
-  },
-  "build": {
-    "appId": "sc.roder.desktop",
-    "productName": "Roder",
-    "icon": "resources/icon.png",
-    "mac": {
-      "icon": "resources/icon.icns"
-    },
-    "win": {
-      "icon": "resources/icon.ico"
-    },
-    "files": [
-      "out/**",
-      "package.json",
-      "node_modules/node-pty/**"
-    ],
-    "asarUnpack": [
-      "node_modules/node-pty/**"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/bin",
-        "to": "bin"
-      },
-      {
-        "from": "resources/icon.png",
-        "to": "icon.png"
-      },
-      {
-        "from": "resources/wordmark.png",
-        "to": "wordmark.png"
-      }
-    ]
+    "doctor": "react-doctor",
+    "package": "pnpm build",
+    "make": "pnpm bundle:roder && pnpm typecheck && electron-forge make"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-vite": "^7.11.2",
+    "@electron-forge/shared-types": "^7.11.2",
     "@tanstack/router-plugin": "^1.168.18",
     "@types/node": "^25.9.2",
     "@types/react": "^19.2.17",
@@ -62,7 +38,6 @@
     "@vitest/coverage-v8": "4.1.8",
     "babel-plugin-react-compiler": "1.0.0",
     "electron": "^42.4.0",
-    "electron-builder": "^26.15.2",
     "npm-run-all": "^4.1.5",
     "oxfmt": "0.54.0",
     "oxlint": "1.69.0",
@@ -90,7 +65,6 @@
     "@xterm/xterm": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron-vite": "^5.0.0",
     "fflate": "^0.8.3",
     "lexical": "0.45.0",
     "lucide-react": "^1.17.0",

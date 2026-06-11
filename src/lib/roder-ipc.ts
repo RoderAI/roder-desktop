@@ -18,12 +18,12 @@ import type {
   HunkListResult,
   HunkReadResult,
   PolicyMode,
+  ProviderDescriptor,
   ProcessesListResult,
   ProcessesStopAllResult,
   ProcessesStopResult,
   ModelSelectChoice,
   ModelSelectResult,
-  ProviderDescriptor,
   ProvidersListResult,
   RoderModel,
   RoderStatus,
@@ -283,6 +283,11 @@ export type ProviderSelectResult = {
   provider: string;
   model: string;
   reasoning: string;
+};
+
+export type ProviderConfigureResult = {
+  provider: string;
+  authenticated: boolean;
 };
 
 export type ThreadArchiveResult = {
@@ -545,6 +550,8 @@ export const roderIpc = {
     window.roderDesktop
       .request("providers/list", {})
       .then((result) => providersListResultFromWire(result as WireProvidersListResult)) as Promise<ProvidersListResult>,
+  configureProvider: (provider: string, apiKey: string) =>
+    window.roderDesktop.request("providers/configure", { provider, api_key: apiKey }) as Promise<ProviderConfigureResult>,
   selectModel: (selection: ModelSelectChoice, threadId?: string) =>
     window.roderDesktop.request("model/select", {
       ...(threadId ? { threadId } : {}),
