@@ -11,11 +11,12 @@ import {
   type PanelSize,
 } from "react-resizable-panels";
 import { AppSidebar } from "@/components/app-sidebar";
+import { FileSearchDialog } from "@/components/file-search-dialog";
 import { ProjectConfigDialog } from "@/components/project-config-dialog";
 import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
 import { renderRightWorkspacePanel, rightWorkspacePanelEntries } from "@/components/right-workspace-panel-registry";
 import { RightWorkspacePanelShell } from "@/components/right-workspace-panel-shell";
-import { TopBar, type WorkspacePanel } from "@/components/top-bar";
+import { TopBar, WorkspacePanelToggleButton, type WorkspacePanel } from "@/components/top-bar";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
 import {
   canShowWorkspacePanelForGroupWidth,
@@ -27,6 +28,11 @@ import {
   workspacePanelMaxOpenWidthForGroup,
 } from "@/lib/app-shell-layout";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
+import {
+  filePanelWorkspaceFilesAvailable,
+  type FilePanelIndexedPath,
+  type FilePanelSelectionIntent,
+} from "@/lib/file-panel";
 import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
 import { toolPanelWidthBounds, type RouteReviewScope, type RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
@@ -62,6 +68,8 @@ export type AppShellLayoutProps = {
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
   panelTabs: RouteWorkspacePanel[];
+  fileSearchOpen: boolean;
+  fileSearchSelectionIntent: FilePanelSelectionIntent | null;
   reviewPath: string;
   reviewScope: RouteReviewScope;
   reviewTurnId: string;
@@ -80,6 +88,8 @@ export type AppShellLayoutProps = {
   onLoadMoreThreads: () => void;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
   onCreateProject: (params: WorkspaceCreateParams) => void;
+  onFileSearchOpenChange: (open: boolean) => void;
+  onFileSearchSelect: (indexedPath: FilePanelIndexedPath) => void;
   onProjectConfigOpenChange: (open: boolean) => void;
   onCloseWorkspacePanel: (panel: RouteWorkspacePanel) => void;
   onCloseWorkspacePanelShell: () => void;
@@ -88,7 +98,7 @@ export type AppShellLayoutProps = {
   onNewThreadInFolder: (path: string) => void;
   onOpenPlugins: () => void;
   onOpenWorkspacePanel: (panel: RouteWorkspacePanel) => void;
-  onOpenWorkspacePanelShell: () => void;
+  onToggleWorkspacePanelShell: () => void;
   onOpenSettings: (section: string) => void;
   onRestart: () => void;
   onSelectExtension: (extensionId: string) => void;
@@ -116,6 +126,8 @@ export function AppShellLayout({
   hasMoreThreads,
   loadingMoreThreads,
   panelTabs,
+  fileSearchOpen,
+  fileSearchSelectionIntent,
   reviewPath,
   reviewScope,
   reviewTurnId,
@@ -134,6 +146,8 @@ export function AppShellLayout({
   onLoadMoreThreads,
   onAttachToComposer,
   onCreateProject,
+  onFileSearchOpenChange,
+  onFileSearchSelect,
   onProjectConfigOpenChange,
   onCloseWorkspacePanel,
   onCloseWorkspacePanelShell,
@@ -142,7 +156,7 @@ export function AppShellLayout({
   onNewThreadInFolder,
   onOpenPlugins,
   onOpenWorkspacePanel,
-  onOpenWorkspacePanelShell,
+  onToggleWorkspacePanelShell,
   onOpenSettings,
   onRestart,
   onSelectExtension,
@@ -441,7 +455,7 @@ export function AppShellLayout({
                 activeFolderPath={activeWorkspaceCwd}
                 status={status}
                 workspacePanelOpen={workspacePanelOpen}
-                workspacePanelToggleVisible={workspacePanelToggleVisible}
+                workspacePanelToggleVisible={false}
                 extensionSidebarVisible={extensionSidebarVisible}
                 sidebarOpen={sidebarOpen}
                 placement="content"
@@ -452,8 +466,7 @@ export function AppShellLayout({
                 onToggleSidebar={onToggleSidebar}
                 onSelectFolder={onSelectFolder}
                 onSelectThread={onSelectThread}
-                onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
-                onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
+                onToggleWorkspacePanelShell={onToggleWorkspacePanelShell}
               />
             )}
             <div className="flex min-h-0 flex-1 flex-col">
@@ -503,6 +516,7 @@ export function AppShellLayout({
             reviewTurnId,
             selectedExtensionId,
             selectedExtensionPanelId,
+            fileSearchSelectionIntent,
             nativeOverlayOcclusion: state.nativeOverlayOcclusion,
             width: measuredWorkspacePanelWidth,
             onAttachToComposer,
@@ -514,6 +528,14 @@ export function AppShellLayout({
         }
       />
     </Panel>
+  );
+
+  const workspacePanelToggle = !useWindowTopBar && workspacePanelToggleVisible && (
+    <WorkspacePanelToggleButton
+      open={workspacePanelOpen}
+      className="fixed right-2 top-[11px] z-[100] size-7 rounded-full pointer-events-auto [&_svg]:size-4"
+      onToggle={onToggleWorkspacePanelShell}
+    />
   );
 
   const appChromeGroup = (
@@ -556,15 +578,28 @@ export function AppShellLayout({
     />
   );
 
+  const fileSearchDialog = (
+    <FileSearchDialog
+      open={fileSearchOpen}
+      workspaceId={activeWorkspaceRef.workspaceId}
+      roots={activeWorkspaceRoots}
+      filesystemAvailable={filePanelWorkspaceFilesAvailable(status.appServerMethods ?? [])}
+      onOpenChange={onFileSearchOpenChange}
+      onSelect={onFileSearchSelect}
+    />
+  );
+
   if (!useWindowTopBar) {
     return (
       <>
         {projectDialog}
+        {fileSearchDialog}
         <div className="relative flex h-screen w-screen overflow-hidden bg-background">
           {sidebarRegion}
           {sidebarResizeHandle}
           {appChromeGroup}
           {extensionActivityRail}
+          {workspacePanelToggle}
         </div>
       </>
     );
@@ -573,6 +608,7 @@ export function AppShellLayout({
   return (
     <>
       {projectDialog}
+      {fileSearchDialog}
       <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
         <TopBar
           thread={activeThread}
@@ -593,8 +629,7 @@ export function AppShellLayout({
           onToggleSidebar={onToggleSidebar}
           onSelectFolder={onSelectFolder}
           onSelectThread={onSelectThread}
-          onCloseWorkspacePanelShell={onCloseWorkspacePanelShell}
-          onOpenWorkspacePanelShell={onOpenWorkspacePanelShell}
+          onToggleWorkspacePanelShell={onToggleWorkspacePanelShell}
         />
         <div className="flex min-h-0 flex-1">
           {sidebarRegion}

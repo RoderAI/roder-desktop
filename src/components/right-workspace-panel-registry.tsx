@@ -9,6 +9,7 @@ import { ReviewPanel } from "@/components/review-panel";
 import { TerminalPanel } from "@/components/terminal-panel";
 import type { NativeOverlayOcclusion, RightWorkspacePanelEntry } from "@/components/right-workspace-panel-shell";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import type { FilePanelSelectionIntent } from "@/lib/file-panel";
 import type { RouteReviewScope, RouteWorkspacePanel } from "@/lib/route-search";
 import type { DesktopAttachment, WorkspaceRoot } from "@/types/roder";
 
@@ -70,6 +71,7 @@ export type RightWorkspacePanelRenderContext = {
   reviewTurnId: string;
   selectedExtensionId: string | null;
   selectedExtensionPanelId: string | null;
+  fileSearchSelectionIntent: FilePanelSelectionIntent | null;
   nativeOverlayOcclusion: NativeOverlayOcclusion | null;
   width: number;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
@@ -146,6 +148,7 @@ export function renderRightWorkspacePanel(
         roots={context.activeWorkspaceRoots}
         selectedRootId={context.activeWorkspaceRef.rootId}
         appServerMethods={context.appServerMethods}
+        selectionIntent={context.fileSearchSelectionIntent}
       />
     );
   }

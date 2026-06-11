@@ -14,6 +14,7 @@ test("content top bar moves the workspace panel button to the window edge withou
   const html = renderTopBar({ extensionSidebarVisible: false });
 
   expect(html).toContain("right-2");
+  expect(html).toContain("z-[100]");
   expect(html).not.toContain("right-14");
 });
 
@@ -59,8 +60,7 @@ function renderTopBar({
       onToggleSidebar: () => {},
       onSelectFolder: () => {},
       onSelectThread: () => {},
-      onCloseWorkspacePanelShell: () => {},
-      onOpenWorkspacePanelShell: () => {},
+      onToggleWorkspacePanelShell: () => {},
     }),
   );
 }

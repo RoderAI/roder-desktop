@@ -533,17 +533,19 @@ export const roderIpc = {
     reasoning?: string,
     options: ThreadStartOptions = {},
   ) =>
-    window.roderDesktop.request("thread/start", {
-      workspaceId: workspace.workspaceId,
-      rootId: workspace.rootId || undefined,
-      model,
-      cwd: workspace.cwd || undefined,
-      modelProvider,
-      reasoning,
-      selection: options.selection ? modelSelectChoiceToWire(options.selection) : undefined,
-      ephemeral: false,
-      initialPrompt: options.initialPrompt || undefined,
-    }).then((result) => threadStartResultFromWire(result as WireThreadStartResult)) as Promise<ThreadStartResult>,
+    window.roderDesktop
+      .request("thread/start", {
+        workspaceId: workspace.workspaceId,
+        rootId: workspace.rootId || undefined,
+        model,
+        cwd: workspace.cwd || undefined,
+        modelProvider,
+        reasoning,
+        selection: options.selection ? modelSelectChoiceToWire(options.selection) : undefined,
+        ephemeral: false,
+        initialPrompt: options.initialPrompt || undefined,
+      })
+      .then((result) => threadStartResultFromWire(result as WireThreadStartResult)) as Promise<ThreadStartResult>,
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
     window.roderDesktop.request("providers/select", { provider, model, reasoning }) as Promise<ProviderSelectResult>,
   listProviders: () =>
@@ -553,10 +555,12 @@ export const roderIpc = {
   configureProvider: (provider: string, apiKey: string) =>
     window.roderDesktop.request("providers/configure", { provider, api_key: apiKey }) as Promise<ProviderConfigureResult>,
   selectModel: (selection: ModelSelectChoice, threadId?: string) =>
-    window.roderDesktop.request("model/select", {
-      ...(threadId ? { threadId } : {}),
-      selection: modelSelectChoiceToWire(selection),
-    }).then((result) => modelSelectResultFromWire(result as WireModelSelectResult)) as Promise<ModelSelectResult>,
+    window.roderDesktop
+      .request("model/select", {
+        ...(threadId ? { threadId } : {}),
+        selection: modelSelectChoiceToWire(selection),
+      })
+      .then((result) => modelSelectResultFromWire(result as WireModelSelectResult)) as Promise<ModelSelectResult>,
   startTurn: (
     threadId: string,
     prompt: string,

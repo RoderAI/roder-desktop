@@ -1,6 +1,6 @@
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
-export type AppCommand = "newProject" | "newThread" | "openSettings" | "openBrowser";
+export type AppCommand = "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch";
 
 export type ShortcutInput = {
   type: string;
@@ -27,6 +27,13 @@ export function isOpenSettingsShortcutInput(
   platform: NodeJS.Platform = process.platform,
 ): boolean {
   return isShortcutInputForKey(input, ",", "Comma", platform);
+}
+
+export function isOpenFileSearchShortcutInput(
+  input: ShortcutInput,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return isShortcutInputForKey(input, "p", "KeyP", platform);
 }
 
 function isShortcutInputForKey(input: ShortcutInput, key: string, code: string, platform: NodeJS.Platform): boolean {
@@ -73,6 +80,16 @@ export function installOpenSettingsShortcut(webContents: WebContents, onOpenSett
   });
 }
 
+export function installOpenFileSearchShortcut(webContents: WebContents, onOpenFileSearch: () => void): void {
+  webContents.on("before-input-event", (event, input) => {
+    if (!isOpenFileSearchShortcutInput(input)) {
+      return;
+    }
+    event.preventDefault();
+    onOpenFileSearch();
+  });
+}
+
 export function createApplicationMenuTemplate(
   onCommand: (command: AppCommand) => void,
   platform: NodeJS.Platform = process.platform,
@@ -97,6 +114,12 @@ export function createApplicationMenuTemplate(
         label: "New Agent",
         accelerator: "CommandOrControl+N",
         click: () => onCommand("newThread"),
+      },
+      {
+        id: "find-file",
+        label: "Find File...",
+        accelerator: "CommandOrControl+P",
+        click: () => onCommand("openFileSearch"),
       },
       ...(platform === "darwin" ? [] : [{ type: "separator" } as const, settingsItem]),
       { type: "separator" },

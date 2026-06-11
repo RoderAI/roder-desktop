@@ -70,6 +70,27 @@ export function filePanelTreePathForIndexedPath(
   return filePanelTreePath(root.treePath, indexedPath);
 }
 
+export function filePanelDirectoryChain(indexedPath: FilePanelIndexedPath): FilePanelIndexedPath[] {
+  if (indexedPath.kind !== "directory") {
+    return [];
+  }
+  const normalizedPath = normalizeRelativePath(indexedPath.relativePath);
+  if (!normalizedPath) {
+    return [indexedPath];
+  }
+  const segments = normalizedPath.split("/").filter(Boolean);
+  return segments.map((_, index) => {
+    const relativePath = segments.slice(0, index + 1).join("/");
+    const target = relativePath === normalizedPath;
+    return {
+      rootId: indexedPath.rootId,
+      relativePath,
+      kind: "directory",
+      hasChildren: target ? indexedPath.hasChildren : true,
+    };
+  });
+}
+
 export function filePanelIndexedPathByTreePath(
   roots: readonly WorkspaceRoot[],
   indexedPaths: readonly FilePanelIndexedPath[],

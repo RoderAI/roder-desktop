@@ -9,6 +9,12 @@ export type FilePanelIndexedPath = {
   hasChildren?: boolean;
 };
 
+export type FilePanelSelectionIntent = {
+  id: number;
+  workspaceId: string;
+  indexedPath: FilePanelIndexedPath;
+};
+
 export type FilePanelRootItem = {
   id: string;
   label: string;

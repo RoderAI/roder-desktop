@@ -30,7 +30,16 @@ test("merges native commands with app-server commands and lets native names win"
     command({ name: "model", source: "builtin", description: "Prompt model help" }),
   ]);
 
-  expect(commands.map((item) => item.name)).toEqual(["agents", "clear", "goal", "model", "ps", "retry", "review", "tasks"]);
+  expect(commands.map((item) => item.name)).toEqual([
+    "agents",
+    "clear",
+    "goal",
+    "model",
+    "ps",
+    "retry",
+    "review",
+    "tasks",
+  ]);
   expect(commands.find((item) => item.name === "model")).toMatchObject({
     source: "desktop",
     description: "Show or change the active model.",

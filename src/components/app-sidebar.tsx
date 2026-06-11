@@ -201,7 +201,9 @@ export function AppSidebar({
               disabled={loadingMoreThreads}
               onClick={onLoadMoreThreads}
             >
-              <span className="min-w-0 flex-1 truncate">{loadingMoreThreads ? "Loading sessions..." : "Load more"}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {loadingMoreThreads ? "Loading sessions..." : "Load more"}
+              </span>
             </SidebarRowButton>
           ) : null}
         </div>
