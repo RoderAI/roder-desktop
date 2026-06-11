@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 export function ModelsSettingsPanel(): React.JSX.Element {
   const models = useRoderStore((state) => state.models);
+  const providers = useRoderStore((state) => state.providers);
   const selectedModel = useRoderStore((state) => state.selectedModel);
   const selectedModelProvider = useRoderStore((state) => state.selectedModelProvider);
   const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
@@ -27,7 +28,7 @@ export function ModelsSettingsPanel(): React.JSX.Element {
         <div>
           <h1 className="text-base font-medium">Models</h1>
           <p className="mt-1 text-base text-muted-foreground">
-            {visibleIds.length} of {models.length} shown in the composer
+            {visibleIds.length} of {models.length} configured models shown in the composer
           </p>
         </div>
         <Button variant="ghost" size="sm" disabled={!customised} onClick={resetVisibleModels}>
@@ -48,7 +49,11 @@ export function ModelsSettingsPanel(): React.JSX.Element {
       </div>
 
       {models.length === 0 ? (
-        <div className="px-5 py-8 text-base text-muted-foreground">No models loaded from the app-server.</div>
+        <div className="px-5 py-8 text-base text-muted-foreground">
+          {providers.length > 0
+            ? "No models are available for configured providers. Set up a provider on the Providers page."
+            : "No providers or models loaded from the app-server."}
+        </div>
       ) : filteredModels.length === 0 ? (
         <div className="px-5 py-8 text-base text-muted-foreground">No matching models.</div>
       ) : (

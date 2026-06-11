@@ -1,4 +1,54 @@
-import type { RoderModel } from "@/types/roder";
+import type { ProviderDescriptor, RoderModel } from "@/types/roder";
+
+export function providerConfigured(provider: string, configuredProviders: Set<string> | null): boolean {
+  const normalizedProvider = normalizeProviderId(provider);
+  if (hiddenProviderIds.has(normalizedProvider)) {
+    return false;
+  }
+  if (!configuredProviders) {
+    return true;
+  }
+  return configuredProviders.has(normalizedProvider);
+}
+
+function normalizeProviderId(provider: string | undefined): string {
+  return (provider || "roder").toLowerCase();
+}
+
+export function configuredModelsFor(models: RoderModel[], providers: ProviderDescriptor[]): RoderModel[] {
+  const configuredProviders = configuredProviderIds(providers);
+  return models.filter((model) => providerConfigured(model.modelProvider, configuredProviders));
+}
+
+export function configuredProviderIds(providers: ProviderDescriptor[]): Set<string> | null {
+  if (providers.length === 0) {
+    return null;
+  }
+  const normalizedProviders = providers.filter((provider) => !hiddenProviderIds.has(normalizeProviderId(provider.id)));
+  if (normalizedProviders.length === 0) {
+    return new Set<string>();
+  }
+  const configured = new Set(
+    normalizedProviders
+      .filter(isProviderConfigured)
+      .map((provider) => normalizeProviderId(provider.id))
+      .filter(Boolean),
+  );
+  return configured.size > 0 ? configured : new Set<string>();
+}
+
+export function isProviderConfigured(provider: ProviderDescriptor): boolean {
+  const authType = provider.authType?.toLowerCase() ?? "";
+  if (hiddenProviderIds.has(normalizeProviderId(provider.id))) {
+    return false;
+  }
+  if (provider.authenticated) {
+    return true;
+  }
+  return authType === "none" || authType === "local";
+}
+
+const hiddenProviderIds = new Set(["mock"]);
 
 export function selectedModelProvider(
   models: RoderModel[],

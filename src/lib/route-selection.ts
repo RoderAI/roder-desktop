@@ -40,6 +40,7 @@ const validSettingsSections = new Set<SettingsSection>([
   "general",
   "appearance",
   "components",
+  "providers",
   "models",
   "skills",
   "extensions",

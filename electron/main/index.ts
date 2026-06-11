@@ -112,17 +112,17 @@ function createWindow(): void {
     trafficLightPosition: { x: 18, y: 18 },
     backgroundColor: currentAppearance() === "dark" ? "#171717" : "#f5f5f4",
     webPreferences: {
-      preload: join(mainDir, "../preload/index.mjs"),
+      preload: join(mainDir, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
   });
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    void mainWindow.loadFile(join(mainDir, "../renderer/index.html"));
+    void mainWindow.loadFile(join(mainDir, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
   mainWindow.webContents.on("did-finish-load", () => {

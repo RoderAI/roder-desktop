@@ -30,7 +30,7 @@ export function NativeModelPicker({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const listboxId = useId();
-  const modelOptions = models.length > 0 ? models : fallbackModels(selectedModel, selectedModelProvider);
+  const modelOptions = models;
   const visibleModels = filteredModels(modelOptions, query);
   const modelGroups = groupModelsByProvider(visibleModels.map((model, index) => ({ model, index, modelProvider: model.modelProvider })));
   const activeIndex = boundedModelIndex(highlightedIndex, visibleModels.length);
@@ -124,7 +124,9 @@ export function NativeModelPicker({
               </div>
             ))
           ) : (
-            <div className="px-3 py-4 text-base text-muted-foreground">No matching models</div>
+            <div className="px-3 py-4 text-base text-muted-foreground">
+              {models.length === 0 ? "Configure a provider in Settings to choose models" : "No matching models"}
+            </div>
           )}
         </CompletionMenuList>
         {visibleModels.length > 8 && <CompletionMenuCount>{visibleModels.length} matches</CompletionMenuCount>}
@@ -145,12 +147,6 @@ function filteredModels(models: RoderModel[], query: string): RoderModel[] {
 
 function modelName(model: RoderModel): string {
   return model.name || model.id;
-}
-
-function fallbackModels(selectedModel: string, selectedModelProvider: string): RoderModel[] {
-  return selectedModel
-    ? [{ id: selectedModel, name: selectedModel, modelProvider: selectedModelProvider || "desktop" }]
-    : [];
 }
 
 function boundedModelIndex(index: number, itemCount: number): number {

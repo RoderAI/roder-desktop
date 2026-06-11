@@ -6,9 +6,16 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: false
+  fs-xattr: true
+  macos-alias: true
   msgpackr-extract: false
   node-pty: true
 
 minimumReleaseAge: 1440
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 1440
+
+overrides:
+  "@electron/node-gyp": 10.2.0-electron.2
+
+nodeLinker: hoisted

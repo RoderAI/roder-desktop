@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  configuredModelsFor,
   effectiveSelectedModel,
   groupModelsByProvider,
   modelVisibilityKey,
@@ -7,7 +8,7 @@ import {
   visibleModelIdsFor,
   visibleModelsFor,
 } from "../src/lib/roder-models";
-import type { RoderModel } from "../src/types/roder";
+import type { ProviderDescriptor, RoderModel } from "../src/types/roder";
 
 test("resolves duplicate model ids with the preferred provider", () => {
   const models: RoderModel[] = [
@@ -20,6 +21,28 @@ test("resolves duplicate model ids with the preferred provider", () => {
     id: "gpt-5.5",
     modelProvider: "opencode",
   });
+});
+
+test("filters mock and unconfigured providers from selectable models", () => {
+  const models: RoderModel[] = [
+    { id: "mock-fast", name: "Mock Fast", modelProvider: "mock" },
+    { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+    { id: "claude-sonnet", name: "Claude Sonnet", modelProvider: "anthropic" },
+  ];
+  const providers: ProviderDescriptor[] = [
+    { id: "mock", name: "Mock", authType: "none", authenticated: true },
+    { id: "openai", name: "OpenAI", authType: "api_key", authenticated: true },
+    { id: "anthropic", name: "Anthropic", authType: "api_key", authenticated: false },
+  ];
+
+  expect(configuredModelsFor(models, providers)).toEqual([models[1]]);
+});
+
+test("does not show mock models when mock is the only reported provider", () => {
+  const models: RoderModel[] = [{ id: "mock-fast", name: "Mock Fast", modelProvider: "mock" }];
+  const providers: ProviderDescriptor[] = [{ id: "mock", name: "Mock", authType: "none", authenticated: true }];
+
+  expect(configuredModelsFor(models, providers)).toEqual([]);
 });
 
 test("visible model ids are provider-qualified while accepting legacy bare ids", () => {

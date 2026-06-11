@@ -190,8 +190,7 @@ export function ModelPicker({
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const visibleModels: RoderModel[] =
-    models.length > 0 || !selectedModel ? models : [{ id: selectedModel, name: "Codex 5.3", modelProvider: "codex" }];
+  const visibleModels: RoderModel[] = models.length > 0 ? models : [];
   const modelItems = visibleModels.map((model): ModelPickerItem => ({ type: "model", model }));
   const autoItems = routingOptions.map((option) => ({ type: "auto" as const, option }));
   const items = [...autoItems, ...modelItems];
@@ -248,7 +247,9 @@ export function ModelPicker({
                 />
               </div>
               <Combobox.Empty>
-                <div className="px-3.5 py-4 text-base text-muted-foreground">No matching models</div>
+                <div className="px-3.5 py-4 text-base text-muted-foreground">
+                  {models.length === 0 ? "Configure a provider in Settings to choose models" : "No matching models"}
+                </div>
               </Combobox.Empty>
               <Combobox.List className="max-h-[286px] overflow-y-auto p-1.5">
                 {autoItems.length > 0 && (
@@ -344,7 +345,7 @@ function modelPickerItemName(item: ModelPickerItem): string {
 }
 
 function modelPickerLabel(item: ModelPickerItem | null): string {
-  return item ? modelPickerItemName(item) : "Select model";
+  return item ? modelPickerItemName(item) : "Configure models";
 }
 
 function modelPickerItemValue(item: ModelPickerItem): string {

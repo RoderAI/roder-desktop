@@ -115,20 +115,28 @@ export function AppSidebar({
               const visibility = visibleThreadsForGroup(group.threads, expanded);
               return (
                 <section key={group.key}>
-                  <div className="group squircle-corners relative flex h-8 items-center rounded-xl px-2.5 pr-8 text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
-                    <div className="min-w-0 flex-1 truncate" title={group.path || group.title}>
+                  <div className="group squircle-corners relative flex h-8 items-center rounded-xl text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
+                    <button
+                      type="button"
+                      className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-8 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+                      title={group.path || group.title}
+                      aria-label={`New agent in ${group.title}`}
+                      onClick={() => onNewThreadInFolder(group.path)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
                       {group.title}
-                    </div>
+                      </span>
+                    </button>
                     <Tooltip>
                       <TooltipTrigger
                         type="button"
                         className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
-                        aria-label={`New thread in ${group.title}`}
+                        aria-label={`New agent in ${group.title}`}
                         onClick={() => onNewThreadInFolder(group.path)}
                       >
                         <CirclePlus className="size-3.5" />
                       </TooltipTrigger>
-                      <TooltipContent side="right">New thread</TooltipContent>
+                      <TooltipContent side="right">New agent</TooltipContent>
                     </Tooltip>
                   </div>
                   <div className="mt-2 flex flex-col gap-0.5">

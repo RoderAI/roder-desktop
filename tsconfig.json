@@ -25,5 +25,15 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["electron", "src", "packages/extension-api/src", "electron.vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "electron",
+    "src",
+    "packages/extension-api/src",
+    "forge.config.ts",
+    "forge.env.d.ts",
+    "vite.main.config.ts",
+    "vite.preload.config.ts",
+    "vite.renderer.config.ts",
+    "vitest.config.ts"
+  ]
 }

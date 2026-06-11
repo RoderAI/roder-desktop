@@ -14,6 +14,7 @@ import {
 import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-wait-requests";
 import {
   compactVisibleModelIds,
+  configuredModelsFor,
   effectiveSelectedModel,
   modelKey,
   selectedModelProvider,
@@ -32,6 +33,8 @@ import type {
   DesktopAttachment,
   PendingWaitRequestsByThread,
   PolicyMode,
+  ProviderDescriptor,
+  ProvidersListResult,
   PlanExitWaitRequest,
   RoderModel,
   RoderNotification,
@@ -68,6 +71,7 @@ type RoderStore = {
   forwardStack: NavigationEntry[];
   models: RoderModel[];
   routingOptions: InferenceRoutingOptionDescriptor[];
+  providers: ProviderDescriptor[];
   visibleModelIds: string[];
   defaultModel: string;
   defaultModelProvider: string;
@@ -113,6 +117,8 @@ type RoderStore = {
   saveDefaults: () => Promise<void>;
   setModelVisibility: (modelId: string, visible: boolean) => void;
   resetVisibleModels: () => void;
+  refreshProviders: () => Promise<void>;
+  configureProvider: (provider: string, apiKey: string) => Promise<void>;
   setSelectedWorkspaceCwd: (cwd: string) => void;
   openWorkspaceFolder: () => Promise<void>;
   resolveApproval: (request: ApprovalWaitRequest, approved: boolean) => Promise<void>;
@@ -349,6 +355,7 @@ export const useRoderStore = create<RoderStore>()(
       forwardStack: [],
       models: [],
       routingOptions: [],
+      providers: [],
       visibleModelIds: [],
       defaultModel: "",
       defaultModelProvider: "",
@@ -386,7 +393,9 @@ export const useRoderStore = create<RoderStore>()(
 
           const threads = realThreads(normalizeThreadsCwd(threadResult.data, status.cwd));
           const current = get();
-          const models = modelResult.models;
+          const providers = providerResult.providers ?? [];
+          const providerModels = modelsFromProviders(providers);
+          const models = configuredModelsFor(providerModels.length > 0 ? providerModels : modelResult.models, providers);
           const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, current.visibleModelIds));
           const visibleModels = visibleModelsFor(models, visibleModelIds);
           const activeThreadId = threads.some((thread) => thread.id === current.activeThreadId)
@@ -431,6 +440,7 @@ export const useRoderStore = create<RoderStore>()(
             loadingMoreThreads: false,
             models,
             routingOptions: providerResult.routingOptions ?? [],
+            providers,
             visibleModelIds,
             defaultModel: currentSelectedModel,
             defaultModelProvider: currentSelectedModelProvider,
@@ -958,6 +968,15 @@ export const useRoderStore = create<RoderStore>()(
           };
         }),
       resetVisibleModels: () => set({ visibleModelIds: [] }),
+      refreshProviders: async () => {
+        const providerResult = await roderIpc.listProviders();
+        set((state) => applyProviderCatalog(state, providerResult));
+      },
+      configureProvider: async (provider, apiKey) => {
+        set({ error: null });
+        await roderIpc.configureProvider(provider, apiKey);
+        await get().refreshProviders();
+      },
       setSelectedReasoning: (selectedReasoning) =>
         set((state) => ({
           selectedReasoning,
@@ -1333,13 +1352,7 @@ async function listWorkspacesForBootstrap(): Promise<{ workspaces: Workspace[] }
   }
 }
 
-async function listProvidersForBootstrap(): Promise<{
-  active_provider: string;
-  active_model: string;
-  active_reasoning: string;
-  routingOptions?: InferenceRoutingOptionDescriptor[];
-  selectionMode?: ModelSelectionMode | null;
-}> {
+async function listProvidersForBootstrap(): Promise<ProvidersListResult> {
   try {
     return await roderIpc.listProviders();
   } catch {
@@ -1347,9 +1360,62 @@ async function listProvidersForBootstrap(): Promise<{
       active_provider: "",
       active_model: "",
       active_reasoning: "",
+      providers: [],
       routingOptions: [],
+      selectionMode: null,
     };
   }
+}
+
+function modelsFromProviders(providers: ProviderDescriptor[]): RoderModel[] {
+  return providers.flatMap((provider) =>
+    (provider.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name || model.id,
+      description: model.description ?? undefined,
+      modelProvider: provider.id,
+      defaultReasoningEffort: model.defaultReasoningEffort,
+      reasoningEfforts: model.reasoningEfforts,
+      isDefault: model.isDefault,
+    })),
+  );
+}
+
+function applyProviderCatalog(
+  state: RoderStore,
+  providerResult: { providers?: ProviderDescriptor[]; routingOptions?: InferenceRoutingOptionDescriptor[] },
+): Partial<RoderStore> {
+  const providers = providerResult.providers ?? [];
+  const providerModels = modelsFromProviders(providers);
+  const models = configuredModelsFor(providerModels.length > 0 ? providerModels : state.models, providers);
+  const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, state.visibleModelIds));
+  const visibleModels = visibleModelsFor(models, visibleModelIds);
+  const defaultModelRecord = selectedModelRecordOrDefault(visibleModels, state.defaultModel, state.defaultModelProvider);
+  const selectedModelRecord = selectedModelRecordOrDefault(visibleModels, state.selectedModel, state.selectedModelProvider);
+
+  return {
+    providers,
+    routingOptions: providerResult.routingOptions ?? state.routingOptions,
+    models,
+    visibleModelIds,
+    defaultModel: defaultModelRecord?.id ?? state.defaultModel,
+    defaultModelProvider: defaultModelRecord?.modelProvider ?? state.defaultModelProvider,
+    selectedModel: selectedModelRecord?.id ?? defaultModelRecord?.id ?? state.selectedModel,
+    selectedModelProvider: selectedModelRecord?.modelProvider ?? defaultModelRecord?.modelProvider ?? state.selectedModelProvider,
+  };
+}
+
+function selectedModelRecordOrDefault(
+  models: RoderModel[],
+  modelId: string,
+  providerId: string,
+): RoderModel | undefined {
+  return (
+    models.find((model) => model.id === modelId && model.modelProvider === providerId) ??
+    models.find((model) => model.id === modelId) ??
+    models.find((model) => model.isDefault) ??
+    models[0]
+  );
 }
 
 async function startThreadForSelection(set: RoderStoreSet, get: () => RoderStore): Promise<void> {
