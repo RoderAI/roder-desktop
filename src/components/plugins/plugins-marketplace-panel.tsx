@@ -205,6 +205,7 @@ export function PluginsMarketplacePanel({ activeTab }: { activeTab: PluginSectio
                   <input
                     className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
                     value={query}
+                    aria-label="Search plugins"
                     placeholder="Search plugins"
                     onChange={(event) => {
                       const nextQuery = event.currentTarget.value;

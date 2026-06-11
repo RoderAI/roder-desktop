@@ -1311,6 +1311,7 @@ export function DesignCanvasPanel({
         <input
           ref={importInputRef}
           type="file"
+          aria-label="Import design file"
           className="hidden"
           accept=".pen,.json,.roderdesign,application/json"
           onChange={(event) => {
@@ -4213,6 +4214,7 @@ function ImageUploadInput({ onCommit }: { onCommit: (src: string) => Promise<voi
       Upload image
       <input
         type="file"
+        aria-label="Upload image"
         accept="image/*"
         className="block w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-sm file:text-foreground"
         onChange={(event) => {

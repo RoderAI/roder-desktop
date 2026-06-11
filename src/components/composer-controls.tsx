@@ -21,6 +21,7 @@ import {
   dropdownMenuTriggerVariants,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { groupModelsByProvider, providerName } from "@/lib/roder-models";
 import { cn } from "@/lib/utils";
 
 export function PolicyModePicker({
@@ -205,6 +206,7 @@ export function ModelPicker({
   const selected =
     selectedAutoItem ?? (selectedModelItem ? { type: "model" as const, model: selectedModelItem } : null);
   const showReasoningPicker = !selectedAutoItem;
+  const modelGroups = groupModelsByProvider(visibleModels);
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
@@ -249,26 +251,56 @@ export function ModelPicker({
                 <div className="px-3.5 py-4 text-base text-muted-foreground">No matching models</div>
               </Combobox.Empty>
               <Combobox.List className="max-h-[286px] overflow-y-auto p-1.5">
-                {(item: ModelPickerItem) => (
-                  <Combobox.Item
-                    key={modelPickerItemValue(item)}
-                    value={item}
-                    className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
-                  >
-                    {item.type === "auto" ? (
-                      <Sparkles className="size-4 shrink-0 text-muted-foreground" />
-                    ) : (
-                      <ProviderLogo provider={item.model.modelProvider} />
-                    )}
-                    <span className="min-w-0 flex-1 truncate text-foreground">{modelPickerItemName(item)}</span>
-                    <Combobox.ItemIndicator
-                      keepMounted
-                      className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
-                    >
-                      <Check className="size-3.5" />
-                    </Combobox.ItemIndicator>
-                  </Combobox.Item>
+                {autoItems.length > 0 && (
+                  <Combobox.Group items={autoItems}>
+                    <Combobox.GroupLabel className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Auto routing
+                    </Combobox.GroupLabel>
+                    <Combobox.Collection>
+                      {(item: ModelPickerItem) => (
+                        <Combobox.Item
+                          key={modelPickerItemValue(item)}
+                          value={item}
+                          className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
+                        >
+                          <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate text-foreground">{modelPickerItemName(item)}</span>
+                          <Combobox.ItemIndicator
+                            keepMounted
+                            className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
+                          >
+                            <Check className="size-3.5" />
+                          </Combobox.ItemIndicator>
+                        </Combobox.Item>
+                      )}
+                    </Combobox.Collection>
+                  </Combobox.Group>
                 )}
+                {modelGroups.map((group) => (
+                  <Combobox.Group key={group.provider} items={group.models.map((model): ModelPickerItem => ({ type: "model", model }))}>
+                    <Combobox.GroupLabel className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {providerName(group.provider)}
+                    </Combobox.GroupLabel>
+                    <Combobox.Collection>
+                      {(item: ModelPickerItem) => (
+                        <Combobox.Item
+                          key={modelPickerItemValue(item)}
+                          value={item}
+                          className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
+                        >
+                          {item.type === "model" && <ProviderLogo provider={item.model.modelProvider} />}
+                          <span className="min-w-0 flex-1 truncate text-foreground">{modelPickerItemName(item)}</span>
+                          <Combobox.ItemIndicator
+                            keepMounted
+                            className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
+                          >
+                            <Check className="size-3.5" />
+                          </Combobox.ItemIndicator>
+                        </Combobox.Item>
+                      )}
+                    </Combobox.Collection>
+                  </Combobox.Group>
+                ))}
               </Combobox.List>
             </Combobox.Popup>
           </Combobox.Positioner>
@@ -496,16 +528,6 @@ function containsProviderToken(normalizedProvider: string, token: string): boole
 
 function modelName(model: RoderModel | undefined): string {
   return model?.name || model?.id || "Model";
-}
-
-function providerName(provider: string): string {
-  if (!provider) {
-    return "Roder";
-  }
-  if (provider.toLowerCase() === "openai") {
-    return "OpenAI";
-  }
-  return provider.slice(0, 1).toUpperCase() + provider.slice(1);
 }
 
 function reasoningLabel(reasoning: ReasoningEffort): string {

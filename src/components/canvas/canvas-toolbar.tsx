@@ -102,6 +102,7 @@ export function CanvasToolbar({
         <input
           value={width}
           type="range"
+          aria-label="Drawing size"
           min={2}
           max={18}
           className="w-20 accent-primary sm:w-24"

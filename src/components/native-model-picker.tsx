@@ -8,6 +8,7 @@ import {
 } from "@/components/composer-completion-popup";
 import { Button } from "@/components/ui/button";
 import { completionOptionId, moveCompletionIndex } from "@/lib/composer-completions";
+import { groupModelsByProvider, modelKey, providerName } from "@/lib/roder-models";
 import type { RoderModel } from "@/types/roder";
 
 type NativeModelPickerProps = {
@@ -31,7 +32,7 @@ export function NativeModelPicker({
   const listboxId = useId();
   const modelOptions = models.length > 0 ? models : fallbackModels(selectedModel, selectedModelProvider);
   const visibleModels = filteredModels(modelOptions, query);
-  const modelGroups = groupedModelsByProvider(visibleModels);
+  const modelGroups = groupModelsByProvider(visibleModels.map((model, index) => ({ model, index, modelProvider: model.modelProvider })));
   const activeIndex = boundedModelIndex(highlightedIndex, visibleModels.length);
 
   useEffect(() => {
@@ -104,7 +105,7 @@ export function NativeModelPicker({
                   const selectedModelRow = model.id === selectedModel && model.modelProvider === selectedModelProvider;
                   return (
                     <CompletionMenuOption
-                      key={`${model.modelProvider}:${model.id}`}
+                      key={modelKey(model)}
                       id={completionOptionId(listboxId, index)}
                       index={index}
                       active={active}
@@ -144,25 +145,6 @@ function filteredModels(models: RoderModel[], query: string): RoderModel[] {
 
 function modelName(model: RoderModel): string {
   return model.name || model.id;
-}
-
-function groupedModelsByProvider(models: RoderModel[]): Array<{
-  provider: string;
-  models: Array<{ model: RoderModel; index: number }>;
-}> {
-  const groups = new Map<string, Array<{ model: RoderModel; index: number }>>();
-  models.forEach((model, index) => {
-    const provider = model.modelProvider || "roder";
-    groups.set(provider, [...(groups.get(provider) ?? []), { model, index }]);
-  });
-  return [...groups.entries()].map(([provider, grouped]) => ({ provider, models: grouped }));
-}
-
-function providerName(provider: string): string {
-  if (provider.toLowerCase() === "openai") {
-    return "OpenAI";
-  }
-  return provider;
 }
 
 function fallbackModels(selectedModel: string, selectedModelProvider: string): RoderModel[] {

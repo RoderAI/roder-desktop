@@ -24,6 +24,7 @@ test("rejects path traversal in extension entry point", async () => {
     ["roder.main"],
     (issue) => issue.path === "roder.main" && issue.message.includes("relative path inside"),
   );
+  expect.assertions(3);
 });
 
 test("rejects unsupported engines, capabilities, and undeclared activation targets", async () => {
@@ -36,6 +37,7 @@ test("rejects unsupported engines, capabilities, and undeclared activation targe
     () => validateExtensionManifest(manifest, { appVersion: "0.1.0" }),
     ["roder.engines.roder", "roder.capabilities[1]", "roder.activationEvents"],
   );
+  expect.assertions(3);
 });
 
 test("rejects malformed contribution points", async () => {
@@ -52,6 +54,7 @@ test("rejects malformed contribution points", async () => {
       "roder.contributes.tools[0].inputSchema",
     ],
   );
+  expect.assertions(3);
 });
 
 function expectManifestIssues(

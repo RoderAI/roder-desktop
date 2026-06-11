@@ -1,7 +1,7 @@
 import { Check, RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { modelVisibilityKey, visibleModelIdsFor } from "@/lib/roder-models";
+import { groupModelsByProvider, modelKey, providerName, visibleModelIdsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type { RoderModel } from "@/types/roder";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 export function ModelsSettingsPanel(): React.JSX.Element {
   const models = useRoderStore((state) => state.models);
   const selectedModel = useRoderStore((state) => state.selectedModel);
+  const selectedModelProvider = useRoderStore((state) => state.selectedModelProvider);
   const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
   const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
   const resetVisibleModels = useRoderStore((state) => state.resetVisibleModels);
@@ -17,7 +18,7 @@ export function ModelsSettingsPanel(): React.JSX.Element {
   const visibleIds = useMemo(() => visibleModelIdsFor(models, visibleModelIds), [models, visibleModelIds]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const filteredModels = useMemo(() => filterModels(models, query), [models, query]);
-  const grouped = useMemo(() => groupByProvider(filteredModels), [filteredModels]);
+  const grouped = useMemo(() => groupModelsByProvider(filteredModels), [filteredModels]);
   const customised = visibleModelIds.length > 0;
 
   return (
@@ -57,13 +58,13 @@ export function ModelsSettingsPanel(): React.JSX.Element {
               <h2 className="mb-2 text-base font-medium text-muted-foreground">{providerName(group.provider)}</h2>
               <div className="space-y-1">
                 {group.models.map((model) => {
-                  const key = modelVisibilityKey(model);
+                  const key = modelKey(model);
                   const visible = visibleSet.has(key);
                   return (
                     <ModelVisibilityRow
                       key={key}
                       model={model}
-                      selected={model.id === selectedModel}
+                      selected={model.id === selectedModel && model.modelProvider === selectedModelProvider}
                       visible={visible}
                       disabled={visible && visibleIds.length <= 1}
                       onToggle={() => setModelVisibility(key, !visible)}
@@ -144,20 +145,4 @@ function filterModels(models: RoderModel[], query: string): RoderModel[] {
     return models;
   }
   return models.filter((model) => `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase().includes(needle));
-}
-
-function groupByProvider(models: RoderModel[]): Array<{ provider: string; models: RoderModel[] }> {
-  const groups = new Map<string, RoderModel[]>();
-  for (const model of models) {
-    const provider = model.modelProvider || "roder";
-    groups.set(provider, [...(groups.get(provider) ?? []), model]);
-  }
-  return [...groups.entries()].map(([provider, groupModels]) => ({ provider, models: groupModels }));
-}
-
-function providerName(provider: string): string {
-  if (provider.toLowerCase() === "openai") {
-    return "OpenAI";
-  }
-  return provider.slice(0, 1).toUpperCase() + provider.slice(1);
 }
