@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { chmod, cp, mkdir } from "node:fs/promises";
+import path from "node:path";
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerDMG } from "@electron-forge/maker-dmg";
@@ -14,7 +17,7 @@ const config: ForgeConfig = {
     appBundleId: "sc.roder.desktop",
     icon: "resources/icon",
     asar: {
-      unpack: "node_modules/node-pty/**",
+      unpack: "**/node_modules/node-pty/**",
     },
     extraResource: ["resources/bin", "resources/icon.png", "resources/wordmark.png"],
   },
@@ -31,6 +34,30 @@ const config: ForgeConfig = {
       }
       if (result.status !== 0) {
         throw new Error(`install-roder-for-build failed with status ${result.status ?? "unknown"}`);
+      }
+    },
+    async packageAfterPrune(_config, buildPath, _electronVersion, platform, arch) {
+      const nodePtySource = path.resolve("node_modules/node-pty");
+      if (!existsSync(nodePtySource)) {
+        throw new Error("Cannot package node-pty because node_modules/node-pty is missing");
+      }
+
+      const nodePtyTarget = path.join(buildPath, "node_modules", "node-pty");
+      await mkdir(nodePtyTarget, { recursive: true });
+
+      await cp(path.join(nodePtySource, "package.json"), path.join(nodePtyTarget, "package.json"));
+      await cp(path.join(nodePtySource, "lib"), path.join(nodePtyTarget, "lib"), { recursive: true });
+
+      const prebuildSource = path.join(nodePtySource, "prebuilds", `${platform}-${arch}`);
+      const prebuildTarget = path.join(nodePtyTarget, "prebuilds", `${platform}-${arch}`);
+      if (!existsSync(prebuildSource)) {
+        throw new Error(`Cannot package node-pty because ${prebuildSource} is missing`);
+      }
+      await cp(prebuildSource, prebuildTarget, { recursive: true });
+
+      const spawnHelper = path.join(prebuildTarget, "spawn-helper");
+      if (platform === "darwin" && existsSync(spawnHelper)) {
+        await chmod(spawnHelper, 0o755);
       }
     },
   },
