@@ -197,9 +197,11 @@ test("thread transcript only shows routing decisions when selected model or thin
     status: { type: "idle", activeTurnId: null, activeFlags: [] },
   });
 
-  expect(messages.filter((message) => message.toolName === "auto_model_routing").map((message) => message.id)).toEqual(
-    ["routing:route-1", "routing:route-3", "routing:route-4"],
-  );
+  expect(messages.filter((message) => message.toolName === "auto_model_routing").map((message) => message.id)).toEqual([
+    "routing:route-1",
+    "routing:route-3",
+    "routing:route-4",
+  ]);
 });
 
 test("manual thread transcripts hide routing decision items", () => {

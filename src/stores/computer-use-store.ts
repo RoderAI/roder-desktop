@@ -63,8 +63,7 @@ export const useComputerUseStore = create<ComputerUseStore>()(
   persist(
     (set) => ({
       ...defaultComputerUsePolicy,
-      setPermission: (key, value) =>
-        set((state) => ({ permissions: { ...state.permissions, [key]: value } })),
+      setPermission: (key, value) => set((state) => ({ permissions: { ...state.permissions, [key]: value } })),
       addDomain: (list, domain) =>
         set((state) => {
           const normalized = normalizeDomain(domain);

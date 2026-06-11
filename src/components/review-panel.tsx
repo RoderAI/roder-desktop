@@ -33,12 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  useReviewChanges,
-  type ReviewDiffState,
-  type ReviewFile,
-  type ReviewListState,
-} from "@/hooks/use-review-changes";
+import { useReviewChanges, type ReviewDiffState, type ReviewFile } from "@/hooks/use-review-changes";
 import { useHorizontalResize } from "@/hooks/use-horizontal-resize";
 import {
   reviewActiveFilePath,
@@ -333,9 +328,25 @@ export function ReviewPanel({
     }
   }, [diffPathsToLoad, loadDiff]);
 
+  const fileTreeToggleButton = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground [&_svg]:size-4"
+      aria-controls={fileTreeId}
+      aria-expanded={fileTreeVisible}
+      aria-label={fileTreeToggleLabel}
+      title={fileTreeToggleLabel}
+      onClick={() => setFileTreeVisible((visible) => !visible)}
+    >
+      <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
+    </Button>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-card text-foreground">
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card px-3">
+        {fileTreeToggleButton}
         <ScopeButton active={scope === "thread"} onClick={() => selectReviewScope("thread")}>
           Thread
         </ScopeButton>
@@ -380,23 +391,8 @@ export function ReviewPanel({
       </div>
 
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0 rounded-full text-muted-foreground hover:bg-muted/40 hover:text-foreground [&_svg]:size-4"
-          aria-controls={fileTreeId}
-          aria-expanded={fileTreeVisible}
-          aria-label={fileTreeToggleLabel}
-          title={fileTreeToggleLabel}
-          onClick={() => setFileTreeVisible((visible) => !visible)}
-        >
-          <HugeiconsIcon icon={LayoutAlignLeftIcon} strokeWidth={1.7} />
-        </Button>
         <div className="flex min-w-0 flex-1 items-center gap-2 text-base">
           <span className="shrink-0 font-medium">{reviewChangedFilesHeadline(reviewFiles.length)}</span>
-          <span className="truncate text-muted-foreground">
-            {reviewScopeContext(scope, listState, effectiveBranchAreaFilter)}
-          </span>
         </div>
         <span className="flex shrink-0 items-center gap-2 font-mono text-sm">
           <span className="text-emerald-600">+{reviewTotals.additions}</span>
@@ -1070,31 +1066,6 @@ function fileStats(file: Pick<ReviewFile, "additions" | "deletions">): string {
     return "";
   }
   return `+${file.additions} -${file.deletions}`;
-}
-
-function reviewScopeContext(
-  scope: RouteReviewScope,
-  listState: ReviewListState,
-  branchAreaFilter: ReviewBranchAreaFilter,
-): string {
-  if (listState.status === "error") {
-    return "Unable to load changes";
-  }
-  if (scope === "branch" && listState.status === "ready") {
-    if (branchAreaFilter === "staged") {
-      return "staged changes";
-    }
-    if (branchAreaFilter === "unstaged") {
-      return "unstaged changes";
-    }
-    const branch = listState.branch ?? "branch";
-    const base = listState.baseRef ?? "base";
-    return `${branch} compared with ${base}`;
-  }
-  if (scope === "turn") {
-    return "in this turn";
-  }
-  return "in this thread";
 }
 
 function directoryPaths(paths: string[]): string[] {
