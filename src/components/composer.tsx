@@ -32,7 +32,7 @@ import {
 import { useCommandCompletion } from "@/hooks/use-command-completion";
 import { useSkillCompletion } from "@/hooks/use-skill-completion";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
-import type { CommandInvocation } from "@/lib/roder-commands";
+import { commandInvocationText, type CommandInvocation } from "@/lib/roder-commands";
 import {
   createSkillPromptEditor,
   readSkillPromptEditorSelectionOffset,
@@ -68,6 +68,7 @@ const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
 type ComposerProps = {
   activeThreadId: string;
   busy: boolean;
+  queueBusy?: boolean;
   commands: CommandDescriptor[];
   models: RoderModel[];
   routingOptions: InferenceRoutingOptionDescriptor[];
@@ -116,6 +117,7 @@ async function imageFileToPngDataUrl(file: File): Promise<string> {
 export function Composer({
   activeThreadId,
   busy,
+  queueBusy = busy,
   commands,
   models,
   routingOptions,
@@ -213,8 +215,15 @@ export function Composer({
   const activeQueueKey = activeThreadId || "new-thread";
   const hasQueuedPrompts = queuedPrompts.length > 0;
 
+  function restorePromptEditor(nextPrompt: string, nextAttachments: DesktopAttachment[]): void {
+    setPrompt(nextPrompt);
+    setCaretPosition(nextPrompt.length);
+    writeSkillPromptEditorText(skillPromptEditor, nextPrompt, skills, nextPrompt.length);
+    onAttachmentsChange(nextAttachments);
+  }
+
   useEffect(() => {
-    if (busy || drainingQueuedPromptId || queuedPrompts.length === 0) {
+    if (queueBusy || drainingQueuedPromptId || queuedPrompts.length === 0) {
       return;
     }
     const nextQueuedPrompt = queuedPrompts[0];
@@ -233,7 +242,7 @@ export function Composer({
         setDrainingQueuedPromptId(null);
       }
     })();
-  }, [activeQueueKey, blockedQueuedPromptId, busy, drainingQueuedPromptId, onRemoveQueuedPrompt, onSend, queuedPrompts]);
+  }, [activeQueueKey, blockedQueuedPromptId, drainingQueuedPromptId, onRemoveQueuedPrompt, onSend, queueBusy, queuedPrompts]);
 
   function editQueuedPrompt(item: QueuedPrompt): void {
     setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
@@ -284,22 +293,34 @@ export function Composer({
     setCaretPosition(0);
     writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
     onAttachmentsChange([]);
-    if (busy) {
+    if (queueBusy) {
       onQueuePrompt(activeQueueKey, value, submittedAttachments);
       return;
     }
-    await onSend(value, submittedAttachments);
+    try {
+      await onSend(value, submittedAttachments);
+    } catch {
+      // The store has already surfaced the error; keep direct submits from becoming unhandled rejections.
+      restorePromptEditor(value, submittedAttachments);
+    }
   }
 
   async function submitCommand(invocation: CommandInvocation): Promise<void> {
-    if (busy) {
-      return;
-    }
+    const commandText = commandInvocationText(invocation);
     setPrompt("");
     setCaretPosition(0);
     writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
     onAttachmentsChange([]);
-    await onCommandSubmit(invocation);
+    if (queueBusy) {
+      onQueuePrompt(activeQueueKey, commandText, []);
+      return;
+    }
+    try {
+      await onCommandSubmit(invocation);
+    } catch {
+      // The store has already surfaced the error; keep direct submits from becoming unhandled rejections.
+      restorePromptEditor(commandText, []);
+    }
   }
 
   function handlePromptEditorKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>): void {

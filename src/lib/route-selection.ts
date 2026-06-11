@@ -134,8 +134,8 @@ export function normalizeSettingsSectionParam(section: string | undefined): Sett
   return "general";
 }
 
-export function defaultRouteForHydratedState({ activeThreadId }: { activeThreadId: string }): string {
-  return activeThreadId ? `/threads/${encodeURIComponent(activeThreadId)}` : "/new";
+export function defaultRouteForHydratedState(): string {
+  return "/new";
 }
 
 export function defaultPluginsRoute(): PluginRoutePath {

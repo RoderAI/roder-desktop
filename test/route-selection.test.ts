@@ -87,9 +87,8 @@ test("settings route accepts known sections and falls back to general", () => {
   expect(normalizeSettingsSectionParam(undefined)).toBe("general");
 });
 
-test("empty route redirects to the persisted thread or new agent route after hydration", () => {
-  expect(defaultRouteForHydratedState({ activeThreadId: "thread-a" })).toBe("/threads/thread-a");
-  expect(defaultRouteForHydratedState({ activeThreadId: "" })).toBe("/new");
+test("empty route redirects to the new agent route after hydration", () => {
+  expect(defaultRouteForHydratedState()).toBe("/new");
 });
 
 test("plugins installed and explore views are route-owned pages", () => {

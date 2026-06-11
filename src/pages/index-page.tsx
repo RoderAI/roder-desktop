@@ -5,7 +5,7 @@ import { defaultRouteForHydratedState } from "@/lib/route-selection";
 
 export function IndexPage(): React.JSX.Element | null {
   const {
-    agent: { activeThreadId, hydrated },
+    agent: { hydrated },
   } = useAppShell();
   const navigate = useNavigate();
 
@@ -13,8 +13,8 @@ export function IndexPage(): React.JSX.Element | null {
     if (!hydrated) {
       return;
     }
-    void navigate({ to: defaultRouteForHydratedState({ activeThreadId }), replace: true, search: true });
-  }, [activeThreadId, hydrated, navigate]);
+    void navigate({ to: defaultRouteForHydratedState(), replace: true, search: true });
+  }, [hydrated, navigate]);
 
   return null;
 }
