@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "main": ".vite/build/index.js",
+  "main": ".vite/build/index.cjs",
   "scripts": {
     "bundle:roder": "node scripts/bundle-roder.mjs",
     "dev": "pnpm bundle:roder && electron-forge start",

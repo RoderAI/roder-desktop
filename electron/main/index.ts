@@ -113,7 +113,7 @@ function createWindow(): void {
     trafficLightPosition: { x: 18, y: 18 },
     backgroundColor: currentAppearance() === "dark" ? "#171717" : "#f5f5f4",
     webPreferences: {
-      preload: join(mainDir, "preload.js"),
+      preload: join(mainDir, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
