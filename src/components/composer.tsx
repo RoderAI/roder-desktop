@@ -1,5 +1,5 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
-import { ArrowDown, ArrowUp, Loader2, Mic, Plus, Square } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Mic, Pencil, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   CommandDescriptor,
@@ -7,6 +7,7 @@ import type {
   InferenceRoutingOptionDescriptor,
   ModelSelectionMode,
   PolicyMode,
+  QueuedPrompt,
   RoderModel,
   ReasoningEffort,
   SkillDescriptor,
@@ -65,6 +66,7 @@ const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
 };
 
 type ComposerProps = {
+  activeThreadId: string;
   busy: boolean;
   commands: CommandDescriptor[];
   models: RoderModel[];
@@ -76,6 +78,7 @@ type ComposerProps = {
   selectedPolicyMode: PolicyMode;
   selectedReasoning: ReasoningEffort;
   attachments: DesktopAttachment[];
+  queuedPrompts: QueuedPrompt[];
   focusSignal: number;
   showScrollToBottom: boolean;
   onSelectedModelChange: (model: string, provider?: string) => void;
@@ -84,8 +87,11 @@ type ComposerProps = {
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
   onAttachmentsChange: (attachments: DesktopAttachment[]) => void;
+  onQueuePrompt: (threadId: string, prompt: string, attachments: DesktopAttachment[]) => QueuedPrompt;
+  onRemoveQueuedPrompt: (threadId: string, queuedPromptId: string) => void;
   onCommandSubmit: (invocation: CommandInvocation) => Promise<void>;
   onSend: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
+  onSteer: (prompt: string, attachments: DesktopAttachment[]) => Promise<void>;
   onStop: () => Promise<void>;
 };
 
@@ -99,6 +105,7 @@ async function imageFileToPngDataUrl(file: File): Promise<string> {
     if (!context) {
       throw new Error("Could not prepare pasted image");
     }
+
     context.drawImage(bitmap, 0, 0);
     return canvas.toDataURL("image/png");
   } finally {
@@ -107,6 +114,7 @@ async function imageFileToPngDataUrl(file: File): Promise<string> {
 }
 
 export function Composer({
+  activeThreadId,
   busy,
   commands,
   models,
@@ -118,6 +126,7 @@ export function Composer({
   selectedPolicyMode,
   selectedReasoning,
   attachments,
+  queuedPrompts,
   focusSignal,
   showScrollToBottom,
   onSelectedModelChange,
@@ -126,11 +135,16 @@ export function Composer({
   onSelectedReasoningChange,
   onScrollToBottom,
   onAttachmentsChange,
+  onQueuePrompt,
+  onRemoveQueuedPrompt,
   onCommandSubmit,
   onSend,
+  onSteer,
   onStop,
 }: ComposerProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
+  const [drainingQueuedPromptId, setDrainingQueuedPromptId] = useState<string | null>(null);
+  const [blockedQueuedPromptId, setBlockedQueuedPromptId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [sketchOpen, setSketchOpen] = useState(false);
   const [caretPosition, setCaretPosition] = useState(0);
@@ -154,6 +168,7 @@ export function Composer({
       skillPromptEditor.focus();
     }
   }, [focusSignal, skillPromptEditor]);
+
 
   useEffect(() => {
     const selectionOffset = readSkillPromptEditorSelectionOffset(skillPromptEditor);
@@ -195,6 +210,52 @@ export function Composer({
     [clearRecordingError, recordingError],
   );
   const canSubmit = prompt.trim().length > 0 || attachments.length > 0;
+  const activeQueueKey = activeThreadId || "new-thread";
+  const hasQueuedPrompts = queuedPrompts.length > 0;
+
+  useEffect(() => {
+    if (busy || drainingQueuedPromptId || queuedPrompts.length === 0) {
+      return;
+    }
+    const nextQueuedPrompt = queuedPrompts[0];
+    if (blockedQueuedPromptId === nextQueuedPrompt.id) {
+      return;
+    }
+    setDrainingQueuedPromptId(nextQueuedPrompt.id);
+    void (async () => {
+      try {
+        await onSend(nextQueuedPrompt.prompt, nextQueuedPrompt.attachments);
+        onRemoveQueuedPrompt(activeQueueKey, nextQueuedPrompt.id);
+        setBlockedQueuedPromptId(null);
+      } catch {
+        setBlockedQueuedPromptId(nextQueuedPrompt.id);
+      } finally {
+        setDrainingQueuedPromptId(null);
+      }
+    })();
+  }, [activeQueueKey, blockedQueuedPromptId, busy, drainingQueuedPromptId, onRemoveQueuedPrompt, onSend, queuedPrompts]);
+
+  function editQueuedPrompt(item: QueuedPrompt): void {
+    setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
+    onRemoveQueuedPrompt(activeQueueKey, item.id);
+    setPrompt(item.prompt);
+    setCaretPosition(item.prompt.length);
+    writeSkillPromptEditorText(skillPromptEditor, item.prompt, skills, item.prompt.length);
+    onAttachmentsChange([...item.attachments]);
+    skillPromptEditor.focus();
+  }
+
+  function deleteQueuedPrompt(itemId: string): void {
+    setBlockedQueuedPromptId((blockedId) => (blockedId === itemId ? null : blockedId));
+    onRemoveQueuedPrompt(activeQueueKey, itemId);
+  }
+
+  async function steerQueuedPrompt(item: QueuedPrompt): Promise<void> {
+    await onSteer(item.prompt, item.attachments);
+    setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
+    onRemoveQueuedPrompt(activeQueueKey, item.id);
+  }
+
   const skillCompletion = useSkillCompletion({
     editor: skillPromptEditor,
     prompt,
@@ -214,9 +275,6 @@ export function Composer({
   });
 
   async function submit(): Promise<void> {
-    if (busy) {
-      return;
-    }
     const value = prompt.trim();
     if (!value && attachments.length === 0) {
       return;
@@ -226,6 +284,10 @@ export function Composer({
     setCaretPosition(0);
     writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
     onAttachmentsChange([]);
+    if (busy) {
+      onQueuePrompt(activeQueueKey, value, submittedAttachments);
+      return;
+    }
     await onSend(value, submittedAttachments);
   }
 
@@ -363,6 +425,15 @@ export function Composer({
         )}
       >
         <ScrollToBottomButton visible={showScrollToBottom} onClick={onScrollToBottom} />
+        {hasQueuedPrompts && (
+          <QueuedPromptList
+            busy={busy}
+            items={queuedPrompts}
+            onDelete={deleteQueuedPrompt}
+            onEdit={editQueuedPrompt}
+            onSteer={(item) => void steerQueuedPrompt(item)}
+          />
+        )}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
             {attachments.map((attachment) => (
@@ -486,6 +557,65 @@ export function Composer({
   );
 }
 
+function QueuedPromptList({
+  busy,
+  items,
+  onDelete,
+  onEdit,
+  onSteer,
+}: {
+  busy: boolean;
+  items: QueuedPrompt[];
+  onDelete: (itemId: string) => void;
+  onEdit: (item: QueuedPrompt) => void;
+  onSteer: (item: QueuedPrompt) => void;
+}): React.JSX.Element {
+  return (
+    <div className="space-y-1 px-3 pb-1 pt-2" aria-label="Queued messages">
+      {items.map((item, index) => (
+        <div key={item.id} className="flex items-center gap-2 rounded-2xl bg-muted/30 px-2 py-1.5 text-sm">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <div className="mt-0.5 shrink-0 tabular-nums text-xs font-medium text-muted-foreground">{index + 1}.</div>
+            <div className="min-w-0 flex-1">
+            <div className="line-clamp-3 whitespace-pre-wrap text-foreground">{item.prompt || attachmentSummary(item.attachments)}</div>
+            {item.attachments.length > 0 && item.prompt && (
+              <div className="mt-1 text-xs text-muted-foreground">{attachmentSummary(item.attachments)}</div>
+            )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-muted-foreground">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs font-medium text-foreground hover:bg-accent"
+            aria-label="Steer with queued message"
+            disabled={!busy}
+            title={busy ? "Steer running turn" : "Start a turn before steering"}
+            onClick={() => onSteer(item)}
+          >
+            Steer
+          </Button>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label="Edit queued message" onClick={() => onEdit(item)}>
+            <Pencil className="size-3.5" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label="Delete queued message" onClick={() => onDelete(item.id)}>
+            <Trash2 className="size-3.5" />
+          </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function attachmentSummary(attachments: DesktopAttachment[]): string {
+  if (attachments.length === 0) {
+    return "Attachment-only message";
+  }
+  return `${attachments.length} attachment${attachments.length === 1 ? "" : "s"}`;
+}
+
 type SkillPromptEditorProps = {
   editor: LexicalEditor;
   skills: SkillDescriptor[];
@@ -593,6 +723,8 @@ function SubmitOrStopButton({
   onStop: () => void;
 }): React.JSX.Element {
   const disabled = !busy && !canSubmit;
+  const submitsDraft = canSubmit;
+  const stopsActiveRun = busy && !submitsDraft;
 
   return (
     <Button
@@ -601,12 +733,12 @@ function SubmitOrStopButton({
       className={cn(
         "composer-submit-button shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
       )}
-      aria-label={busy ? "Stop inference" : "Send message"}
+      aria-label={stopsActiveRun ? "Stop inference" : busy ? "Queue message" : "Send message"}
       disabled={disabled}
-      data-state={busy ? "stop" : "send"}
-      onClick={busy ? onStop : onSubmit}
+      data-state={stopsActiveRun ? "stop" : busy ? "queue" : "send"}
+      onClick={stopsActiveRun ? onStop : onSubmit}
     >
-      {busy ? <Square className="size-3.5 fill-current" /> : <ArrowUp className="size-4" />}
+      {stopsActiveRun ? <Square className="size-3.5 fill-current" /> : <ArrowUp className="size-4" />}
     </Button>
   );
 }

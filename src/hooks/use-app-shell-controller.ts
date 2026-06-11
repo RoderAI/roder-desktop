@@ -58,6 +58,7 @@ export function useAppShellController(): AppShellController {
     sendPrompt: sendAgentPrompt,
     setSelectedModel,
     setSelectedWorkspaceCwd,
+    stageNewThread: stageAgentNewThread,
     status,
     threads,
     waitRequests,
@@ -175,11 +176,10 @@ export function useAppShellController(): AppShellController {
     (path: string) => {
       followBottom();
       setComposerFocusSignal((value) => value + 1);
-      setSelectedWorkspaceCwd(path);
+      stageAgentNewThread(path);
       void navigate({ to: "/new", search: true });
-      void selectAgentThread("", { pushHistory: false });
     },
-    [followBottom, navigate, selectAgentThread, setSelectedWorkspaceCwd],
+    [followBottom, navigate, stageAgentNewThread],
   );
   const newProject = useCallback(() => {
     followBottom();
@@ -324,6 +324,13 @@ export function useAppShellController(): AppShellController {
     },
     [followBottom, runCommandOrNativeInvocation],
   );
+  const steerPrompt = useCallback(
+    async (prompt: string, attachments: DesktopAttachment[]) => {
+      followBottom();
+      await agent.steerPrompt(prompt, attachments);
+    },
+    [agent, followBottom],
+  );
   const selectExtensionFromRail = useCallback(
     (extensionId: string) => {
       void setRouteSearch((current) => ({ ...openWorkspacePanelTab(current, "extensions"), extension: extensionId }), {
@@ -446,6 +453,7 @@ export function useAppShellController(): AppShellController {
       selectNativeCommandModel,
       sendCommandInvocation,
       sendPrompt,
+      steerPrompt,
     }),
     [
       activeThread,
@@ -468,6 +476,7 @@ export function useAppShellController(): AppShellController {
       selectedExtensionId,
       sendCommandInvocation,
       sendPrompt,
+      steerPrompt,
       setRouteSearch,
       showWorkingIndicator,
       localTranscriptOffset,

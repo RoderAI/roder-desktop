@@ -59,14 +59,17 @@ export function ComposerCompletionPopup<T>({
 export function CompletionMenuShell({
   children,
   className,
+  surface = "popover",
 }: {
   children: ReactNode;
   className?: string;
+  surface?: "popover" | "card";
 }): React.JSX.Element {
   return (
     <div
       className={cn(
-        "composer-skill-menu overflow-hidden rounded-3xl bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10",
+        "composer-skill-menu overflow-hidden rounded-3xl shadow-md ring-1 ring-foreground/10",
+        surface === "card" ? "bg-card text-card-foreground" : "bg-popover text-popover-foreground",
         className,
       )}
     >

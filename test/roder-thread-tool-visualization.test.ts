@@ -284,6 +284,52 @@ test("file edit tools expose inline timeline previews", () => {
   expect(messages[0].toolSummary).toBe("Editing +1 -1 in app.ts");
 });
 
+test("apply_patch previews are extracted from raw string tool input", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool(
+          "tool-patch-1",
+          "apply_patch",
+          "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
+          "inProgress",
+        ),
+      ],
+      "inProgress",
+    ),
+  );
+
+  expect(messages[0].toolPreviewKind).toBe("patch");
+  expect(messages[0].toolPreview).toBe(
+    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -0,0 +0,0 @@\n-old\n+new\n",
+  );
+  expect(messages[0].toolSummary).toBe("Editing +1 -1 in app.ts");
+});
+
+test("apply_patch previews are extracted from JSON string tool input", () => {
+  const messages = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool(
+          "tool-patch-1",
+          "apply_patch",
+          JSON.stringify({
+            patch: "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
+          }),
+          "inProgress",
+        ),
+      ],
+      "inProgress",
+    ),
+  );
+
+  expect(messages[0].toolPreviewKind).toBe("patch");
+  expect(messages[0].toolPreview).toContain("diff --git a/src/app.ts b/src/app.ts");
+  expect(messages[0].toolSummary).toBe("Editing +1 -1 in app.ts");
+});
+
 test("completed apply_patch summaries include edited file and change counts", () => {
   const messages = messagesFromTurn(
     "thread-1",

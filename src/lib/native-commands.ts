@@ -137,7 +137,9 @@ function planModelCommand(argumentsText: string, models: RoderModel[]): NativeCo
   if (!modelId) {
     return { type: "openModelPicker" };
   }
-  const model = models.find((candidate) => candidate.id === modelId || candidate.name === modelId);
+  const model = models.find(
+    (candidate) => candidate.id === modelId || candidate.name === modelId || candidate.displayName === modelId,
+  );
   if (!model) {
     return {
       type: "output",

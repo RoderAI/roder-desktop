@@ -111,7 +111,7 @@ function ModelVisibilityRow({
       <VisibilitySwitch checked={visible} disabled={disabled} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-base">{model.name || model.id}</span>
+          <span className="truncate text-base">{model.displayName || model.name || model.id}</span>
           {selected && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-base text-muted-foreground">Selected</span>
           )}
@@ -149,5 +149,7 @@ function filterModels(models: RoderModel[], query: string): RoderModel[] {
   if (!needle) {
     return models;
   }
-  return models.filter((model) => `${model.name} ${model.id} ${model.modelProvider}`.toLowerCase().includes(needle));
+  return models.filter((model) =>
+    `${model.displayName ?? ""} ${model.name} ${model.id} ${model.modelProvider}`.toLowerCase().includes(needle),
+  );
 }

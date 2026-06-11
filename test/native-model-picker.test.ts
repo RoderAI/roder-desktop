@@ -19,6 +19,8 @@ test("renders a dedicated native model picker with the current model", () => {
 
   expect(html).toContain("Choose model");
   expect(html).toContain("Search models");
+  expect(html).toContain("bg-card text-card-foreground");
+  expect(html).toContain("ring-border/70");
   expect(html).toContain("Claude Sonnet 5");
   expect(html).toMatch(/GPT-5\.5<\/span><span class="text-muted-foreground"> - openai/);
   expect(html).toContain("openai");
@@ -52,8 +54,8 @@ test("groups the native model picker by provider and includes visible configured
     React.createElement(NativeModelPicker, {
       models: [
         { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
-        { id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" },
-        { id: "claude-code/opus", name: "Claude Code Opus", modelProvider: "claude-code" },
+        { id: "claude-code/sonnet", name: "Claude Code Sonnet 4.7", displayName: "Sonnet 4.7", modelProvider: "claude-code" },
+        { id: "claude-code/fable", name: "Claude Code Fable 5", displayName: "Fable 5", modelProvider: "claude-code" },
       ],
       selectedModel: "claude-code/sonnet",
       selectedModelProvider: "claude-code",
@@ -64,15 +66,19 @@ test("groups the native model picker by provider and includes visible configured
 
   expect(html).toContain("OpenAI");
   expect(html).toContain("claude-code");
-  expect(html).toContain("Claude Code Sonnet");
-  expect(html).toContain("Claude Code Opus");
-  expect(html).toMatch(/Claude Code Sonnet<\/span><span class="text-muted-foreground"> - claude-code/);
+  expect(html).toContain("Sonnet 4.7");
+  expect(html).toContain("Fable 5");
+  expect(html).not.toContain("Claude Code Sonnet");
+  expect(html).not.toContain("Claude Code Fable");
+  expect(html).toMatch(/Sonnet 4\.7<\/span><span class="text-muted-foreground"> - claude-code/);
 });
 
 test("does not render models hidden by desktop settings", () => {
   const html = renderToStaticMarkup(
     React.createElement(NativeModelPicker, {
-      models: [{ id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" }],
+      models: [
+        { id: "claude-code/sonnet", name: "Claude Code Sonnet 4.7", displayName: "Sonnet 4.7", modelProvider: "claude-code" },
+      ],
       selectedModel: "claude-code/sonnet",
       selectedModelProvider: "claude-code",
       onDismiss: () => undefined,
@@ -80,6 +86,7 @@ test("does not render models hidden by desktop settings", () => {
     }),
   );
 
-  expect(html).toContain("Claude Code Sonnet");
-  expect(html).not.toContain("Claude Code Opus");
+  expect(html).toContain("Sonnet 4.7");
+  expect(html).not.toContain("Claude Code Sonnet");
+  expect(html).not.toContain("Fable 5");
 });

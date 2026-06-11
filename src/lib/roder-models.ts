@@ -112,6 +112,14 @@ export function providerName(provider: string): string {
   return provider.slice(0, 1).toUpperCase() + provider.slice(1);
 }
 
+export function displayModelName(model: Pick<RoderModel, "id" | "name" | "displayName" | "modelProvider">): string {
+  const name = model.displayName || model.name || model.id;
+  if (model.modelProvider !== "claude-code") {
+    return name;
+  }
+  return name.replace(/^claude\s+code\s+/i, "");
+}
+
 export function effectiveSelectedModel(
   models: RoderModel[],
   visibleModelIds: string[],
