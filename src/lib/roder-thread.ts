@@ -13,6 +13,9 @@ import { normalizedToolPreview, summarizeApplyPatch } from "@/lib/tool-preview";
 
 const emptyMessages: ConversationMessage[] = [];
 const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
+// Per-turn cache: streaming deltas replace only the affected turn object, so
+// untouched turns keep identity and their messages can be reused as-is.
+const messagesByTurn = new WeakMap<RoderTurn, { threadId: string; messages: ConversationMessage[] }>();
 const duplicateItemIdMarker = "::duplicate-";
 
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
@@ -308,34 +311,74 @@ export function messagesFromThread(thread: RoderThread | undefined): Conversatio
   }
 
   const turns = turnsWithVisibleRoutingDecisions(thread.turns, thread.selectionMode?.type === "auto");
-  const messages = turns.flatMap((turn) => messagesFromTurn(thread.id, turn));
+  const messages = turns.flatMap((turn) => cachedMessagesFromTurn(thread.id, turn));
   messagesByThread.set(thread, messages);
   return messages;
 }
+
+function cachedMessagesFromTurn(threadId: string, turn: RoderTurn): ConversationMessage[] {
+  const cached = messagesByTurn.get(turn);
+  if (cached && cached.threadId === threadId) {
+    return cached.messages;
+  }
+  const messages = messagesFromTurn(threadId, turn);
+  messagesByTurn.set(turn, { threadId, messages });
+  return messages;
+}
+
+interface FilteredTurnCacheEntry {
+  showRoutingDecisions: boolean;
+  inSignature: string | null;
+  outSignature: string | null;
+  turn: RoderTurn;
+}
+
+// Keeps filtered turn identity stable across calls so per-turn message caching
+// still works for turns whose routing decisions get filtered out.
+const filteredTurnsCache = new WeakMap<RoderTurn, FilteredTurnCacheEntry>();
 
 function turnsWithVisibleRoutingDecisions(turns: RoderTurn[], showRoutingDecisions: boolean): RoderTurn[] {
   let lastRoutingSignature: string | null = null;
   let changed = false;
   const filteredTurns = turns.map((turn) => {
+    const cached = filteredTurnsCache.get(turn);
+    if (
+      cached &&
+      cached.showRoutingDecisions === showRoutingDecisions &&
+      cached.inSignature === lastRoutingSignature
+    ) {
+      lastRoutingSignature = cached.outSignature;
+      if (cached.turn !== turn) {
+        changed = true;
+      }
+      return cached.turn;
+    }
+
+    const inSignature = lastRoutingSignature;
     const filteredItems = turn.items.filter((item) => {
       if (item.type === "routingDecision") {
         if (!showRoutingDecisions) {
-          changed = true;
           return false;
         }
         const signature = routingDecisionSignature(item.decision);
         if (signature === lastRoutingSignature) {
-          changed = true;
           return false;
         }
         lastRoutingSignature = signature;
       }
       return true;
     });
-    if (filteredItems.length === turn.items.length) {
-      return turn;
+    const filteredTurn = filteredItems.length === turn.items.length ? turn : { ...turn, items: filteredItems };
+    filteredTurnsCache.set(turn, {
+      showRoutingDecisions,
+      inSignature,
+      outSignature: lastRoutingSignature,
+      turn: filteredTurn,
+    });
+    if (filteredTurn !== turn) {
+      changed = true;
     }
-    return { ...turn, items: filteredItems };
+    return filteredTurn;
   });
   return changed ? filteredTurns : turns;
 }

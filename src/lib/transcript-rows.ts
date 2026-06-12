@@ -137,10 +137,112 @@ export function transcriptRowsSearchText(rows: TranscriptRow[], options: Transcr
       if (options.excludedRowKeys?.has(row.key)) {
         return [];
       }
-      const searchText = transcriptRowSearchText(row);
+      const searchText = cachedTranscriptRowSearchText(row);
       return searchText ? [searchText] : [];
     })
     .join("\n\n");
+}
+
+// Row identity is preserved across streaming deltas (see reconcileTranscriptRows),
+// so search text can be cached per row object instead of re-deriving it from
+// every message on each call.
+const searchTextByRow = new WeakMap<TranscriptRow, string>();
+
+function cachedTranscriptRowSearchText(row: TranscriptRow): string {
+  const cached = searchTextByRow.get(row);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const searchText = transcriptRowSearchText(row);
+  searchTextByRow.set(row, searchText);
+  return searchText;
+}
+
+/**
+ * Reuses prior row objects when a rebuilt row is structurally equivalent, so
+ * memoized row components can bail out and per-row caches stay warm. Relies on
+ * message objects keeping identity for untouched turns.
+ */
+export function reconcileTranscriptRows(previousRows: TranscriptRow[], nextRows: TranscriptRow[]): TranscriptRow[] {
+  if (previousRows.length === 0) {
+    return nextRows;
+  }
+  const previousByKey = new Map<string, TranscriptRow>();
+  for (const row of previousRows) {
+    previousByKey.set(row.key, row);
+  }
+  let reusedAll = nextRows.length === previousRows.length;
+  const reconciled = nextRows.map((row) => {
+    const previous = previousByKey.get(row.key);
+    if (previous && transcriptRowsEquivalent(previous, row)) {
+      return previous;
+    }
+    reusedAll = false;
+    return row;
+  });
+  return reusedAll ? previousRows : reconciled;
+}
+
+function transcriptRowsEquivalent(left: TranscriptRow, right: TranscriptRow): boolean {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "working" || right.kind === "working") {
+    return true;
+  }
+  if (left.kind === "turnReviewChanges" && right.kind === "turnReviewChanges") {
+    return left.turnId === right.turnId && left.summary === right.summary;
+  }
+  if (left.kind !== "entry" || right.kind !== "entry") {
+    return false;
+  }
+  return (
+    left.disclosureKey === right.disclosureKey &&
+    left.entryIsTool === right.entryIsTool &&
+    left.nextIsTool === right.nextIsTool &&
+    left.previousIsTool === right.previousIsTool &&
+    left.turnId === right.turnId &&
+    transcriptEntriesEquivalent(left.entry, right.entry)
+  );
+}
+
+function transcriptEntriesEquivalent(left: TranscriptMessageEntry, right: TranscriptMessageEntry): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "message" || right.kind === "message") {
+    return left.kind === "message" && right.kind === "message" && left.message === right.message;
+  }
+  if (left.id !== right.id) {
+    return false;
+  }
+  if (left.kind === "activityGroup" && right.kind === "activityGroup") {
+    return (
+      sameActivitySummary(left.summary, right.summary) &&
+      left.entries.length === right.entries.length &&
+      left.entries.every((entry, index) => transcriptEntriesEquivalent(entry, right.entries[index]))
+    );
+  }
+  if (left.kind === "activityGroup" || right.kind === "activityGroup") {
+    return false;
+  }
+  return left.messages.length === right.messages.length &&
+    left.messages.every((message, index) => message === right.messages[index]);
+}
+
+function sameActivitySummary(
+  left: { commands: number; files: number; label: string; searches: number },
+  right: { commands: number; files: number; label: string; searches: number },
+): boolean {
+  return (
+    left.commands === right.commands &&
+    left.files === right.files &&
+    left.label === right.label &&
+    left.searches === right.searches
+  );
 }
 
 export function isTranscriptToolEntry(entry: TranscriptMessageEntry | undefined): boolean {

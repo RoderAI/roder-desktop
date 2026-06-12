@@ -331,7 +331,6 @@ export function AppShellLayout({
   function applySidebarWidth(nextWidth: number): void {
     sidebarWidthRef.current = nextWidth;
     setSidebarWidth(nextWidth);
-    writeStoredSidebarPanelWidth(nextWidth);
   }
 
   // Custom drag handle: the sidebar lives outside the resize group, so we drive its width directly.
@@ -362,6 +361,8 @@ export function AppShellLayout({
       document.body.style.removeProperty("user-select");
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+      // Persist once per drag instead of on every pointer move.
+      writeStoredSidebarPanelWidth(sidebarWidthRef.current);
     }
 
     document.body.style.cursor = "col-resize";

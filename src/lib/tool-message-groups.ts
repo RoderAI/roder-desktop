@@ -182,10 +182,22 @@ function shouldCollapseActivity(entries: TranscriptToolEntry[], summary: Activit
 }
 
 function summarizeActivity(entries: TranscriptToolEntry[]): ActivitySummary {
-  const messages = entries.flatMap(toolMessagesFromEntry);
-  const files = messages.filter((message) => isFileActivityTool(message.toolName)).length;
-  const searches = messages.filter((message) => isSearchActivityTool(message.toolName)).length;
-  const commands = messages.filter((message) => isCommandActivityTool(message.toolName)).length;
+  let files = 0;
+  let searches = 0;
+  let commands = 0;
+  for (const entry of entries) {
+    for (const message of toolMessagesFromEntry(entry)) {
+      if (isFileActivityTool(message.toolName)) {
+        files += 1;
+      }
+      if (isSearchActivityTool(message.toolName)) {
+        searches += 1;
+      }
+      if (isCommandActivityTool(message.toolName)) {
+        commands += 1;
+      }
+    }
+  }
   return {
     commands,
     files,

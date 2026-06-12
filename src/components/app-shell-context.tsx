@@ -27,7 +27,6 @@ export type AppShellContextValue = {
   setCanScrollTranscriptToBottom: (canScroll: boolean) => void;
   setComposerAttachments: (attachments: DesktopAttachment[]) => void;
   setRouteSearch: SetValues<typeof routeSearchParsers>;
-  showWorkingIndicator: boolean;
   localTranscriptOffset: LocalTranscriptOffset | null;
   threadOptions: RoderThread[];
   attachToComposer: (attachment: DesktopAttachment) => void;
