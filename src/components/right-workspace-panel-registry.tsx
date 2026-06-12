@@ -1,17 +1,28 @@
 import { Files, GitCompareArrows, Globe2, LayoutTemplate, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
-import type React from "react";
-import { BrowserPanel } from "@/components/browser-panel";
-import { CanvasPanel } from "@/components/canvas-panel";
-import { DesignCanvasPanel } from "@/components/design-canvas/design-canvas-panel";
-import { ExtensionsPanel } from "@/components/extensions/extensions-panel";
-import { FilePanel } from "@/components/file-panel";
-import { ReviewPanel } from "@/components/review-panel";
-import { TerminalPanel } from "@/components/terminal-panel";
+import React, { lazy, Suspense } from "react";
 import type { NativeOverlayOcclusion, RightWorkspacePanelEntry } from "@/components/right-workspace-panel-shell";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
 import type { FilePanelSelectionIntent } from "@/lib/file-panel";
 import type { RouteReviewScope, RouteWorkspacePanel } from "@/lib/route-search";
 import type { DesktopAttachment, WorkspaceRoot } from "@/types/roder";
+
+// Panels are lazy so heavyweight dependencies (xterm, the design canvas,
+// @pierre diff/tree viewers) stay out of the initial chunk until opened.
+const TerminalPanel = lazy(() => import("@/components/terminal-panel").then((m) => ({ default: m.TerminalPanel })));
+const BrowserPanel = lazy(() => import("@/components/browser-panel").then((m) => ({ default: m.BrowserPanel })));
+const CanvasPanel = lazy(() => import("@/components/canvas-panel").then((m) => ({ default: m.CanvasPanel })));
+const DesignCanvasPanel = lazy(() =>
+  import("@/components/design-canvas/design-canvas-panel").then((m) => ({ default: m.DesignCanvasPanel })),
+);
+const ExtensionsPanel = lazy(() =>
+  import("@/components/extensions/extensions-panel").then((m) => ({ default: m.ExtensionsPanel })),
+);
+const FilePanel = lazy(() => import("@/components/file-panel").then((m) => ({ default: m.FilePanel })));
+const ReviewPanel = lazy(() => import("@/components/review-panel").then((m) => ({ default: m.ReviewPanel })));
+
+function PanelFallback(): React.JSX.Element {
+  return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading...</div>;
+}
 
 export const rightWorkspacePanelEntries: RightWorkspacePanelEntry[] = [
   {
@@ -82,6 +93,17 @@ export type RightWorkspacePanelRenderContext = {
 };
 
 export function renderRightWorkspacePanel(
+  panel: RouteWorkspacePanel,
+  context: RightWorkspacePanelRenderContext,
+): React.ReactNode {
+  const content = renderPanelContent(panel, context);
+  if (content == null) {
+    return content;
+  }
+  return <Suspense fallback={<PanelFallback />}>{content}</Suspense>;
+}
+
+function renderPanelContent(
   panel: RouteWorkspacePanel,
   context: RightWorkspacePanelRenderContext,
 ): React.ReactNode {

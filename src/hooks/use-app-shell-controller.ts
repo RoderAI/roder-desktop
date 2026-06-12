@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AppShellContextValue } from "@/components/app-shell-context";
 import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
-import { useRoderAgent } from "@/hooks/use-roder-agent";
+import { activeThreadMessagesSnapshot, useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
 import type { FilePanelIndexedPath, FilePanelSelectionIntent } from "@/lib/file-panel";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
@@ -21,7 +21,7 @@ import {
   isNewRoutePath,
   isPluginsRoutePath,
 } from "@/lib/route-selection";
-import { isThreadRunning, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
+import { isThreadRunning } from "@/lib/roder-thread";
 import {
   closeWorkspacePanelShell,
   closeWorkspacePanelTab,
@@ -48,7 +48,6 @@ export function useAppShellController(): AppShellController {
     activeThreadId,
     appearance,
     archiveThread: archiveAgentThread,
-    messages,
     models,
     newProject: createProjectThread,
     restart,
@@ -61,7 +60,6 @@ export function useAppShellController(): AppShellController {
     stageNewThread: stageAgentNewThread,
     status,
     threads,
-    waitRequests,
   } = agent;
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -95,7 +93,6 @@ export function useAppShellController(): AppShellController {
   const routeActiveThreadId = routeThreadId || (isNewRoute ? "" : activeThreadId);
   const activeThread = threads.find((thread) => thread.id === routeActiveThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
-  const showWorkingIndicator = shouldShowThreadWorkingIndicator(activeThread, waitRequests.length, messages);
   const activeWorkspaceContext = useMemo(
     () =>
       activeWorkspaceContextForRoute({
@@ -281,12 +278,13 @@ export function useAppShellController(): AppShellController {
         state: {
           activeThreadBusy,
           activeThreadId: routeActiveThreadId,
-          messages,
+          // Read lazily so the app shell doesn't re-render on every streaming delta.
+          messages: activeThreadMessagesSnapshot(),
           models,
         },
       });
     },
-    [activeThreadBusy, hideNativeModelPicker, messages, models, routeActiveThreadId, sendAgentPrompt, setSelectedModel],
+    [activeThreadBusy, hideNativeModelPicker, models, routeActiveThreadId, sendAgentPrompt, setSelectedModel],
   );
 
   const runCommandOrNativeInvocation = useCallback(
@@ -443,7 +441,6 @@ export function useAppShellController(): AppShellController {
       setCanScrollTranscriptToBottom,
       setComposerAttachments,
       setRouteSearch,
-      showWorkingIndicator,
       localTranscriptOffset,
       threadOptions,
       attachToComposer,
@@ -478,7 +475,6 @@ export function useAppShellController(): AppShellController {
       sendPrompt,
       steerPrompt,
       setRouteSearch,
-      showWorkingIndicator,
       localTranscriptOffset,
       threadOptions,
       closeNativeModelPicker,

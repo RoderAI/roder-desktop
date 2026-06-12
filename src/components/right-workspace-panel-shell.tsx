@@ -240,7 +240,9 @@ function PanelAddMenu({
       resizeObserver.observe(contentRef.current);
     }
     window.addEventListener("resize", syncBounds);
-    window.addEventListener("scroll", syncBounds, true);
+    // The handler only reads layout, so let the browser keep scrolling on the
+    // compositor thread instead of waiting on it.
+    window.addEventListener("scroll", syncBounds, { capture: true, passive: true });
 
     return () => {
       cancelAnimationFrame(animationFrame);
