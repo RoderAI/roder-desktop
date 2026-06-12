@@ -3,14 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import { TopBar } from "../src/components/top-bar";
 
-test("content top bar keeps the workspace panel button at the window edge when the extension sidebar is visible", () => {
+test("content top bar moves the workspace panel button left when the extension sidebar is visible", () => {
   const html = renderTopBar({ extensionSidebarVisible: true });
 
-  expect(html).toContain("right-2");
-  expect(html).not.toContain("right-14");
+  expect(html).toContain("right-14");
+  expect(html).not.toContain("right-2");
 });
 
-test("content top bar moves the workspace panel button to the window edge without the extension sidebar", () => {
+test("content top bar keeps the workspace panel button at the default window edge without the extension sidebar", () => {
   const html = renderTopBar({ extensionSidebarVisible: false });
 
   expect(html).toContain("right-2");
