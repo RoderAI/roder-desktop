@@ -210,7 +210,10 @@ export function TopBar({
         {workspacePanelToggleVisible && (
           <WorkspacePanelToggleButton
             open={workspacePanelOpen}
-            className="fixed right-2 top-[11px] z-[100] size-7 rounded-full pointer-events-auto [&_svg]:size-4"
+            className={cn(
+              "fixed top-[11px] z-[100] size-7 rounded-full pointer-events-auto [&_svg]:size-4",
+              extensionSidebarVisible ? "right-14" : "right-2",
+            )}
             onToggle={onToggleWorkspacePanelShell}
           />
         )}
