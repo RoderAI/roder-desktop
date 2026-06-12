@@ -111,7 +111,19 @@ export type PlanExitWaitRequest = {
   error?: string;
 };
 
-export type AgentWaitRequest = ApprovalWaitRequest | UserInputWaitRequest | PlanExitWaitRequest;
+export type McpAuthWaitRequest = {
+  kind: "mcpAuth";
+  id: string;
+  serviceName: string;
+  authType: "oauth" | "apikey";
+  oauthUrl?: string;
+  apiKeyLabel?: string;
+  status: "pending" | "authenticating" | "complete" | "skipped" | "failed";
+  resolving?: boolean;
+  error?: string;
+};
+
+export type AgentWaitRequest = ApprovalWaitRequest | UserInputWaitRequest | PlanExitWaitRequest | McpAuthWaitRequest;
 
 export type PendingWaitRequestsByThread = Record<string, AgentWaitRequest[]>;
 
@@ -1124,6 +1136,7 @@ declare global {
   interface Window {
     roderDesktop: {
       platform: NodeJS.Platform;
+      homeDir: string;
       request: (method: string, params?: unknown) => Promise<unknown>;
       setMinWindowWidth: (width: number) => Promise<void>;
       start: () => Promise<RoderStatus>;
@@ -1190,6 +1203,13 @@ declare global {
       onTerminalData: (callback: (payload: { id: string; data: string }) => void) => () => void;
       onChromeBridgeStatus: (callback: (status: ChromeBridgeStatus) => void) => () => void;
       onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => () => void;
+      onMcpAuthRequested: (callback: (request: McpAuthWaitRequest) => void) => () => void;
+      onMcpOAuthCallback: (callback: (payload: { id: string; status: "complete" | "failed"; error?: string }) => void) => () => void;
+      mcpAuthSkip: (id: string) => Promise<void>;
+      mcpApiKeySubmit: (id: string, apiKey: string) => Promise<void>;
+      mcpOAuthStart: (id: string, url: string) => Promise<void>;
+      mcpReadConfig: (configPath: string) => Promise<{ config: unknown; error: string | null }>;
+      mcpWriteConfig: (configPath: string, config: unknown) => Promise<{ error: string | null }>;
     };
   }
 }

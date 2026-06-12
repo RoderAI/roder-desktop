@@ -64,12 +64,18 @@ function useRoderStoreBootstrap(): void {
   const applyStatus = useRoderStore((state) => state.applyStatus);
   const applyStderr = useRoderStore((state) => state.applyStderr);
   const applyNotification = useRoderStore((state) => state.applyNotification);
+  const mcpAuthRequested = useRoderStore((state) => state.mcpAuthRequested);
+  const mcpOAuthComplete = useRoderStore((state) => state.mcpOAuthComplete);
 
   useEffect(() => {
     const offAppearance = roderIpc.onAppearance(applyAppearance);
     const offStatus = roderIpc.onStatus(applyStatus);
     const offStderr = roderIpc.onStderr(applyStderr);
     const offNotification = roderIpc.onNotification(applyNotification);
+    const offMcpAuthRequested = window.roderDesktop.onMcpAuthRequested(mcpAuthRequested);
+    const offMcpOAuthCallback = window.roderDesktop.onMcpOAuthCallback(({ id, status, error }) => {
+      mcpOAuthComplete(id, status, error);
+    });
 
     void roderIpc.appearance().then(applyAppearance);
     void bootstrap();
@@ -79,8 +85,10 @@ function useRoderStoreBootstrap(): void {
       offStatus();
       offStderr();
       offNotification();
+      offMcpAuthRequested();
+      offMcpOAuthCallback();
     };
-  }, [applyAppearance, applyNotification, applyStatus, applyStderr, bootstrap]);
+  }, [applyAppearance, applyNotification, applyStatus, applyStderr, bootstrap, mcpAuthRequested, mcpOAuthComplete]);
 }
 
 function selectAgentState(state: RoderStoreState) {
@@ -143,5 +151,9 @@ function selectAgentState(state: RoderStoreState) {
     resolveApproval: state.resolveApproval,
     resolveUserInput: state.resolveUserInput,
     exitPlan: state.exitPlan,
+    pendingMcpAuthRequests: state.pendingMcpAuthRequests,
+    mcpAuthSkip: state.mcpAuthSkip,
+    mcpAuthApiKeySubmit: state.mcpAuthApiKeySubmit,
+    mcpOAuthStart: window.roderDesktop.mcpOAuthStart,
   };
 }

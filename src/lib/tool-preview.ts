@@ -137,24 +137,99 @@ function normalizeApplyPatchFile(header: PatchFileHeader, bodyLines: string[]): 
     `diff --git a/${header.oldPath} b/${header.newPath}`,
     `--- ${oldPath}`,
     `+++ ${newPath}`,
-    ...normalizeApplyPatchBody(bodyLines),
+    ...normalizeApplyPatchBody(bodyLines, header.type),
   ];
 }
 
-function normalizeApplyPatchBody(lines: string[]): string[] {
-  return lines.flatMap((line) => {
-    if (line.startsWith("***")) {
-      return [];
+type ApplyPatchHunk = {
+  header?: string;
+  lines: string[];
+};
+
+function normalizeApplyPatchBody(lines: string[], fileType: PatchFileHeader["type"]): string[] {
+  const hunks = splitApplyPatchHunks(lines);
+  const normalized: string[] = [];
+  let oldStart = fileType === "add" ? 0 : 1;
+  let newStart = fileType === "delete" ? 0 : 1;
+
+  for (const hunk of hunks) {
+    if (hunk.lines.length === 0) {
+      continue;
     }
-    if (line.startsWith("@@")) {
-      return [normalizeHunkHeader(line)];
-    }
-    return [line];
-  });
+
+    const counts = applyPatchHunkCounts(hunk.lines);
+    normalized.push(normalizeHunkHeader(hunk.header, oldStart, counts.oldCount, newStart, counts.newCount));
+    normalized.push(...hunk.lines);
+
+    oldStart += counts.oldCount;
+    newStart += counts.newCount;
+  }
+
+  return normalized;
 }
 
-function normalizeHunkHeader(line: string): string {
-  return line.trim() === "@@" ? "@@ -0,0 +0,0 @@" : line;
+function splitApplyPatchHunks(lines: string[]): ApplyPatchHunk[] {
+  const hunks: ApplyPatchHunk[] = [];
+  let current: ApplyPatchHunk = { lines: [] };
+
+  for (const line of lines) {
+    if (line.startsWith("***")) {
+      continue;
+    }
+    if (line.startsWith("@@")) {
+      if (current.header || current.lines.length > 0) {
+        hunks.push(current);
+      }
+      current = { header: line, lines: [] };
+      continue;
+    }
+    current.lines.push(line);
+  }
+
+  if (current.header || current.lines.length > 0) {
+    hunks.push(current);
+  }
+
+  return hunks;
+}
+
+function applyPatchHunkCounts(lines: string[]): { oldCount: number; newCount: number } {
+  let oldCount = 0;
+  let newCount = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("\\")) {
+      continue;
+    }
+    if (line.startsWith("+")) {
+      newCount += 1;
+      continue;
+    }
+    if (line.startsWith("-")) {
+      oldCount += 1;
+      continue;
+    }
+    oldCount += 1;
+    newCount += 1;
+  }
+
+  return { oldCount, newCount };
+}
+
+function normalizeHunkHeader(
+  line: string | undefined,
+  oldStart: number,
+  oldCount: number,
+  newStart: number,
+  newCount: number,
+): string {
+  const trimmed = line?.trim();
+  if (trimmed && /^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@/.test(trimmed)) {
+    return line ?? trimmed;
+  }
+
+  const suffix = trimmed && trimmed !== "@@" ? ` ${trimmed.replace(/^@@\s*/, "")}` : "";
+  return `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@${suffix}`;
 }
 
 function uniqueStrings(values: string[]): string[] {

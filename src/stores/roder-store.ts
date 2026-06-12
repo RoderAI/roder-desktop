@@ -32,6 +32,7 @@ import {
 import type {
   ApprovalWaitRequest,
   DesktopAttachment,
+  McpAuthWaitRequest,
   PendingWaitRequestsByThread,
   PolicyMode,
   ProviderDescriptor,
@@ -92,6 +93,7 @@ type RoderStore = {
   selectedWorkspaceCwd: string;
   workspaceRecents: WorkspaceFolder[];
   pendingWaitRequestsByThread: PendingWaitRequestsByThread;
+  pendingMcpAuthRequests: McpAuthWaitRequest[];
   appearance: SystemAppearance;
   busy: boolean;
   hydrated: boolean;
@@ -131,6 +133,10 @@ type RoderStore = {
   resolveApproval: (request: ApprovalWaitRequest, approved: boolean) => Promise<void>;
   resolveUserInput: (request: UserInputWaitRequest, answers: Record<string, string>) => Promise<void>;
   exitPlan: (request: PlanExitWaitRequest, approved: boolean) => Promise<void>;
+  mcpAuthRequested: (request: McpAuthWaitRequest) => void;
+  mcpAuthSkip: (id: string) => Promise<void>;
+  mcpAuthApiKeySubmit: (id: string, apiKey: string) => Promise<void>;
+  mcpOAuthComplete: (id: string, status: "complete" | "failed", error?: string) => void;
   applyAppearance: (appearance: SystemAppearance) => void;
   applyStatus: (status: RoderStatus) => void;
   applyStderr: (message: string) => void;
@@ -396,6 +402,7 @@ export const useRoderStore = create<RoderStore>()(
       selectedWorkspaceCwd: "",
       workspaceRecents: [],
       pendingWaitRequestsByThread: {},
+      pendingMcpAuthRequests: [],
       appearance: "light",
       busy: false,
       hydrated: false,
@@ -1170,6 +1177,65 @@ export const useRoderStore = create<RoderStore>()(
           await roderIpc.exitPlan({ requestId: request.requestId, approved });
         } catch (error) {
           markWaitRequestResolving(set, request.threadId, request.id, false, (error as Error).message);
+        }
+      },
+      mcpAuthRequested: (request) => {
+        set((state) => ({
+          pendingMcpAuthRequests: [
+            ...state.pendingMcpAuthRequests.filter((r) => r.id !== request.id),
+            request,
+          ],
+        }));
+      },
+      mcpAuthSkip: async (id) => {
+        set((state) => ({
+          pendingMcpAuthRequests: state.pendingMcpAuthRequests.map((r) =>
+            r.id === id ? { ...r, status: "skipped" as const, resolving: true } : r,
+          ),
+        }));
+        await window.roderDesktop.mcpAuthSkip(id);
+        set((state) => ({
+          pendingMcpAuthRequests: state.pendingMcpAuthRequests.filter((r) => r.id !== id),
+        }));
+      },
+      mcpAuthApiKeySubmit: async (id, apiKey) => {
+        set((state) => ({
+          pendingMcpAuthRequests: state.pendingMcpAuthRequests.map((r) =>
+            r.id === id ? { ...r, resolving: true } : r,
+          ),
+        }));
+        try {
+          await window.roderDesktop.mcpApiKeySubmit(id, apiKey);
+          set((state) => ({
+            pendingMcpAuthRequests: state.pendingMcpAuthRequests.map((r) =>
+              r.id === id ? { ...r, status: "complete" as const, resolving: false } : r,
+            ),
+          }));
+          setTimeout(() => {
+            set((state) => ({
+              pendingMcpAuthRequests: state.pendingMcpAuthRequests.filter((r) => r.id !== id),
+            }));
+          }, 1500);
+        } catch (error) {
+          set((state) => ({
+            pendingMcpAuthRequests: state.pendingMcpAuthRequests.map((r) =>
+              r.id === id ? { ...r, resolving: false, error: (error as Error).message } : r,
+            ),
+          }));
+        }
+      },
+      mcpOAuthComplete: (id, status, error) => {
+        set((state) => ({
+          pendingMcpAuthRequests: state.pendingMcpAuthRequests.map((r) =>
+            r.id === id ? { ...r, status, resolving: false, error } : r,
+          ),
+        }));
+        if (status === "complete") {
+          setTimeout(() => {
+            set((state) => ({
+              pendingMcpAuthRequests: state.pendingMcpAuthRequests.filter((r) => r.id !== id),
+            }));
+          }, 1500);
         }
       },
       applyAppearance: (appearance) => set({ appearance }),

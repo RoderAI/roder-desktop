@@ -94,8 +94,11 @@ export type AppCommand = {
   command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch";
 };
 
+import { homedir } from "node:os";
+
 const api = {
   platform: process.platform,
+  homeDir: homedir(),
   request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
   setMinWindowWidth: (width: number) => ipcRenderer.invoke("window:setMinWidth", width) as Promise<void>,
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
@@ -214,6 +217,24 @@ const api = {
     ipcRenderer.on("terminal:exit", listener);
     return () => ipcRenderer.removeListener("terminal:exit", listener);
   },
+  onMcpAuthRequested: (callback: (request: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, request: unknown) => callback(request);
+    ipcRenderer.on("mcp:authRequested", listener);
+    return () => ipcRenderer.removeListener("mcp:authRequested", listener);
+  },
+  onMcpOAuthCallback: (callback: (payload: { id: string; status: "complete" | "failed"; error?: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; status: "complete" | "failed"; error?: string }) =>
+      callback(payload);
+    ipcRenderer.on("mcp:oauthCallback", listener);
+    return () => ipcRenderer.removeListener("mcp:oauthCallback", listener);
+  },
+  mcpAuthSkip: (id: string) => ipcRenderer.invoke("mcp:authSkip", id) as Promise<void>,
+  mcpApiKeySubmit: (id: string, apiKey: string) => ipcRenderer.invoke("mcp:apiKeySubmit", id, apiKey) as Promise<void>,
+  mcpOAuthStart: (id: string, url: string) => ipcRenderer.invoke("mcp:oauthStart", id, url) as Promise<void>,
+  mcpReadConfig: (configPath: string) =>
+    ipcRenderer.invoke("mcp:readConfig", configPath) as Promise<{ config: unknown; error: string | null }>,
+  mcpWriteConfig: (configPath: string, config: unknown) =>
+    ipcRenderer.invoke("mcp:writeConfig", configPath, config) as Promise<{ error: string | null }>,
 };
 
 contextBridge.exposeInMainWorld("roderDesktop", api);

@@ -275,7 +275,7 @@ test("file edit tools expose inline timeline previews", () => {
   );
 
   expect(plain(messages.map((message) => message.toolPreview))).toEqual([
-    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -0,0 +0,0 @@\n-old\n+new\n",
+    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old\n+new\n",
     "export const value = 1;\n",
     "- value = 1\n+ value = 2",
     "@@ edit 1 @@\n- value = 2\n+ value = 3\n@@ edit 2 @@\n- name = 'old'\n+ name = 'new'",
@@ -302,7 +302,7 @@ test("apply_patch previews are extracted from raw string tool input", () => {
 
   expect(messages[0].toolPreviewKind).toBe("patch");
   expect(messages[0].toolPreview).toBe(
-    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -0,0 +0,0 @@\n-old\n+new\n",
+    "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,1 +1,1 @@\n-old\n+new\n",
   );
   expect(messages[0].toolSummary).toBe("Editing +1 -1 in app.ts");
 });

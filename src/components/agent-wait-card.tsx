@@ -31,7 +31,10 @@ export function AgentWaitCards({
         if (request.kind === "userInput") {
           return <UserInputWaitCard key={request.id} request={request} onResolve={onResolveUserInput} />;
         }
-        return <PlanExitWaitCard key={request.id} request={request} onResolve={onExitPlan} />;
+        if (request.kind === "planExit") {
+          return <PlanExitWaitCard key={request.id} request={request} onResolve={onExitPlan} />;
+        }
+        return null;
       })}
     </div>
   );
