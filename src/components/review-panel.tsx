@@ -128,6 +128,15 @@ export function ReviewPanel({
   const diffSections = diffSectionRefs.current;
   const selectionSourceRef = useRef<"navigation" | "scroll" | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
+  // Section bounds in scroll-content coordinates, measured lazily and reused
+  // across scroll frames so scrolling never forces per-section layout reads.
+  const sectionBoundsRef = useRef<Map<string, { top: number; bottom: number }> | null>(null);
+  const sectionResizeObserverRef = useRef<ResizeObserver | null>(null);
+  if (!sectionResizeObserverRef.current && typeof ResizeObserver !== "undefined") {
+    sectionResizeObserverRef.current = new ResizeObserver(() => {
+      sectionBoundsRef.current = null;
+    });
+  }
   const fileTreeToggleLabel = reviewFileTreeToggleLabel(fileTreeVisible);
   const effectiveFileTreeWidth = reviewFileTreeWidth(fileTreeWidth, width);
   const reviewPanelStyle = { "--review-file-tree-width": `${effectiveFileTreeWidth}px` } as ReviewPanelStyle;
@@ -135,7 +144,7 @@ export function ReviewPanel({
     () => reviewBranchAreaFiles(files, effectiveBranchAreaFilter),
     [effectiveBranchAreaFilter, files],
   );
-  const reviewTotals = reviewChangedFilesTotals(reviewFiles);
+  const reviewTotals = useMemo(() => reviewChangedFilesTotals(reviewFiles), [reviewFiles]);
   // PatchDiff treats options identity as input, so keep it stable until the actual renderer settings change.
   const reviewDiffOptions = useMemo(
     () =>
@@ -195,13 +204,26 @@ export function ReviewPanel({
 
   const setDiffSectionRef = useCallback(
     (path: string, section: HTMLElement | null) => {
+      sectionBoundsRef.current = null;
+      const previous = diffSections.get(path);
+      if (previous) {
+        sectionResizeObserverRef.current?.unobserve(previous);
+      }
       if (section) {
         diffSections.set(path, section);
+        sectionResizeObserverRef.current?.observe(section);
         return;
       }
       diffSections.delete(path);
     },
     [diffSections],
+  );
+
+  useEffect(
+    () => () => {
+      sectionResizeObserverRef.current?.disconnect();
+    },
+    [],
   );
 
   const setDiffScrollNode = useCallback((node: HTMLElement | null) => {
@@ -225,32 +247,45 @@ export function ReviewPanel({
     });
   }, []);
 
+  const measureSectionBounds = useCallback(
+    (scrollContainer: HTMLElement) => {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const offset = scrollContainer.scrollTop - containerRect.top;
+      const bounds = new Map<string, { top: number; bottom: number }>();
+      for (const [path, section] of diffSections) {
+        const rect = section.getBoundingClientRect();
+        bounds.set(path, { top: rect.top + offset, bottom: rect.bottom + offset });
+      }
+      return bounds;
+    },
+    [diffSections],
+  );
+
   const updateSelectedPathFromScroll = useCallback(() => {
     const scrollContainer = diffScrollRef.current;
     if (!scrollContainer) {
       return;
     }
-    const viewportRect = scrollContainer.getBoundingClientRect();
-    const sections = reviewFiles
-      .map((file) => {
-        const section = diffSections.get(file.path);
-        if (!section) {
-          return null;
-        }
-        const rect = section.getBoundingClientRect();
-        return { path: file.path, top: rect.top, bottom: rect.bottom };
-      })
-      .filter((section) => section !== null);
+    sectionBoundsRef.current ??= measureSectionBounds(scrollContainer);
+    const sectionBounds = sectionBoundsRef.current;
+    const sections: Array<{ path: string; top: number; bottom: number }> = [];
+    for (const file of reviewFiles) {
+      const bounds = sectionBounds.get(file.path);
+      if (bounds) {
+        sections.push({ path: file.path, top: bounds.top, bottom: bounds.bottom });
+      }
+    }
+    const viewportTop = scrollContainer.scrollTop;
     const nextPath = reviewActiveFilePath(
       sections,
-      { top: viewportRect.top, bottom: viewportRect.bottom },
+      { top: viewportTop, bottom: viewportTop + scrollContainer.clientHeight },
       selectedPath,
     );
     if (nextPath && nextPath !== selectedPath) {
       selectionSourceRef.current = "scroll";
       onSelectedPathChange(nextPath);
     }
-  }, [diffSections, onSelectedPathChange, reviewFiles, selectedPath]);
+  }, [measureSectionBounds, onSelectedPathChange, reviewFiles, selectedPath]);
 
   const handleDiffScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) {

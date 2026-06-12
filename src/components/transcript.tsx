@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/transcript-scroll";
 import {
   buildTranscriptRows,
+  reconcileTranscriptRows,
   transcriptNestedDisclosureKey,
   transcriptRowDisclosureKeys,
   transcriptRowsSearchText,
@@ -106,25 +108,37 @@ export function Transcript({
       bottomInsetPx,
     ].join(":");
   }, [bottomInsetPx, messages, showWorkingIndicator]);
-  const transcriptRows = useMemo(
-    () =>
+  const previousTranscriptRowsRef = useRef<TranscriptRow[]>([]);
+  const transcriptRows = useMemo(() => {
+    const rows = reconcileTranscriptRows(
+      previousTranscriptRowsRef.current,
       buildTranscriptRows({
         activeTurnId,
         messages,
         showWorkingIndicator,
         turnChangeSummaries: onReviewTurnChanges ? turnChangeSummaries : {},
       }),
-    [activeTurnId, messages, onReviewTurnChanges, showWorkingIndicator, turnChangeSummaries],
-  );
+    );
+    previousTranscriptRowsRef.current = rows;
+    return rows;
+  }, [activeTurnId, messages, onReviewTurnChanges, showWorkingIndicator, turnChangeSummaries]);
   const transcriptRowKeys = useMemo(() => transcriptRows.map((row) => row.key), [transcriptRows]);
   const rowKeyVersion = useMemo(() => transcriptRowKeys.join("\u0000"), [transcriptRowKeys]);
   const transcriptVersion = useMemo(() => [messageVersion, rowKeyVersion].join("\n"), [messageVersion, rowKeyVersion]);
-  const transcriptHasActiveStreaming = useMemo(
-    () =>
-      showWorkingIndicator ||
-      messages.some((message) => message.status === "streaming" || message.toolStatus === "running"),
-    [messages, showWorkingIndicator],
-  );
+  const transcriptHasActiveStreaming = useMemo(() => {
+    if (showWorkingIndicator) {
+      return true;
+    }
+    // Scan from the end: active streams live at the tail, so this exits in O(1)
+    // on the per-delta hot path.
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.status === "streaming" || message.toolStatus === "running") {
+        return true;
+      }
+    }
+    return false;
+  }, [messages, showWorkingIndicator]);
   scrollStateKeyRef.current = scrollStateKey;
   transcriptRowsRef.current = transcriptRows;
   transcriptRowKeysRef.current = transcriptRowKeys;
@@ -421,12 +435,18 @@ export function Transcript({
   }, [followSignal, reportCanScrollToBottom, scheduleScrollToEnd, setPinnedToEndState, transcriptVersion]);
 
   const virtualItems = rowVirtualizer.getVirtualItems();
+  // Key the memo on the mounted row keys (not virtualItems identity) so plain
+  // scroll frames that keep the same rows mounted skip the rebuild entirely.
+  const mountedRowKeysVersion = useMemo(
+    () => virtualItems.map((virtualItem) => String(virtualItem.key)).join("\u0000"),
+    [virtualItems],
+  );
   const transcriptSearchText = useMemo(() => {
-    const mountedRowKeys = new Set(virtualItems.map((virtualItem) => String(virtualItem.key)));
+    const mountedRowKeys = new Set(mountedRowKeysVersion ? mountedRowKeysVersion.split("\u0000") : []);
     return transcriptRowsSearchText(transcriptRows, {
       excludedRowKeys: mountedRowKeys,
     });
-  }, [transcriptRows, virtualItems]);
+  }, [mountedRowKeysVersion, transcriptRows]);
   const suppressAutoFollowScrollbar = transcriptHasActiveStreaming && pinnedToEnd;
 
   return (
@@ -493,7 +513,7 @@ export function Transcript({
   );
 }
 
-function TranscriptRowView({
+const TranscriptRowView = memo(function TranscriptRowView({
   disclosureOpenByKey,
   onDisclosureOpenChange,
   onReviewTurnChanges,
@@ -525,9 +545,9 @@ function TranscriptRowView({
       skills={skills}
     />
   );
-}
+});
 
-function TranscriptEntryView({
+const TranscriptEntryView = memo(function TranscriptEntryView({
   disclosureOpenByKey,
   onDisclosureOpenChange,
   row,
@@ -592,7 +612,7 @@ function TranscriptEntryView({
       )}
     </article>
   );
-}
+});
 
 function transcriptRowSpacing(row: TranscriptRow): string {
   if (row.kind === "turnReviewChanges") {
