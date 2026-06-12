@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
 import { AgentWaitCards } from "@/components/agent-wait-card";
+import { McpAuthWaitCards } from "@/components/mcp-auth-wait-card";
 import { useAppShell } from "@/components/app-shell-context";
 import { Composer } from "@/components/composer";
 import { NativeCommandOutput } from "@/components/native-command-output";
@@ -205,6 +206,12 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
       </div>
       <div ref={composerStackRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
         <div className="pointer-events-auto relative">
+          <McpAuthWaitCards
+            requests={agent.pendingMcpAuthRequests}
+            onSkip={agent.mcpAuthSkip}
+            onApiKeySubmit={agent.mcpAuthApiKeySubmit}
+            onOAuthStart={agent.mcpOAuthStart}
+          />
           <AgentWaitCards
             requests={agent.waitRequests}
             onResolveApproval={agent.resolveApproval}

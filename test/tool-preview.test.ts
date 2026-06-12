@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { parsePatchFiles } from "@pierre/diffs";
 import {
   normalizeApplyPatchPreview,
   normalizedToolPreview,
@@ -25,16 +26,35 @@ test("normalizes apply_patch payloads into unified diffs", () => {
       "diff --git a/src/app.ts b/src/app.ts",
       "--- a/src/app.ts",
       "+++ b/src/app.ts",
-      "@@ -0,0 +0,0 @@",
+      "@@ -1,1 +1,1 @@",
       "-old",
       "+new",
       "diff --git a/docs/intro.md b/docs/intro.md",
       "--- /dev/null",
       "+++ b/docs/intro.md",
+      "@@ -0,0 +1,1 @@",
       "+hello",
       "",
     ].join("\n"),
   );
+});
+
+test("normalizes bare apply_patch hunks with parseable line ranges", () => {
+  const preview = normalizeApplyPatchPreview(
+    [
+      "*** Begin Patch",
+      "*** Update File: src/app.ts",
+      "@@",
+      " old context",
+      "-old",
+      "+new",
+      " next context",
+      "*** End Patch",
+    ].join("\n"),
+  );
+
+  expect(preview).toContain("@@ -1,3 +1,3 @@");
+  expect(parsePatchFiles(preview ?? "")[0]?.files[0]?.hunks[0]?.hunkContent.length).toBeGreaterThan(0);
 });
 
 test("marks apply_patch previews as patch previews", () => {
@@ -44,7 +64,7 @@ test("marks apply_patch previews as patch previews", () => {
       "diff --git a/src/app.ts b/src/app.ts",
       "--- a/src/app.ts",
       "+++ b/src/app.ts",
-      "@@ -0,0 +0,0 @@",
+      "@@ -1,1 +1,1 @@",
       "-old",
       "+new",
       "",
@@ -89,12 +109,19 @@ test("splits normalized apply_patch previews into one-file diffs", () => {
       "diff --git a/src/app.ts b/src/app.ts",
       "--- a/src/app.ts",
       "+++ b/src/app.ts",
-      "@@ -0,0 +0,0 @@",
+      "@@ -1,1 +1,1 @@",
       "-old",
       "+new",
       "",
     ].join("\n"),
-    ["diff --git a/docs/intro.md b/docs/intro.md", "--- /dev/null", "+++ b/docs/intro.md", "+hello", ""].join("\n"),
+    [
+      "diff --git a/docs/intro.md b/docs/intro.md",
+      "--- /dev/null",
+      "+++ b/docs/intro.md",
+      "@@ -0,0 +1,1 @@",
+      "+hello",
+      "",
+    ].join("\n"),
   ]);
 });
 

@@ -32,6 +32,7 @@ import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import { ProvidersSettingsPanel } from "@/components/settings-providers-panel";
 import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
+import { SettingsMcpPanel } from "@/components/settings-mcp-panel";
 import { parseTerminalThemeJson, terminalThemeForSettings, terminalThemePresets } from "@/lib/terminal-theme";
 import {
   presetsForScheme,
@@ -197,6 +198,8 @@ export function SettingsView({
             <SettingsComputerUsePanel />
           ) : section === "terminal" ? (
             <TerminalSettingsPanel />
+          ) : section === "mcp" ? (
+            <SettingsMcpPanel />
           ) : (
             <SettingsPlaceholder section={section} />
           )}

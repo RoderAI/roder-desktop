@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, type Rectangle } from "electron";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { watch as fsWatch } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
@@ -324,13 +325,148 @@ ipcMain.handle("extensions:readTheme", async (_event, extensionId: string, theme
 });
 ipcMain.handle("appserver:events", () => appServerEvents);
 
+ipcMain.handle("mcp:readConfig", async (_event, configPath: string) => {
+  try {
+    const content = await readFile(configPath, "utf-8");
+    return { config: JSON.parse(content), error: null };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return { config: { mcpServers: {} }, error: null };
+    }
+    return { config: null, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle("mcp:writeConfig", async (_event, configPath: string, config: unknown) => {
+  try {
+    const dir = dirname(configPath);
+    await mkdir(dir, { recursive: true });
+    await writeFile(configPath, JSON.stringify(config, null, 2));
+    return { error: null };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+});
+
+const mcpAuthPendingDir = join(homedir(), ".roder", "mcp-auth-pending");
+const mcpAuthResultDir = join(homedir(), ".roder", "mcp-auth-results");
+
+async function ensureMcpAuthDirs(): Promise<void> {
+  await mkdir(mcpAuthPendingDir, { recursive: true });
+  await mkdir(mcpAuthResultDir, { recursive: true });
+}
+
+async function readMcpAuthRequest(filePath: string): Promise<unknown | null> {
+  try {
+    const content = await readFile(filePath, "utf-8");
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+function startMcpAuthWatcher(): void {
+  void ensureMcpAuthDirs().then(() => {
+    fsWatch(mcpAuthPendingDir, { persistent: false }, (_event, filename) => {
+      if (!filename || !filename.endsWith(".json")) return;
+      const filePath = join(mcpAuthPendingDir, filename);
+      void readMcpAuthRequest(filePath).then((request) => {
+        if (request) {
+          sendToRenderer("mcp:authRequested", request);
+        }
+      });
+    });
+  });
+}
+
+ipcMain.handle("mcp:authSkip", async (_event, id: string) => {
+  try {
+    const pendingPath = join(mcpAuthPendingDir, `${id}.json`);
+    const resultPath = join(mcpAuthResultDir, `${id}.json`);
+    await writeFile(resultPath, JSON.stringify({ id, status: "skipped" }));
+    await unlink(pendingPath).catch(() => undefined);
+  } catch {
+    // ignore cleanup errors
+  }
+});
+
+ipcMain.handle("mcp:apiKeySubmit", async (_event, id: string, apiKey: string) => {
+  const pendingPath = join(mcpAuthPendingDir, `${id}.json`);
+  const resultPath = join(mcpAuthResultDir, `${id}.json`);
+  const request = await readMcpAuthRequest(pendingPath);
+  if (!request || typeof request !== "object") {
+    throw new Error("Auth request not found");
+  }
+  const req = request as Record<string, unknown>;
+  const serviceName = String(req.serviceName ?? id);
+  await writeFile(resultPath, JSON.stringify({ id, status: "complete", apiKey, serviceName }));
+  await unlink(pendingPath).catch(() => undefined);
+});
+
+ipcMain.handle("mcp:oauthStart", async (_event, id: string, url: string) => {
+  // Open the OAuth URL with our callback scheme embedded
+  const callbackUrl = `roder://mcp-oauth-callback?id=${encodeURIComponent(id)}`;
+  const oauthUrl = new URL(url);
+  // Only inject redirect_uri if not already set
+  if (!oauthUrl.searchParams.has("redirect_uri")) {
+    oauthUrl.searchParams.set("redirect_uri", callbackUrl);
+  }
+  await shell.openExternal(oauthUrl.toString());
+});
+
 nativeTheme.on("updated", () => {
   sendToRenderer("roder:appearance", currentAppearance());
 });
 
+// Register deep-link scheme for MCP OAuth callbacks (must be before app is ready on some platforms)
+if (!app.isPackaged) {
+  // In dev mode we can't reliably use setAsDefaultProtocolClient, but register anyway
+  app.setAsDefaultProtocolClient("roder");
+} else {
+  app.setAsDefaultProtocolClient("roder");
+}
+
+// Handle OAuth callback on macOS via open-url event
+app.on("open-url", (_event, url) => {
+  handleMcpOAuthCallback(url);
+});
+
+// Handle OAuth callback on Windows/Linux via second-instance argv
+app.on("second-instance", (_event, argv) => {
+  const deepLink = argv.find((arg) => arg.startsWith("roder://"));
+  if (deepLink) {
+    handleMcpOAuthCallback(deepLink);
+  }
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
+function handleMcpOAuthCallback(url: string): void {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "mcp-oauth-callback") return;
+    const id = parsed.searchParams.get("id");
+    const error = parsed.searchParams.get("error");
+    if (!id) return;
+    const status = error ? "failed" : "complete";
+    sendToRenderer("mcp:oauthCallback", { id, status, error: error ?? undefined });
+    // Write result file so the skill can read it
+    void writeFile(
+      join(mcpAuthResultDir, `${id}.json`),
+      JSON.stringify({ id, status, error: error ?? null }),
+    ).catch(() => undefined);
+    void unlink(join(mcpAuthPendingDir, `${id}.json`)).catch(() => undefined);
+  } catch {
+    // ignore malformed URLs
+  }
+}
+
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(Menu.buildFromTemplate(createApplicationMenuTemplate(sendAppCommand)));
   createWindow();
+  startMcpAuthWatcher();
   try {
     await roder.start();
   } catch (error) {
