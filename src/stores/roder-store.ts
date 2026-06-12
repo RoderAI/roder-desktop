@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 import { roderIpc } from "@/lib/roder-ipc";
 import { commandInvocationText, type CommandInvocation } from "@/lib/roder-commands";
 import {
@@ -1183,6 +1183,7 @@ export const useRoderStore = create<RoderStore>()(
     }),
     {
       name: "roder-desktop-navigation",
+      storage: debouncedLocalStorage<PersistedRoderState>(500),
       partialize: (state) => ({
         activeThreadId: state.activeThreadId,
         backStack: state.backStack,
@@ -1198,6 +1199,77 @@ export const useRoderStore = create<RoderStore>()(
     },
   ),
 );
+
+type PersistedRoderState = Pick<
+  RoderStore,
+  | "activeThreadId"
+  | "backStack"
+  | "forwardStack"
+  | "visibleModelIds"
+  | "workspaces"
+  | "selectedWorkspaceId"
+  | "selectedRootId"
+  | "selectedWorkspaceCwd"
+  | "workspaceRecents"
+  | "queuedPromptsByThread"
+>;
+
+// The persist middleware calls setItem on every store set, including each
+// streaming item delta. Defer serialization + the localStorage write to a
+// trailing debounce so the hot path never touches storage, and flush on
+// pagehide so the latest navigation state survives app shutdown.
+function debouncedLocalStorage<S>(delayMs: number): PersistStorage<S> {
+  let pending: { name: string; value: StorageValue<S> } | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const flush = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (!pending) {
+      return;
+    }
+    const { name, value } = pending;
+    pending = null;
+    try {
+      localStorage.setItem(name, JSON.stringify(value));
+    } catch {
+      // Storage may be full or unavailable; persisting navigation is best-effort.
+    }
+  };
+
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("pagehide", flush);
+  }
+
+  return {
+    getItem: (name) => {
+      if (pending?.name === name) {
+        return pending.value;
+      }
+      const raw = localStorage.getItem(name);
+      if (!raw) {
+        return null;
+      }
+      try {
+        return JSON.parse(raw) as StorageValue<S>;
+      } catch {
+        return null;
+      }
+    },
+    setItem: (name, value) => {
+      pending = { name, value };
+      timer ??= setTimeout(flush, delayMs);
+    },
+    removeItem: (name) => {
+      if (pending?.name === name) {
+        pending = null;
+      }
+      localStorage.removeItem(name);
+    },
+  };
+}
 
 type RoderStoreSet = (partial: Partial<RoderStore> | ((state: RoderStore) => Partial<RoderStore>)) => void;
 

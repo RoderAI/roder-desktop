@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
 import { AgentWaitCards } from "@/components/agent-wait-card";
@@ -19,6 +19,7 @@ import { threadSelectionForRoute } from "@/lib/route-selection";
 import { threadTitle } from "@/lib/roder-thread";
 import { normalizeWorkspacePath, normalizedTimestamp, type FolderOption } from "@/lib/workspace-thread-options";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
+import { useActiveThreadMessages, useShowWorkingIndicator } from "@/hooks/use-roder-agent";
 import { useCommandsStore } from "@/stores/commands-store";
 import { skillsLoadContextKey, useSkillsStore } from "@/stores/skills-store";
 import type { RoderThread, Workspace } from "@/types/roder";
@@ -45,7 +46,6 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     openReview,
     setCanScrollTranscriptToBottom,
     setComposerAttachments,
-    showWorkingIndicator,
     followBottom,
     selectNativeCommandModel,
     sendCommandInvocation,
@@ -54,7 +54,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     localTranscriptOffset,
   } = shell;
   const commands = useCommandsStore((state) => state.commands);
-  const mergedCommands = mergedCommandDescriptors(commands);
+  const mergedCommands = useMemo(() => mergedCommandDescriptors(commands), [commands]);
   const commandsLoaded = useCommandsStore((state) => state.loaded);
   const commandsLoading = useCommandsStore((state) => state.loading);
   const loadCommands = useCommandsStore((state) => state.load);
@@ -64,6 +64,9 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const skillsLoading = useSkillsStore((state) => state.loading);
   const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
+  const routeActiveThreadId = threadId || (route === "new" ? "" : activeThreadId);
+  const messages = useActiveThreadMessages();
+  const showWorkingIndicator = useShowWorkingIndicator(routeActiveThreadId);
   const composerStackRef = useRef<HTMLDivElement | null>(null);
   const [composerStackHeight, setComposerStackHeight] = useState(initialComposerStackHeightPx);
   const newRouteReadyForCreatedThreadRef = useRef(false);
@@ -71,8 +74,8 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const transcriptBottomInsetPx = composerStackHeight + transcriptComposerGapPx;
   const transcriptMessages =
     localTranscriptOffset?.threadId === (activeThreadId || "new-thread")
-      ? agent.messages.slice(localTranscriptOffset.hiddenMessageCount)
-      : agent.messages;
+      ? messages.slice(localTranscriptOffset.hiddenMessageCount)
+      : messages;
   const composerQueueBusy = activeThreadBusy || agent.busy;
   const showNewAgentEmptyState = route === "new" && transcriptMessages.length === 0 && !showWorkingIndicator;
   const showScrollToBottom = showNewAgentEmptyState ? false : canScrollTranscriptToBottom;

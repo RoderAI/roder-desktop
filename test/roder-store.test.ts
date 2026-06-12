@@ -1354,6 +1354,9 @@ test("queued prompts are stored per thread and persisted", async () => {
       "thread-2": [second],
     });
 
+    // Persistence is debounced so streaming deltas don't hit localStorage.
+    vi.advanceTimersByTime(600);
+
     const setItem = vi.mocked(globalThis.localStorage.setItem);
     const lastPersistedNavigation = [...setItem.mock.calls]
       .reverse()

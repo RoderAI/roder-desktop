@@ -1,11 +1,15 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { roderIpc } from "@/lib/roder-ipc";
-import { activeTurnIdForThread, messagesFromThread } from "@/lib/roder-thread";
+import {
+  activeTurnIdForThread,
+  messagesFromThread,
+  shouldShowThreadWorkingIndicator,
+} from "@/lib/roder-thread";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
-import type { QueuedPrompt } from "@/types/roder";
+import type { ConversationMessage, QueuedPrompt } from "@/types/roder";
 
 const emptyQueuedPrompts: QueuedPrompt[] = [];
 
@@ -24,6 +28,34 @@ export function useRoderAgent() {
     }),
     [models, state],
   );
+}
+
+type RoderStoreState = ReturnType<typeof useRoderStore.getState>;
+
+function activeThreadForState(state: RoderStoreState) {
+  return state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
+}
+
+/** Messages of the store-active thread. Subscribes narrowly so only consumers
+ * of the transcript re-render on streaming deltas. */
+export function useActiveThreadMessages(): ConversationMessage[] {
+  return useRoderStore((state) => messagesFromThread(activeThreadForState(state)));
+}
+
+/** Snapshot (non-reactive) of the active thread's messages, for event handlers. */
+export function activeThreadMessagesSnapshot(): ConversationMessage[] {
+  return messagesFromThread(activeThreadForState(useRoderStore.getState()));
+}
+
+/** Working-indicator flag derived inside the selector so streaming deltas only
+ * re-render subscribers when the boolean actually flips. */
+export function useShowWorkingIndicator(routeActiveThreadId: string): boolean {
+  return useRoderStore((state) => {
+    const routeThread = state.threads.find((thread) => thread.id === routeActiveThreadId);
+    const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
+    const messages = messagesFromThread(activeThreadForState(state));
+    return shouldShowThreadWorkingIndicator(routeThread, waitRequests.length, messages);
+  });
 }
 
 function useRoderStoreBootstrap(): void {
@@ -51,11 +83,9 @@ function useRoderStoreBootstrap(): void {
   }, [applyAppearance, applyNotification, applyStatus, applyStderr, bootstrap]);
 }
 
-function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
-  const activeThread =
-    state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
+function selectAgentState(state: RoderStoreState) {
+  const activeThread = activeThreadForState(state);
   const activeThreadGoal = state.threadGoalsByThread[state.activeThreadId] ?? null;
-  const messages = messagesFromThread(activeThread);
   const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
   return {
     status: state.status,
@@ -66,7 +96,6 @@ function selectAgentState(state: ReturnType<typeof useRoderStore.getState>) {
     activeThreadId: state.activeThreadId,
     activeThreadGoal: activeThreadGoal?.threadId === state.activeThreadId ? activeThreadGoal : null,
     queuedPrompts: state.queuedPromptsByThread[state.activeThreadId || "new-thread"] ?? emptyQueuedPrompts,
-    messages,
     allModels: state.models,
     routingOptions: state.routingOptions,
     visibleModelIds: state.visibleModelIds,
