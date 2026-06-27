@@ -10,7 +10,7 @@ date: 2026-06-11
 
 Add a centered Cmd-P file/folder launcher for the active workspace. The launcher searches workspace file-index entries, lets the user type and choose a file or folder from a combobox-style dialog, then opens the right-sidebar Files tab with the selected file opened in a file tab or the selected folder expanded in the tree.
 
-**Target repos:** `gode-desktop` for the desktop UI and Electron command path; `gode` for the app-server workspace file query extension. Paths are repo-relative to the repo named in each file list.
+**Target repos:** `roder-desktop` for the desktop UI and Electron command path; `roder` for the app-server workspace file query extension. Paths are repo-relative to the repo named in each file list.
 
 ---
 
@@ -152,7 +152,7 @@ This feature crosses native shortcut handling, preload command typing, app-shell
 
 **Dependencies:** None
 
-**Files (gode):**
+**Files (roder):**
 
 - `crates/roder-app-server/src/workspace_files.rs`
 - `crates/roder-app-server/tests/e2e.rs`
@@ -358,6 +358,6 @@ This feature crosses native shortcut handling, preload command typing, app-shell
 - `src/components/file-panel.tsx`, `src/components/file-panel/use-open-file-tabs.ts`, `src/hooks/use-file-panel-tree.ts`, and `src/components/file-panel/file-panel-sidebar.tsx` show the existing Files tab state, file-tab opening, directory loading, and tree expansion patterns.
 - `src/components/ui/dialog.tsx` and `src/components/ui/combobox.tsx` provide the Base UI wrappers required by project guidance.
 - `https://ui.shadcn.com/docs/components/base/command` provides the requested command dialog composition reference for the file-search launcher.
-- In the `gode` repo, `crates/roder-app-server/src/workspace_files.rs` shows that `workspace/files/query` currently queries files, while `workspace/files/children` already synthesizes directory entries.
-- In the `gode` repo, `docs/app-server/api.md` names `workspace/files/query` as the intended command-p quick-open method.
+- In the `roder` repo, `crates/roder-app-server/src/workspace_files.rs` shows that `workspace/files/query` currently queries files, while `workspace/files/children` already synthesizes directory entries.
+- In the `roder` repo, `docs/app-server/api.md` names `workspace/files/query` as the intended command-p quick-open method.
 - `docs/plans/2026-06-04-001-feat-file-view-panel-plan.md` records the prior Files tab plan and its intentional boundary around read-only file browsing.

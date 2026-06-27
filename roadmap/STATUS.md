@@ -2,7 +2,7 @@
 
 Last updated: **2026-05-19**
 
-This file indexes PRD roadmap plans for `gode-desktop`. Individual PRDs remain the source of truth for detailed tasks, acceptance criteria, implementation stage, and evidence.
+This file indexes PRD roadmap plans for `roder-desktop`. Individual PRDs remain the source of truth for detailed tasks, acceptance criteria, implementation stage, and evidence.
 
 ## Status Legend
 
