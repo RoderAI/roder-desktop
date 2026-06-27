@@ -1,0 +1,40 @@
+# roder-distro-config.toml
+#
+# Single source of truth for the upstream Roder release that roder-desktop
+# embeds. Roder is consumed as a published crate from crates.io -- the desktop
+# build NEVER compiles from the local ~/w/roder checkout. The companion
+# `roder-desktop-distro` crate pins this version, wraps `roder::run_distribution`,
+# and produces the binary the Electron shell bundles at `resources/bin/roder`.
+#
+# To change the embedded version:
+#   1. Edit [roder].version below (or run `pnpm roder:distro:update <version>`).
+#   2. Run `pnpm roder:distro:update <version>` to sync the distro crate +
+#      Cargo.lock.
+#   3. Run `pnpm roder:distro:build` (debug) or `pnpm roder:distro:release`.
+#
+# See `.agents/skills/roder-distro/SKILL.md` for the full workflow.
+
+[roder]
+# crates.io version of the `roder` crate the desktop binary is built from.
+# Must stay in sync with roder-desktop-distro/Cargo.toml (enforced at build time).
+version = "0.1.4"
+# Published crate that provides the roder CLI + `run_distribution` entrypoint.
+crate = "roder"
+# Binary name the Electron shell loads from resources/bin/ (see
+# electron/roder/app-server-client.ts).
+binary = "roder"
+
+[distro]
+# Local crate (a standalone Cargo workspace) that pins the upstream version and
+# wraps `roder::run_distribution`. It is built to produce the embedded binary.
+path = "roder-desktop-distro"
+package = "roder-desktop-distro"
+
+[source]
+# Registry the pinned version is pulled from.
+registry = "https://crates.io"
+repository = "https://github.com/RoderAI/roder"
+# Maintainer reference checkout only. The build NEVER compiles from this path;
+# it exists so engineers can read the upstream source that the pinned crate was
+# published from.
+reference_checkout = "~/w/roder"

@@ -1,0 +1,34 @@
+# roder-desktop-distro
+#
+# Standalone Cargo workspace (NOT part of any parent workspace, like vex's
+# `vex-roder/`) that builds the Roder binary embedded by roder-desktop. It
+# depends on the published upstream `roder` crate from crates.io and re-exposes
+# the full roder CLI (TUI, exec, app-server, ...) through
+# `roder::run_distribution`.
+#
+# The pinned `roder` version below is kept in sync with
+# ../roder-distro-config.toml and is verified at build time by
+# scripts/lib/roder-distro.mjs. Change it with:
+#   pnpm roder:distro:update <version>
+[workspace]
+
+[package]
+name = "roder-desktop-distro"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# The Electron shell loads `resources/bin/roder`, so this binary is named
+# `roder` even though the wrapping package is `roder-desktop-distro`.
+[[bin]]
+name = "roder"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+# Upstream Roder agent harness. Keep in sync with roder-distro-config.toml.
+roder = "0.1.4"
+
+[profile.release]
+lto = "thin"
