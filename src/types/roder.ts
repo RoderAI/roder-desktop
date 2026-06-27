@@ -13,6 +13,16 @@ export type RoderNotification = {
   params: unknown;
 };
 
+export type AgentSwarmModeChangedNotification = {
+  thread_id?: string;
+  threadId?: string;
+  turn_id?: string | null;
+  turnId?: string | null;
+  enabled: boolean;
+  trigger?: "manual" | "task" | "tool" | string;
+  timestamp?: string;
+};
+
 export type RoderActiveFlag = "approvalRequired" | "userInputRequired" | "planExitRequired" | string;
 
 export type RoderQuestionOption = {
@@ -1204,7 +1214,9 @@ declare global {
       onChromeBridgeStatus: (callback: (status: ChromeBridgeStatus) => void) => () => void;
       onTerminalExit: (callback: (payload: { id: string; exitCode: number; signal?: number }) => void) => () => void;
       onMcpAuthRequested: (callback: (request: McpAuthWaitRequest) => void) => () => void;
-      onMcpOAuthCallback: (callback: (payload: { id: string; status: "complete" | "failed"; error?: string }) => void) => () => void;
+      onMcpOAuthCallback: (
+        callback: (payload: { id: string; status: "complete" | "failed"; error?: string }) => void,
+      ) => () => void;
       mcpAuthSkip: (id: string) => Promise<void>;
       mcpApiKeySubmit: (id: string, apiKey: string) => Promise<void>;
       mcpOAuthStart: (id: string, url: string) => Promise<void>;

@@ -1,11 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { roderIpc } from "@/lib/roder-ipc";
-import {
-  activeTurnIdForThread,
-  messagesFromThread,
-  shouldShowThreadWorkingIndicator,
-} from "@/lib/roder-thread";
+import { activeTurnIdForThread, messagesFromThread, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
@@ -33,7 +29,9 @@ export function useRoderAgent() {
 type RoderStoreState = ReturnType<typeof useRoderStore.getState>;
 
 function activeThreadForState(state: RoderStoreState) {
-  return state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId);
+  return (
+    state.threadDetails[state.activeThreadId] ?? state.threads.find((thread) => thread.id === state.activeThreadId)
+  );
 }
 
 /** Messages of the store-active thread. Subscribes narrowly so only consumers
@@ -112,6 +110,8 @@ function selectAgentState(state: RoderStoreState) {
     selectedSelectionMode: state.selectedSelectionMode,
     selectedReasoning: state.selectedReasoning,
     selectedPolicyMode: state.selectedPolicyMode,
+    agentSwarmMode: state.agentSwarmMode,
+    agentSwarmModeAvailable: state.agentSwarmModeAvailable,
     workspaces: state.workspaces,
     selectedWorkspaceId: state.selectedWorkspaceId,
     selectedRootId: state.selectedRootId,
@@ -145,6 +145,7 @@ function selectAgentState(state: RoderStoreState) {
     setSelectedAutoModel: state.setSelectedAutoModel,
     setSelectedReasoning: state.setSelectedReasoning,
     setSelectedPolicyMode: state.setSelectedPolicyMode,
+    setAgentSwarmMode: state.setAgentSwarmMode,
     saveDefaults: state.saveDefaults,
     setSelectedWorkspaceCwd: state.setSelectedWorkspaceCwd,
     openWorkspaceFolder: state.openWorkspaceFolder,

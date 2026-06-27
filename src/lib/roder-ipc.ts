@@ -314,6 +314,8 @@ export type SettingsGetResult = {
   default_model: string;
   default_reasoning: string;
   default_mode: PolicyMode;
+  agent_swarm_mode?: boolean;
+  agentSwarmMode?: boolean;
 };
 
 export type ThreadStateResult = {
@@ -331,6 +333,12 @@ export type ThreadStateResult = {
 
 export type ThreadSetModeResult = {
   mode: PolicyMode;
+};
+
+export type ThreadSetAgentSwarmModeResult = {
+  enabled: boolean;
+  threadId?: string | null;
+  thread_id?: string | null;
 };
 
 export type SettingsSetDefaultModeResult = {
@@ -553,7 +561,10 @@ export const roderIpc = {
       .request("providers/list", {})
       .then((result) => providersListResultFromWire(result as WireProvidersListResult)) as Promise<ProvidersListResult>,
   configureProvider: (provider: string, apiKey: string) =>
-    window.roderDesktop.request("providers/configure", { provider, api_key: apiKey }) as Promise<ProviderConfigureResult>,
+    window.roderDesktop.request("providers/configure", {
+      provider,
+      api_key: apiKey,
+    }) as Promise<ProviderConfigureResult>,
   selectModel: (selection: ModelSelectChoice, threadId?: string) =>
     window.roderDesktop
       .request("model/select", {
@@ -636,6 +647,12 @@ export const roderIpc = {
     window.roderDesktop.request("thread/exit_plan", { requestId: params.requestId, approved: params.approved }),
   setThreadMode: (mode: PolicyMode, reason: string) =>
     window.roderDesktop.request("thread/set_mode", { mode, reason }) as Promise<ThreadSetModeResult>,
+  setThreadAgentSwarmMode: (enabled: boolean, threadId?: string) =>
+    window.roderDesktop.request("thread/set_agent_swarm_mode", {
+      enabled,
+      trigger: "manual",
+      threadId: threadId || undefined,
+    }) as Promise<ThreadSetAgentSwarmModeResult>,
   setDefaultMode: (mode: PolicyMode) =>
     window.roderDesktop.request("settings/set_default_mode", { mode }) as Promise<SettingsSetDefaultModeResult>,
   settings: () => window.roderDesktop.request("settings/get", {}) as Promise<SettingsGetResult>,

@@ -1,5 +1,5 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
-import { ArrowDown, ArrowUp, Loader2, Mic, Pencil, Plus, Square, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   CommandDescriptor,
@@ -15,6 +15,7 @@ import type {
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AttachmentChip,
+  ComposerAgentSwarmModeMenuItem,
   ComposerAttachMenuItems,
   ComposerPlanModeMenuItem,
   ModelPicker,
@@ -77,6 +78,8 @@ type ComposerProps = {
   selectedModelProvider: string;
   selectedSelectionMode: ModelSelectionMode;
   selectedPolicyMode: PolicyMode;
+  agentSwarmMode: boolean;
+  agentSwarmModeAvailable: boolean;
   selectedReasoning: ReasoningEffort;
   attachments: DesktopAttachment[];
   queuedPrompts: QueuedPrompt[];
@@ -85,6 +88,7 @@ type ComposerProps = {
   onSelectedModelChange: (model: string, provider?: string) => void;
   onSelectedAutoModelChange: (optionId: string) => void;
   onSelectedPolicyModeChange: (mode: PolicyMode) => void;
+  onAgentSwarmModeChange: (enabled: boolean) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
   onAttachmentsChange: (attachments: DesktopAttachment[]) => void;
@@ -126,6 +130,8 @@ export function Composer({
   selectedModelProvider,
   selectedSelectionMode,
   selectedPolicyMode,
+  agentSwarmMode,
+  agentSwarmModeAvailable,
   selectedReasoning,
   attachments,
   queuedPrompts,
@@ -134,6 +140,7 @@ export function Composer({
   onSelectedModelChange,
   onSelectedAutoModelChange,
   onSelectedPolicyModeChange,
+  onAgentSwarmModeChange,
   onSelectedReasoningChange,
   onScrollToBottom,
   onAttachmentsChange,
@@ -170,7 +177,6 @@ export function Composer({
       skillPromptEditor.focus();
     }
   }, [focusSignal, skillPromptEditor]);
-
 
   useEffect(() => {
     const selectionOffset = readSkillPromptEditorSelectionOffset(skillPromptEditor);
@@ -242,7 +248,15 @@ export function Composer({
         setDrainingQueuedPromptId(null);
       }
     })();
-  }, [activeQueueKey, blockedQueuedPromptId, drainingQueuedPromptId, onRemoveQueuedPrompt, onSend, queueBusy, queuedPrompts]);
+  }, [
+    activeQueueKey,
+    blockedQueuedPromptId,
+    drainingQueuedPromptId,
+    onRemoveQueuedPrompt,
+    onSend,
+    queueBusy,
+    queuedPrompts,
+  ]);
 
   function editQueuedPrompt(item: QueuedPrompt): void {
     setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
@@ -338,6 +352,12 @@ export function Composer({
 
   function togglePlanMode(): void {
     onSelectedPolicyModeChange(selectedPolicyMode === "plan" ? "default" : "plan");
+  }
+
+  function toggleAgentSwarmMode(): void {
+    if (agentSwarmModeAvailable) {
+      onAgentSwarmModeChange(!agentSwarmMode);
+    }
   }
 
   function addAttachments(nextAttachments: DesktopAttachment[]): void {
@@ -528,6 +548,11 @@ export function Composer({
                 <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-44">
                   <DropdownMenuGroup>
                     <ComposerPlanModeMenuItem enabled={selectedPolicyMode === "plan"} onToggle={togglePlanMode} />
+                    <ComposerAgentSwarmModeMenuItem
+                      enabled={agentSwarmMode}
+                      available={agentSwarmModeAvailable}
+                      onToggle={toggleAgentSwarmMode}
+                    />
                     <ComposerAttachMenuItems
                       onOpenSketch={() => setSketchOpen(true)}
                       onUploadFile={() => fileInputRef.current?.click()}
@@ -535,6 +560,19 @@ export function Composer({
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {agentSwarmMode && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 max-w-44 rounded-full bg-primary/10 px-3 text-base text-primary hover:bg-primary/15 hover:text-primary"
+                  aria-pressed="true"
+                  title="Agent Swarm mode is on for this thread"
+                  onClick={toggleAgentSwarmMode}
+                >
+                  <Network className="size-4 shrink-0" />
+                  <span className="truncate">Agent Swarm</span>
+                </Button>
+              )}
               <PolicyModePicker selectedMode={selectedPolicyMode} onChange={onSelectedPolicyModeChange} />
             </div>
             <div className="flex items-center gap-2">
@@ -598,31 +636,45 @@ function QueuedPromptList({
           <div className="flex min-w-0 flex-1 items-start gap-2">
             <div className="mt-0.5 shrink-0 tabular-nums text-xs font-medium text-muted-foreground">{index + 1}.</div>
             <div className="min-w-0 flex-1">
-            <div className="line-clamp-3 whitespace-pre-wrap text-foreground">{item.prompt || attachmentSummary(item.attachments)}</div>
-            {item.attachments.length > 0 && item.prompt && (
-              <div className="mt-1 text-xs text-muted-foreground">{attachmentSummary(item.attachments)}</div>
-            )}
+              <div className="line-clamp-3 whitespace-pre-wrap text-foreground">
+                {item.prompt || attachmentSummary(item.attachments)}
+              </div>
+              {item.attachments.length > 0 && item.prompt && (
+                <div className="mt-1 text-xs text-muted-foreground">{attachmentSummary(item.attachments)}</div>
+              )}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 text-muted-foreground">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs font-medium text-foreground hover:bg-accent"
-            aria-label="Steer with queued message"
-            disabled={!busy}
-            title={busy ? "Steer running turn" : "Start a turn before steering"}
-            onClick={() => onSteer(item)}
-          >
-            Steer
-          </Button>
-          <Button type="button" variant="ghost" size="icon-xs" aria-label="Edit queued message" onClick={() => onEdit(item)}>
-            <Pencil className="size-3.5" />
-          </Button>
-          <Button type="button" variant="ghost" size="icon-xs" aria-label="Delete queued message" onClick={() => onDelete(item.id)}>
-            <Trash2 className="size-3.5" />
-          </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs font-medium text-foreground hover:bg-accent"
+              aria-label="Steer with queued message"
+              disabled={!busy}
+              title={busy ? "Steer running turn" : "Start a turn before steering"}
+              onClick={() => onSteer(item)}
+            >
+              Steer
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Edit queued message"
+              onClick={() => onEdit(item)}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Delete queued message"
+              onClick={() => onDelete(item.id)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
           </div>
         </div>
       ))}

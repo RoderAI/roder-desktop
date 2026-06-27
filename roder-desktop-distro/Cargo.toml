@@ -2,8 +2,9 @@
 #
 # Standalone Cargo workspace (NOT part of any parent workspace, like vex's
 # `vex-roder/`) that builds the Roder binary embedded by roder-desktop. It
-# depends on the published upstream `roder` crate from crates.io and re-exposes
-# the full roder CLI (TUI, exec, app-server, ...) through
+# depends on the versioned upstream `roder` release pinned by
+# roder-distro-config.toml and re-exposes the full roder CLI (TUI, exec,
+# app-server, ...) through
 # `roder::run_distribution`.
 #
 # The pinned `roder` version below is kept in sync with
@@ -28,7 +29,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 # Upstream Roder agent harness. Keep in sync with roder-distro-config.toml.
-roder = "0.1.4"
+roder = { git = "https://github.com/RoderAI/roder", tag = "roder/v0.1.6", package = "roder" }
 
 [profile.release]
 lto = "thin"

@@ -38,8 +38,11 @@ async function main() {
     const latest = await fetchLatestCratesVersion(config.crate);
     console.log(`[roder-distro] crate:          ${config.crate}`);
     console.log(`[roder-distro] pinned version: ${config.version}`);
+    if (config.source?.tag) {
+      console.log(`[roder-distro] pinned tag:     ${config.source.tag}`);
+    }
     console.log(`[roder-distro] crates.io latest: ${latest ?? "unknown (offline?)"}`);
-    if (latest && latest !== config.version) {
+    if (latest && latest !== config.version && !config.source?.tag) {
       console.log(`[roder-distro] update available -> pnpm roder:distro:update ${latest}`);
     }
     return;
@@ -52,11 +55,11 @@ async function main() {
   console.log(`[roder-distro]   ${manifestPath}`);
 
   // Refresh the distro crate lockfile so the pin is reflected deterministically.
-  const lockResult = spawnSync(
-    "cargo",
-    ["update", "--manifest-path", resolve(config.distroDir, "Cargo.toml"), "-p", config.crate, "--precise", version],
-    { cwd: config.distroDir, stdio: "inherit", env: process.env },
-  );
+  const updateArgs = ["update", "--manifest-path", resolve(config.distroDir, "Cargo.toml"), "-p", config.crate];
+  if (!config.source?.tag) {
+    updateArgs.push("--precise", version);
+  }
+  const lockResult = spawnSync("cargo", updateArgs, { cwd: config.distroDir, stdio: "inherit", env: process.env });
   if (lockResult.status !== 0) {
     console.warn(
       `[roder-distro] could not refresh Cargo.lock automatically; run ` +

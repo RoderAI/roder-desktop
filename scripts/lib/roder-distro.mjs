@@ -15,8 +15,11 @@ const libDir = dirname(fileURLToPath(import.meta.url)); // scripts/lib
 export const repoRoot = resolve(libDir, "..", "..");
 export const configPath = resolve(repoRoot, "roder-distro-config.toml");
 
-// Matches the `roder = "x.y.z"` dependency line in the distro crate Cargo.toml.
-const DISTRO_DEP_RE = /^(\s*roder\s*=\s*)"([^"]+)"(.*)$/m;
+// Matches the `roder = "x.y.z"` dependency line in the distro crate Cargo.toml,
+// or the release-tag form used when the upstream tag exists before crates.io
+// has indexed the package version.
+const DISTRO_REGISTRY_DEP_RE = /^(\s*roder\s*=\s*)"([^"]+)"(.*)$/m;
+const DISTRO_GIT_DEP_RE = /^(\s*roder\s*=\s*)\{([^\n]+)\}(.*)$/m;
 
 // Strip a trailing `# comment` while respecting double-quoted strings.
 function stripComment(line) {
@@ -80,9 +83,7 @@ function setTomlValue(text, sectionName, key, value) {
 
 export function readDistroConfig() {
   if (!existsSync(configPath)) {
-    throw new Error(
-      `Missing ${configPath}. This file pins the upstream roder version roder-desktop embeds.`,
-    );
+    throw new Error(`Missing ${configPath}. This file pins the upstream roder version roder-desktop embeds.`);
   }
   const toml = parseToml(readFileSync(configPath, "utf8"));
   const roder = toml.roder ?? {};
@@ -103,22 +104,41 @@ export function readDistroConfig() {
   };
 }
 
+function expectedDependency(config) {
+  const source = config.source ?? {};
+  if (source.repository && source.tag) {
+    return {
+      kind: "git",
+      value: `{ git = "${source.repository}", tag = "${source.tag}", package = "${config.crate}" }`,
+    };
+  }
+  return { kind: "registry", value: config.version };
+}
+
 export function readPinnedVersion(distroDir) {
   const manifestPath = resolve(distroDir, "Cargo.toml");
   if (!existsSync(manifestPath)) {
     throw new Error(`Missing distro crate manifest at ${manifestPath}`);
   }
   const text = readFileSync(manifestPath, "utf8");
-  const match = text.match(DISTRO_DEP_RE);
-  return { manifestPath, text, pinned: match ? match[2] : null };
+  const registryMatch = text.match(DISTRO_REGISTRY_DEP_RE);
+  if (registryMatch) {
+    return { manifestPath, text, pinned: registryMatch[2], kind: "registry" };
+  }
+  const gitMatch = text.match(DISTRO_GIT_DEP_RE);
+  if (gitMatch) {
+    return { manifestPath, text, pinned: `{ ${gitMatch[2].trim()} }`, kind: "git" };
+  }
+  return { manifestPath, text, pinned: null, kind: null };
 }
 
 function ensurePinMatches(config) {
-  const { pinned } = readPinnedVersion(config.distroDir);
+  const { pinned, kind } = readPinnedVersion(config.distroDir);
   if (!pinned) {
     throw new Error(`Could not find the \`roder\` dependency in ${config.distroPath}/Cargo.toml`);
   }
-  if (pinned !== config.version) {
+  const expected = expectedDependency(config);
+  if (kind !== expected.kind || pinned !== expected.value) {
     throw new Error(
       `Version drift: roder-distro-config.toml pins roder ${config.version} but ` +
         `${config.distroPath}/Cargo.toml pins ${pinned}.\n` +
@@ -132,10 +152,15 @@ export function setDistroVersion(version) {
   const config = readDistroConfig();
   writeFileSync(configPath, setTomlValue(readFileSync(configPath, "utf8"), "roder", "version", version));
   const { manifestPath, text } = readPinnedVersion(config.distroDir);
-  if (!DISTRO_DEP_RE.test(text)) {
+  const expected = expectedDependency({ ...config, version });
+  const replacement = `$1${expected.kind === "registry" ? `"${expected.value}"` : expected.value}$3`;
+  if (DISTRO_REGISTRY_DEP_RE.test(text)) {
+    writeFileSync(manifestPath, text.replace(DISTRO_REGISTRY_DEP_RE, replacement));
+  } else if (DISTRO_GIT_DEP_RE.test(text)) {
+    writeFileSync(manifestPath, text.replace(DISTRO_GIT_DEP_RE, replacement));
+  } else {
     throw new Error(`Could not find the \`roder\` dependency in ${manifestPath}`);
   }
-  writeFileSync(manifestPath, text.replace(DISTRO_DEP_RE, `$1"${version}"$3`));
   return { configPath, manifestPath, version };
 }
 
