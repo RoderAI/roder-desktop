@@ -324,4 +324,4 @@ This change touches the client contract with the app-server, persisted renderer 
 - Current Desktop extension and UI guidance: `docs/extensions.md`, `docs/design.md`
 - Desktop selection and settings code: `src/stores/roder-store.ts`, `src/lib/roder-ipc.ts`, `src/lib/roder-models.ts`, `src/components/settings-general-panel.tsx`, `src/components/composer-controls.tsx`, `src/components/native-model-picker.tsx`
 - Desktop transcript code: `electron/roder/app-server-client.ts`, `src/lib/roder-thread.ts`, `src/lib/transcript-rows.ts`, `src/components/transcript.tsx`
-- Backend repo `gode`: `docs/app-server/api.md`, `docs/app-server/protocol.md`, `docs/plans/2026-06-06-002-feat-auto-model-selection-mode-plan.md`, `crates/roder-protocol/src/lib.rs`, `crates/roder-app-server/src/server.rs`, `crates/roder-ext-inference-router/src/config.rs`
+- Backend repo `roder`: `docs/app-server/api.md`, `docs/app-server/protocol.md`, `docs/plans/2026-06-06-002-feat-auto-model-selection-mode-plan.md`, `crates/roder-protocol/src/lib.rs`, `crates/roder-app-server/src/server.rs`, `crates/roder-ext-inference-router/src/config.rs`

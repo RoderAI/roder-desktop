@@ -263,7 +263,7 @@ src/lib/design-canvas/
   tool-contract.ts
 ```
 
-Backend/app-server in `../gode`:
+Backend/app-server in `../roder`:
 
 ```text
 crates/roder-app-server/src/design.rs
