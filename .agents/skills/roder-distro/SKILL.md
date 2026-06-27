@@ -6,14 +6,15 @@ description: Use when building, pinning, upgrading, downgrading, or debugging th
 # Roder Distribution Management
 
 roder-desktop ships an embedded `roder` agent-harness binary. That binary is
-built from a **pinned upstream release published to crates.io**, NOT from the
-local `~/w/roder` checkout. This skill is the source of truth for how that works
-and how to change the embedded version.
+built from a **pinned upstream release** (prefer crates.io when indexed; a
+versioned upstream Git tag is acceptable when the release tag exists before the
+crate index catches up), NOT from the local `~/w/roder` checkout. This skill is
+the source of truth for how that works and how to change the embedded version.
 
 ## Architecture (how the pieces link)
 
 ```
-roder-distro-config.toml        # [roder].version pins the upstream crates.io release (source of truth)
+roder-distro-config.toml        # [roder].version pins the upstream release (source of truth)
    |                            #   kept in sync with v
 roder-desktop-distro/           # standalone Cargo workspace (like vex's vex-roder/)
    Cargo.toml                   #   roder = "<version>"  (the real Cargo pin)
@@ -28,11 +29,13 @@ electron/roder/app-server-client.ts   # spawns `roder app-server --listen stdio:
 
 Key facts:
 
-- Roder is the published `roder` crate on crates.io. It exposes both the `roder`
-  CLI binary and a library entrypoint `roder::run_distribution(DistributionOptions { .. })`.
+- Roder is the upstream `roder` release. Prefer the published crate on crates.io;
+  if the release is tagged but not yet indexed there, pin the Git tag via
+  `[source].repository` + `[source].tag`. It exposes both the `roder` CLI binary
+  and a library entrypoint `roder::run_distribution(DistributionOptions { .. })`.
 - `roder-desktop-distro` is a **standalone Cargo workspace** (it has its own
   `[workspace]` table). It is excluded from the pnpm/JS workspace and must not be
-  compiled from `~/w/roder`. It depends only on the crates.io release.
+  compiled from `~/w/roder`. It depends only on the pinned upstream release/tag.
 - The desktop build NEVER builds upstream roder from source in `~/w/roder`.
   `~/w/roder` is reference-only.
 - `scripts/lib/roder-distro.mjs` enforces that `roder-distro-config.toml` and
@@ -101,4 +104,5 @@ This mirrors how `~/w/vex/vex-roder` registers the Vex MCP tools extension.
   drift.
 - A first build downloads and compiles the upstream crate tree, so it is slow;
   subsequent builds are incremental.
-- Only pin versions that actually exist on crates.io (`pnpm roder:distro:check`).
+- Only pin versions that actually exist as upstream releases: crates.io when
+  available (`pnpm roder:distro:check`) or an immutable upstream release tag.

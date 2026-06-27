@@ -243,6 +243,8 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             selectedModelProvider={agent.selectedModelProvider}
             selectedSelectionMode={agent.selectedSelectionMode}
             selectedPolicyMode={agent.selectedPolicyMode}
+            agentSwarmMode={agent.agentSwarmMode}
+            agentSwarmModeAvailable={agent.agentSwarmModeAvailable}
             selectedReasoning={agent.selectedReasoning}
             attachments={composerAttachments}
             queuedPrompts={agent.queuedPrompts}
@@ -251,6 +253,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onSelectedModelChange={(model, provider) => void agent.setSelectedModel(model, provider)}
             onSelectedAutoModelChange={(optionId) => void agent.setSelectedAutoModel(optionId)}
             onSelectedPolicyModeChange={(mode) => void agent.setSelectedPolicyMode(mode)}
+            onAgentSwarmModeChange={(enabled) => void agent.setAgentSwarmMode(enabled)}
             onSelectedReasoningChange={agent.setSelectedReasoning}
             onScrollToBottom={followBottom}
             onAttachmentsChange={setComposerAttachments}
@@ -348,7 +351,9 @@ function ProjectPicker({
                 >
                   <Folder className="size-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate text-foreground">{project.name}</span>
-                  <span className="shrink-0 text-base text-muted-foreground">{threadCountLabel(project.threadCount)}</span>
+                  <span className="shrink-0 text-base text-muted-foreground">
+                    {threadCountLabel(project.threadCount)}
+                  </span>
                   {selected && <Check className="size-3.5 shrink-0 text-primary" />}
                 </DropdownMenuItem>
               );
@@ -390,9 +395,13 @@ function RecentThreads({
               <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base font-medium text-foreground">{threadTitle(thread)}</span>
-                <span className="block truncate text-sm font-normal text-muted-foreground">{folderLabel(thread.cwd)}</span>
+                <span className="block truncate text-sm font-normal text-muted-foreground">
+                  {folderLabel(thread.cwd)}
+                </span>
               </span>
-              <span className="shrink-0 text-sm font-normal text-muted-foreground">{relativeAge(thread.updatedAt)}</span>
+              <span className="shrink-0 text-sm font-normal text-muted-foreground">
+                {relativeAge(thread.updatedAt)}
+              </span>
               <ChevronDown className="size-4 shrink-0 -rotate-90 text-muted-foreground/70" aria-hidden="true" />
             </button>
           ))

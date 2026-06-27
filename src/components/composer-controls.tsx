@@ -1,4 +1,15 @@
-import { Check, FileText, FileUp, ImageIcon, PencilLine, Search, ShieldCheck, Sparkles, X } from "lucide-react";
+import {
+  Check,
+  FileText,
+  FileUp,
+  ImageIcon,
+  Network,
+  PencilLine,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { Combobox } from "@base-ui/react/combobox";
 import { useState } from "react";
 import type {
@@ -170,6 +181,36 @@ export function ComposerPlanModeMenuItem({
   );
 }
 
+export function ComposerAgentSwarmModeMenuItem({
+  enabled,
+  available,
+  onToggle,
+}: {
+  enabled: boolean;
+  available: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <DropdownMenuItem
+      className="h-9 justify-between"
+      selected={enabled}
+      disabled={!available}
+      title={
+        available
+          ? "Route suitable work through agent_swarm fanout"
+          : "Update the bundled Roder binary to use Agent Swarm mode"
+      }
+      onSelect={onToggle}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <Network className="size-4 shrink-0" />
+        <span>Agent Swarm</span>
+      </span>
+      {enabled && <Check className="size-3.5 shrink-0 text-primary" />}
+    </DropdownMenuItem>
+  );
+}
+
 export function ModelPicker({
   models,
   routingOptions,
@@ -283,7 +324,10 @@ export function ModelPicker({
                   </Combobox.Group>
                 )}
                 {modelGroups.map((group) => (
-                  <Combobox.Group key={group.provider} items={group.models.map((model): ModelPickerItem => ({ type: "model", model }))}>
+                  <Combobox.Group
+                    key={group.provider}
+                    items={group.models.map((model): ModelPickerItem => ({ type: "model", model }))}
+                  >
                     <Combobox.GroupLabel className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       {providerName(group.provider)}
                     </Combobox.GroupLabel>
@@ -320,12 +364,7 @@ export function ModelPicker({
           >
             <span>{reasoningLabel(selectedReasoning)}</span>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            side="top"
-            sideOffset={8}
-            className={pickerMenuSurfaceClassName}
-          >
+          <DropdownMenuContent align="end" side="top" sideOffset={8} className={pickerMenuSurfaceClassName}>
             <DropdownMenuGroup>
               {reasoningOptions.map((reasoning) => (
                 <DropdownMenuItem
