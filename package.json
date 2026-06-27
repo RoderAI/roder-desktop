@@ -6,6 +6,10 @@
   "main": ".vite/build/index.cjs",
   "scripts": {
     "bundle:roder": "node scripts/bundle-roder.mjs",
+    "roder:distro:build": "node scripts/bundle-roder.mjs",
+    "roder:distro:release": "node scripts/bundle-roder.mjs --release",
+    "roder:distro:update": "node scripts/update-roder-distro.mjs",
+    "roder:distro:check": "node scripts/update-roder-distro.mjs --check",
     "dev": "pnpm bundle:roder && electron-forge start",
     "build": "pnpm typecheck && electron-forge package",
     "dist": "pnpm make",

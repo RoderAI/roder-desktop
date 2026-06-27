@@ -3,7 +3,13 @@
 ## Project References
 
 - The Roder app-server API contract is documented in `docs/api.md`.
-- To access the backend code, run `cd ../gode` from this directory.
+- The Roder agent harness is consumed as a published crate from crates.io. The
+  embedded version is pinned in `roder-distro-config.toml` and built via the
+  `roder-desktop-distro` crate into `resources/bin/roder`. See
+  `.agents/skills/roder-distro/SKILL.md` for the update/upgrade/build workflow.
+- The upstream Roder source lives at `~/w/roder` for reference only; the desktop
+  build never compiles from it. (The backend was historically referenced as
+  `../gode`; that name is retired.)
 - Product UI defaults and current desktop design decisions are documented in
   `docs/design.md`. Reference it before making product UI changes, especially
   when choosing typography, font weight, surfaces, hover states, radius, spacing,
@@ -22,7 +28,7 @@ release-age window to pass.
 ## Project Terminology
 
 When the user says "thread", "last thread", "session", "conversation", or asks
-about something getting stuck, assume they are talking about the Roder/Gode app
+about something getting stuck, assume they are talking about the Roder app
 model and UI in this repository unless they explicitly say "Codex", "Codex
 thread", "Codex session", or refer to files under `~/.codex`.
 
