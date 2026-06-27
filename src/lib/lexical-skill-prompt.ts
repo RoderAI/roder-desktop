@@ -153,7 +153,7 @@ export function $isSkillTokenNode(node: LexicalNode | null | undefined): node is
 
 export function createSkillPromptEditor(): LexicalEditor {
   return createEditor({
-    namespace: "gode-skill-prompt",
+    namespace: "roder-skill-prompt",
     nodes: [SkillTokenNode],
     onError(error) {
       throw error;
