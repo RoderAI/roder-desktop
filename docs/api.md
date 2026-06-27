@@ -83,7 +83,7 @@ Authorization: Bearer <token>
 or, for browser-constrained clients:
 
 ```text
-Sec-WebSocket-Protocol: gode.remote.v1, bearer.<token>
+Sec-WebSocket-Protocol: roder.remote.v1, bearer.<token>
 ```
 
 Provider auth is provider-specific:
@@ -114,7 +114,7 @@ clients. It is shaped as:
   "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
   "workspaceId": "ws_abc123",
   "rootId": "root_abc123",
-  "cwd": "/Users/pz/w/gode",
+  "cwd": "/Users/pz/w/roder",
   "name": "optional title",
   "turns": []
 }
@@ -305,7 +305,7 @@ Response:
 {
   "provider": "openai",
   "model": "gpt-5.5",
-  "cwd": "/Users/pz/w/gode"
+  "cwd": "/Users/pz/w/roder"
 }
 ```
 
@@ -664,14 +664,14 @@ Response:
     "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
     "workspaceId": "ws_abc123",
     "rootId": "root_abc123",
-    "cwd": "/Users/pz/w/gode"
+    "cwd": "/Users/pz/w/roder"
   },
   "model": "gpt-5.5",
   "modelProvider": "openai",
   "reasoning": "high",
   "workspaceId": "ws_abc123",
   "rootId": "root_abc123",
-  "cwd": "/Users/pz/w/gode"
+  "cwd": "/Users/pz/w/roder"
 }
 ```
 
@@ -716,7 +716,7 @@ Response:
       "createdAt": 1770000000,
       "updatedAt": 1770000100,
       "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
-      "cwd": "/Users/pz/w/gode",
+      "cwd": "/Users/pz/w/roder",
       "name": "Fix tests"
     }
   ],
@@ -756,7 +756,7 @@ Response:
     "createdAt": 1770000000,
     "updatedAt": 1770000100,
     "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
-    "cwd": "/Users/pz/w/gode",
+    "cwd": "/Users/pz/w/roder",
     "turns": [
       {
         "id": "turn-123",
@@ -1069,7 +1069,7 @@ Request:
 
 ```json
 {
-  "path": "/Users/pz/w/gode/README.md"
+  "path": "/Users/pz/w/roder/README.md"
 }
 ```
 
@@ -1094,7 +1094,7 @@ Request:
 
 ```json
 {
-  "path": "/Users/pz/w/gode/docs"
+  "path": "/Users/pz/w/roder/docs"
 }
 ```
 
@@ -1121,7 +1121,7 @@ Request:
 {
   "command": ["cargo", "test", "-p", "roder-app-server"],
   "processId": "process-123",
-  "cwd": "/Users/pz/w/gode",
+  "cwd": "/Users/pz/w/roder",
   "env": {
     "RUST_LOG": "info",
     "NO_COLOR": null
@@ -1265,7 +1265,7 @@ Request:
 {
   "name": "test",
   "arguments": "roder-app-server",
-  "workspace": "/Users/pz/w/gode"
+  "workspace": "/Users/pz/w/roder"
 }
 ```
 
@@ -1308,7 +1308,7 @@ Request:
   "thread_id": "thread-123",
   "name": "test",
   "arguments": "roder-app-server",
-  "workspace": "/Users/pz/w/gode"
+  "workspace": "/Users/pz/w/roder"
 }
 ```
 
@@ -1350,7 +1350,7 @@ List request:
   "params": {
     "workspaceId": "ws_abc123",
     "rootId": "root_abc123",
-    "cwd": "/Users/pz/w/gode"
+    "cwd": "/Users/pz/w/roder"
   }
 }
 ```
@@ -1424,7 +1424,7 @@ Request:
   "input": { "prompt": "summarize docs" },
   "thread_id": "thread-123",
   "turn_id": "turn-123",
-  "workspace": "/Users/pz/w/gode"
+  "workspace": "/Users/pz/w/roder"
 }
 ```
 
@@ -1806,7 +1806,7 @@ Examples:
 {
   "method": "workflow/scan",
   "params": {
-    "workspace": "/Users/pz/w/gode",
+    "workspace": "/Users/pz/w/roder",
     "includeUser": true
   }
 }
@@ -1816,7 +1816,7 @@ Examples:
 {
   "method": "workflow/enable",
   "params": {
-    "workspace": "/Users/pz/w/gode",
+    "workspace": "/Users/pz/w/roder",
     "itemId": "skill:roder-app-server-docs",
     "approveSideEffects": true
   }
@@ -1882,7 +1882,7 @@ Examples:
 {
   "method": "memory/save",
   "params": {
-    "scope": { "kind": "project", "workspace": "/Users/pz/w/gode" },
+    "scope": { "kind": "project", "workspace": "/Users/pz/w/roder" },
     "text": "Roder app-server uses JSON-RPC.",
     "metadata": { "source": "docs" }
   }
@@ -1893,7 +1893,7 @@ Examples:
 {
   "method": "memory/query",
   "params": {
-    "scope": { "kind": "project", "workspace": "/Users/pz/w/gode" },
+    "scope": { "kind": "project", "workspace": "/Users/pz/w/roder" },
     "text": "app-server JSON-RPC",
     "limit": 10,
     "includeGlobal": true
@@ -2028,7 +2028,7 @@ Example `design/spawn_agents` response:
 
 ```json
 {
-  "path": "/Users/pz/.roder/design/gode-desktop-project_6d8f2a1b9c0e4d31.roderdesign",
+  "path": "/Users/pz/.roder/design/roder-desktop-project_6d8f2a1b9c0e4d31.roderdesign",
   "planned": [
     {
       "scopeNodeId": "frame-login",
@@ -2072,7 +2072,7 @@ or the remote WebSocket notification stream for remote clients.
     "createdAt": 1770000000,
     "updatedAt": 1770000000,
     "status": { "type": "idle", "activeTurnId": null, "activeFlags": [] },
-    "cwd": "/Users/pz/w/gode"
+    "cwd": "/Users/pz/w/roder"
   }
 }
 ```
