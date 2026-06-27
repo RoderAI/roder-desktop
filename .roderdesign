@@ -1,7 +1,7 @@
 {
   "version": "0.1",
   "documentId": "design_b445ac7007d46a7c",
-  "title": "gode-desktop",
+  "title": "roder-desktop",
   "createdAt": "2026-06-06T22:24:40.981558Z",
   "updatedAt": "2026-06-06T22:24:40.981558Z",
   "nodes": {
@@ -28,6 +28,6 @@
   "variables": {},
   "assets": {},
   "metadata": {
-    "workspaceRoot": "/Users/pz/w/gode-desktop"
+    "workspaceRoot": "/Users/pz/w/roder-desktop"
   }
 }
