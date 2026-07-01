@@ -1,0 +1,169 @@
+name: Build signed macOS desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+      - "desktop/v*"
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "26"
+  PNPM_VERSION: "11.5.0"
+  APPLE_SIGNING_IDENTITY: "Developer ID Application: Pandelis Zembashis (7UNZ734ZYN)"
+
+jobs:
+  macos:
+    name: Sign and notarize macOS arm64
+    runs-on: macos-26
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Select latest installed Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_xcode="$(python3 - <<'PY'
+          from pathlib import Path
+
+          candidates = [
+              path
+              for path in Path("/Applications").glob("Xcode*.app")
+              if path.name != "Xcode.app"
+          ]
+          if not candidates:
+              raise SystemExit("No versioned Xcode.app installations found")
+
+          def version_key(path: Path):
+              version = path.name.removeprefix("Xcode_").removesuffix(".app")
+              version = version.replace("_Release_Candidate_", ".")
+              parts = []
+              for chunk in version.split("."):
+                  try:
+                      parts.append(int(chunk))
+                  except ValueError:
+                      parts.append(0)
+              return parts
+
+          print(max(candidates, key=version_key))
+          PY
+          )"
+          sudo xcode-select -s "${latest_xcode}/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Import Apple signing assets
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARIZE_KEY_BASE64: ${{ secrets.APPLE_NOTARIZE_KEY_BASE64 }}
+          APPLE_NOTARIZE_KEY_ID: ${{ secrets.APPLE_NOTARIZE_KEY_ID }}
+          APPLE_NOTARIZE_ISSUER_ID: ${{ secrets.APPLE_NOTARIZE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          for name in APPLE_CERTIFICATE_BASE64 APPLE_CERTIFICATE_PASSWORD APPLE_NOTARIZE_KEY_BASE64 APPLE_NOTARIZE_KEY_ID APPLE_NOTARIZE_ISSUER_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "${name} secret is required for macOS signing and notarization" >&2
+              exit 1
+            fi
+          done
+
+          keychain_password="$(openssl rand -base64 32)"
+          keychain_path="${RUNNER_TEMP}/roder-desktop-signing.keychain-db"
+          certificate_path="${RUNNER_TEMP}/developer-id-application.p12"
+          notary_key_path="${RUNNER_TEMP}/AuthKey_${APPLE_NOTARIZE_KEY_ID}.p8"
+
+          echo "${APPLE_CERTIFICATE_BASE64}" | base64 --decode > "${certificate_path}"
+          echo "${APPLE_NOTARIZE_KEY_BASE64}" | base64 --decode > "${notary_key_path}"
+          chmod 600 "${certificate_path}" "${notary_key_path}"
+
+          security create-keychain -p "${keychain_password}" "${keychain_path}"
+          security set-keychain-settings -lut 21600 "${keychain_path}"
+          security unlock-keychain -p "${keychain_password}" "${keychain_path}"
+          security import "${certificate_path}" \
+            -k "${keychain_path}" \
+            -P "${APPLE_CERTIFICATE_PASSWORD}" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security list-keychains -d user -s "${keychain_path}" $(security list-keychains -d user | sed 's/[ "]//g')
+          security default-keychain -s "${keychain_path}"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychain_password}" "${keychain_path}"
+
+          {
+            echo "CSC_KEYCHAIN=${keychain_path}"
+            echo "APPLE_NOTARIZE_KEY_PATH=${notary_key_path}"
+            echo "APPLE_NOTARIZE_KEY_ID=${APPLE_NOTARIZE_KEY_ID}"
+            echo "APPLE_NOTARIZE_ISSUER_ID=${APPLE_NOTARIZE_ISSUER_ID}"
+            echo "RODER_DESKTOP_MACOS_SIGN=1"
+          } >> "${GITHUB_ENV}"
+
+      - name: Build signed notarized app
+        shell: bash
+        run: pnpm make --platform darwin --arch arm64
+
+      - name: Validate signed artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="out/Roder-darwin-arm64/Roder.app"
+          test -d "${app}"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          codesign -dvvv --entitlements :- "${app}"
+          xcrun stapler validate "${app}"
+
+          while IFS= read -r dmg; do
+            codesign --verify --verbose=2 "${dmg}"
+            xcrun stapler validate "${dmg}"
+          done < <(find out/make -type f -name '*.dmg' -print)
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) -exec cp {} dist/ \;
+          (
+            cd dist
+            shasum -a 256 * > SHA256SUMS
+          )
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: roder-desktop-macos-arm64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Upload artifacts to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            gh release create "${tag}" --title "${tag}" --notes "Roder Desktop ${tag}"
+          fi
+          gh release upload "${tag}" dist/* --clobber
