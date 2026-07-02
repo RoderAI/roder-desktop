@@ -127,10 +127,12 @@ jobs:
           app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit)"
           if [[ -z "${app}" ]]; then
             echo "electron-forge did not leave a Roder.app; packaging explicitly with electron-packager" >&2
+            packager_out="${RUNNER_TEMP}/roder-desktop-packager-out"
+            rm -rf "${packager_out}"
             pnpm exec electron-packager . Roder \
               --platform=darwin \
               --arch=arm64 \
-              --out=out \
+              --out="${packager_out}" \
               --overwrite \
               --executable-name=Roder \
               --app-bundle-id=sc.roder.desktop \
@@ -145,9 +147,10 @@ jobs:
               --ignore='^/\\.github($|/)' \
               --ignore='^/roder-desktop-distro/target($|/)' \
               --no-prune
-            app="$(find "${GITHUB_WORKSPACE}/out" -type d -name 'Roder.app' -print -quit)"
+            app="$(find "${packager_out}" -type d -name 'Roder.app' -print -quit)"
             if [[ -z "${app}" ]]; then
               echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
+              find "${packager_out}" -maxdepth 6 -print >&2 || true
               find "${GITHUB_WORKSPACE}" -maxdepth 6 -print >&2
               exit 1
             fi
