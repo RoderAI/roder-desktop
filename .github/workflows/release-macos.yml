@@ -68,6 +68,17 @@ jobs:
           sudo xcode-select -s "${latest_xcode}/Contents/Developer"
           xcodebuild -version
 
+      - name: Cache Rust build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            roder-desktop-distro/target
+          key: roder-desktop-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('roder-desktop-distro/Cargo.lock', 'roder-desktop-distro/Cargo.toml', 'roder-desktop-distro/src/**/*.rs') }}
+          restore-keys: |
+            roder-desktop-rust-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Install dependencies
         shell: bash
         run: pnpm install --frozen-lockfile
