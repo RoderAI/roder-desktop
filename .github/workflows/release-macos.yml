@@ -176,10 +176,10 @@ jobs:
           codesign --verify --verbose=2 "${dmg}"
           xcrun stapler validate "${dmg}"
 
-          (
-            cd dist
-            shasum -a 256 * > SHA256SUMS
-          )
+          shasum -a 256 \
+            dist/Roder-macos-arm64.dmg \
+            dist/Roder-macos-arm64.zip \
+            > dist/SHA256SUMS
 
       - name: Validate signed artifacts
         shell: bash
