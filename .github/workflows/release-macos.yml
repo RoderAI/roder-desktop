@@ -120,22 +120,38 @@ jobs:
 
       - name: Build signed notarized app
         shell: bash
-        run: pnpm make --platform darwin --arch arm64
+        run: |
+          set -euo pipefail
+          pnpm typecheck
+          pnpm exec electron-forge make --platform darwin --arch arm64
+          find out -maxdepth 5 -print
 
       - name: Validate signed artifacts
         shell: bash
         run: |
           set -euo pipefail
-          app="out/Roder-darwin-arm64/Roder.app"
-          test -d "${app}"
+          app="$(find out -type d -name 'Roder.app' -print -quit)"
+          if [[ -z "${app}" ]]; then
+            echo "Roder.app was not produced under out/" >&2
+            find out -maxdepth 5 -print >&2
+            exit 1
+          fi
+
           codesign --verify --deep --strict --verbose=2 "${app}"
           codesign -dvvv --entitlements :- "${app}"
           xcrun stapler validate "${app}"
 
+          mapfile -t dmgs < <(find out/make -type f -name '*.dmg' -print)
+          if [[ "${#dmgs[@]}" -eq 0 ]]; then
+            echo "No DMG artifacts were produced under out/make" >&2
+            find out -maxdepth 5 -print >&2
+            exit 1
+          fi
+
           while IFS= read -r dmg; do
             codesign --verify --verbose=2 "${dmg}"
             xcrun stapler validate "${dmg}"
-          done < <(find out/make -type f -name '*.dmg' -print)
+          done < <(printf '%s\n' "${dmgs[@]}")
 
       - name: Prepare artifacts
         shell: bash
@@ -143,6 +159,11 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) -exec cp {} dist/ \;
+          if ! compgen -G 'dist/*' >/dev/null; then
+            echo "No distributable artifacts were copied into dist/" >&2
+            find out -maxdepth 5 -print >&2
+            exit 1
+          fi
           (
             cd dist
             shasum -a 256 * > SHA256SUMS
