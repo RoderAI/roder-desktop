@@ -124,7 +124,14 @@ jobs:
           set -euo pipefail
           pnpm typecheck
           RODER_DESKTOP_MACOS_SIGN=0 pnpm exec electron-forge package --platform darwin --arch arm64
-          app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit)"
+          app=""
+          for _ in {1..30}; do
+            app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit 2>/dev/null || true)"
+            if [[ -n "${app}" ]]; then
+              break
+            fi
+            sleep 1
+          done
           if [[ -z "${app}" ]]; then
             echo "electron-forge did not leave a Roder.app; packaging explicitly with electron-packager" >&2
             packager_out="${RUNNER_TEMP}/roder-desktop-packager-out"
@@ -147,7 +154,13 @@ jobs:
               --ignore='^/\\.github($|/)' \
               --ignore='^/roder-desktop-distro/target($|/)' \
               --no-prune
-            app="$(find "${packager_out}" -type d -name 'Roder.app' -print -quit)"
+            for _ in {1..120}; do
+              app="$(find "${packager_out}" -type d -name 'Roder.app' -print -quit 2>/dev/null || true)"
+              if [[ -n "${app}" ]]; then
+                break
+              fi
+              sleep 1
+            done
             if [[ -z "${app}" ]]; then
               echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
               find "${packager_out}" -maxdepth 6 -print >&2 || true
