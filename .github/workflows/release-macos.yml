@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 env:
-  NODE_VERSION: "26"
+  NODE_VERSION: "24"
   PNPM_VERSION: "11.5.0"
   APPLE_SIGNING_IDENTITY: "Developer ID Application: Pandelis Zembashis (7UNZ734ZYN)"
 
