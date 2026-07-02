@@ -123,51 +123,75 @@ jobs:
         run: |
           set -euo pipefail
           pnpm typecheck
-          pnpm exec electron-forge make --platform darwin --arch arm64
-          find out -maxdepth 5 -print
+          pnpm exec electron-forge package --platform darwin --arch arm64
+          find "${GITHUB_WORKSPACE}" -maxdepth 6 -name 'Roder.app' -print
 
-      - name: Validate signed artifacts
+      - name: Prepare signed release artifacts
         shell: bash
         run: |
           set -euo pipefail
-          app="$(find out -type d -name 'Roder.app' -print -quit)"
+          app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit)"
           if [[ -z "${app}" ]]; then
-            echo "Roder.app was not produced under out/" >&2
-            find out -maxdepth 5 -print >&2
+            echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
+            find "${GITHUB_WORKSPACE}" -maxdepth 6 -print >&2
             exit 1
           fi
 
           codesign --verify --deep --strict --verbose=2 "${app}"
           codesign -dvvv --entitlements :- "${app}"
+
+          app_submission="${RUNNER_TEMP}/Roder.app.zip"
+          ditto -c -k --keepParent "${app}" "${app_submission}"
+          xcrun notarytool submit "${app_submission}" \
+            --key "${APPLE_NOTARIZE_KEY_PATH}" \
+            --key-id "${APPLE_NOTARIZE_KEY_ID}" \
+            --issuer "${APPLE_NOTARIZE_ISSUER_ID}" \
+            --wait
+          xcrun stapler staple "${app}"
           xcrun stapler validate "${app}"
 
-          mapfile -t dmgs < <(find out/make -type f -name '*.dmg' -print)
-          if [[ "${#dmgs[@]}" -eq 0 ]]; then
-            echo "No DMG artifacts were produced under out/make" >&2
-            find out -maxdepth 5 -print >&2
-            exit 1
-          fi
-
-          while IFS= read -r dmg; do
-            codesign --verify --verbose=2 "${dmg}"
-            xcrun stapler validate "${dmg}"
-          done < <(printf '%s\n' "${dmgs[@]}")
-
-      - name: Prepare artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
           mkdir -p dist
-          find out/make -type f \( -name '*.dmg' -o -name '*.zip' \) -exec cp {} dist/ \;
-          if ! compgen -G 'dist/*' >/dev/null; then
-            echo "No distributable artifacts were copied into dist/" >&2
-            find out -maxdepth 5 -print >&2
-            exit 1
-          fi
+          ditto -c -k --keepParent "${app}" dist/Roder-macos-arm64.zip
+
+          dmg="dist/Roder-macos-arm64.dmg"
+          rm -f "${dmg}"
+          hdiutil create \
+            -volname "Roder" \
+            -srcfolder "${app}" \
+            -ov \
+            -format UDZO \
+            "${dmg}"
+
+          codesign --force \
+            --sign "${APPLE_SIGNING_IDENTITY}" \
+            --timestamp \
+            --keychain "${CSC_KEYCHAIN}" \
+            "${dmg}"
+          xcrun notarytool submit "${dmg}" \
+            --key "${APPLE_NOTARIZE_KEY_PATH}" \
+            --key-id "${APPLE_NOTARIZE_KEY_ID}" \
+            --issuer "${APPLE_NOTARIZE_ISSUER_ID}" \
+            --wait
+          xcrun stapler staple "${dmg}"
+          codesign --verify --verbose=2 "${dmg}"
+          xcrun stapler validate "${dmg}"
+
           (
             cd dist
             shasum -a 256 * > SHA256SUMS
           )
+
+      - name: Validate signed artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -s dist/Roder-macos-arm64.zip || ! -s dist/Roder-macos-arm64.dmg ]]; then
+            echo "Expected release artifacts are missing from dist/" >&2
+            find dist -maxdepth 2 -print >&2
+            exit 1
+          fi
+
+          shasum -a 256 -c dist/SHA256SUMS
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
