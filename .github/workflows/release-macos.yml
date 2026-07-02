@@ -126,9 +126,31 @@ jobs:
           RODER_DESKTOP_MACOS_SIGN=0 pnpm exec electron-forge package --platform darwin --arch arm64
           app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit)"
           if [[ -z "${app}" ]]; then
-            echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
-            find "${GITHUB_WORKSPACE}" -maxdepth 6 -print >&2
-            exit 1
+            echo "electron-forge did not leave a Roder.app; packaging explicitly with electron-packager" >&2
+            pnpm exec electron-packager . Roder \
+              --platform=darwin \
+              --arch=arm64 \
+              --out=out \
+              --overwrite \
+              --executable-name=Roder \
+              --app-bundle-id=sc.roder.desktop \
+              --app-category-type=public.app-category.developer-tools \
+              --icon=resources/icon \
+              --asar.unpack='**/node_modules/node-pty/**' \
+              --extra-resource=resources/bin \
+              --extra-resource=resources/icon.png \
+              --extra-resource=resources/wordmark.png \
+              --ignore='^/out($|/)' \
+              --ignore='^/\\.git($|/)' \
+              --ignore='^/\\.github($|/)' \
+              --ignore='^/roder-desktop-distro/target($|/)' \
+              --no-prune
+            app="$(find "${GITHUB_WORKSPACE}/out" -type d -name 'Roder.app' -print -quit)"
+            if [[ -z "${app}" ]]; then
+              echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
+              find "${GITHUB_WORKSPACE}" -maxdepth 6 -print >&2
+              exit 1
+            fi
           fi
 
           pnpm exec electron-osx-sign "${app}" \
