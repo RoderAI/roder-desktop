@@ -123,16 +123,31 @@ jobs:
         run: |
           set -euo pipefail
           pnpm typecheck
-          pnpm exec electron-forge package --platform darwin --arch arm64
-          find "${GITHUB_WORKSPACE}" -maxdepth 6 -name 'Roder.app' -print
+          RODER_DESKTOP_MACOS_SIGN=0 pnpm exec electron-forge package --platform darwin --arch arm64
+          app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit)"
+          if [[ -z "${app}" ]]; then
+            echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
+            find "${GITHUB_WORKSPACE}" -maxdepth 6 -print >&2
+            exit 1
+          fi
+
+          pnpm exec electron-osx-sign "${app}" \
+            --identity="${APPLE_SIGNING_IDENTITY}" \
+            --keychain="${CSC_KEYCHAIN}" \
+            --platform=darwin \
+            --type=distribution \
+            --hardened-runtime \
+            --strictVerify
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          echo "RODER_DESKTOP_APP_PATH=${app}" >> "${GITHUB_ENV}"
 
       - name: Prepare signed release artifacts
         shell: bash
         run: |
           set -euo pipefail
-          app="$(find "${GITHUB_WORKSPACE}" -type d -name 'Roder.app' -print -quit)"
+          app="${RODER_DESKTOP_APP_PATH:-}"
           if [[ -z "${app}" ]]; then
-            echo "Roder.app was not produced under ${GITHUB_WORKSPACE}" >&2
+            echo "RODER_DESKTOP_APP_PATH was not exported by the build step" >&2
             find "${GITHUB_WORKSPACE}" -maxdepth 6 -print >&2
             exit 1
           fi
