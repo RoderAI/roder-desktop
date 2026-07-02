@@ -1,8 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, cp, mkdir, readdir, stat } from "node:fs/promises";
+import { chmod, cp, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { notarize } from "@electron/notarize";
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import type { Options as ElectronPackagerOptions } from "@electron/packager";
 import { MakerDeb } from "@electron-forge/maker-deb";
@@ -15,84 +14,6 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 const shouldSignMac = process.env.RODER_DESKTOP_MACOS_SIGN === "1";
 const macSigningIdentity =
   process.env.APPLE_SIGNING_IDENTITY ?? "Developer ID Application: Pandelis Zembashis (7UNZ734ZYN)";
-
-function macNotarizeCredentials() {
-  const appleApiKey = process.env.APPLE_NOTARIZE_KEY_PATH;
-  const appleApiKeyId = process.env.APPLE_NOTARIZE_KEY_ID;
-  const appleApiIssuer = process.env.APPLE_NOTARIZE_ISSUER_ID;
-  if (!shouldSignMac || !appleApiKey || !appleApiKeyId || !appleApiIssuer) {
-    return null;
-  }
-
-  return { appleApiKey, appleApiKeyId, appleApiIssuer };
-}
-
-async function collectMatchingPaths(root: string, matcher: (candidate: string) => boolean): Promise<string[]> {
-  if (!existsSync(root)) {
-    return [];
-  }
-  if (matcher(root)) {
-    return [root];
-  }
-
-  const rootStat = await stat(root);
-  if (!rootStat.isDirectory()) {
-    return [];
-  }
-
-  const matches: string[] = [];
-  for (const entry of await readdir(root)) {
-    const candidate = path.join(root, entry);
-    if (matcher(candidate)) {
-      matches.push(candidate);
-      continue;
-    }
-
-    const candidateStat = await stat(candidate);
-    if (candidateStat.isDirectory()) {
-      matches.push(...(await collectMatchingPaths(candidate, matcher)));
-    }
-  }
-  return matches;
-}
-
-async function notarizeMacApp(appPath: string) {
-  const credentials = macNotarizeCredentials();
-  if (!credentials) {
-    return;
-  }
-
-  await notarize({
-    appPath,
-    ...credentials,
-  });
-}
-
-async function notarizeMacDmg(dmgPath: string) {
-  const credentials = macNotarizeCredentials();
-  if (!credentials) {
-    return;
-  }
-
-  const signArgs = ["--force", "--sign", macSigningIdentity, "--timestamp"];
-  if (process.env.CSC_KEYCHAIN) {
-    signArgs.push("--keychain", process.env.CSC_KEYCHAIN);
-  }
-  signArgs.push(dmgPath);
-
-  const result = spawnSync("codesign", signArgs, { stdio: "inherit" });
-  if (result.error) {
-    throw result.error;
-  }
-  if (result.status !== 0) {
-    throw new Error(`codesign failed for ${dmgPath} with status ${result.status ?? "unknown"}`);
-  }
-
-  await notarize({
-    appPath: dmgPath,
-    ...credentials,
-  });
-}
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -154,38 +75,6 @@ const config: ForgeConfig = {
       if (platform === "darwin" && existsSync(spawnHelper)) {
         await chmod(spawnHelper, 0o755);
       }
-    },
-    async postPackage(_config, packageResult) {
-      if (packageResult.platform !== "darwin") {
-        return;
-      }
-
-      const appPaths = (
-        await Promise.all(
-          packageResult.outputPaths.map((outputPath) =>
-            collectMatchingPaths(outputPath, (candidate) => candidate.endsWith(".app")),
-          ),
-        )
-      ).flat();
-
-      for (const appPath of appPaths) {
-        await notarizeMacApp(appPath);
-      }
-    },
-    async postMake(_config, makeResults) {
-      for (const result of makeResults) {
-        if (result.platform !== "darwin") {
-          continue;
-        }
-
-        for (const artifact of result.artifacts) {
-          if (artifact.endsWith(".dmg")) {
-            await notarizeMacDmg(artifact);
-          }
-        }
-      }
-
-      return makeResults;
     },
   },
   makers: [
