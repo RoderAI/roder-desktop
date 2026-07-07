@@ -1,0 +1,119 @@
+name: Build Windows desktop installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+      - "desktop/v*"
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.5.0"
+
+jobs:
+  windows:
+    name: Build Windows x64 installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            roder-desktop-distro/target
+          key: roder-desktop-windows-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('roder-desktop-distro/Cargo.lock', 'roder-desktop-distro/Cargo.toml', 'roder-desktop-distro/src/**/*.rs') }}
+          restore-keys: |
+            roder-desktop-windows-rust-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        shell: pwsh
+        run: pnpm typecheck
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: pnpm exec electron-forge make --platform win32 --arch x64
+
+      - name: Collect installer artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          $setup = Get-ChildItem -Path out/make -Recurse -Filter *.exe | Where-Object { $_.Name -like "*Setup*.exe" } | Select-Object -First 1
+          if (-not $setup) {
+            $setup = Get-ChildItem -Path out/make -Recurse -Filter *.exe | Select-Object -First 1
+          }
+          if (-not $setup) {
+            Write-Error "No Windows .exe installer was produced under out/make"
+          }
+
+          Copy-Item $setup.FullName dist/Roder-windows-x64-installer.exe
+
+          Get-ChildItem -Path out/make -Recurse -Include RELEASES,*.nupkg | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path dist $_.Name)
+          }
+
+          Get-FileHash dist/* -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content dist/SHA256SUMS.txt
+
+      - name: Validate installer artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (-not (Test-Path dist/Roder-windows-x64-installer.exe)) {
+            Write-Error "dist/Roder-windows-x64-installer.exe is missing"
+          }
+          if ((Get-Item dist/Roder-windows-x64-installer.exe).Length -le 0) {
+            Write-Error "dist/Roder-windows-x64-installer.exe is empty"
+          }
+          Get-ChildItem dist
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: roder-desktop-windows-x64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Upload artifacts to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title $tag --notes "Roder Desktop $tag"
+          }
+          gh release upload $tag dist/* --clobber
