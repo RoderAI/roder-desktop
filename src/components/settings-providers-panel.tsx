@@ -1,22 +1,36 @@
-import { Check, KeyRound, RefreshCw, Search } from "lucide-react";
+import { Check, ChevronRight, KeyRound, Plus, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { isProviderConfigured, providerName } from "@/lib/roder-models";
+import { isProviderConfigured, modelKey, providerName, visibleModelIdsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
-import type { ProviderDescriptor } from "@/types/roder";
+import type { ProviderDescriptor, ProviderModelDescriptor, RoderModel } from "@/types/roder";
 import { cn } from "@/lib/utils";
 
 export function ProvidersSettingsPanel(): React.JSX.Element {
   const providers = useRoderStore((state) => state.providers);
+  const models = useRoderStore((state) => state.models);
+  const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
+  const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
   const configureProvider = useRoderStore((state) => state.configureProvider);
   const [query, setQuery] = useState("");
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const filteredProviders = useMemo(() => filterProviders(providers, query), [providers, query]);
+  const selectedProvider = useMemo(
+    () =>
+      filteredProviders.find((provider) => provider.id === selectedProviderId) ??
+      providers.find((provider) => provider.id === selectedProviderId) ??
+      filteredProviders[0] ??
+      providers[0],
+    [filteredProviders, providers, selectedProviderId],
+  );
+  const visibleIds = useMemo(() => visibleModelIdsFor(models, visibleModelIds), [models, visibleModelIds]);
+  const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const configuredCount = providers.filter(isProviderConfigured).length;
 
   async function refresh(): Promise<void> {
@@ -84,46 +98,107 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
       ) : filteredProviders.length === 0 ? (
         <div className="px-5 py-8 text-base text-muted-foreground">No matching providers.</div>
       ) : (
-        <div className="divide-y divide-border">
-          {filteredProviders.map((provider) => (
-            <ProviderRow
-              key={provider.id}
-              provider={provider}
-              apiKey={apiKeys[provider.id] ?? ""}
-              saving={savingProvider === provider.id}
-              onApiKeyChange={(apiKey) => setApiKeys((current) => ({ ...current, [provider.id]: apiKey }))}
-              onSave={() => void saveApiKey(provider.id)}
+        <div className="grid min-h-[560px] grid-cols-[minmax(240px,300px)_1fr] divide-x divide-border">
+          <nav className="space-y-2 p-4" aria-label="Provider configuration menu">
+            {filteredProviders.map((provider) => (
+              <ProviderMenuItem
+                key={provider.id}
+                provider={provider}
+                selected={provider.id === selectedProvider?.id}
+                onSelect={() => setSelectedProviderId(provider.id)}
+              />
+            ))}
+          </nav>
+          {selectedProvider && (
+            <ProviderDetails
+              provider={selectedProvider}
+              models={models}
+              visibleIds={visibleIds}
+              visibleSet={visibleSet}
+              apiKey={apiKeys[selectedProvider.id] ?? ""}
+              saving={savingProvider === selectedProvider.id}
+              onApiKeyChange={(apiKey) => setApiKeys((current) => ({ ...current, [selectedProvider.id]: apiKey }))}
+              onSave={() => void saveApiKey(selectedProvider.id)}
+              onToggleModel={(modelId, visible) => setModelVisibility(modelId, visible)}
             />
-          ))}
+          )}
         </div>
       )}
     </section>
   );
 }
 
-function ProviderRow({
+function ProviderMenuItem({
   provider,
+  selected,
+  onSelect,
+}: {
+  provider: ProviderDescriptor;
+  selected: boolean;
+  onSelect: () => void;
+}): React.JSX.Element {
+  const configured = isProviderConfigured(provider);
+  const modelCount = provider.models?.length ?? 0;
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors",
+        selected ? "border-primary/40 bg-primary/10" : "border-transparent hover:bg-accent/70",
+      )}
+      onClick={onSelect}
+    >
+      <span
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-full",
+          configured ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+        )}
+      >
+        {configured ? <Check className="size-4" /> : <Plus className="size-4" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base font-medium">{provider.name || providerName(provider.id)}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+          {configured ? "Configured" : "Add provider"} · {modelCount} {modelCount === 1 ? "model" : "models"}
+        </span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
+function ProviderDetails({
+  provider,
+  models,
+  visibleIds,
+  visibleSet,
   apiKey,
   saving,
   onApiKeyChange,
   onSave,
+  onToggleModel,
 }: {
   provider: ProviderDescriptor;
+  models: RoderModel[];
+  visibleIds: string[];
+  visibleSet: Set<string>;
   apiKey: string;
   saving: boolean;
   onApiKeyChange: (apiKey: string) => void;
   onSave: () => void;
+  onToggleModel: (modelId: string, visible: boolean) => void;
 }): React.JSX.Element {
   const configured = isProviderConfigured(provider);
   const authType = provider.authType ?? "unknown";
   const supportsApiKey = authType === "api_key";
 
   return (
-    <section className="px-5 py-4">
+    <section className="px-6 py-5">
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="truncate text-base font-medium">{provider.name || providerName(provider.id)}</h2>
+            <h2 className="truncate text-lg font-semibold">{provider.name || providerName(provider.id)}</h2>
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-xs",
@@ -141,62 +216,214 @@ function ProviderRow({
             <span className="rounded-full bg-muted px-2 py-1">ID: {provider.id}</span>
             <span className="rounded-full bg-muted px-2 py-1">Auth: {authLabel(authType)}</span>
             {provider.authLabel && <span className="rounded-full bg-muted px-2 py-1">{provider.authLabel}</span>}
+            {provider.authDetail && <span className="rounded-full bg-muted px-2 py-1">{provider.authDetail}</span>}
           </div>
         </div>
         {configured && <Check className="mt-1 size-4 shrink-0 text-primary" />}
       </div>
 
       {supportsApiKey && (
-        <div className="mt-4 flex items-center gap-2">
-          <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-background px-3">
-            <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-            <input
-              type="password"
-              value={apiKey}
-              aria-label={`${provider.name || provider.id} API key`}
-              className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-              placeholder={provider.authLabel ? `Paste ${provider.authLabel}` : "Paste API key"}
-              onChange={(event) => onApiKeyChange(event.currentTarget.value)}
-            />
+        <div className="mt-5 rounded-xl border border-border bg-background/60 p-4">
+          <div className="text-base font-medium">API key</div>
+          <p className="mt-1 text-base text-muted-foreground">
+            {configured ? "Update the saved key for this provider." : "Paste a key to configure this provider."}
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3">
+              <KeyRound className="size-4 shrink-0 text-muted-foreground" />
+              <input
+                type="password"
+                value={apiKey}
+                aria-label={`${provider.name || provider.id} API key`}
+                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
+                placeholder={provider.authLabel ? `Paste ${provider.authLabel}` : "Paste API key"}
+                onChange={(event) => onApiKeyChange(event.currentTarget.value)}
+              />
+            </div>
+            <Button size="sm" disabled={saving || apiKey.trim().length === 0} onClick={onSave}>
+              {saving ? "Saving..." : configured ? "Update key" : "Configure"}
+            </Button>
           </div>
-          <Button size="sm" disabled={saving || apiKey.trim().length === 0} onClick={onSave}>
-            {saving ? "Saving..." : "Save key"}
-          </Button>
+        </div>
+      )}
+
+      {!supportsApiKey && authType !== "oauth" && (
+        <div className="mt-5 rounded-xl border border-border bg-background/60 p-4 text-base text-muted-foreground">
+          {configured
+            ? "This provider is available without additional setup."
+            : "This provider cannot be configured from the desktop UI yet."}
         </div>
       )}
 
       {authType === "oauth" && (
-        <p className="mt-4 text-base text-muted-foreground">
+        <div className="mt-5 rounded-xl border border-border bg-background/60 p-4 text-base text-muted-foreground">
           OAuth setup is handled by the provider runtime. Refresh after signing in to update model availability.
-        </p>
+        </div>
       )}
 
-      <ModelCatalog provider={provider} />
+      <ModelAccessList
+        provider={provider}
+        configured={configured}
+        models={models}
+        visibleIds={visibleIds}
+        visibleSet={visibleSet}
+        onToggleModel={onToggleModel}
+      />
     </section>
   );
 }
 
-function ModelCatalog({ provider }: { provider: ProviderDescriptor }): React.JSX.Element | null {
-  const models = provider.models ?? [];
-  if (models.length === 0) {
-    return <p className="mt-4 text-base text-muted-foreground">No models reported for this provider.</p>;
-  }
+function ModelAccessList({
+  provider,
+  configured,
+  models,
+  visibleIds,
+  visibleSet,
+  onToggleModel,
+}: {
+  provider: ProviderDescriptor;
+  configured: boolean;
+  models: RoderModel[];
+  visibleIds: string[];
+  visibleSet: Set<string>;
+  onToggleModel: (modelId: string, visible: boolean) => void;
+}): React.JSX.Element {
+  const providerModels = provider.models ?? [];
+  const availableModels = models.filter((model) => model.modelProvider === provider.id);
+  const availableById = new Map(availableModels.map((model) => [model.id, model]));
+  const enabledCount = availableModels.filter((model) => visibleSet.has(modelKey(model))).length;
+
   return (
-    <div className="mt-4">
-      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Models ({models.length})
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {models.slice(0, 8).map((model) => (
-          <div key={model.id} className="min-w-0 rounded-lg bg-muted/50 px-3 py-2">
-            <div className="truncate text-base font-medium">{model.name || model.id}</div>
-            <div className="truncate text-xs text-muted-foreground">{model.id}</div>
+    <section className="mt-5 rounded-xl border border-border bg-background/60">
+      <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
+        <div>
+          <h3 className="text-base font-medium">Model access</h3>
+          <p className="mt-1 text-base text-muted-foreground">
+            {configured
+              ? `${enabledCount} of ${availableModels.length} available in the composer.`
+              : "Configure this provider before enabling individual models."}
+          </p>
+        </div>
+        {configured && availableModels.length > 0 && (
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                for (const model of availableModels) {
+                  onToggleModel(modelKey(model), true);
+                }
+              }}
+            >
+              Enable all
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={enabledCount === 0 || visibleIds.length <= enabledCount}
+              onClick={() => {
+                for (const model of availableModels) {
+                  onToggleModel(modelKey(model), false);
+                }
+              }}
+            >
+              Disable all
+            </Button>
           </div>
-        ))}
+        )}
       </div>
-      {models.length > 8 && <div className="mt-2 text-xs text-muted-foreground">+{models.length - 8} more</div>}
-    </div>
+
+      {providerModels.length === 0 ? (
+        <div className="px-4 py-6 text-base text-muted-foreground">No models reported for this provider.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {providerModels.map((providerModel) => {
+            const model = availableById.get(providerModel.id);
+            const key = model ? modelKey(model) : providerModelKey(provider.id, providerModel.id);
+            const visible = visibleSet.has(key);
+            const disabled = !configured || !model || (visible && visibleIds.length <= 1);
+            return (
+              <ProviderModelRow
+                key={key}
+                providerModel={providerModel}
+                visible={visible}
+                disabled={disabled}
+                unavailable={!model}
+                onToggle={() => onToggleModel(key, !visible)}
+              />
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
+}
+
+function ProviderModelRow({
+  providerModel,
+  visible,
+  disabled,
+  unavailable,
+  onToggle,
+}: {
+  providerModel: ProviderModelDescriptor;
+  visible: boolean;
+  disabled: boolean;
+  unavailable: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+        visible ? "text-foreground hover:bg-accent/70" : "text-muted-foreground hover:bg-accent/40",
+      )}
+      disabled={disabled}
+      onClick={onToggle}
+    >
+      <VisibilitySwitch checked={visible} disabled={disabled} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-base font-medium">{providerModel.name || providerModel.id}</span>
+          {providerModel.isDefault && <span className="rounded-full bg-muted px-2 py-0.5 text-xs">Default</span>}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{providerModel.id}</span>
+        {providerModel.description && (
+          <span className="mt-1 block line-clamp-2 text-base text-muted-foreground">{providerModel.description}</span>
+        )}
+        {unavailable && (
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Configure this provider to make this model available.
+          </span>
+        )}
+      </span>
+      {visible && <Check className="size-4 shrink-0 text-primary" />}
+    </button>
+  );
+}
+
+function VisibilitySwitch({ checked, disabled }: { checked: boolean; disabled: boolean }): React.JSX.Element {
+  return (
+    <span
+      className={cn(
+        "relative h-6 w-10 shrink-0 rounded-full transition-colors",
+        checked ? "bg-primary" : "bg-muted",
+        disabled && "opacity-50",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute left-1 top-1 size-4 rounded-full bg-white transition-transform",
+          checked && "translate-x-4",
+        )}
+      />
+    </span>
+  );
+}
+
+function providerModelKey(providerId: string, modelId: string): string {
+  return `${providerId || "roder"}:${modelId}`;
 }
 
 function filterProviders(providers: ProviderDescriptor[], query: string): ProviderDescriptor[] {
