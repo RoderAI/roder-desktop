@@ -11,7 +11,7 @@ import {
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileDiff } from "lucide-react";
-import type { ConversationMessage, SkillDescriptor } from "@/types/roder";
+import type { ConversationMessage, SkillDescriptor, SubagentLifecycleEvent } from "@/types/roder";
 import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,6 +44,7 @@ import {
 import { CompactToolGroup } from "./compact-tool-group";
 import { MessageContent } from "./message-content";
 import { PhaseMessage } from "./phase-message";
+import { SubagentLifecycleChip } from "./subagent-lifecycle-chip";
 import { ToolActivityGroup } from "./tool-activity-group";
 import { ToolTimelineItem } from "./tool-timeline-item";
 import { ShimmerText } from "./tool-timeline-shared";
@@ -57,10 +58,13 @@ type TranscriptProps = {
   activeTurnId?: string;
   scrollStateKey?: string;
   showWorkingIndicator?: boolean;
+  subagentLifecycleEvents?: readonly SubagentLifecycleEvent[];
   turnChangeSummaries?: Record<string, ReviewTurnChangeSummary>;
   onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
   onReviewTurnChanges?: (turnId: string) => void;
 };
+
+const emptySubagentLifecycleEvents: SubagentLifecycleEvent[] = [];
 
 const defaultTranscriptScrollStateKey = "default";
 const emptyTurnChangeSummaries: Record<string, ReviewTurnChangeSummary> = {};
@@ -73,6 +77,7 @@ export function Transcript({
   followSignal,
   scrollStateKey = defaultTranscriptScrollStateKey,
   showWorkingIndicator = false,
+  subagentLifecycleEvents = emptySubagentLifecycleEvents,
   turnChangeSummaries = emptyTurnChangeSummaries,
   onCanScrollToBottomChange,
   onReviewTurnChanges,
@@ -116,12 +121,20 @@ export function Transcript({
         activeTurnId,
         messages,
         showWorkingIndicator,
+        subagentLifecycleEvents,
         turnChangeSummaries: onReviewTurnChanges ? turnChangeSummaries : {},
       }),
     );
     previousTranscriptRowsRef.current = rows;
     return rows;
-  }, [activeTurnId, messages, onReviewTurnChanges, showWorkingIndicator, turnChangeSummaries]);
+  }, [
+    activeTurnId,
+    messages,
+    onReviewTurnChanges,
+    showWorkingIndicator,
+    subagentLifecycleEvents,
+    turnChangeSummaries,
+  ]);
   const transcriptRowKeys = useMemo(() => transcriptRows.map((row) => row.key), [transcriptRows]);
   const rowKeyVersion = useMemo(() => transcriptRowKeys.join("\u0000"), [transcriptRowKeys]);
   const transcriptVersion = useMemo(() => [messageVersion, rowKeyVersion].join("\n"), [messageVersion, rowKeyVersion]);
@@ -537,6 +550,10 @@ const TranscriptRowView = memo(function TranscriptRowView({
     return <ThreadWorkingIndicator />;
   }
 
+  if (row.kind === "subagentLifecycle") {
+    return <SubagentLifecycleChip event={row.event} />;
+  }
+
   return (
     <TranscriptEntryView
       disclosureOpenByKey={disclosureOpenByKey}
@@ -618,7 +635,7 @@ function transcriptRowSpacing(row: TranscriptRow): string {
   if (row.kind === "turnReviewChanges") {
     return "py-3";
   }
-  if (row.kind === "working") {
+  if (row.kind === "working" || row.kind === "subagentLifecycle") {
     return "py-1.5";
   }
 
@@ -640,8 +657,8 @@ function estimateTranscriptRowSize(row: TranscriptRow | undefined): number {
   if (row.kind === "turnReviewChanges") {
     return 88;
   }
-  if (row.kind === "working") {
-    return 56;
+  if (row.kind === "working" || row.kind === "subagentLifecycle") {
+    return 36;
   }
   if (row.entryIsTool) {
     return 36;

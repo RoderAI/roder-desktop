@@ -241,6 +241,48 @@ test("excludes mounted rows from the hidden search mirror text", () => {
   expect(searchText).toContain("Hidden beta");
 });
 
+test("interleaves subagent lifecycle chips after their anchor messages", () => {
+  const user = createUserMessage("Delegate cleanup", "turn-1");
+  const tool = createToolMessage("tool-1", "shell", "ran cleanup", "turn-1");
+  const rows = buildTranscriptRows({
+    messages: [user, tool],
+    subagentLifecycleEvents: [
+      {
+        id: "lifecycle:trace-1:started working:1",
+        traceId: "trace-1",
+        threadId: "thread-1",
+        turnId: "turn-1",
+        title: "Token cleanup",
+        role: "explore",
+        verb: "started working",
+        at: 1,
+        afterMessageId: user.id,
+      },
+      {
+        id: "lifecycle:trace-1:finished:2",
+        traceId: "trace-1",
+        threadId: "thread-1",
+        turnId: "turn-1",
+        title: "Token cleanup",
+        role: "explore",
+        verb: "finished",
+        at: 2,
+        afterMessageId: tool.id,
+      },
+    ],
+  });
+
+  expect(rows.map((row) => row.kind)).toEqual(["entry", "subagentLifecycle", "entry", "subagentLifecycle"]);
+  expect(rows[1]).toMatchObject({
+    kind: "subagentLifecycle",
+    event: { title: "Token cleanup", verb: "started working" },
+  });
+  expect(rows[3]).toMatchObject({
+    kind: "subagentLifecycle",
+    event: { title: "Token cleanup", verb: "finished" },
+  });
+});
+
 function createToolMessage(
   toolCallId: string,
   toolName: string,

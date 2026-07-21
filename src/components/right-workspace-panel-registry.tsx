@@ -1,4 +1,13 @@
-import { Files, GitCompareArrows, Globe2, LayoutTemplate, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
+import {
+  Bot,
+  Files,
+  GitCompareArrows,
+  Globe2,
+  LayoutTemplate,
+  Paintbrush,
+  Puzzle,
+  TerminalSquare,
+} from "lucide-react";
 import React, { lazy, Suspense } from "react";
 import type { NativeOverlayOcclusion, RightWorkspacePanelEntry } from "@/components/right-workspace-panel-shell";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
@@ -19,6 +28,9 @@ const ExtensionsPanel = lazy(() =>
 );
 const FilePanel = lazy(() => import("@/components/file-panel").then((m) => ({ default: m.FilePanel })));
 const ReviewPanel = lazy(() => import("@/components/review-panel").then((m) => ({ default: m.ReviewPanel })));
+const SubagentsPanel = lazy(() =>
+  import("@/components/subagents-panel").then((m) => ({ default: m.SubagentsPanel })),
+);
 
 function PanelFallback(): React.JSX.Element {
   return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading...</div>;
@@ -66,6 +78,12 @@ export const rightWorkspacePanelEntries: RightWorkspacePanelEntry[] = [
     title: "Files",
     description: "Browse workspace",
     icon: <Files />,
+  },
+  {
+    id: "subagents",
+    title: "Subagents",
+    description: "Delegated agent work",
+    icon: <Bot />,
   },
 ];
 
@@ -173,5 +191,8 @@ function renderPanelContent(
         selectionIntent={context.fileSearchSelectionIntent}
       />
     );
+  }
+  if (panel === "subagents") {
+    return <SubagentsPanel threadId={context.activeThreadId} />;
   }
 }

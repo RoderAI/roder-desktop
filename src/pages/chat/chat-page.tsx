@@ -22,8 +22,11 @@ import { normalizeWorkspacePath, normalizedTimestamp, type FolderOption } from "
 import { mergedCommandDescriptors } from "@/lib/native-commands";
 import { useActiveThreadMessages, useShowWorkingIndicator } from "@/hooks/use-roder-agent";
 import { useCommandsStore } from "@/stores/commands-store";
+import { useRoderStore } from "@/stores/roder-store";
 import { skillsLoadContextKey, useSkillsStore } from "@/stores/skills-store";
-import type { RoderThread, Workspace } from "@/types/roder";
+import type { RoderThread, SubagentLifecycleEvent, Workspace } from "@/types/roder";
+
+const emptySubagentLifecycleEvents: SubagentLifecycleEvent[] = [];
 
 const transcriptComposerGapPx = 24;
 const composerGuardFadeHeightPx = 88;
@@ -68,6 +71,9 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const routeActiveThreadId = threadId || (route === "new" ? "" : activeThreadId);
   const messages = useActiveThreadMessages();
   const showWorkingIndicator = useShowWorkingIndicator(routeActiveThreadId);
+  const subagentLifecycleEvents = useRoderStore(
+    (state) => state.subagentLifecycleByThread[routeActiveThreadId] ?? emptySubagentLifecycleEvents,
+  );
   const composerStackRef = useRef<HTMLDivElement | null>(null);
   const [composerStackHeight, setComposerStackHeight] = useState(initialComposerStackHeightPx);
   const newRouteReadyForCreatedThreadRef = useRef(false);
@@ -192,6 +198,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           bottomInsetPx={transcriptBottomInsetPx}
           scrollStateKey={activeThreadId || "new-thread"}
           showWorkingIndicator={showWorkingIndicator}
+          subagentLifecycleEvents={subagentLifecycleEvents}
           turnChangeSummaries={hunkSummary.turnChangeSummaries}
           onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
           onReviewTurnChanges={openTurnChanges}

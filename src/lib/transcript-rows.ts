@@ -1,9 +1,14 @@
-import type { ConversationMessage } from "@/types/roder";
+import type { ConversationMessage, SubagentLifecycleEvent } from "@/types/roder";
 import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { groupToolMessagesForTranscript, type TranscriptMessageEntry } from "@/lib/tool-message-groups";
 
 export type TranscriptRow =
   | TranscriptEntryRow
+  | {
+      key: string;
+      event: SubagentLifecycleEvent;
+      kind: "subagentLifecycle";
+    }
   | {
       key: string;
       summary: ReviewTurnChangeSummary;
@@ -30,6 +35,7 @@ export type TranscriptRowsOptions = {
   activeTurnId?: string;
   messages: ConversationMessage[];
   showWorkingIndicator?: boolean;
+  subagentLifecycleEvents?: readonly SubagentLifecycleEvent[];
   turnChangeSummaries?: Record<string, ReviewTurnChangeSummary>;
 };
 
@@ -41,11 +47,17 @@ export function buildTranscriptRows({
   activeTurnId,
   messages,
   showWorkingIndicator = false,
+  subagentLifecycleEvents = [],
   turnChangeSummaries = {},
 }: TranscriptRowsOptions): TranscriptRow[] {
   const entries = groupToolMessagesForTranscript(messages, { activeTurnId });
   const turnBoundaryIndexes = findTurnBoundaryIndexes(entries);
+  const lifecycleByAfterMessageId = groupLifecycleEventsByAnchor(subagentLifecycleEvents);
   const rows: TranscriptRow[] = [];
+
+  for (const event of lifecycleByAfterMessageId.get(null) ?? []) {
+    rows.push(subagentLifecycleRow(event));
+  }
 
   entries.forEach((entry, index) => {
     const turnId = transcriptEntryTurnId(entry);
@@ -64,6 +76,12 @@ export function buildTranscriptRows({
 
     rows.push(entryRow);
 
+    for (const messageId of transcriptEntryMessageIds(entry)) {
+      for (const event of lifecycleByAfterMessageId.get(messageId) ?? []) {
+        rows.push(subagentLifecycleRow(event));
+      }
+    }
+
     const turnChangeSummary = turnId ? turnChangeSummaries[turnId] : undefined;
     if (turnId && turnChangeSummary && turnChangeSummary.files.length > 0 && turnBoundaryIndexes.has(index)) {
       rows.push({
@@ -75,6 +93,12 @@ export function buildTranscriptRows({
     }
   });
 
+  // Events anchored to messages that are no longer present (e.g. local
+  // transcript offsets) still need to appear at the end of the transcript.
+  for (const event of orphanLifecycleEvents(subagentLifecycleEvents, messages)) {
+    rows.push(subagentLifecycleRow(event));
+  }
+
   if (showWorkingIndicator) {
     rows.push({
       key: "thread-working-indicator",
@@ -83,6 +107,48 @@ export function buildTranscriptRows({
   }
 
   return rows;
+}
+
+function subagentLifecycleRow(event: SubagentLifecycleEvent): TranscriptRow {
+  return {
+    key: `subagent-lifecycle:${event.id}`,
+    kind: "subagentLifecycle",
+    event,
+  };
+}
+
+function groupLifecycleEventsByAnchor(
+  events: readonly SubagentLifecycleEvent[],
+): Map<string | null, SubagentLifecycleEvent[]> {
+  const grouped = new Map<string | null, SubagentLifecycleEvent[]>();
+  for (const event of events) {
+    const key = event.afterMessageId;
+    const bucket = grouped.get(key);
+    if (bucket) {
+      bucket.push(event);
+    } else {
+      grouped.set(key, [event]);
+    }
+  }
+  return grouped;
+}
+
+function transcriptEntryMessageIds(entry: TranscriptMessageEntry): string[] {
+  if (entry.kind === "message") {
+    return [entry.message.id];
+  }
+  if (entry.kind === "activityGroup") {
+    return entry.entries.flatMap(transcriptEntryMessageIds);
+  }
+  return entry.messages.map((message) => message.id);
+}
+
+function orphanLifecycleEvents(
+  events: readonly SubagentLifecycleEvent[],
+  messages: readonly ConversationMessage[],
+): SubagentLifecycleEvent[] {
+  const messageIds = new Set(messages.map((message) => message.id));
+  return events.filter((event) => event.afterMessageId != null && !messageIds.has(event.afterMessageId));
 }
 
 export function transcriptEntryKey(entry: TranscriptMessageEntry): string {
@@ -189,6 +255,9 @@ function transcriptRowsEquivalent(left: TranscriptRow, right: TranscriptRow): bo
   }
   if (left.kind === "working" || right.kind === "working") {
     return true;
+  }
+  if (left.kind === "subagentLifecycle" && right.kind === "subagentLifecycle") {
+    return left.event === right.event;
   }
   if (left.kind === "turnReviewChanges" && right.kind === "turnReviewChanges") {
     return left.turnId === right.turnId && left.summary === right.summary;
@@ -299,6 +368,9 @@ function transcriptEntryMessages(entry: TranscriptMessageEntry | undefined): Con
 function transcriptRowSearchText(row: TranscriptRow): string {
   if (row.kind === "turnReviewChanges") {
     return [reviewTurnChangeLabel(row.summary), reviewChangeDeltaText(row.summary)].filter(Boolean).join("\n");
+  }
+  if (row.kind === "subagentLifecycle") {
+    return `${row.event.title} — ${row.event.verb}`;
   }
   if (row.kind === "working") {
     return "Agent is working";
