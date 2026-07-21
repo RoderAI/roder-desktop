@@ -138,3 +138,14 @@ test("macOS application menu preserves standard app roles", () => {
   expect(roles).toContain("unhide");
   expect(roles).toContain("quit");
 });
+
+test("macOS application menu exposes Check for Updates", () => {
+  const commands = [];
+  const template = createApplicationMenuTemplate((command) => commands.push(command), "darwin");
+  const appMenu = template.find((item) => item.role === "appMenu");
+  const updateItem = appMenu.submenu.find((item) => item.id === "check-for-updates");
+
+  expect(updateItem.label).toBe("Check for Updates...");
+  updateItem.click();
+  expect(commands).toEqual(["checkForUpdates"]);
+});

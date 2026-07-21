@@ -4,24 +4,23 @@ Local-first Electron app for the [Roder](https://github.com/RoderAI/roder) agent
 
 Alpha software. Expect sharp edges.
 
-![Roder Desktop — new agent](https://roder.sh/product/roder-desktop/desktop-new-agent.png)
+![Roder Desktop — new agent](https://dl.roder.sh/desktop/product/desktop-new-agent.png)
 
 Product page: [roder.sh/desktop](https://roder.sh/desktop/)
 
 ## Download
 
-Prebuilt installs ship on [GitHub Releases](https://github.com/RoderAI/roder-desktop/releases) for tagged builds:
+One-click installs: [roder.sh/desktop](https://roder.sh/desktop/). Artifacts and macOS update feeds are published by release CI to [dl.roder.sh](https://dl.roder.sh) (`desktop/latest/`), and also attached to [GitHub Releases](https://github.com/RoderAI/roder-desktop/releases).
 
 | Platform | Artifact |
 | --- | --- |
 | macOS Apple Silicon | `Roder-macos-arm64.dmg` (signed + notarized; also `.zip`) |
 | Windows x64 | `Roder-windows-x64-installer.exe` |
-
-Tagged releases may also mirror to [dl.roder.sh](https://dl.roder.sh).
+| macOS updates | `desktop/latest/updates.json` + `appcast.xml` (Sparkle / Squirrel.Mac) |
 
 ## Features
 
-![Subagents panel](https://roder.sh/product/roder-desktop/desktop-subagents-panel.png)
+![Subagents panel](https://dl.roder.sh/desktop/product/desktop-subagents-panel.png)
 
 - **Subagents** — parallel agent orchestration with a live Subagents panel and transcript lifecycle chips
 - **Models & providers** — full catalog from the embedded app-server (GPT-5.6 Sol/Terra/Luna, Claude Fable 5/Opus/Sonnet, Grok 4.5, Gemini, Composer, DeepSeek, Kimi, and more across ~15 providers), with reasoning efforts up to Ultra

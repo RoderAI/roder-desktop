@@ -1,6 +1,12 @@
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 
-export type AppCommand = "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch";
+export type AppCommand =
+  | "newProject"
+  | "newThread"
+  | "openSettings"
+  | "openBrowser"
+  | "openFileSearch"
+  | "checkForUpdates";
 
 export type ShortcutInput = {
   type: string;
@@ -134,6 +140,12 @@ export function createApplicationMenuTemplate(
             role: "appMenu",
             submenu: [
               { role: "about" },
+              { type: "separator" },
+              {
+                id: "check-for-updates",
+                label: "Check for Updates...",
+                click: () => onCommand("checkForUpdates"),
+              },
               { type: "separator" },
               settingsItem,
               { type: "separator" },
