@@ -64,7 +64,7 @@ test("does not show mock models when mock is the only reported provider", () => 
   expect(configuredModelsFor(models, providers)).toEqual([]);
 });
 
-test("visible model ids are provider-qualified while accepting legacy bare ids", () => {
+test("hidden model ids are provider-qualified while accepting legacy bare ids", () => {
   const models: RoderModel[] = [
     { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
     { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "opencode" },
@@ -77,8 +77,31 @@ test("visible model ids are provider-qualified while accepting legacy bare ids",
     "opencode:gpt-5.5",
     "claude-code:claude-code/sonnet",
   ]);
-  expect(visibleModelsFor(models, ["opencode:gpt-5.5"])).toEqual([models[1]]);
-  expect(visibleModelsFor(models, ["gpt-5.5"])).toEqual([models[0], models[1]]);
+  // hiddenModelIds is a blocklist: hiding one provider entry leaves the rest
+  expect(visibleModelsFor(models, ["opencode:gpt-5.5"])).toEqual([models[0], models[2]]);
+  expect(visibleModelsFor(models, ["gpt-5.5"])).toEqual([models[2]]);
+});
+
+test("models from providers/list appear even when absent from stored visibility list", () => {
+  const models: RoderModel[] = [
+    { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "codex" },
+    { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", modelProvider: "codex" },
+    { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", modelProvider: "codex" },
+    { id: "grok-4.5", name: "Grok 4.5", modelProvider: "opencode" },
+  ];
+
+  // Stale allowlist-era customization only hid gpt-5.5; new catalog models must still show.
+  expect(visibleModelsFor(models, ["codex:gpt-5.5"]).map((model) => model.id)).toEqual([
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "grok-4.5",
+  ]);
+  expect(visibleModelIdsFor(models, [])).toEqual([
+    "codex:gpt-5.5",
+    "codex:gpt-5.6-sol",
+    "codex:gpt-5.6-terra",
+    "opencode:grok-4.5",
+  ]);
 });
 
 test("groups configured models by provider in source order", () => {
