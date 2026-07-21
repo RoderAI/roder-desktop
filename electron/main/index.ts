@@ -151,14 +151,23 @@ const autoUpdate = createAutoUpdateController({
   getMainWindow: () => mainWindow,
   isPackaged: app.isPackaged,
 });
+autoUpdate.onStatus((status) => {
+  sendToRenderer("appUpdate:status", status);
+});
 
 function sendAppCommand(command: AppCommand): void {
   if (command === "checkForUpdates") {
-    autoUpdate.checkForUpdates({ interactive: true });
+    void autoUpdate.checkForUpdates({ interactive: true });
     return;
   }
   sendToRenderer("app:command", { command });
 }
+
+ipcMain.handle("appUpdate:status", () => autoUpdate.getStatus());
+ipcMain.handle("appUpdate:check", (_event, interactive?: boolean) =>
+  autoUpdate.checkForUpdates({ interactive: Boolean(interactive) }),
+);
+ipcMain.handle("appUpdate:install", () => autoUpdate.installUpdate());
 
 roder.on("notification", (payload) => {
   recordAppServerEvent("notification", payload.method, payload.params);
@@ -477,8 +486,10 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(Menu.buildFromTemplate(createApplicationMenuTemplate(sendAppCommand)));
   createWindow();
   startMcpAuthWatcher();
-  // Background Sparkle/Squirrel.Mac check after the window is up (signed builds only).
-  setTimeout(() => autoUpdate.checkForUpdates({ interactive: false }), 15_000);
+  // Detect a newer feed version for the sidebar update button (and download on Mac when packaged).
+  setTimeout(() => {
+    void autoUpdate.checkForUpdates({ interactive: false });
+  }, 4_000);
   try {
     await roder.start();
   } catch (error) {

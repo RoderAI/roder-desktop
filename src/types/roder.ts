@@ -1221,8 +1221,17 @@ export type DesignSpawnAgentsResult = {
 };
 
 export type AppCommand = {
-  command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch";
+  command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch" | "checkForUpdates";
 };
+
+export type AppUpdateStatus =
+  | { state: "idle"; currentVersion: string }
+  | { state: "checking"; currentVersion: string }
+  | { state: "upToDate"; currentVersion: string }
+  | { state: "available"; currentVersion: string; availableVersion: string }
+  | { state: "downloading"; currentVersion: string; availableVersion: string }
+  | { state: "ready"; currentVersion: string; availableVersion: string }
+  | { state: "error"; currentVersion: string; message: string };
 
 declare global {
   interface Window {
@@ -1304,6 +1313,10 @@ declare global {
       mcpOAuthStart: (id: string, url: string) => Promise<void>;
       mcpReadConfig: (configPath: string) => Promise<{ config: unknown; error: string | null }>;
       mcpWriteConfig: (configPath: string, config: unknown) => Promise<{ error: string | null }>;
+      appUpdateStatus: () => Promise<AppUpdateStatus>;
+      appUpdateCheck: (interactive?: boolean) => Promise<AppUpdateStatus>;
+      appUpdateInstall: () => Promise<AppUpdateStatus>;
+      onAppUpdateStatus: (callback: (status: AppUpdateStatus) => void) => () => void;
     };
   }
 }

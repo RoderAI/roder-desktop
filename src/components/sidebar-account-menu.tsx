@@ -1,5 +1,6 @@
 import { ChevronDown, Gauge, Loader2, LogIn, LogOut, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { SidebarUpdateButton } from "@/components/sidebar-update-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { cn } from "@/lib/utils";
 import type { CodexAccountSnapshot, CodexRateWindow } from "@/types/roder";
 
@@ -43,7 +45,7 @@ export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => 
   const [busy, setBusy] = useState<"login" | "logout" | null>(null);
   const accountLoading = account === undefined;
 
-  useEffect(() => {
+  useMountEffect(() => {
     let cancelled = false;
     void window.roderDesktop
       .codexAccount()
@@ -57,7 +59,7 @@ export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => 
     return () => {
       cancelled = true;
     };
-  }, []);
+  });
 
   async function refresh(): Promise<void> {
     setAccount(await window.roderDesktop.codexAccount().catch(() => disconnectedAccount));
@@ -83,6 +85,7 @@ export function SidebarAccountMenu({ onOpenSettings }: { onOpenSettings?: () => 
 
   return (
     <div className="no-drag shrink-0 border-t border-border/70 p-2">
+      <SidebarUpdateButton />
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger
           className={cn(
