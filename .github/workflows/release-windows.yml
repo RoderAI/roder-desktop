@@ -13,6 +13,9 @@ permissions:
 env:
   NODE_VERSION: "24"
   PNPM_VERSION: "11.5.0"
+  R2_ACCOUNT_ID: "769befa385792ae6e7ca7136b7010256"
+  R2_BUCKET: "roder-downloads"
+  R2_PUBLIC_BASE_URL: "https://dl.roder.sh"
 
 jobs:
   windows:
@@ -96,6 +99,14 @@ jobs:
             Write-Error "dist/Roder-windows-x64-installer.exe is empty"
           }
           Get-ChildItem dist
+
+      - name: Publish artifacts to Cloudflare R2
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash scripts/publish-desktop-r2.sh
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
