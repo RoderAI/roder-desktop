@@ -8,35 +8,37 @@ test("sidebar account trigger shows a loading skeleton before account state reso
   const html = renderToStaticMarkup(React.createElement(SidebarAccountTriggerContent, { account: undefined }));
 
   expect(html).toContain("Loading Codex account");
-  expect(html).toContain("size-6");
+  expect(html).not.toContain("Settings");
   expect(html).not.toContain("Sign in to Codex");
   expect(html).not.toContain("Connect provider");
 });
 
-test("sidebar account trigger shows the sign-in prompt after an unauthenticated snapshot resolves", () => {
+test("sidebar account trigger shows Settings after an unauthenticated snapshot resolves", () => {
   const html = renderToStaticMarkup(
     React.createElement(SidebarAccountTriggerContent, { account: unauthenticatedAccount() }),
   );
 
-  expect(html).toContain("Sign in to Codex");
-  expect(html).toContain("Connect provider");
+  expect(html).toContain("Settings");
+  expect(html).not.toContain("Sign in to Codex");
+  expect(html).not.toContain("Connect provider");
 });
 
-test("sidebar account trigger omits provider status after an authenticated snapshot resolves", () => {
+test("sidebar account trigger shows Settings without the signed-in email or avatar", () => {
   const html = renderToStaticMarkup(
     React.createElement(SidebarAccountTriggerContent, {
       account: {
         ...unauthenticatedAccount(),
         codexSignedIn: true,
         roderSignedIn: true,
-        displayName: "Ada Lovelace",
+        displayName: "droidpantelas@gmail.com",
         accountId: "acct_123",
       },
     }),
   );
 
-  expect(html).toContain("Ada Lovelace");
-  expect(html).toContain("size-6");
+  expect(html).toContain("Settings");
+  expect(html).not.toContain("droidpantelas@gmail.com");
+  expect(html).not.toContain("size-6");
   expect(html).not.toContain("Roder connected");
 });
 

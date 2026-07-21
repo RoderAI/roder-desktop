@@ -1,4 +1,4 @@
-import { ChevronDown, Gauge, Loader2, LogIn, LogOut, Settings, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Gauge, Loader2, LogIn, LogOut, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -185,39 +185,19 @@ export function SidebarAccountTriggerContent({
   if (account === undefined) {
     return (
       <>
-        <div
-          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50"
-          aria-hidden="true"
-        >
-          <Skeleton className="size-3.5 rounded-full bg-sidebar-muted/30" />
-        </div>
-        <span className="flex min-w-0 flex-1 flex-col gap-1.5 text-left" aria-hidden="true">
-          <Skeleton className="h-3 w-28 rounded-full bg-sidebar-muted/25" />
-          <Skeleton className="h-3 w-20 rounded-full bg-sidebar-muted/20" />
+        <Skeleton className="size-4 shrink-0 rounded-md bg-sidebar-muted/30" aria-hidden="true" />
+        <span className="min-w-0 flex-1 text-left" aria-hidden="true">
+          <Skeleton className="h-3.5 w-16 rounded-full bg-sidebar-muted/25" />
         </span>
         <span className="sr-only">Loading Codex account</span>
-        <SlidersHorizontal className="size-3.5 shrink-0 text-sidebar-muted/60" aria-hidden="true" />
       </>
     );
   }
 
-  const label = account.roderSignedIn ? (account.displayName ?? "Codex account") : "Sign in to Codex";
-  const secondary = account.roderSignedIn
-    ? undefined
-    : account.codexSignedIn
-      ? "Codex CLI detected"
-      : "Connect provider";
-
   return (
     <>
-      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sidebar-active/50 text-sm text-sidebar-muted">
-        {account.displayName ? initials(account.displayName) : "G"}
-      </div>
-      <span className="min-w-0 flex-1 text-left">
-        <span className="block truncate text-sidebar-active-foreground">{label}</span>
-        {secondary ? <span className="block truncate text-base text-sidebar-muted">{secondary}</span> : null}
-      </span>
-      <SlidersHorizontal className="size-3.5 shrink-0 text-sidebar-muted" />
+      <Settings className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-left">Settings</span>
     </>
   );
 }
@@ -234,12 +214,4 @@ function LimitLine({ window, fallback }: { window: CodexRateWindow | null; fallb
       </span>
     </div>
   );
-}
-
-function initials(value: string): string {
-  const [first = "G", second = ""] = value
-    .replace(/@.*/, "")
-    .split(/[.\s_-]+/)
-    .filter(Boolean);
-  return `${first[0] ?? "G"}${second[0] ?? ""}`.toUpperCase();
 }
