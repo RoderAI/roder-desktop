@@ -16,6 +16,8 @@ import type {
   FileSystemReadFileResult,
   AgentsListResult,
   HunkListResult,
+  SubagentTraceReadResult,
+  SubagentTracesListResult,
   HunkReadResult,
   PolicyMode,
   ProviderDescriptor,
@@ -666,6 +668,22 @@ export const roderIpc = {
       workspace: params.workspace || undefined,
     }) as Promise<CommandsRunResult>,
   listAgents: () => window.roderDesktop.request("agents/list", {}) as Promise<AgentsListResult>,
+  listSubagentTraces: (threadId: string, turnId: string) =>
+    window.roderDesktop.request("turn/subagentTraces/list", {
+      threadId,
+      turnId,
+    }) as Promise<SubagentTracesListResult>,
+  readSubagentTrace: (
+    threadId: string,
+    traceId: string,
+    options: { offset?: number; limit?: number } = {},
+  ) =>
+    window.roderDesktop.request("turn/subagentTrace/read", {
+      threadId,
+      traceId,
+      offset: options.offset ?? 0,
+      limit: options.limit,
+    }) as Promise<SubagentTraceReadResult>,
   listTasks: () => window.roderDesktop.request("tasks/list", {}) as Promise<TasksListResult>,
   getTask: (taskId: string) => window.roderDesktop.request("tasks/get", { task_id: taskId }) as Promise<TasksGetResult>,
   listProcesses: (includeCompleted = false) =>

@@ -13,8 +13,8 @@ export function useRoderAgent() {
   useRoderStoreBootstrap();
   const state = useRoderStore(useShallow(selectAgentState));
   const models = useMemo(
-    () => visibleModelsFor(state.allModels, state.visibleModelIds),
-    [state.allModels, state.visibleModelIds],
+    () => visibleModelsFor(state.allModels, state.hiddenModelIds),
+    [state.allModels, state.hiddenModelIds],
   );
 
   return useMemo(
@@ -104,7 +104,7 @@ function selectAgentState(state: RoderStoreState) {
     queuedPrompts: state.queuedPromptsByThread[state.activeThreadId || "new-thread"] ?? emptyQueuedPrompts,
     allModels: state.models,
     routingOptions: state.routingOptions,
-    visibleModelIds: state.visibleModelIds,
+    hiddenModelIds: state.hiddenModelIds,
     selectedModel: state.selectedModel,
     selectedModelProvider: state.selectedModelProvider,
     selectedSelectionMode: state.selectedSelectionMode,

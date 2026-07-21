@@ -245,6 +245,88 @@ export type AgentsListResult = {
   agents: AgentDescriptor[];
 };
 
+export type SubagentTraceStatus =
+  | "queued"
+  | "running"
+  | "waiting_for_approval"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type ParentTurnRef = {
+  threadId: string;
+  turnId: string;
+};
+
+export type SubagentDestination = {
+  kind: "in_process" | "local_worktree" | "remote_runner";
+  label: string;
+  path?: string | null;
+  providerId?: string | null;
+  destinationId?: string | null;
+};
+
+export type SubagentTraceSummary = {
+  traceId: string;
+  parent: ParentTurnRef;
+  childThreadId: string;
+  childTurnId: string;
+  title: string;
+  role: string;
+  model?: string | null;
+  lane?: string | null;
+  status: SubagentTraceStatus;
+  elapsedMs: number;
+  usage?: unknown;
+  destination?: SubagentDestination | null;
+  latestActivity?: string | null;
+  errorSummary?: string | null;
+  exitReason?: string | null;
+};
+
+export type SubagentTracesListResult = {
+  traces: SubagentTraceSummary[];
+};
+
+export type SubagentTraceItem =
+  | { type: "message"; role: string; content: { text: string; truncated?: boolean; nextOffset?: number | null } }
+  | { type: "reasoning"; content: { text: string; truncated?: boolean; nextOffset?: number | null } }
+  | { type: "toolCall"; toolId: string; toolName: string; input?: unknown }
+  | { type: "toolResult"; toolId: string; isError: boolean; output: { text: string; truncated?: boolean; nextOffset?: number | null } }
+  | { type: "status"; status: SubagentTraceStatus; detail?: string | null };
+
+export type SubagentTraceDelta = {
+  traceId: string;
+  parent: ParentTurnRef;
+  item: SubagentTraceItem;
+};
+
+export type SubagentTraceReadResult = {
+  traceId: string;
+  events: SubagentTraceDelta[];
+  nextOffset?: number | null;
+};
+
+/** UI-enriched summary kept in the desktop store. */
+export type SubagentTraceView = SubagentTraceSummary & {
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type SubagentLifecycleVerb = "started working" | "updated" | "finished" | "failed";
+
+export type SubagentLifecycleEvent = {
+  id: string;
+  traceId: string;
+  threadId: string;
+  turnId: string;
+  title: string;
+  role: string;
+  verb: SubagentLifecycleVerb;
+  at: number;
+  afterMessageId: string | null;
+};
+
 export type TaskSpec = {
   kind: string;
   description: string;
@@ -570,7 +652,7 @@ export type InferenceRoutingDecisionEvent = {
   timestamp: string;
 };
 
-export type ReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "ultra";
 
 export type PolicyMode = "default" | "accept_all" | "plan" | "bypass";
 
