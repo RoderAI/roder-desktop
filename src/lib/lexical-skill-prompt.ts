@@ -27,6 +27,7 @@ import {
   type PointType,
   type SerializedLexicalNode,
 } from "lexical";
+import { completionTriggerInsertion } from "@/lib/composer-completions";
 import {
   deleteSkillTokenAtCaret,
   humanizedSkillName,
@@ -233,6 +234,19 @@ export function replaceSkillPromptEditorSelectionText(
   const caret = selection.start + replacement.length;
   writeSkillPromptEditorText(editor, nextText, skills, caret);
   return { text: nextText, caret };
+}
+
+export function insertSkillPromptCompletionTrigger(
+  editor: LexicalEditor,
+  trigger: string,
+  skills: SkillDescriptor[],
+): SkillPromptTextEdit {
+  const currentText = readSkillPromptEditorText(editor);
+  const selection = readSkillPromptEditorSelectionRange(editor);
+  const withoutSelection = `${currentText.slice(0, selection.start)}${currentText.slice(selection.end)}`;
+  const next = completionTriggerInsertion(withoutSelection, selection.start, trigger);
+  writeSkillPromptEditorText(editor, next.text, skills, next.caret);
+  return next;
 }
 
 export function deleteSkillPromptEditorSelectionText(

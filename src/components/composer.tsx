@@ -17,12 +17,18 @@ import {
   AttachmentChip,
   ComposerAgentSwarmModeMenuItem,
   ComposerAttachMenuItems,
+  ComposerMcpServersMenuItem,
   ComposerPlanModeMenuItem,
+  ComposerSkillsMenuItem,
   ModelPicker,
   PolicyModePicker,
 } from "@/components/composer-controls";
 import { CommandCompletionPopup, commandCompletionOptionId } from "@/components/command-completion-popup";
 import { ComposerSketchPad } from "@/components/composer-sketch-pad";
+import {
+  McpServerCompletionPopup,
+  mcpServerCompletionOptionId,
+} from "@/components/mcp-server-completion-popup";
 import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
 import {
   DropdownMenu,
@@ -31,11 +37,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCommandCompletion } from "@/hooks/use-command-completion";
+import { useMcpServerCompletion } from "@/hooks/use-mcp-server-completion";
 import { useSkillCompletion } from "@/hooks/use-skill-completion";
 import { useSpeechTranscription } from "@/hooks/use-speech-transcription";
 import { commandInvocationText, type CommandInvocation } from "@/lib/roder-commands";
 import {
   createSkillPromptEditor,
+  insertSkillPromptCompletionTrigger,
   readSkillPromptEditorSelectionOffset,
   readSkillPromptEditorText,
   registerSkillPromptPlainText,
@@ -161,6 +169,7 @@ export function Composer({
   const skillPromptEditor = useMemo(() => createSkillPromptEditor(), []);
   const skillCompletionListboxId = useId();
   const commandCompletionListboxId = useId();
+  const mcpServerCompletionListboxId = useId();
   const skillsRef = useRef(skills);
   const skillNamesKey = useMemo(
     () =>
@@ -286,6 +295,13 @@ export function Composer({
     skills,
     onPromptChange: handlePromptEditorChange,
   });
+  const mcpServerCompletion = useMcpServerCompletion({
+    editor: skillPromptEditor,
+    prompt,
+    caretPosition,
+    skills,
+    onPromptChange: handlePromptEditorChange,
+  });
   const commandCompletion = useCommandCompletion({
     editor: skillPromptEditor,
     prompt,
@@ -347,6 +363,9 @@ export function Composer({
     if (commandCompletion.handleCommandCompletionKeyDown(event)) {
       return;
     }
+    if (mcpServerCompletion.handleMcpServerCompletionKeyDown(event)) {
+      return;
+    }
     skillCompletion.handleSkillCompletionKeyDown(event);
   }
 
@@ -384,6 +403,14 @@ export function Composer({
   function attachSketch(attachment: DesktopAttachment): void {
     addAttachments([attachment]);
     skillPromptEditor.focus();
+  }
+
+  function insertCompletionTrigger(trigger: string): void {
+    const next = insertSkillPromptCompletionTrigger(skillPromptEditor, trigger, skills);
+    handlePromptEditorChange(next.text, next.caret);
+    requestAnimationFrame(() => {
+      skillPromptEditor.focus();
+    });
   }
 
   function attachFiles(files: FileList | File[]): void {
@@ -427,15 +454,25 @@ export function Composer({
     }
   }
 
-  const completionOpen = commandCompletion.showCommandCompletionMenu || skillCompletion.showSkillCompletionMenu;
+  const completionOpen =
+    commandCompletion.showCommandCompletionMenu ||
+    mcpServerCompletion.showMcpServerCompletionMenu ||
+    skillCompletion.showSkillCompletionMenu;
   const activeCompletionListboxId = commandCompletion.showCommandCompletionMenu
     ? commandCompletionListboxId
-    : skillCompletionListboxId;
+    : mcpServerCompletion.showMcpServerCompletionMenu
+      ? mcpServerCompletionListboxId
+      : skillCompletionListboxId;
   const activeCompletionOptionId = commandCompletion.showCommandCompletionMenu
     ? commandCompletionOptionId(commandCompletionListboxId, commandCompletion.highlightedCommandIndex)
-    : skillCompletion.showSkillCompletionMenu
-      ? skillCompletionOptionId(skillCompletionListboxId, skillCompletion.highlightedSkillIndex)
-      : undefined;
+    : mcpServerCompletion.showMcpServerCompletionMenu
+      ? mcpServerCompletionOptionId(
+          mcpServerCompletionListboxId,
+          mcpServerCompletion.highlightedMcpServerIndex,
+        )
+      : skillCompletion.showSkillCompletionMenu
+        ? skillCompletionOptionId(skillCompletionListboxId, skillCompletion.highlightedSkillIndex)
+        : undefined;
 
   return (
     <div
@@ -495,6 +532,14 @@ export function Composer({
           onHighlight={commandCompletion.setHighlightedCommandIndex}
           onSelect={commandCompletion.runCommandCompletion}
         />
+        <McpServerCompletionPopup
+          visible={mcpServerCompletion.showMcpServerCompletionMenu}
+          listboxId={mcpServerCompletionListboxId}
+          servers={mcpServerCompletion.mcpServerCompletions}
+          highlightedServerIndex={mcpServerCompletion.highlightedMcpServerIndex}
+          onHighlight={mcpServerCompletion.setHighlightedMcpServerIndex}
+          onSelect={mcpServerCompletion.insertMcpServerCompletion}
+        />
         <SkillCompletionPopup
           visible={skillCompletion.showSkillCompletionMenu}
           listboxId={skillCompletionListboxId}
@@ -545,7 +590,7 @@ export function Composer({
                 >
                   <Plus className="size-4" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-44">
+                <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-48">
                   <DropdownMenuGroup>
                     <ComposerPlanModeMenuItem enabled={selectedPolicyMode === "plan"} onToggle={togglePlanMode} />
                     <ComposerAgentSwarmModeMenuItem
@@ -553,6 +598,8 @@ export function Composer({
                       available={agentSwarmModeAvailable}
                       onToggle={toggleAgentSwarmMode}
                     />
+                    <ComposerSkillsMenuItem onSelect={() => insertCompletionTrigger("$")} />
+                    <ComposerMcpServersMenuItem onSelect={() => insertCompletionTrigger("@")} />
                     <ComposerAttachMenuItems
                       onOpenSketch={() => setSketchOpen(true)}
                       onUploadFile={() => fileInputRef.current?.click()}

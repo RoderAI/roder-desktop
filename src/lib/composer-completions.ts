@@ -62,3 +62,23 @@ export function moveCompletionIndex(currentIndex: number, itemCount: number, dir
   }
   return (currentIndex - 1 + itemCount) % itemCount;
 }
+
+/** Insert `$` / `@` (etc.) at the caret, adding a leading space when mid-word so completion can open. */
+export function completionTriggerInsertion(
+  text: string,
+  caret: number,
+  trigger: string,
+): { text: string; caret: number } {
+  const clampedCaret = Math.max(0, Math.min(caret, text.length));
+  const previous = clampedCaret > 0 ? text[clampedCaret - 1] : undefined;
+  const needsLeadingSpace = previous !== undefined && !isCompletionTriggerBoundary(previous);
+  const insertion = needsLeadingSpace ? ` ${trigger}` : trigger;
+  return {
+    text: `${text.slice(0, clampedCaret)}${insertion}${text.slice(clampedCaret)}`,
+    caret: clampedCaret + insertion.length,
+  };
+}
+
+function isCompletionTriggerBoundary(character: string): boolean {
+  return /\s/.test(character) || "([{,;".includes(character);
+}

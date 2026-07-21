@@ -9,6 +9,7 @@ import {
   readSkillPromptEditorSelectionOffset,
   readSkillPromptEditorText,
   deleteSkillPromptEditorSelectionText,
+  insertSkillPromptCompletionTrigger,
   replaceSkillPromptCompletionToken,
   replaceSkillPromptEditorSelectionText,
   selectSkillPromptEditorText,
@@ -101,6 +102,25 @@ test("selects the whole prompt so typing replaces text and skill tokens", () => 
     text: "replacement",
   });
   expect(readSkillPromptEditorText(editor)).toBe("replacement");
+});
+
+test("inserts a completion trigger at the caret and focuses a mid-word boundary", () => {
+  const editor = createSkillPromptEditor();
+  const skills = [skill({ name: "commit" })];
+
+  writeSkillPromptEditorText(editor, "please help", skills, "please".length);
+  expect(insertSkillPromptCompletionTrigger(editor, "$", skills)).toEqual({
+    text: "please $ help",
+    caret: "please $".length,
+  });
+  expect(readSkillPromptEditorSelectionOffset(editor)).toBe("please $".length);
+  expect(skillCompletionToken(readSkillPromptEditorText(editor), readSkillPromptEditorSelectionOffset(editor))).toEqual(
+    {
+      start: "please ".length,
+      end: "please $".length,
+      query: "",
+    },
+  );
 });
 
 test("plain-text command adapter inserts text through Lexical commands", () => {

@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Check,
   FileText,
   FileUp,
@@ -6,6 +7,7 @@ import {
   Network,
   PencilLine,
   Search,
+  Server,
   ShieldCheck,
   Sparkles,
   X,
@@ -160,6 +162,30 @@ export function ComposerAttachMenuItems({
         <span>Sketch</span>
       </DropdownMenuItem>
     </>
+  );
+}
+
+export function ComposerSkillsMenuItem({ onSelect }: { onSelect: () => void }): React.JSX.Element {
+  return (
+    <DropdownMenuItem className="h-9 justify-between gap-3" onSelect={onSelect}>
+      <span className="flex min-w-0 items-center gap-2">
+        <BookOpen className="size-4 shrink-0" />
+        <span>Skills</span>
+      </span>
+      <span className="ml-auto shrink-0 text-sm text-muted-foreground">$</span>
+    </DropdownMenuItem>
+  );
+}
+
+export function ComposerMcpServersMenuItem({ onSelect }: { onSelect: () => void }): React.JSX.Element {
+  return (
+    <DropdownMenuItem className="h-9 justify-between gap-3" onSelect={onSelect}>
+      <span className="flex min-w-0 items-center gap-2">
+        <Server className="size-4 shrink-0" />
+        <span>MCP servers</span>
+      </span>
+      <span className="ml-auto shrink-0 text-sm text-muted-foreground">@</span>
+    </DropdownMenuItem>
   );
 }
 
@@ -408,7 +434,7 @@ function modelPickerItemSearchText(item: ModelPickerItem): string {
   return `${item.model.displayName ?? ""} ${item.model.name} ${item.model.id} ${item.model.modelProvider}`;
 }
 
-const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
+const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh", "ultra"];
 
 type ProviderLogoDefinition = {
   title: string;
@@ -587,12 +613,18 @@ function reasoningLabel(reasoning: ReasoningEffort): string {
   if (reasoning === "xhigh") {
     return "xHigh";
   }
+  if (reasoning === "ultra") {
+    return "Ultra";
+  }
   return reasoning.slice(0, 1).toUpperCase() + reasoning.slice(1);
 }
 
 function reasoningName(reasoning: ReasoningEffort): string {
   if (reasoning === "xhigh") {
     return "Extra high";
+  }
+  if (reasoning === "ultra") {
+    return "Ultra";
   }
   return reasoning.slice(0, 1).toUpperCase() + reasoning.slice(1);
 }
