@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile, rm, stat } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, shell } from "electron";
+import { findLatestCodexRateLimits } from "./codex-rate-limits";
 
 const rateLimitResetDateFormatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
@@ -65,12 +66,6 @@ type CodexIdTokenPayload = {
 type RoderAuthJson = {
   refresh?: string;
   account_id?: string;
-};
-
-type RawRateLimits = {
-  plan_type?: string | null;
-  primary?: RawRateWindow | null;
-  secondary?: RawRateWindow | null;
 };
 
 type RawRateWindow = {
@@ -195,70 +190,11 @@ async function readRoderAuth(): Promise<{ signedIn: boolean; accountId: string |
   };
 }
 
-async function readLatestLimits(): Promise<{ raw: RawRateLimits; updatedAt: string; planType: string | null } | null> {
-  const files = await collectJsonlFiles([
+async function readLatestLimits() {
+  return findLatestCodexRateLimits([
     join(homedir(), ".codex", "sessions"),
     join(homedir(), ".codex", "archived_sessions"),
   ]);
-  let latest: { timestamp: number; raw: RawRateLimits } | null = null;
-
-  const sessionFiles = await Promise.all(
-    files.slice(0, 160).map(async (file) => ({
-      ...file,
-      data: await readFile(file.path, "utf8").catch(() => ""),
-    })),
-  );
-  for (const file of sessionFiles) {
-    for (const line of file.data.split("\n")) {
-      if (!line.trim()) {
-        continue;
-      }
-      const parsed = parseJson<{
-        type?: string;
-        timestamp?: string;
-        payload?: { type?: string; rate_limits?: RawRateLimits };
-      }>(line);
-      if (parsed?.type !== "event_msg" || parsed.payload?.type !== "token_count" || !parsed.payload.rate_limits) {
-        continue;
-      }
-      const timestamp = Date.parse(parsed.timestamp ?? "") || file.mtimeMs;
-      if (!latest || timestamp > latest.timestamp) {
-        latest = { timestamp, raw: parsed.payload.rate_limits };
-      }
-    }
-  }
-
-  if (!latest) {
-    return null;
-  }
-  return {
-    raw: latest.raw,
-    updatedAt: new Date(latest.timestamp).toISOString(),
-    planType: firstText(latest.raw.plan_type),
-  };
-}
-
-async function collectJsonlFiles(roots: string[]): Promise<Array<{ path: string; mtimeMs: number }>> {
-  const files: Array<{ path: string; mtimeMs: number }> = [];
-  await Promise.all(roots.map((root) => walkJsonl(root, files)));
-  return files.sort((left, right) => right.mtimeMs - left.mtimeMs);
-}
-
-async function walkJsonl(dir: string, files: Array<{ path: string; mtimeMs: number }>): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  await Promise.all(
-    entries.map(async (entry) => {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walkJsonl(path, files);
-      } else if (entry.isFile() && path.endsWith(".jsonl")) {
-        const info = await stat(path).catch(() => null);
-        if (info) {
-          files.push({ path, mtimeMs: info.mtimeMs });
-        }
-      }
-    }),
-  );
 }
 
 function normalizeRateWindow(label: string, raw: RawRateWindow | null): CodexRateWindow | null {
