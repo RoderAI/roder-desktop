@@ -2,6 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import { SidebarAccountTriggerContent } from "../src/components/sidebar-account-menu";
+import { SidebarUpdateButtonContent } from "../src/components/sidebar-update-button";
 import type { CodexAccountSnapshot } from "../src/types/roder";
 
 test("sidebar account trigger shows a loading skeleton before account state resolves", () => {
@@ -54,3 +55,23 @@ function unauthenticatedAccount(): CodexAccountSnapshot {
     loginPending: false,
   };
 }
+
+test("sidebar update button content only renders when an update is available", () => {
+  const hidden = renderToStaticMarkup(
+    React.createElement(SidebarUpdateButtonContent, {
+      status: { state: "upToDate", currentVersion: "0.1.1" },
+    }),
+  );
+  expect(hidden).toBe("");
+
+  const visible = renderToStaticMarkup(
+    React.createElement(SidebarUpdateButtonContent, {
+      status: {
+        state: "available",
+        currentVersion: "0.1.1",
+        availableVersion: "0.1.2",
+      },
+    }),
+  );
+  expect(visible).toContain("Update to 0.1.2");
+});

@@ -91,8 +91,17 @@ export type AppServerEvent = {
 };
 
 export type AppCommand = {
-  command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch";
+  command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch" | "checkForUpdates";
 };
+
+export type AppUpdateStatus =
+  | { state: "idle"; currentVersion: string }
+  | { state: "checking"; currentVersion: string }
+  | { state: "upToDate"; currentVersion: string }
+  | { state: "available"; currentVersion: string; availableVersion: string }
+  | { state: "downloading"; currentVersion: string; availableVersion: string }
+  | { state: "ready"; currentVersion: string; availableVersion: string }
+  | { state: "error"; currentVersion: string; message: string };
 
 import { homedir } from "node:os";
 
@@ -235,6 +244,15 @@ const api = {
     ipcRenderer.invoke("mcp:readConfig", configPath) as Promise<{ config: unknown; error: string | null }>,
   mcpWriteConfig: (configPath: string, config: unknown) =>
     ipcRenderer.invoke("mcp:writeConfig", configPath, config) as Promise<{ error: string | null }>,
+  appUpdateStatus: () => ipcRenderer.invoke("appUpdate:status") as Promise<AppUpdateStatus>,
+  appUpdateCheck: (interactive = false) =>
+    ipcRenderer.invoke("appUpdate:check", interactive) as Promise<AppUpdateStatus>,
+  appUpdateInstall: () => ipcRenderer.invoke("appUpdate:install") as Promise<AppUpdateStatus>,
+  onAppUpdateStatus: (callback: (status: AppUpdateStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: AppUpdateStatus) => callback(status);
+    ipcRenderer.on("appUpdate:status", listener);
+    return () => ipcRenderer.removeListener("appUpdate:status", listener);
+  },
 };
 
 contextBridge.exposeInMainWorld("roderDesktop", api);
