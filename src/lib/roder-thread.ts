@@ -109,7 +109,7 @@ export function applyThreadItemEvent(
 
 export function applyThreadItemEventToItems(items: RoderItem[], event: RoderThreadItemEventKind): RoderItem[] {
   if (event.type === "itemStarted") {
-    return upsertRoderItem(items, event.item, mergeStartedItem);
+    return startRoderItem(items, event.item);
   }
   if (event.type === "itemCompleted") {
     return completeRoderItem(items, event.item);
@@ -122,6 +122,31 @@ export function applyThreadItemEventToItems(items: RoderItem[], event: RoderThre
   const nextItems = [...items];
   nextItems[index] = applyThreadItemDelta(nextItems[index], event.delta);
   return nextItems;
+}
+
+function startRoderItem(items: RoderItem[], incoming: RoderItem): RoderItem[] {
+  const activeIndex = activeRoderItemIndex(items, incoming.id);
+  if (activeIndex !== -1) {
+    const nextItems = [...items];
+    const existing = nextItems[activeIndex];
+    nextItems[activeIndex] = mergeStartedItem(existing, { ...incoming, id: existing.id });
+    return nextItems;
+  }
+
+  const exactIndex = items.findIndex((item) => item.id === incoming.id);
+  if (exactIndex === -1) {
+    return [...items, incoming];
+  }
+
+  // Later steps often reuse stable protocol item ids (especially phased agent
+  // messages around tool calls). If that id already finished earlier in the
+  // turn, append a localized duplicate so the transcript stays chronological
+  // instead of rewriting the earlier message at the top of the turn.
+  if (items[exactIndex].status !== "inProgress") {
+    return [...items, { ...incoming, id: nextLocalItemId(items, incoming.id) }];
+  }
+
+  return upsertRoderItem(items, incoming, mergeStartedItem);
 }
 
 function completeRoderItem(items: RoderItem[], incoming: RoderItem): RoderItem[] {

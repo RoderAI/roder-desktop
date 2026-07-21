@@ -351,6 +351,163 @@ test("duplicate message item ids from loaded thread snapshots are localized", ()
   ]);
 });
 
+test("itemStarted after tools keeps later assistant messages chronological", () => {
+  let current = {
+    ...thread("thread-a", 100),
+    status: { type: "running", activeTurnId: "turn-a", activeFlags: [] },
+    turns: [{ id: "turn-a", items: [], itemsView: "default", status: "inProgress" }],
+  };
+
+  current = applyThreadItemEvent(current, {
+    seq: 1,
+    eventId: "event-1",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: { id: "turn-a-user", type: "userMessage", text: "inspect the repo", status: "completed" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 2,
+    eventId: "event-2",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemStarted",
+      item: {
+        id: "turn-a-agent-commentary",
+        type: "agentMessage",
+        text: "",
+        phase: "commentary",
+        status: "inProgress",
+      },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 3,
+    eventId: "event-3",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemDelta",
+      itemId: "turn-a-agent-commentary",
+      delta: { type: "agentMessageText", delta: "Looking at package.json first.", phase: "commentary" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 4,
+    eventId: "event-4",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: {
+        id: "turn-a-agent-commentary",
+        type: "agentMessage",
+        text: "Looking at package.json first.",
+        phase: "commentary",
+        status: "completed",
+      },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 5,
+    eventId: "event-5",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemStarted",
+      item: {
+        id: "tool-1",
+        type: "toolExecution",
+        toolName: "read_file",
+        toolCallId: "call-1",
+        status: "inProgress",
+        input: JSON.stringify({ path: "package.json" }),
+      },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 6,
+    eventId: "event-6",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: {
+        id: "tool-1",
+        type: "toolExecution",
+        toolName: "read_file",
+        toolCallId: "call-1",
+        status: "completed",
+        input: JSON.stringify({ path: "package.json" }),
+        output: "{ \"name\": \"roder-desktop\" }",
+      },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 7,
+    eventId: "event-7",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemStarted",
+      item: {
+        id: "turn-a-agent-commentary",
+        type: "agentMessage",
+        text: "",
+        phase: "commentary",
+        status: "inProgress",
+      },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 8,
+    eventId: "event-8",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemDelta",
+      itemId: "turn-a-agent-commentary",
+      delta: { type: "agentMessageText", delta: "Next I will inspect the providers panel.", phase: "commentary" },
+    },
+  });
+  current = applyThreadItemEvent(current, {
+    seq: 9,
+    eventId: "event-9",
+    threadId: "thread-a",
+    turnId: "turn-a",
+    timestamp: "1970-01-01T00:00:00Z",
+    event: {
+      type: "itemCompleted",
+      item: {
+        id: "turn-a-agent-commentary",
+        type: "agentMessage",
+        text: "Next I will inspect the providers panel.",
+        phase: "commentary",
+        status: "completed",
+      },
+    },
+  });
+
+  const messages = messagesFromThread(current);
+  expect(plain(messages.map((message) => [message.role, message.id, message.text]))).toEqual([
+    ["user", "turn-a-user", "inspect the repo"],
+    ["assistant", "turn-a-agent-commentary:commentary", "Looking at package.json first."],
+    ["tool", "tool:call-1", "Read package.json"],
+    ["assistant", "turn-a-agent-commentary::duplicate-2:commentary", "Next I will inspect the providers panel."],
+  ]);
+});
+
 function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
