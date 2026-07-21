@@ -6,11 +6,9 @@
     "types": ["vite/client", "node"],
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@roderai/extension-api": ["packages/extension-api/src/index.ts"]
+      "@/*": ["./src/*"],
+      "@roderai/extension-api": ["./packages/extension-api/src/index.ts"]
     },
 
     /* Bundler mode */

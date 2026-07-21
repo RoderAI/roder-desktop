@@ -8,6 +8,7 @@ import {
   useGroupRef,
   usePanelRef,
   type Layout,
+  type LayoutChangedMeta,
   type PanelSize,
 } from "react-resizable-panels";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -380,11 +381,11 @@ export function AppShellLayout({
     setMeasuredWorkspacePanelWidthOverride(nextWidth);
   }
 
-  function handleLayoutChanged(layout: Layout): void {
+  function handleLayoutChanged(layout: Layout, meta: LayoutChangedMeta): void {
     // The group only holds the main column and workspace panel; persist their split only while the
     // workspace panel is open so a collapsed (0px) state never overwrites the user's last real sizes.
     if (workspacePanelVisible) {
-      saveLayout(layout);
+      saveLayout(layout, meta);
     }
   }
 
