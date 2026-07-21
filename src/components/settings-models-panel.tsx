@@ -11,16 +11,16 @@ export function ModelsSettingsPanel(): React.JSX.Element {
   const providers = useRoderStore((state) => state.providers);
   const selectedModel = useRoderStore((state) => state.selectedModel);
   const selectedModelProvider = useRoderStore((state) => state.selectedModelProvider);
-  const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
+  const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
   const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
   const resetVisibleModels = useRoderStore((state) => state.resetVisibleModels);
   const [query, setQuery] = useState("");
 
-  const visibleIds = useMemo(() => visibleModelIdsFor(models, visibleModelIds), [models, visibleModelIds]);
+  const visibleIds = useMemo(() => visibleModelIdsFor(models, hiddenModelIds), [models, hiddenModelIds]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const filteredModels = useMemo(() => filterModels(models, query), [models, query]);
   const grouped = useMemo(() => groupModelsByProvider(filteredModels), [filteredModels]);
-  const customised = visibleModelIds.length > 0;
+  const customised = hiddenModelIds.length > 0;
 
   return (
     <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">

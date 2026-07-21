@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export function ProvidersSettingsPanel(): React.JSX.Element {
   const providers = useRoderStore((state) => state.providers);
   const models = useRoderStore((state) => state.models);
-  const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
+  const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
   const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
   const configureProvider = useRoderStore((state) => state.configureProvider);
@@ -29,7 +29,7 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
       providers[0],
     [filteredProviders, providers, selectedProviderId],
   );
-  const visibleIds = useMemo(() => visibleModelIdsFor(models, visibleModelIds), [models, visibleModelIds]);
+  const visibleIds = useMemo(() => visibleModelIdsFor(models, hiddenModelIds), [models, hiddenModelIds]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const configuredCount = providers.filter(isProviderConfigured).length;
 

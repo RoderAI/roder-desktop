@@ -13,7 +13,7 @@ import type {
   RoderModel,
 } from "@/types/roder";
 
-const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
+const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh", "ultra"];
 
 const policyOptions: Array<{ mode: PolicyMode; label: string; description: string }> = [
   {
@@ -41,7 +41,7 @@ const policyOptions: Array<{ mode: PolicyMode; label: string; description: strin
 export function GeneralSettingsPanel(): React.JSX.Element {
   const allModels = useRoderStore((state) => state.models);
   const routingOptions = useRoderStore((state) => state.routingOptions);
-  const visibleModelIds = useRoderStore((state) => state.visibleModelIds);
+  const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
   const defaultModel = useRoderStore((state) => state.defaultModel);
   const defaultModelProvider = useRoderStore((state) => state.defaultModelProvider);
   const defaultSelectionMode = useRoderStore((state) => state.defaultSelectionMode);
@@ -56,7 +56,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const models = useMemo(() => visibleModelsFor(allModels, visibleModelIds), [allModels, visibleModelIds]);
+  const models = useMemo(() => visibleModelsFor(allModels, hiddenModelIds), [allModels, hiddenModelIds]);
   const selectedModelRecord = useMemo(
     () => resolveSelectedModelRecord(models, defaultModel, defaultModelProvider) ?? models[0],
     [models, defaultModel, defaultModelProvider],
@@ -239,6 +239,9 @@ function selectedModelDescription(selectionMode: ModelSelectionMode, model: Rode
 function reasoningLabel(reasoning: ReasoningEffort): string {
   if (reasoning === "xhigh") {
     return "Extra high";
+  }
+  if (reasoning === "ultra") {
+    return "Ultra";
   }
   return reasoning.slice(0, 1).toUpperCase() + reasoning.slice(1);
 }

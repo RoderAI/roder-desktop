@@ -68,27 +68,29 @@ export function modelKeys(models: RoderModel[]): string[] {
   return models.map(modelKey);
 }
 
-export function visibleModelIdsFor(models: RoderModel[], explicitIds: string[]): string[] {
+/** Resolve which model keys are visible. `hiddenIds` is a blocklist: empty means all visible. */
+export function visibleModelIdsFor(models: RoderModel[], hiddenIds: string[]): string[] {
   const allIds = modelKeys(models);
-  if (explicitIds.length === 0) {
+  if (hiddenIds.length === 0) {
     return allIds;
   }
-  const visibleIds = explicitIds.flatMap((id) => visibleModelKeysForId(models, id));
-  return visibleIds.length > 0 ? visibleIds : allIds;
+  const hidden = new Set(hiddenIds.flatMap((id) => visibleModelKeysForId(models, id)));
+  return allIds.filter((id) => !hidden.has(id));
 }
 
-export function compactVisibleModelIds(models: RoderModel[], visibleIds: string[]): string[] {
-  const allIds = modelKeys(models);
-  if (visibleIds.length === allIds.length && visibleIds.every((id, index) => id === allIds[index])) {
+/** Persist only keys that are still present in the live catalog. */
+export function compactHiddenModelIds(models: RoderModel[], hiddenIds: string[]): string[] {
+  if (hiddenIds.length === 0) {
     return [];
   }
-  return visibleIds;
+  const allIds = new Set(modelKeys(models));
+  const resolved = new Set(hiddenIds.flatMap((id) => visibleModelKeysForId(models, id)));
+  return [...resolved].filter((id) => allIds.has(id));
 }
 
-export function visibleModelsFor(models: RoderModel[], explicitIds: string[]): RoderModel[] {
-  const visibleIds = visibleModelIdsFor(models, explicitIds);
-  const visible = new Set(visibleIds);
-  return models.filter((model) => visible.has(modelKey(model)));
+export function visibleModelsFor(models: RoderModel[], hiddenIds: string[]): RoderModel[] {
+  const visibleIds = new Set(visibleModelIdsFor(models, hiddenIds));
+  return models.filter((model) => visibleIds.has(modelKey(model)));
 }
 
 export function groupModelsByProvider<T extends Pick<RoderModel, "modelProvider">>(
@@ -122,11 +124,11 @@ export function displayModelName(model: Pick<RoderModel, "id" | "name" | "displa
 
 export function effectiveSelectedModel(
   models: RoderModel[],
-  visibleModelIds: string[],
+  hiddenModelIds: string[],
   selectedModel: string,
   selectedProvider?: string,
 ): RoderModel | undefined {
-  const visibleModels = visibleModelsFor(models, visibleModelIds);
+  const visibleModels = visibleModelsFor(models, hiddenModelIds);
   return selectedModelRecord(visibleModels, selectedModel, selectedProvider) ?? visibleModels[0];
 }
 
