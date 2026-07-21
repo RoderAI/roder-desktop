@@ -19,6 +19,7 @@ export const workspacePanelValues = [
   "extensions",
   "review",
   "files",
+  "subagents",
 ] as const;
 export const pluginProviderValues = ["all", "anthropic", "cursor", "codex", "local"] as const;
 export const reviewScopeValues = ["thread", "turn", "branch"] as const;

@@ -696,6 +696,9 @@ function reasoningLevelLabel(level: string): string {
   if (level === "xhigh") {
     return "Extra high";
   }
+  if (level === "ultra") {
+    return "Ultra";
+  }
   return level.slice(0, 1).toUpperCase() + level.slice(1);
 }
 
