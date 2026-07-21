@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   completionKey,
   completionOptionId,
+  completionTriggerInsertion,
   currentCompletionUiState,
   moveCompletionIndex,
   shouldClearDismissedCompletion,
@@ -68,4 +69,13 @@ test("clears dismissed completions when editing the dismissed token", () => {
   expect(shouldClearDismissedCompletion("0:1:", "0:1:", { key: "ArrowLeft" })).toBe(false);
   expect(shouldClearDismissedCompletion("0:1:", "0:1:", { key: "a", metaKey: true })).toBe(false);
   expect(shouldClearDismissedCompletion("0:2:a", "0:1:", { key: "Backspace" })).toBe(false);
+});
+
+test("inserts completion triggers at the caret with a leading space when mid-word", () => {
+  expect(completionTriggerInsertion("", 0, "$")).toEqual({ text: "$", caret: 1 });
+  expect(completionTriggerInsertion("hello ", 6, "$")).toEqual({ text: "hello $", caret: 7 });
+  expect(completionTriggerInsertion("hello", 5, "$")).toEqual({ text: "hello $", caret: 7 });
+  expect(completionTriggerInsertion("use(", 4, "$")).toEqual({ text: "use($", caret: 5 });
+  expect(completionTriggerInsertion("hello world", 5, "@")).toEqual({ text: "hello @ world", caret: 7 });
+  expect(completionTriggerInsertion("ab", 1, "$")).toEqual({ text: "a $b", caret: 3 });
 });
