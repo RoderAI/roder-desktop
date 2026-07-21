@@ -9,23 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as PluginsRouteImport } from './routes/plugins'
-import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ThreadsThreadIdRouteImport } from './routes/threads.$threadId'
-import { Route as SettingsSectionRouteImport } from './routes/settings.$section'
-import { Route as PluginsInstalledRouteImport } from './routes/plugins.installed'
+import { Route as NewRouteImport } from './routes/new'
+import { Route as PluginsRouteImport } from './routes/plugins'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PluginsExploreRouteImport } from './routes/plugins.explore'
+import { Route as PluginsInstalledRouteImport } from './routes/plugins.installed'
+import { Route as SettingsSectionRouteImport } from './routes/settings.$section'
+import { Route as ThreadsThreadIdRouteImport } from './routes/threads.$threadId'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PluginsRoute = PluginsRouteImport.update({
-  id: '/plugins',
-  path: '/plugins',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewRoute = NewRouteImport.update({
@@ -33,30 +28,35 @@ const NewRoute = NewRouteImport.update({
   path: '/new',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const PluginsRoute = PluginsRouteImport.update({
+  id: '/plugins',
+  path: '/plugins',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ThreadsThreadIdRoute = ThreadsThreadIdRouteImport.update({
-  id: '/threads/$threadId',
-  path: '/threads/$threadId',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsSectionRoute = SettingsSectionRouteImport.update({
-  id: '/$section',
-  path: '/$section',
-  getParentRoute: () => SettingsRoute,
+const PluginsExploreRoute = PluginsExploreRouteImport.update({
+  id: '/explore',
+  path: '/explore',
+  getParentRoute: () => PluginsRoute,
 } as any)
 const PluginsInstalledRoute = PluginsInstalledRouteImport.update({
   id: '/installed',
   path: '/installed',
   getParentRoute: () => PluginsRoute,
 } as any)
-const PluginsExploreRoute = PluginsExploreRouteImport.update({
-  id: '/explore',
-  path: '/explore',
-  getParentRoute: () => PluginsRoute,
+const SettingsSectionRoute = SettingsSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const ThreadsThreadIdRoute = ThreadsThreadIdRouteImport.update({
+  id: '/threads/$threadId',
+  path: '/threads/$threadId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -133,18 +133,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/plugins': {
-      id: '/plugins'
-      path: '/plugins'
-      fullPath: '/plugins'
-      preLoaderRoute: typeof PluginsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/new': {
@@ -154,26 +147,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/plugins': {
+      id: '/plugins'
+      path: '/plugins'
+      fullPath: '/plugins'
+      preLoaderRoute: typeof PluginsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/threads/$threadId': {
-      id: '/threads/$threadId'
-      path: '/threads/$threadId'
-      fullPath: '/threads/$threadId'
-      preLoaderRoute: typeof ThreadsThreadIdRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/$section': {
-      id: '/settings/$section'
-      path: '/$section'
-      fullPath: '/settings/$section'
-      preLoaderRoute: typeof SettingsSectionRouteImport
-      parentRoute: typeof SettingsRoute
+    '/plugins/explore': {
+      id: '/plugins/explore'
+      path: '/explore'
+      fullPath: '/plugins/explore'
+      preLoaderRoute: typeof PluginsExploreRouteImport
+      parentRoute: typeof PluginsRoute
     }
     '/plugins/installed': {
       id: '/plugins/installed'
@@ -182,12 +175,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PluginsInstalledRouteImport
       parentRoute: typeof PluginsRoute
     }
-    '/plugins/explore': {
-      id: '/plugins/explore'
-      path: '/explore'
-      fullPath: '/plugins/explore'
-      preLoaderRoute: typeof PluginsExploreRouteImport
-      parentRoute: typeof PluginsRoute
+    '/settings/$section': {
+      id: '/settings/$section'
+      path: '/$section'
+      fullPath: '/settings/$section'
+      preLoaderRoute: typeof SettingsSectionRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/threads/$threadId': {
+      id: '/threads/$threadId'
+      path: '/threads/$threadId'
+      fullPath: '/threads/$threadId'
+      preLoaderRoute: typeof ThreadsThreadIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
