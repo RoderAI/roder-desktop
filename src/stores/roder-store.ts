@@ -7,21 +7,28 @@ import {
   activeTurnIdForThread,
   isThreadRunning,
   markThreadStatus,
+  messagesFromThread,
   patchThread,
   sortThreadsByUpdatedAt,
   upsertThread,
 } from "@/lib/roder-thread";
+import {
+  mergeHydratedSubagentTraces,
+  reduceSubagentTraceNotification,
+  type SubagentLifecycleByThread,
+  type SubagentTracesByThread,
+} from "@/lib/subagent-traces";
 import { reducePendingWaitRequests, setWaitRequestResolving } from "@/lib/roder-wait-requests";
 import {
-  compactVisibleModelIds,
+  compactHiddenModelIds,
   configuredModelsFor,
   displayModelName,
   effectiveSelectedModel,
   modelKey,
   selectedModelProvider,
-  visibleModelIdsFor,
   visibleModelsFor,
 } from "@/lib/roder-models";
+import { runStaleEmptyThreadCleanup } from "@/lib/thread-cleanup";
 import {
   normalizeCwd,
   normalizeThreadCwd,
@@ -71,13 +78,18 @@ type RoderStore = {
   threadControlsByThread: Record<string, ThreadControlState>;
   queuedPromptsByThread: Record<string, QueuedPrompt[]>;
   hunkRevisionByThread: Record<string, number>;
+  subagentTracesByThread: SubagentTracesByThread;
+  subagentLifecycleByThread: SubagentLifecycleByThread;
+  teamLeadThreadByTeamId: Record<string, string>;
+  teamMemberTitlesByKey: Record<string, string>;
   activeThreadId: string;
   backStack: NavigationEntry[];
   forwardStack: NavigationEntry[];
   models: RoderModel[];
   routingOptions: InferenceRoutingOptionDescriptor[];
   providers: ProviderDescriptor[];
-  visibleModelIds: string[];
+  /** Blocklist of provider-qualified model keys the user hid. Empty = all visible. */
+  hiddenModelIds: string[];
   defaultModel: string;
   defaultModelProvider: string;
   defaultSelectionMode: ModelSelectionMode;
@@ -177,6 +189,9 @@ function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
   }
   if (value === "xhigh") {
     return "xhigh";
+  }
+  if (value === "ultra") {
+    return "ultra";
   }
   return "low";
 }
@@ -384,13 +399,17 @@ export const useRoderStore = create<RoderStore>()(
       threadControlsByThread: {},
       queuedPromptsByThread: {},
       hunkRevisionByThread: {},
+      subagentTracesByThread: {},
+      subagentLifecycleByThread: {},
+      teamLeadThreadByTeamId: {},
+      teamMemberTitlesByKey: {},
       activeThreadId: "",
       backStack: [],
       forwardStack: [],
       models: [],
       routingOptions: [],
       providers: [],
-      visibleModelIds: [],
+      hiddenModelIds: [],
       defaultModel: "",
       defaultModelProvider: "",
       defaultSelectionMode: initialManualSelection,
@@ -434,8 +453,8 @@ export const useRoderStore = create<RoderStore>()(
           const providerModels = modelsFromProviders(providers);
           const fallbackModels = normalizeModelRecords(modelResult.models);
           const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers);
-          const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, current.visibleModelIds));
-          const visibleModels = visibleModelsFor(models, visibleModelIds);
+          const hiddenModelIds = compactHiddenModelIds(models, current.hiddenModelIds);
+          const visibleModels = visibleModelsFor(models, hiddenModelIds);
           const activeThreadId = threads.some((thread) => thread.id === current.activeThreadId)
             ? current.activeThreadId
             : firstThreadId(threads, "");
@@ -485,7 +504,7 @@ export const useRoderStore = create<RoderStore>()(
             models,
             routingOptions: providerResult.routingOptions ?? [],
             providers,
-            visibleModelIds,
+            hiddenModelIds,
             defaultModel: currentSelectedModel,
             defaultModelProvider: currentSelectedModelProvider,
             defaultSelectionMode: providerSelectionMode,
@@ -512,6 +531,14 @@ export const useRoderStore = create<RoderStore>()(
           if (activeThreadId) {
             void get().selectThread(activeThreadId, { pushHistory: false, deferRead: true });
           }
+
+          // Fire-and-forget: archive stale empty untitled threads without delaying boot.
+          void runStaleEmptyThreadCleanup({
+            listThreads: (limit, cursor) => roderIpc.listThreads(limit, cursor),
+            archiveThread: (threadId) => roderIpc.archiveThread(threadId),
+            refreshThreads: () => get().refreshThreads(),
+            getActiveThreadId: () => get().activeThreadId,
+          });
         } catch (error) {
           set({
             status: { state: "error", binary: "unresolved", message: (error as Error).message },
@@ -571,6 +598,7 @@ export const useRoderStore = create<RoderStore>()(
         }
         if (threadId === current.activeThreadId && current.threadDetails[threadId]) {
           await syncThreadGoal(threadId, set);
+          void hydrateSubagentTracesForThread(threadId, current.threadDetails[threadId].turns ?? [], get, set);
           return;
         }
         const selectedThread = threadForState(current, threadId);
@@ -640,6 +668,7 @@ export const useRoderStore = create<RoderStore>()(
               workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
             };
           });
+          void hydrateSubagentTracesForThread(threadId, thread.turns ?? [], get, set);
         } catch (error) {
           set({ error: (error as Error).message });
         }
@@ -661,6 +690,9 @@ export const useRoderStore = create<RoderStore>()(
             const { [threadId]: _archivedGoal, ...threadGoalsByThread } = state.threadGoalsByThread;
             const { [threadId]: _archivedQueue, ...queuedPromptsByThread } = state.queuedPromptsByThread;
             const { [threadId]: _archivedHunkRevision, ...hunkRevisionByThread } = state.hunkRevisionByThread;
+            const { [threadId]: _archivedSubagentTraces, ...subagentTracesByThread } = state.subagentTracesByThread;
+            const { [threadId]: _archivedSubagentLifecycle, ...subagentLifecycleByThread } =
+              state.subagentLifecycleByThread;
             return {
               threads: state.threads.filter((thread) => thread.id !== threadId),
               threadDetails,
@@ -668,6 +700,8 @@ export const useRoderStore = create<RoderStore>()(
               queuedPromptsByThread,
               threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
               hunkRevisionByThread,
+              subagentTracesByThread,
+              subagentLifecycleByThread,
               activeThreadId: nextActiveThreadId,
               backStack: state.backStack.filter((entry) => entry.threadId !== threadId),
               forwardStack: state.forwardStack.filter((entry) => entry.threadId !== threadId),
@@ -904,7 +938,7 @@ export const useRoderStore = create<RoderStore>()(
           const turnState = get();
           const turnModel = effectiveSelectedModel(
             turnState.models,
-            turnState.visibleModelIds,
+            turnState.hiddenModelIds,
             turnState.selectedModel,
             turnState.selectedModelProvider,
           );
@@ -1052,22 +1086,22 @@ export const useRoderStore = create<RoderStore>()(
       },
       setModelVisibility: (modelId, visible) =>
         set((state) => {
-          const currentVisibleIds = visibleModelIdsFor(state.models, state.visibleModelIds);
-          const currentVisible = new Set(currentVisibleIds);
-          const targetKeys = state.models.flatMap((model) => (model.id === modelId ? [modelKey(model)] : []));
+          const currentHidden = new Set(compactHiddenModelIds(state.models, state.hiddenModelIds));
+          const targetKeys = state.models.flatMap((model) =>
+            modelKey(model) === modelId || model.id === modelId ? [modelKey(model)] : [],
+          );
           const keysToUpdate = targetKeys.length > 0 ? targetKeys : [modelId];
           if (visible) {
             for (const key of keysToUpdate) {
-              currentVisible.add(key);
+              currentHidden.delete(key);
             }
           } else {
             for (const key of keysToUpdate) {
-              currentVisible.delete(key);
+              currentHidden.add(key);
             }
           }
-          const nextVisibleModels = state.models.filter((model) => currentVisible.has(modelKey(model)));
-          const nextVisibleIds = nextVisibleModels.map(modelKey);
-          if (nextVisibleIds.length === 0) {
+          const nextVisibleModels = visibleModelsFor(state.models, [...currentHidden]);
+          if (nextVisibleModels.length === 0) {
             return {};
           }
           const selectedVisible = nextVisibleModels.some(
@@ -1081,12 +1115,12 @@ export const useRoderStore = create<RoderStore>()(
               selectedModelProvider(state.models, selectedModel, state.selectedModelProvider) ??
               state.selectedModelProvider);
           return {
-            visibleModelIds: compactVisibleModelIds(state.models, nextVisibleIds),
+            hiddenModelIds: compactHiddenModelIds(state.models, [...currentHidden]),
             selectedModel,
             selectedModelProvider: selectedModelProviderValue,
           };
         }),
-      resetVisibleModels: () => set({ visibleModelIds: [] }),
+      resetVisibleModels: () => set({ hiddenModelIds: [] }),
       refreshProviders: async () => {
         const providerResult = await roderIpc.listProviders();
         set((state) => applyProviderCatalog(state, providerResult));
@@ -1154,7 +1188,7 @@ export const useRoderStore = create<RoderStore>()(
         const state = get();
         const model = effectiveSelectedModel(
           state.models,
-          state.visibleModelIds,
+          state.hiddenModelIds,
           state.defaultModel,
           state.defaultModelProvider,
         );
@@ -1291,11 +1325,21 @@ export const useRoderStore = create<RoderStore>()(
     {
       name: "roder-desktop-navigation",
       storage: debouncedLocalStorage<PersistedRoderState>(500),
+      version: 1,
+      migrate: (persistedState) => {
+        const state = persistedState as PersistedRoderState & { visibleModelIds?: string[] };
+        // Drop the stale allowlist so newly published provider models default to visible.
+        const { visibleModelIds: _staleAllowlist, ...rest } = state;
+        return {
+          ...rest,
+          hiddenModelIds: Array.isArray(state.hiddenModelIds) ? state.hiddenModelIds : [],
+        };
+      },
       partialize: (state) => ({
         activeThreadId: state.activeThreadId,
         backStack: state.backStack,
         forwardStack: state.forwardStack,
-        visibleModelIds: state.visibleModelIds,
+        hiddenModelIds: state.hiddenModelIds,
         workspaces: state.workspaces,
         selectedWorkspaceId: state.selectedWorkspaceId,
         selectedRootId: state.selectedRootId,
@@ -1312,7 +1356,7 @@ type PersistedRoderState = Pick<
   | "activeThreadId"
   | "backStack"
   | "forwardStack"
-  | "visibleModelIds"
+  | "hiddenModelIds"
   | "workspaces"
   | "selectedWorkspaceId"
   | "selectedRootId"
@@ -1706,8 +1750,8 @@ function applyProviderCatalog(
   const providerModels = modelsFromProviders(providers);
   const fallbackModels = normalizeModelRecords(state.models);
   const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers);
-  const visibleModelIds = compactVisibleModelIds(models, visibleModelIdsFor(models, state.visibleModelIds));
-  const visibleModels = visibleModelsFor(models, visibleModelIds);
+  const hiddenModelIds = compactHiddenModelIds(models, state.hiddenModelIds);
+  const visibleModels = visibleModelsFor(models, hiddenModelIds);
   const defaultModelRecord = selectedModelRecordOrDefault(
     visibleModels,
     state.defaultModel,
@@ -1723,7 +1767,7 @@ function applyProviderCatalog(
     providers,
     routingOptions: providerResult.routingOptions ?? state.routingOptions,
     models,
-    visibleModelIds,
+    hiddenModelIds,
     defaultModel: defaultModelRecord?.id ?? state.defaultModel,
     defaultModelProvider: defaultModelRecord?.modelProvider ?? state.defaultModelProvider,
     selectedModel: selectedModelRecord?.id ?? defaultModelRecord?.id ?? state.selectedModel,
@@ -1780,7 +1824,7 @@ async function createThreadForPrompt(
   const requestedProvider = concrete.provider || selectionSource.provider;
   const model = effectiveSelectedModel(
     latestState.models,
-    latestState.visibleModelIds,
+    latestState.hiddenModelIds,
     requestedModel,
     requestedProvider,
   );
@@ -2161,6 +2205,49 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     };
   }
 
+  if (
+    notification.method === "turn/subagentTraceCreated" ||
+    notification.method === "turn/subagentTraceDelta" ||
+    notification.method === "turn/subagentTraceStatusChanged" ||
+    notification.method === "turn/subagentTraceCompleted" ||
+    notification.method === "turn/subagentTraceFailed" ||
+    notification.method === "team/started" ||
+    notification.method === "team/member/started" ||
+    notification.method === "team/member/statusChanged" ||
+    notification.method === "team/member/messageDelta" ||
+    notification.method === "team/member/completed"
+  ) {
+    const fallbackThreadId = state.activeThreadId || null;
+    const threadIdForLifecycle =
+      subagentNotificationThreadId(params) ??
+      teamNotificationThreadId(params, state.teamLeadThreadByTeamId) ??
+      fallbackThreadId ??
+      "";
+    const afterMessageId = lastMessageIdForThread(state, threadIdForLifecycle);
+    const patch = reduceSubagentTraceNotification(
+      {
+        subagentTracesByThread: state.subagentTracesByThread,
+        subagentLifecycleByThread: state.subagentLifecycleByThread,
+        teamLeadThreadByTeamId: state.teamLeadThreadByTeamId,
+        teamMemberTitlesByKey: state.teamMemberTitlesByKey,
+      },
+      notification.method,
+      params,
+      afterMessageId,
+      {
+        fallbackThreadId,
+        resolveThreadTitle: (threadId) =>
+          state.threadDetails[threadId]?.preview ??
+          state.threads.find((thread) => thread.id === threadId)?.preview ??
+          null,
+      },
+    );
+    if (!patch) {
+      return waitPatch;
+    }
+    return { ...waitPatch, ...patch };
+  }
+
   if (notification.method === "agentSwarm/modeChanged") {
     const event = params as AgentSwarmModeChangedNotification;
     const threadId = event.threadId ?? event.thread_id ?? "";
@@ -2230,4 +2317,96 @@ function markWaitRequestResolving(
       error,
     ),
   }));
+}
+
+function lastMessageIdForThread(state: RoderStore, threadId: string): string | null {
+  if (!threadId) {
+    return null;
+  }
+  const messages = messagesFromThread(threadForState(state, threadId));
+  return messages.at(-1)?.id ?? null;
+}
+
+function subagentNotificationThreadId(params: Record<string, unknown>): string | null {
+  const summary = isRecord(params.summary) ? params.summary : null;
+  const delta = isRecord(params.delta) ? params.delta : null;
+  const parent =
+    (summary && isRecord(summary.parent) ? summary.parent : null) ||
+    (delta && isRecord(delta.parent) ? delta.parent : null) ||
+    (isRecord(params.parent) ? params.parent : null);
+  if (!parent) {
+    return null;
+  }
+  const threadId = parent.threadId ?? parent.thread_id;
+  return typeof threadId === "string" && threadId ? threadId : null;
+}
+
+function teamNotificationThreadId(
+  params: Record<string, unknown>,
+  teamLeadThreadByTeamId: Record<string, string>,
+): string | null {
+  const team = isRecord(params.team) ? params.team : null;
+  if (team) {
+    const leadThreadId = team.leadThreadId ?? team.lead_thread_id;
+    if (typeof leadThreadId === "string" && leadThreadId) {
+      return leadThreadId;
+    }
+  }
+  const member = isRecord(params.member) ? params.member : null;
+  if (member) {
+    const parentThreadId = member.parentThreadId ?? member.parent_thread_id;
+    if (typeof parentThreadId === "string" && parentThreadId) {
+      return parentThreadId;
+    }
+  }
+  const teamId = params.teamId ?? params.team_id;
+  if (typeof teamId === "string" && teamId && teamLeadThreadByTeamId[teamId]) {
+    return teamLeadThreadByTeamId[teamId];
+  }
+  return null;
+}
+
+async function hydrateSubagentTracesForThread(
+  threadId: string,
+  turns: RoderTurn[],
+  get: () => RoderStore,
+  set: (partial: Partial<RoderStore> | ((state: RoderStore) => Partial<RoderStore>)) => void,
+): Promise<void> {
+  const methods = get().status.appServerMethods ?? [];
+  if (methods.length > 0 && !methods.includes("turn/subagentTraces/list")) {
+    return;
+  }
+  const turnIds = turns.map((turn) => turn.id).filter(Boolean);
+  if (turnIds.length === 0) {
+    return;
+  }
+  try {
+    const pages = await Promise.all(
+      turnIds.map(async (turnId) => {
+        try {
+          return await roderIpc.listSubagentTraces(threadId, turnId);
+        } catch {
+          // Older binaries or missing turns should not block thread selection.
+          return { traces: [] };
+        }
+      }),
+    );
+    const summaries = pages.flatMap((page) => page.traces ?? []);
+    if (summaries.length === 0) {
+      return;
+    }
+    set((state) => {
+      if (state.activeThreadId !== threadId && !state.threadDetails[threadId]) {
+        return {};
+      }
+      return {
+        subagentTracesByThread: {
+          ...state.subagentTracesByThread,
+          [threadId]: mergeHydratedSubagentTraces(state.subagentTracesByThread[threadId] ?? [], summaries),
+        },
+      };
+    });
+  } catch {
+    // Tolerate absent methods (-32601) and transient list failures.
+  }
 }

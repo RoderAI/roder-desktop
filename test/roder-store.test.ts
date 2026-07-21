@@ -1165,6 +1165,128 @@ test("hunk recorded notifications bump the hunk revision for the changed thread"
   });
 });
 
+test("subagent trace notifications update the per-thread store slice", async () => {
+  const useRoderStore = await loadRoderStore();
+  useRoderStore.setState({
+    activeThreadId: "thread-1",
+    threadDetails: {
+      "thread-1": {
+        id: "thread-1",
+        preview: "Trace thread",
+        modelProvider: "openai",
+        model: "gpt-5.5",
+        createdAt: 1770000000,
+        updatedAt: 1770000100,
+        status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
+        cwd: "/workspace",
+        turns: [
+          {
+            id: "turn-1",
+            items: [
+              {
+                id: "item-1",
+                type: "userMessage",
+                text: "delegate",
+              },
+            ],
+            itemsView: "default",
+            status: "inProgress",
+            error: null,
+          },
+        ],
+      },
+    },
+    subagentTracesByThread: {},
+    subagentLifecycleByThread: {},
+  });
+
+  useRoderStore.getState().applyNotification({
+    method: "turn/subagentTraceCreated",
+    params: {
+      summary: {
+        traceId: "trace-1",
+        parent: { threadId: "thread-1", turnId: "turn-1" },
+        childThreadId: "child",
+        childTurnId: "child-turn",
+        title: "Native runner review",
+        role: "explore",
+        status: "running",
+        elapsedMs: 0,
+        latestActivity: "starting",
+      },
+      timestamp: "2026-07-21T12:00:00.000Z",
+    },
+  });
+  useRoderStore.getState().applyNotification({
+    method: "turn/subagentTraceCompleted",
+    params: {
+      summary: {
+        traceId: "trace-1",
+        parent: { threadId: "thread-1", turnId: "turn-1" },
+        childThreadId: "child",
+        childTurnId: "child-turn",
+        title: "Native runner review",
+        role: "explore",
+        status: "completed",
+        elapsedMs: 1200,
+        latestActivity: "finished review",
+      },
+      timestamp: "2026-07-21T12:01:00.000Z",
+    },
+  });
+
+  const traces = useRoderStore.getState().subagentTracesByThread["thread-1"];
+  const lifecycle = useRoderStore.getState().subagentLifecycleByThread["thread-1"];
+  expect(traces).toHaveLength(1);
+  expect(traces[0]).toMatchObject({ title: "Native runner review", status: "completed" });
+  expect(lifecycle.map((event) => event.verb)).toEqual(["started working", "finished"]);
+});
+
+test("team member notifications populate subagent traces on the active thread", async () => {
+  const useRoderStore = await loadRoderStore();
+  const teamId = "824ae94d-aaaa-bbbb-cccc-ddddeeeeffff";
+
+  useRoderStore.setState({ activeThreadId: "thread-1" });
+
+  useRoderStore.getState().applyNotification({
+    method: "team/member/messageDelta",
+    params: {
+      teamId,
+      memberId: "lead",
+      turnId: "turn-1",
+      delta: ".",
+    },
+  });
+  useRoderStore.getState().applyNotification({
+    method: "team/member/messageDelta",
+    params: {
+      teamId,
+      memberId: "member-3",
+      turnId: "turn-1",
+      delta: "Scanning demo repo",
+    },
+  });
+  useRoderStore.getState().applyNotification({
+    method: "team/member/completed",
+    params: {
+      teamId,
+      memberId: "member-3",
+      turnId: "turn-1",
+      status: "completed",
+      finalMessage: "Demo repo used to validate subagent behavior.",
+    },
+  });
+
+  const traces = useRoderStore.getState().subagentTracesByThread["thread-1"];
+  expect(traces).toHaveLength(1);
+  expect(traces[0]).toMatchObject({
+    traceId: `team:${teamId}:member-3`,
+    title: "Member 3",
+    status: "completed",
+    latestActivity: "Demo repo used to validate subagent behavior.",
+  });
+});
+
 test("thread goal reads ignore goals from another thread", async () => {
   const useRoderStore = await loadRoderStore(async (method, params) => {
     const requestParams = params as { threadId?: string };
@@ -1755,12 +1877,12 @@ test("model visibility can hide one provider when duplicate model ids exist", as
       { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "opencode" },
       { id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" },
     ],
-    visibleModelIds: [],
+    hiddenModelIds: [],
   });
 
   useRoderStore.getState().setModelVisibility("opencode:gpt-5.5", false);
 
-  expect(useRoderStore.getState().visibleModelIds).toEqual(["openai:gpt-5.5", "claude-code:claude-code/sonnet"]);
+  expect(useRoderStore.getState().hiddenModelIds).toEqual(["opencode:gpt-5.5"]);
   expect(useRoderStore.getState().selectedModelProvider).toBe("openai");
 });
 
