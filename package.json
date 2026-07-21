@@ -85,5 +85,7 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "zustand": "^5.0.14"
-  }
+  },
+  "description": "Roder Desktop - a local-first desktop app for the Roder agent harness",
+  "author": "RoderAI"
 }
