@@ -34,3 +34,4 @@ resources/bin/*
 !/.agents/skills/react-doctor/
 !/.agents/skills/react-doctor/SKILL.md
 /skills/react-doctor/
+.tmp-r2-dist/

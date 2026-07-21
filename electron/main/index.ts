@@ -24,6 +24,7 @@ import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
 import { TerminalManager } from "../terminal/pty-manager";
+import { createAutoUpdateController } from "./auto-update";
 import {
   createApplicationMenuTemplate,
   installOpenFileSearchShortcut,
@@ -146,7 +147,16 @@ function sendToRenderer(channel: string, payload: unknown): void {
   mainWindow?.webContents.send(channel, payload);
 }
 
+const autoUpdate = createAutoUpdateController({
+  getMainWindow: () => mainWindow,
+  isPackaged: app.isPackaged,
+});
+
 function sendAppCommand(command: AppCommand): void {
+  if (command === "checkForUpdates") {
+    autoUpdate.checkForUpdates({ interactive: true });
+    return;
+  }
   sendToRenderer("app:command", { command });
 }
 
@@ -467,6 +477,8 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(Menu.buildFromTemplate(createApplicationMenuTemplate(sendAppCommand)));
   createWindow();
   startMcpAuthWatcher();
+  // Background Sparkle/Squirrel.Mac check after the window is up (signed builds only).
+  setTimeout(() => autoUpdate.checkForUpdates({ interactive: false }), 15_000);
   try {
     await roder.start();
   } catch (error) {
