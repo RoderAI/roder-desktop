@@ -17,7 +17,7 @@
 [roder]
 # crates.io version of the `roder` crate the desktop binary is built from.
 # Must stay in sync with roder-desktop-distro/Cargo.toml (enforced at build time).
-version = "0.1.14"
+version = "0.1.23"
 # Published crate that provides the roder CLI + `run_distribution` entrypoint.
 crate = "roder"
 # Binary name the Electron shell loads from resources/bin/ (see
@@ -34,6 +34,7 @@ package = "roder-desktop-distro"
 # Registry the pinned version is pulled from.
 registry = "https://crates.io"
 repository = "https://github.com/RoderAI/roder"
+
 # Maintainer reference checkout only. The build NEVER compiles from this path;
 # it exists so engineers can read the upstream source that the pinned crate was
 # published from.
