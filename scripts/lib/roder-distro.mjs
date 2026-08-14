@@ -186,7 +186,16 @@ export function buildDistroBinary({ release = false, log = console.log } = {}) {
 
   const profileDir = release ? "release" : "debug";
   const builtName = process.platform === "win32" ? `${config.binary}.exe` : config.binary;
-  const builtBinary = resolve(config.distroDir, "target", profileDir, builtName);
+  const metadata = spawnSync(
+    "cargo",
+    ["metadata", "--manifest-path", resolve(config.distroDir, "Cargo.toml"), "--format-version", "1", "--no-deps"],
+    { cwd: config.distroDir, encoding: "utf8", env: process.env },
+  );
+  if (metadata.error || metadata.status !== 0) {
+    throw new Error(`cargo metadata failed with status ${metadata.status ?? "unknown"}`);
+  }
+  const { target_directory: targetDirectory } = JSON.parse(metadata.stdout);
+  const builtBinary = resolve(targetDirectory, profileDir, builtName);
   if (!existsSync(builtBinary)) {
     throw new Error(`Expected built binary at ${builtBinary} but it is missing`);
   }
