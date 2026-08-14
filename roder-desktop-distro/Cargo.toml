@@ -29,7 +29,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 # Upstream Roder agent harness. Keep in sync with roder-distro-config.toml.
-roder = "0.1.14"
+roder = { git = "https://github.com/RoderAI/roder", tag = "roder/v0.1.23", package = "roder" }
 
 [profile.release]
 lto = "thin"
