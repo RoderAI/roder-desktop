@@ -55,10 +55,10 @@ async function main() {
   console.log(`[roder-distro]   ${manifestPath}`);
 
   // Refresh the distro crate lockfile so the pin is reflected deterministically.
-  const updateArgs = ["update", "--manifest-path", resolve(config.distroDir, "Cargo.toml"), "-p", config.crate];
-  if (!config.source?.tag) {
-    updateArgs.push("--precise", version);
-  }
+  // Refresh the complete standalone lockfile. The published `roder` crate has
+  // several companion crates with compatible 0.1.x ranges; limiting the update
+  // to the top-level crate can retain stale, incompatible companion entries.
+  const updateArgs = ["update", "--manifest-path", resolve(config.distroDir, "Cargo.toml")];
   const lockResult = spawnSync("cargo", updateArgs, { cwd: config.distroDir, stdio: "inherit", env: process.env });
   if (lockResult.status !== 0) {
     console.warn(
