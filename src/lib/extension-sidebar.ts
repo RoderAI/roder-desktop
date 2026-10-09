@@ -1,7 +1,9 @@
 import type { ExtensionCatalogRecord } from "@/types/extensions";
 
+// Disabled extensions are hidden from the sidebar and the activity rail; they stay listed in
+// Settings > Extensions, where they can be enabled again.
 export function getSidebarExtensions(extensions: ExtensionCatalogRecord[]): ExtensionCatalogRecord[] {
-  return extensions.filter(hasSidebarRelevantContribution);
+  return extensions.filter((extension) => extension.enabled && hasSidebarRelevantContribution(extension));
 }
 
 export function selectedSidebarExtensionId(

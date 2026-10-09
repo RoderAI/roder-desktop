@@ -34,7 +34,7 @@ import {
   dropdownMenuTriggerVariants,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { groupModelsByProvider, providerName } from "@/lib/roder-models";
+import { groupModelsByProvider, providerName, reasoningEffortsFor, resolveReasoningEffort } from "@/lib/roder-models";
 import { cn } from "@/lib/utils";
 
 export const pickerMenuSurfaceClassName = "bg-card text-card-foreground ring-border/70";
@@ -273,7 +273,11 @@ export function ModelPicker({
       : undefined;
   const selected =
     selectedAutoItem ?? (selectedModelItem ? { type: "model" as const, model: selectedModelItem } : null);
-  const showReasoningPicker = !selectedAutoItem;
+  // Efforts come from the selected model, as the engine advertises them. A model that takes none
+  // (for example claude-code haiku) shows no effort picker.
+  const reasoningChoices = reasoningEffortsFor(selectedModelItem);
+  const shownReasoning = resolveReasoningEffort(selectedModelItem, selectedReasoning) ?? selectedReasoning;
+  const showReasoningPicker = !selectedAutoItem && reasoningChoices.length > 0;
   const modelGroups = groupModelsByProvider(visibleModels);
 
   return (
@@ -283,7 +287,6 @@ export function ModelPicker({
         onOpenChange={setOpen}
         value={selected}
         items={items}
-        limit={10}
         itemToStringLabel={modelPickerItemName}
         itemToStringValue={modelPickerItemValue}
         isItemEqualToValue={(item, value) => modelPickerItemValue(item) === modelPickerItemValue(value)}
@@ -384,23 +387,20 @@ export function ModelPicker({
       </Combobox.Root>
       {showReasoningPicker && (
         <DropdownMenu>
-          <DropdownMenuTrigger
-            variant="pill"
-            aria-label={`Choose thinking effort: ${reasoningLabel(selectedReasoning)}`}
-          >
-            <span>{reasoningLabel(selectedReasoning)}</span>
+          <DropdownMenuTrigger variant="pill" aria-label={`Choose thinking effort: ${reasoningLabel(shownReasoning)}`}>
+            <span>{reasoningLabel(shownReasoning)}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" sideOffset={8} className={pickerMenuSurfaceClassName}>
             <DropdownMenuGroup>
-              {reasoningOptions.map((reasoning) => (
+              {reasoningChoices.map((reasoning) => (
                 <DropdownMenuItem
                   key={reasoning}
-                  selected={reasoning === selectedReasoning}
+                  selected={reasoning === shownReasoning}
                   className="h-9 text-base"
                   onSelect={() => onReasoningChange(reasoning)}
                 >
                   <span className="min-w-0 flex-1">{reasoningName(reasoning)}</span>
-                  {reasoning === selectedReasoning && <Check className="size-3.5 text-primary" />}
+                  {reasoning === shownReasoning && <Check className="size-3.5 text-primary" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
@@ -433,8 +433,6 @@ function modelPickerItemSearchText(item: ModelPickerItem): string {
   }
   return `${item.model.displayName ?? ""} ${item.model.name} ${item.model.id} ${item.model.modelProvider}`;
 }
-
-const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh", "ultra"];
 
 type ProviderLogoDefinition = {
   title: string;

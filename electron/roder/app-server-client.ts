@@ -45,6 +45,21 @@ type DesktopNotification = {
 const thisDir = dirname(fileURLToPath(import.meta.url));
 const schemaProbeTimeoutMs = 5_000;
 
+// Deadlines for short-latency engine methods. Methods not listed here have no
+// deadline, because some (for example thread/compact) legitimately run for minutes.
+const requestTimeoutsMs = new Map<string, number>([
+  ["initialize", 30_000],
+  ["thread/start", 60_000],
+  ["turn/start", 60_000],
+  ["model/list", 60_000],
+  ["providers/list", 60_000],
+  ["model/select", 60_000],
+  ["thread/list", 60_000],
+  ["thread/read", 60_000],
+  ["skills/list", 60_000],
+  ["settings/get", 60_000],
+]);
+
 export class RoderAppServerClient extends EventEmitter {
   #child: ChildProcessWithoutNullStreams | null = null;
   #buffer = "";
@@ -81,16 +96,30 @@ export class RoderAppServerClient extends EventEmitter {
     const appServerMethods = readAppServerMethods(target);
     this.#setStatus({ state: "starting", binary: target.label, appServerMethods, cwd: target.cwd });
 
-    this.#child = spawn(target.command, target.args, {
+    // Each listener below belongs to one spawned engine. Once that engine is no
+    // longer the current child (after stop or restart), its events must not touch
+    // shared state, or a late exit would clobber the replacement engine.
+    const child = spawn(target.command, target.args, {
       cwd: target.cwd,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
+    this.#child = child;
+    this.#buffer = "";
 
-    this.#child.stdout.setEncoding("utf8");
-    this.#child.stderr.setEncoding("utf8");
-    this.#child.stdout.on("data", (chunk: string) => this.#handleStdout(chunk));
-    this.#child.stderr.on("data", (chunk: string) => {
+    child.stdin.on("error", (error) => this.#handleStdinError(child, error));
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (this.#child === child) {
+        this.#handleStdout(chunk);
+      }
+    });
+    child.stdout.on("error", (error) => this.#reportStreamError(child, "stdout", error));
+    child.stderr.on("data", (chunk: string) => {
+      if (this.#child !== child) {
+        return;
+      }
       this.emit("stderr", chunk);
       if (this.#status.state !== "ready") {
         this.#setStatus({
@@ -99,15 +128,22 @@ export class RoderAppServerClient extends EventEmitter {
         });
       }
     });
-    this.#child.once("exit", (code, signal) => {
+    child.stderr.on("error", (error) => this.#reportStreamError(child, "stderr", error));
+    child.once("exit", (code, signal) => {
+      if (this.#child !== child) {
+        return;
+      }
       const message = signal ? `roder exited with signal ${signal}` : `roder exited with code ${code ?? 0}`;
-      this.#rejectAll(new Error(message));
       this.#child = null;
+      this.#rejectAll(new Error(message));
       this.#setStatus({ state: "stopped", binary: target.label, appServerMethods, cwd: target.cwd, message });
     });
-    this.#child.once("error", (error) => {
-      this.#rejectAll(error);
+    child.on("error", (error) => {
+      if (this.#child !== child) {
+        return;
+      }
       this.#child = null;
+      this.#rejectAll(error);
       this.#setStatus({
         state: "error",
         binary: target.label,
@@ -117,16 +153,36 @@ export class RoderAppServerClient extends EventEmitter {
       });
     });
 
-    await this.#rawRequest("initialize", {
-      clientInfo: {
-        name: "roder-desktop",
-        title: "Roder Desktop",
-        version: app.getVersion(),
-      },
-      capabilities: {
-        experimentalApi: true,
-      },
-    });
+    try {
+      await this.#sendRequest(child, "initialize", {
+        clientInfo: {
+          name: "roder-desktop",
+          title: "Roder Desktop",
+          version: app.getVersion(),
+        },
+        capabilities: {
+          experimentalApi: true,
+        },
+      });
+    } catch (error) {
+      // The handshake failed, so nothing owns this engine. Kill it, and touch shared
+      // state only if it is still the current child: a stop or a newer start may
+      // already have replaced it and set its own status.
+      child.kill();
+      if (this.#child === child) {
+        this.#child = null;
+        const reason = error instanceof Error ? error : new Error(String(error));
+        this.#rejectAll(reason);
+        this.#setStatus({
+          state: "error",
+          binary: target.label,
+          appServerMethods,
+          cwd: target.cwd,
+          message: reason.message,
+        });
+      }
+      throw error;
+    }
 
     this.#setStatus({ state: "ready", binary: target.label, appServerMethods, cwd: target.cwd });
     return this.#status;
@@ -161,20 +217,44 @@ export class RoderAppServerClient extends EventEmitter {
     if (!this.#child && method !== "initialize") {
       await this.start();
     }
-    if (!this.#child) {
+    const child = this.#child;
+    if (!child) {
       throw new Error("roder app-server is not running");
     }
+    return this.#sendRequest(child, method, params);
+  }
 
+  #sendRequest(child: ChildProcessWithoutNullStreams, method: string, params: unknown): Promise<unknown> {
     const id = this.#nextId++;
     const message = JSON.stringify({ id, method, params });
+    const timeoutMs = requestTimeoutsMs.get(method);
     return new Promise((resolve, reject) => {
-      this.#pending.set(id, { resolve, reject });
-      this.#child?.stdin.write(`${message}\n`, (error) => {
+      // The timer is cleared by whichever path settles the request, so a late reply
+      // after a timeout finds no pending entry and is ignored.
+      const timer =
+        timeoutMs === undefined
+          ? undefined
+          : setTimeout(() => {
+              this.#pending.delete(id);
+              reject(new Error(`roder app-server ${method} timed out after ${timeoutMs}ms`));
+            }, timeoutMs);
+      this.#pending.set(id, {
+        resolve: (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      });
+      child.stdin.write(`${message}\n`, (error) => {
         if (!error) {
           return;
         }
+        const pending = this.#pending.get(id);
         this.#pending.delete(id);
-        reject(error);
+        pending?.reject(error);
       });
     });
   }
@@ -249,6 +329,23 @@ export class RoderAppServerClient extends EventEmitter {
     throw new Error(
       `Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`,
     );
+  }
+
+  #handleStdinError(child: ChildProcessWithoutNullStreams, error: Error): void {
+    if (this.#child !== child) {
+      return;
+    }
+    this.emit("stderr", `roder stdin error: ${error.message}\n`);
+    // With stdin broken, no pending request can reach the engine, so fail them all
+    // instead of leaving them to wait for an exit that may never come.
+    this.#rejectAll(error);
+  }
+
+  #reportStreamError(child: ChildProcessWithoutNullStreams, stream: "stdout" | "stderr", error: Error): void {
+    if (this.#child !== child) {
+      return;
+    }
+    this.emit("stderr", `roder ${stream} error: ${error.message}\n`);
   }
 
   #setStatus(status: RoderStatus): void {

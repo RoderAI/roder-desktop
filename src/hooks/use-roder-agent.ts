@@ -11,6 +11,7 @@ const emptyQueuedPrompts: QueuedPrompt[] = [];
 
 export function useRoderAgent() {
   useRoderStoreBootstrap();
+  useProviderCatalogRefresh();
   const state = useRoderStore(useShallow(selectAgentState));
   const models = useMemo(
     () => visibleModelsFor(state.allModels, state.hiddenModelIds),
@@ -54,6 +55,27 @@ export function useShowWorkingIndicator(routeActiveThreadId: string): boolean {
     const messages = messagesFromThread(activeThreadForState(state));
     return shouldShowThreadWorkingIndicator(routeThread, waitRequests.length, messages);
   });
+}
+
+// The engine fills in some provider catalogs (OpenRouter, opencode, ...) in the background after it
+// starts, so the first providers/list can be partial. Re-read it so the model pickers catch up.
+const providerCatalogRefreshMs = 60_000;
+
+function useProviderCatalogRefresh(): void {
+  const refreshProviders = useRoderStore((state) => state.refreshProviders);
+  const engineReady = useRoderStore((state) => state.status.state === "ready");
+
+  useEffect(() => {
+    if (!engineReady) {
+      return;
+    }
+    const refresh = () => {
+      void refreshProviders().catch(() => undefined);
+    };
+    refresh();
+    const timer = window.setInterval(refresh, providerCatalogRefreshMs);
+    return () => window.clearInterval(timer);
+  }, [engineReady, refreshProviders]);
 }
 
 function useRoderStoreBootstrap(): void {

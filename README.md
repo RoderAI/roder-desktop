@@ -54,7 +54,7 @@ Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` fro
 
 ## Embedded harness
 
-Desktop never compiles Roder from a sibling `~/w/roder` checkout. It embeds a **pinned crates.io release** of the `roder` crate (currently **0.1.14**).
+Desktop never compiles Roder from a sibling `~/w/roder` checkout. It embeds a **pinned crates.io release** of the `roder` crate (currently **0.3.2**).
 
 ```
 roder-distro-config.toml          # pin ([roder].version)

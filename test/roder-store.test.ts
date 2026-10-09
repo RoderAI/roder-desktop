@@ -101,7 +101,16 @@ test("newProject creates a configured multi-root workspace and starts in the def
     activeThreadId: "",
     status: { state: "ready", binary: "test", cwd: "/workspace" },
     selectedWorkspaceCwd: "/workspace",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     selectedModel: "gpt-5.5",
     threadDetails: {},
@@ -185,7 +194,18 @@ test("bootstrap does not wait for full active transcript read", async () => {
           backwardsCursor: null,
         };
       case "model/list":
-        return { models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }] };
+        return {
+          models: [
+            {
+              id: "gpt-5.5",
+              name: "GPT-5.5",
+              modelProvider: "openai",
+              isDefault: true,
+              defaultReasoningEffort: "medium",
+              reasoningEfforts: ["low", "medium", "high", "xhigh"],
+            },
+          ],
+        };
       case "settings/get":
         return {
           default_provider: "openai",
@@ -301,7 +321,18 @@ test("new threads use the current cwd instead of an unmatched stale workspace", 
       case "thread/list":
         return { data: [] };
       case "model/list":
-        return { models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }] };
+        return {
+          models: [
+            {
+              id: "gpt-5.5",
+              name: "GPT-5.5",
+              modelProvider: "openai",
+              isDefault: true,
+              defaultReasoningEffort: "medium",
+              reasoningEfforts: ["low", "medium", "high", "xhigh"],
+            },
+          ],
+        };
       case "settings/get":
         return {
           default_provider: "openai",
@@ -476,7 +507,16 @@ test("new agent in clicked project starts in that project on the first send", as
     selectedWorkspaceId: "ws-desktop",
     selectedRootId: "root-desktop",
     workspaces: [godeDesktopWorkspace, godeWorkspace],
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     defaultModelProvider: "openai",
     selectedModel: "gpt-5.5",
@@ -585,7 +625,7 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
               id: "thread-1",
               preview: "Existing thread",
               modelProvider: "openai",
-              model: "gpt-5.5",
+              model: "gpt-6-sol",
               createdAt: 1770000000,
               updatedAt: 1770000100,
               status: { type: "idle", activeTurnId: null, activeFlags: [] },
@@ -595,11 +635,22 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
           ],
         };
       case "model/list":
-        return { models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }] };
+        return {
+          models: [
+            {
+              id: "gpt-6-sol",
+              name: "GPT-6 Sol",
+              modelProvider: "openai",
+              isDefault: true,
+              defaultReasoningEffort: "medium",
+              reasoningEfforts: ["low", "medium", "high", "xhigh"],
+            },
+          ],
+        };
       case "settings/get":
         return {
           default_provider: "openai",
-          default_model: "gpt-5.5",
+          default_model: "gpt-6-sol",
           default_reasoning: "medium",
           default_mode: "accept_all",
         };
@@ -611,7 +662,7 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
             id: "thread-1",
             preview: "Existing thread",
             modelProvider: "openai",
-            model: "gpt-5.5",
+            model: "gpt-6-sol",
             createdAt: 1770000000,
             updatedAt: 1770000100,
             status: { type: "idle", activeTurnId: null, activeFlags: [] },
@@ -677,7 +728,16 @@ test("stale root ids do not silently select the first root in a workspace", asyn
     selectedWorkspaceId: "ws_multi",
     selectedRootId: "root_removed",
     selectedWorkspaceCwd: "",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     selectedModel: "gpt-5.5",
     workspaces: [
@@ -757,7 +817,16 @@ test("new blank threads preserve an explicitly selected project folder", async (
     activeThreadId: "thread-a",
     status: { state: "ready", binary: "test", cwd: "/workspace" },
     selectedWorkspaceCwd: "/workspace/project-a",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     selectedModel: "gpt-5.5",
     threadDetails: {
@@ -851,7 +920,16 @@ test("new threads preserve the Auto default selection in thread/start", async ()
     activeThreadId: "",
     status: { state: "ready", binary: "test", cwd: "/workspace" },
     selectedWorkspaceCwd: "/workspace",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     defaultModelProvider: "openai",
     defaultSelectionMode: selectionMode,
@@ -910,7 +988,16 @@ test("new threads do not send malformed Auto defaults without an option id", asy
     activeThreadId: "",
     status: { state: "ready", binary: "test", cwd: "/workspace" },
     selectedWorkspaceCwd: "/workspace",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     defaultModelProvider: "openai",
     defaultSelectionMode: {
@@ -972,7 +1059,16 @@ test("saveDefaults saves Auto routing through model/select", async () => {
   });
   const useRoderStore = await loadRoderStore(request);
   useRoderStore.setState({
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     defaultModel: "gpt-5.5",
     defaultModelProvider: "openai",
     defaultSelectionMode: selectionMode,
@@ -1037,7 +1133,16 @@ test("setSelectedAutoModel applies the canonical app-server selection response",
         baseline: { provider: "openai", model: "gpt-5.5" },
       },
     ],
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
   });
 
   await useRoderStore.getState().setSelectedAutoModel("local:coding");
@@ -1111,6 +1216,15 @@ test("sendPrompt starts a blank thread with the selected Auto routing option", a
     activeThreadId: "",
     status: { state: "ready", binary: "test", cwd: "/workspace" },
     selectedWorkspaceCwd: "/workspace",
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     selectedModel: "gpt-5.5",
     selectedModelProvider: "openai",
     selectedSelectionMode,
@@ -1574,7 +1688,16 @@ test("sendPrompt starts a new turn when a stale activeTurnId is not running", as
     activeThreadId: "thread-1",
     busy: false,
     selectedModel: "gpt-5.5",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     threadDetails: { "thread-1": thread },
     threads: [thread],
   });
@@ -1626,7 +1749,16 @@ test("sendPrompt leaves model selection to the app-server when Auto routing is a
     selectedSelectionMode: selectionMode,
     selectedReasoning: "high",
     selectedPolicyMode: "plan",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     threadDetails: { "thread-1": thread },
     threads: [thread],
   });
@@ -1673,7 +1805,16 @@ test("sendPrompt sends manual overrides when Auto state is not configured", asyn
     } as never,
     selectedReasoning: "high",
     selectedPolicyMode: "plan",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     threadDetails: { "thread-1": thread },
     threads: [thread],
   });
@@ -1717,7 +1858,16 @@ test("sendPrompt immediately labels an untitled blank thread from the first prom
     selectedModelProvider: "openai",
     selectedReasoning: "medium",
     selectedPolicyMode: "accept_all",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     threadDetails: { "thread-untitled": thread },
     threads: [thread],
   });
@@ -1770,7 +1920,16 @@ test("prompt-created threads use the first prompt as an immediate optimistic tit
     defaultPolicyMode: "accept_all",
     selectedModel: "gpt-5.5",
     selectedModelProvider: "openai",
-    models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai", isDefault: true }],
+    models: [
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ],
     workspaces: [
       {
         id: "ws_1",
@@ -1837,8 +1996,21 @@ test("prompt-created threads use the submission picker model instead of defaults
     selectedReasoning: "high",
     selectedPolicyMode: "accept_all",
     models: [
-      { id: "gpt-5.3", name: "GPT-5.3", modelProvider: "openai", isDefault: true },
-      { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+      {
+        id: "gpt-5.3",
+        name: "GPT-5.3",
+        modelProvider: "openai",
+        isDefault: true,
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
     ],
     workspaces: [
       {
@@ -1873,7 +2045,13 @@ test("model visibility can hide one provider when duplicate model ids exist", as
     selectedModel: "gpt-5.5",
     selectedModelProvider: "openai",
     models: [
-      { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "openai" },
+      {
+        id: "gpt-5.5",
+        name: "GPT-5.5",
+        modelProvider: "openai",
+        defaultReasoningEffort: "medium",
+        reasoningEfforts: ["low", "medium", "high", "xhigh"],
+      },
       { id: "gpt-5.5", name: "GPT-5.5", modelProvider: "opencode" },
       { id: "claude-code/sonnet", name: "Claude Code Sonnet", modelProvider: "claude-code" },
     ],

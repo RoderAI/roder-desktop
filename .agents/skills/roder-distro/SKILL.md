@@ -70,8 +70,8 @@ hook (`scripts/install-roder-for-build.mjs`).
 3. Build and smoke-test the binary:
    ```sh
    pnpm roder:distro:release
-   ./resources/bin/roder --version
    ./resources/bin/roder app-server schema --format manifest | head
+   # `roder --version` needs a TTY and fails with "Device not configured" under pipes or CI.
    ```
 4. Launch the desktop app to confirm the app-server connects:
    ```sh

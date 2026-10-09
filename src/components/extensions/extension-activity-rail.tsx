@@ -46,13 +46,11 @@ export function ExtensionActivityRail({
               <span
                 className={cn(
                   "absolute bottom-1 right-1 size-1.5 rounded-full",
-                  !extension.enabled
-                    ? "bg-muted-foreground/40"
-                    : extension.activationState === "failed"
-                      ? "bg-destructive"
-                      : extension.activationState === "active"
-                        ? "bg-primary"
-                        : "bg-muted-foreground/70",
+                  extension.activationState === "failed"
+                    ? "bg-destructive"
+                    : extension.activationState === "active"
+                      ? "bg-primary"
+                      : "bg-muted-foreground/70",
                 )}
                 aria-hidden="true"
               />

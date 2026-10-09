@@ -21,6 +21,7 @@ import type {
   HunkReadResult,
   PolicyMode,
   ProviderDescriptor,
+  ProviderModelDescriptor,
   ProcessesListResult,
   ProcessesStopAllResult,
   ProcessesStopResult,
@@ -154,11 +155,23 @@ type WireModelSelectResult = Omit<ModelSelectResult, "selectionMode"> & {
   selectionMode: WireModelSelectionMode;
 };
 
-type WireProviderDescriptor = Omit<ProviderDescriptor, "authType" | "authLabel" | "authDetail" | "sortOrder"> & {
+// providers/list is snake_case per model and per provider; model/list is camelCase. Only the
+// providers/list shape is adapted here (`supported_reasoning` is a list of {effort, description}).
+type WireProviderModelDescriptor = Omit<ProviderModelDescriptor, "defaultReasoningEffort" | "reasoningEfforts"> & {
+  default_reasoning?: string | null;
+  supported_reasoning?: Array<{ effort: string; description?: string | null }> | null;
+  context_window?: number | null;
+};
+
+type WireProviderDescriptor = Omit<
+  ProviderDescriptor,
+  "authType" | "authLabel" | "authDetail" | "sortOrder" | "models"
+> & {
   auth_type?: string;
   auth_label?: string | null;
   auth_detail?: string | null;
   sort_order?: number;
+  models?: WireProviderModelDescriptor[];
 };
 
 type WireProvidersListResult = Omit<ProvidersListResult, "providers" | "selectionMode"> & {
@@ -217,13 +230,24 @@ function modelSelectionModeFromWire(selectionMode: WireModelSelectionMode): Mode
 }
 
 function providerDescriptorFromWire(provider: WireProviderDescriptor): ProviderDescriptor {
-  const { auth_type, auth_label, auth_detail, sort_order, ...domainProvider } = provider;
+  const { auth_type, auth_label, auth_detail, sort_order, models, ...domainProvider } = provider;
   return {
     ...domainProvider,
-    authType: auth_type,
+    authType: auth_type === "o_auth" ? "oauth" : auth_type,
     authLabel: auth_label,
     authDetail: auth_detail,
     sortOrder: sort_order,
+    models: models?.map(providerModelDescriptorFromWire),
+  };
+}
+
+function providerModelDescriptorFromWire(model: WireProviderModelDescriptor): ProviderModelDescriptor {
+  const { default_reasoning, supported_reasoning, context_window, ...domainModel } = model;
+  return {
+    ...domainModel,
+    defaultReasoningEffort: default_reasoning || undefined,
+    reasoningEfforts: supported_reasoning?.map((option) => option.effort) ?? [],
+    contextWindow: context_window ?? null,
   };
 }
 
@@ -705,12 +729,12 @@ export const roderIpc = {
     }) as Promise<SkillsListResult>,
   setSkillEnabled: (canonicalPath: string, enabled: boolean) =>
     window.roderDesktop.request("skills/setEnabled", {
-      selector: { path: canonicalPath },
+      selector: { path: { path: canonicalPath } },
       enabled,
     }) as Promise<SkillsUpdateResult>,
   setSkillExposure: (canonicalPath: string, exposure: SkillExposure) =>
     window.roderDesktop.request("skills/setExposure", {
-      selector: { path: canonicalPath },
+      selector: { path: { path: canonicalPath } },
       exposure,
     }) as Promise<SkillsUpdateResult>,
   listSpeechProviders: () =>

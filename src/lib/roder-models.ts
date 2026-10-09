@@ -1,4 +1,4 @@
-import type { ProviderDescriptor, RoderModel } from "@/types/roder";
+import type { ProviderDescriptor, ReasoningEffort, RoderModel } from "@/types/roder";
 
 export function providerConfigured(provider: string, configuredProviders: Set<string> | null): boolean {
   const normalizedProvider = normalizeProviderId(provider);
@@ -141,6 +141,47 @@ export function selectedModelRecord(
     models.find((model) => model.id === selectedModel && model.modelProvider === selectedProvider) ??
     models.find((model) => model.id === selectedModel)
   );
+}
+
+// GPT-5.x models are retired from every picker. Dynamically discovered providers (OpenCode, Cursor)
+// keep reporting them until a roder release without them is pinned, so the desktop filters them too.
+const retiredModelIdPattern = /(?:^|\/)gpt-5(?:[.-]|$)/i;
+
+export function isRetiredModel(model: Pick<RoderModel, "id">): boolean {
+  return retiredModelIdPattern.test(model.id);
+}
+
+/** Reasoning efforts the engine advertises for this model, in the engine's order. */
+export function reasoningEffortsFor(model: Pick<RoderModel, "reasoningEfforts"> | null | undefined): ReasoningEffort[] {
+  return (model?.reasoningEfforts ?? []).filter((effort) => effort.length > 0);
+}
+
+/**
+ * The effort to send for this model. The engine rejects any effort a model does not advertise
+ * ("model X does not support reasoning effort Y"), so an unsupported request is replaced by the
+ * model's default. `null` means the model takes no effort, or is not known yet, and the field should
+ * be omitted so the engine applies its own default.
+ */
+export function resolveReasoningEffort(
+  model: Pick<RoderModel, "defaultReasoningEffort" | "reasoningEfforts"> | null | undefined,
+  requested: string | null | undefined,
+): ReasoningEffort | null {
+  const efforts = reasoningEffortsFor(model);
+  if (efforts.length === 0) {
+    return null;
+  }
+  if (requested && efforts.includes(requested)) {
+    return requested;
+  }
+  if (model?.defaultReasoningEffort && efforts.includes(model.defaultReasoningEffort)) {
+    return model.defaultReasoningEffort;
+  }
+  // Without a usable default, prefer the desktop's usual "medium" over whatever sorts first
+  // (which can be "none").
+  if (efforts.includes("medium")) {
+    return "medium";
+  }
+  return efforts[0] ?? null;
 }
 
 function visibleModelKeysForId(models: RoderModel[], id: string): string[] {
