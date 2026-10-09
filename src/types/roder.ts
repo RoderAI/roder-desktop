@@ -245,13 +245,7 @@ export type AgentsListResult = {
   agents: AgentDescriptor[];
 };
 
-export type SubagentTraceStatus =
-  | "queued"
-  | "running"
-  | "waiting_for_approval"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export type SubagentTraceStatus = "queued" | "running" | "waiting_for_approval" | "completed" | "failed" | "cancelled";
 
 export type ParentTurnRef = {
   threadId: string;
@@ -292,7 +286,12 @@ export type SubagentTraceItem =
   | { type: "message"; role: string; content: { text: string; truncated?: boolean; nextOffset?: number | null } }
   | { type: "reasoning"; content: { text: string; truncated?: boolean; nextOffset?: number | null } }
   | { type: "toolCall"; toolId: string; toolName: string; input?: unknown }
-  | { type: "toolResult"; toolId: string; isError: boolean; output: { text: string; truncated?: boolean; nextOffset?: number | null } }
+  | {
+      type: "toolResult";
+      toolId: string;
+      isError: boolean;
+      output: { text: string; truncated?: boolean; nextOffset?: number | null };
+    }
   | { type: "status"; status: SubagentTraceStatus; detail?: string | null };
 
 export type SubagentTraceDelta = {
@@ -578,6 +577,7 @@ export type ProviderModelDescriptor = {
   description?: string | null;
   defaultReasoningEffort?: string;
   reasoningEfforts?: string[];
+  contextWindow?: number | null;
   isDefault?: boolean;
 };
 
@@ -652,7 +652,18 @@ export type InferenceRoutingDecisionEvent = {
   timestamp: string;
 };
 
-export type ReasoningEffort = "low" | "medium" | "high" | "xhigh" | "ultra";
+// Engine efforts are per model (see ProviderModelDescriptor.reasoningEfforts). The known names are
+// listed for autocomplete; `(string & {})` keeps unknown names from a newer engine representable.
+export type ReasoningEffort =
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max"
+  | "ultra"
+  | (string & {});
 
 export type PolicyMode = "default" | "accept_all" | "plan" | "bypass";
 
@@ -670,7 +681,9 @@ export type SkillExposure = "global" | "direct_only";
 
 export type SkillActivationState = "enabled" | "disabled" | "experimental";
 
-export type SkillSelector = { path: string } | { name: string };
+// The engine's SkillSelector is externally tagged with a struct payload, so the wire form is
+// {"path": {"path": "..."}} or {"name": {"name": "..."}}, not {"path": "..."}.
+export type SkillSelector = { path: { path: string } } | { name: { name: string } };
 
 export type SkillAgentMetadata = {
   interface?: string;

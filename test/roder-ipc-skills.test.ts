@@ -64,7 +64,7 @@ test("setSkillEnabled mutates by canonical path selector", async () => {
     {
       method: "skills/setEnabled",
       params: {
-        selector: { path: "builtin://skills/commit/SKILL.md" },
+        selector: { path: { path: "builtin://skills/commit/SKILL.md" } },
         enabled: false,
       },
     },
@@ -84,7 +84,7 @@ test("setSkillExposure mutates by canonical path selector", async () => {
     {
       method: "skills/setExposure",
       params: {
-        selector: { path: "builtin://skills/commit/SKILL.md" },
+        selector: { path: { path: "builtin://skills/commit/SKILL.md" } },
         exposure: "global",
       },
     },

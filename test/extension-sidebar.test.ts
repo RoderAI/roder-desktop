@@ -1,9 +1,10 @@
 import { expect, test } from "vitest";
 import { getSidebarExtensions, selectedSidebarExtensionId } from "../src/lib/extension-sidebar";
 
-function extensionRecord(id, contributes) {
+function extensionRecord(id, contributes, { enabled = true } = {}) {
   return {
     id,
+    enabled,
     manifest: {
       contributes: {
         commands: [],
@@ -59,4 +60,20 @@ test("selects the requested sidebar extension or falls back to the first availab
   expect(selectedSidebarExtensionId(extensions, "theme-only")).toBe("first-sidebar");
   expect(selectedSidebarExtensionId(extensions, null)).toBe("first-sidebar");
   expect(selectedSidebarExtensionId([], "missing")).toBeNull();
+});
+
+test("hides disabled extensions from the sidebar even when they contribute panels, commands, or tools", () => {
+  const extensions = [
+    extensionRecord(
+      "event-log",
+      { views: { panels: [{ id: "event-log.panel", title: "Event Log", html: "assets/panel.html" }] } },
+      { enabled: false },
+    ),
+    extensionRecord("aurora-theme", { commands: [{ id: "aurora.apply", title: "Apply" }] }, { enabled: false }),
+    extensionRecord("hello", { commands: [{ id: "hello.sayHello", title: "Say Hello" }] }),
+  ];
+
+  expect(getSidebarExtensions(extensions).map((extension) => extension.id)).toEqual(["hello"]);
+  expect(selectedSidebarExtensionId(extensions, "event-log")).toBe("hello");
+  expect(selectedSidebarExtensionId(extensions.slice(0, 2), null)).toBeNull();
 });

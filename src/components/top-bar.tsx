@@ -130,7 +130,7 @@ export function TopBar({
           <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
         </h1>
         <div className="flex min-w-0 items-center justify-end gap-2">
-          {status.state === "error" && (
+          {(status.state === "error" || status.state === "stopped") && (
             <Button variant="outline" size="sm" onClick={onRestart}>
               Restart
             </Button>
@@ -202,7 +202,7 @@ export function TopBar({
         )}
       </div>
       <div className="no-drag ml-auto flex items-center gap-2">
-        {status.state === "error" && (
+        {(status.state === "error" || status.state === "stopped") && (
           <Button variant="outline" size="sm" onClick={onRestart}>
             Restart
           </Button>

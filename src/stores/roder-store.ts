@@ -24,7 +24,9 @@ import {
   configuredModelsFor,
   displayModelName,
   effectiveSelectedModel,
+  isRetiredModel,
   modelKey,
+  resolveReasoningEffort,
   selectedModelProvider,
   visibleModelsFor,
 } from "@/lib/roder-models";
@@ -180,20 +182,32 @@ const initialManualSelection: ModelSelectionMode = {
   reasoning: "medium",
 };
 
-function normalizeReasoningEffort(value: string | undefined): ReasoningEffort {
-  if (value === "medium") {
-    return "medium";
+function settleRunningThread(thread: RoderThread): RoderThread {
+  if (thread.status.type !== "running") {
+    return thread;
   }
-  if (value === "high") {
-    return "high";
-  }
-  if (value === "xhigh") {
-    return "xhigh";
-  }
-  if (value === "ultra") {
-    return "ultra";
-  }
-  return "low";
+  return { ...thread, status: { type: "idle", activeTurnId: null, activeFlags: [] } };
+}
+
+function settleRunningThreads(threads: RoderThread[]): RoderThread[] {
+  return threads.map(settleRunningThread);
+}
+
+// Keeps the effort name the engine reported (none, minimal, max, ultra, ...). Whether a model accepts
+// it is decided per model by resolveReasoningEffort when a request is sent.
+function normalizeReasoningEffort(value: string | undefined | null): ReasoningEffort {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "medium";
+}
+
+function reasoningForModel(
+  models: RoderModel[],
+  provider: string,
+  model: string,
+  requested: string | null | undefined,
+): ReasoningEffort | null {
+  const record = models.find((candidate) => candidate.id === model && candidate.modelProvider === provider);
+  return resolveReasoningEffort(record, requested);
 }
 
 function normalizePolicyMode(value: string | undefined): PolicyMode {
@@ -452,7 +466,10 @@ export const useRoderStore = create<RoderStore>()(
           const providers = providerResult.providers ?? [];
           const providerModels = modelsFromProviders(providers);
           const fallbackModels = normalizeModelRecords(modelResult.models);
-          const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers);
+          const models = configuredModelsFor(
+            providerModels.length > 0 ? providerModels : fallbackModels,
+            providers,
+          ).filter((model) => !isRetiredModel(model));
           const hiddenModelIds = compactHiddenModelIds(models, current.hiddenModelIds);
           const visibleModels = visibleModelsFor(models, hiddenModelIds);
           const activeThreadId = threads.some((thread) => thread.id === current.activeThreadId)
@@ -951,7 +968,7 @@ export const useRoderStore = create<RoderStore>()(
                     turnModel?.modelProvider ??
                     selectedModelProvider(turnState.models, selectedTurnModel, turnState.selectedModelProvider),
                   model: selectedTurnModel,
-                  reasoning: turnState.selectedReasoning,
+                  reasoning: resolveReasoningEffort(turnModel, turnState.selectedReasoning) ?? undefined,
                 }),
             policyMode: turnState.selectedPolicyMode,
           });
@@ -1071,8 +1088,11 @@ export const useRoderStore = create<RoderStore>()(
           selectedModelProviderOverride ??
           selectedModelProvider(initialState.models, selectedModel, initialState.selectedModelProvider) ??
           initialState.selectedModelProvider;
-        const selectionMode = manualSelection(selectedProvider, selectedModel, initialState.selectedReasoning);
-        applySelectedModelState(set, selectedModel, selectedProvider, selectionMode);
+        const nextReasoning =
+          reasoningForModel(initialState.models, selectedProvider, selectedModel, initialState.selectedReasoning) ??
+          initialState.selectedReasoning;
+        const selectionMode = manualSelection(selectedProvider, selectedModel, nextReasoning);
+        applySelectedModelState(set, selectedModel, selectedProvider, selectionMode, nextReasoning);
         await applyLiveModelSelection(set, get, selectionMode);
       },
       setSelectedAutoModel: async (optionId) => {
@@ -1207,7 +1227,7 @@ export const useRoderStore = create<RoderStore>()(
 
         set({ error: null });
         const [selection, mode] = await Promise.all([
-          roderIpc.selectModel(modelSelectChoice(selectionMode, state.defaultReasoning)),
+          roderIpc.selectModel(modelSelectChoice(selectionMode, state.defaultReasoning, state.models)),
           roderIpc.setDefaultMode(state.defaultPolicyMode),
         ]);
 
@@ -1315,10 +1335,28 @@ export const useRoderStore = create<RoderStore>()(
       },
       applyAppearance: (appearance) => set({ appearance }),
       applyStatus: (status) =>
-        set((state) => ({
-          status,
-          selectedWorkspaceCwd: state.selectedWorkspaceCwd || status.cwd || "",
-        })),
+        set((state) => {
+          const statusPatch = {
+            status,
+            selectedWorkspaceCwd: state.selectedWorkspaceCwd || status.cwd || "",
+          };
+          if (status.state !== "stopped" && status.state !== "error") {
+            return statusPatch;
+          }
+          // The engine process is gone, so no in-flight turn can finish. Clear busy so the composer stops
+          // queueing prompts, and settle running threads so they are not shown as working forever.
+          return {
+            ...statusPatch,
+            busy: false,
+            threads: settleRunningThreads(state.threads),
+            threadDetails: Object.fromEntries(
+              Object.entries(state.threadDetails).map(([id, thread]) => [id, settleRunningThread(thread)]),
+            ),
+            error: status.message
+              ? `Roder engine ${status.state}: ${status.message}`
+              : `Roder engine ${status.state}. Restart it to continue.`,
+          };
+        }),
       applyStderr: (message) => set((state) => ({ stderr: [message, ...state.stderr].slice(0, 8) })),
       applyNotification: (notification) => set((state) => reduceNotification(state, notification)),
     }),
@@ -1495,7 +1533,13 @@ function configuredAutoOptionId(selectionMode: ModelSelectionMode): string | nul
   return typeof optionId === "string" && optionId !== "" ? optionId : null;
 }
 
-function modelSelectChoice(selectionMode: ModelSelectionMode, reasoning: ReasoningEffort): ModelSelectChoice {
+// `reasoning` is the user's current choice. It wins over the effort stored in selectionMode, which can
+// be stale (saving defaults after changing the effort used to send the old one).
+function modelSelectChoice(
+  selectionMode: ModelSelectionMode,
+  reasoning: ReasoningEffort,
+  models: RoderModel[],
+): ModelSelectChoice {
   const optionId = configuredAutoOptionId(selectionMode);
   if (selectionMode.type === "auto" && optionId) {
     return {
@@ -1504,18 +1548,20 @@ function modelSelectChoice(selectionMode: ModelSelectionMode, reasoning: Reasoni
     };
   }
   if (selectionMode.type === "auto") {
+    const baselineProvider = selectionMode.baseline?.provider ?? "";
+    const baselineModel = selectionMode.baseline?.model ?? "";
     return {
       type: "manual",
-      provider: selectionMode.baseline?.provider ?? "",
-      model: selectionMode.baseline?.model ?? "",
-      reasoning,
+      provider: baselineProvider,
+      model: baselineModel,
+      reasoning: reasoningForModel(models, baselineProvider, baselineModel, reasoning) ?? undefined,
     };
   }
   return {
     type: "manual",
     provider: selectionMode.provider,
     model: selectionMode.model,
-    reasoning: selectionMode.reasoning ?? reasoning,
+    reasoning: reasoningForModel(models, selectionMode.provider, selectionMode.model, reasoning) ?? undefined,
   };
 }
 
@@ -1524,15 +1570,18 @@ function applySelectedModelState(
   selectedModel: string,
   selectedModelProviderValue: string,
   selectedSelectionMode: ModelSelectionMode,
+  selectedReasoning?: ReasoningEffort,
 ): void {
   set((state) => ({
     selectedModel,
     selectedModelProvider: selectedModelProviderValue,
     selectedSelectionMode,
+    ...(selectedReasoning === undefined ? {} : { selectedReasoning }),
     threadControlsByThread: updateActiveThreadControls(state, {
       model: selectedModel,
       modelProvider: selectedModelProviderValue,
       selectionMode: selectedSelectionMode,
+      ...(selectedReasoning === undefined ? {} : { reasoning: selectedReasoning }),
     }),
   }));
 }
@@ -1548,7 +1597,7 @@ async function applyLiveModelSelection(
   }
   try {
     const result = await roderIpc.selectModel(
-      modelSelectChoice(selectionMode, state.selectedReasoning),
+      modelSelectChoice(selectionMode, state.selectedReasoning, state.models),
       state.activeThreadId,
     );
     set((state) => ({
@@ -1728,7 +1777,7 @@ function modelsFromProviders(providers: ProviderDescriptor[]): RoderModel[] {
 }
 
 function normalizeModelRecords(models: RoderModel[]): RoderModel[] {
-  return models.map(normalizeModelRecord);
+  return models.filter((model) => !isRetiredModel(model)).map(normalizeModelRecord);
 }
 
 function normalizeModelRecord(model: RoderModel): RoderModel {
@@ -1749,7 +1798,9 @@ function applyProviderCatalog(
   const providers = providerResult.providers ?? [];
   const providerModels = modelsFromProviders(providers);
   const fallbackModels = normalizeModelRecords(state.models);
-  const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers);
+  const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers).filter(
+    (model) => !isRetiredModel(model),
+  );
   const hiddenModelIds = compactHiddenModelIds(models, state.hiddenModelIds);
   const visibleModels = visibleModelsFor(models, hiddenModelIds);
   const defaultModelRecord = selectedModelRecordOrDefault(
@@ -1833,7 +1884,8 @@ async function createThreadForPrompt(
     model?.modelProvider ??
     selectedModelProvider(latestState.models, selectedModel, requestedProvider) ??
     requestedProvider;
-  const reasoning = selectionSource.reasoning;
+  // The engine rejects an effort the model does not advertise, so send only one it accepts.
+  const reasoning = resolveReasoningEffort(model, selectionSource.reasoning) ?? undefined;
   const result = await roderIpc.startThread(
     selectedModel,
     threadStartWorkspace(workspaceSelection),
@@ -1842,7 +1894,7 @@ async function createThreadForPrompt(
     {
       ...(initialPrompt === undefined ? {} : { initialPrompt }),
       selection: configuredAutoOptionId(selectionMode)
-        ? modelSelectChoice(selectionMode, reasoning)
+        ? modelSelectChoice(selectionMode, selectionSource.reasoning, latestState.models)
         : {
             type: "manual",
             provider: selectedProvider,

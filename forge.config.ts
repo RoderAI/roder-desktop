@@ -11,6 +11,7 @@ import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 
+const verifiedPackagingNodeMajors = new Set([24, 25]);
 const shouldSignMac = process.env.RODER_DESKTOP_MACOS_SIGN === "1";
 const macSigningIdentity =
   process.env.APPLE_SIGNING_IDENTITY ?? "Developer ID Application: Pandelis Zembashis (7UNZ734ZYN)";
@@ -40,6 +41,16 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   hooks: {
     async prePackage() {
+      // On Node 26 electron-forge's package step ends with exit code 0 and writes nothing, so a broken
+      // build looks like a successful one. Fail here instead. CI packages on Node 24.
+      const nodeMajor = Number(process.versions.node.split(".")[0]);
+      if (!verifiedPackagingNodeMajors.has(nodeMajor) && process.env.RODER_ALLOW_UNVERIFIED_NODE !== "1") {
+        throw new Error(
+          `Packaging is verified on Node 24 (the CI version) and 25. Running ${process.version} can exit 0 without writing a package. ` +
+            "Switch Node (for example `nvm use 24`), or set RODER_ALLOW_UNVERIFIED_NODE=1 to build anyway.",
+        );
+      }
+
       const result = spawnSync(process.execPath, ["scripts/install-roder-for-build.mjs"], {
         stdio: "inherit",
         env: process.env,

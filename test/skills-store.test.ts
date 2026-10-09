@@ -105,7 +105,7 @@ test("setSkillEnabled refreshes skills and tracks pending path", async () => {
     {
       method: "skills/setEnabled",
       params: {
-        selector: { path: "builtin://skills/commit/SKILL.md" },
+        selector: { path: { path: "builtin://skills/commit/SKILL.md" } },
         enabled: false,
       },
     },
@@ -139,7 +139,7 @@ test("skill mutations preserve the current loaded context", async () => {
     {
       method: "skills/setEnabled",
       params: {
-        selector: { path: "builtin://skills/commit/SKILL.md" },
+        selector: { path: { path: "builtin://skills/commit/SKILL.md" } },
         enabled: false,
       },
     },
