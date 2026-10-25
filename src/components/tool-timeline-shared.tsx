@@ -21,11 +21,9 @@ export function ShimmerText({ className, ...props }: HTMLAttributes<HTMLSpanElem
   return <span className={cn("ai-shimmer-text", className)} {...props} />;
 }
 
-export function ToolFailureDot({ failed }: { failed: boolean }): React.JSX.Element {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn("size-1.5 shrink-0 rounded-full", failed ? "bg-destructive" : "bg-transparent")}
-    />
-  );
+export function ToolFailureDot({ failed }: { failed: boolean }): React.JSX.Element | null {
+  if (!failed) {
+    return null;
+  }
+  return <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-destructive" />;
 }

@@ -35,7 +35,7 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
   }
 
   return (
-    <div className="flex min-h-7 min-w-0 items-center gap-2 pl-5 text-base leading-7">
+    <div className="flex min-h-6 min-w-0 items-center gap-2 text-base leading-5">
       <ToolFailureDot failed={status === "failed"} />
       <Title className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</Title>
       {summary && summary !== title ? (
@@ -58,7 +58,7 @@ function RoutingDecisionToolItem({
 }): React.JSX.Element {
   if (!message.toolOutput) {
     return (
-      <div className="flex min-h-7 min-w-0 items-center gap-2 pl-5 text-base leading-7">
+      <div className="flex min-h-6 min-w-0 items-center gap-2 text-base leading-5">
         <ToolFailureDot failed={false} />
         <span className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</span>
       </div>
@@ -66,9 +66,9 @@ function RoutingDecisionToolItem({
   }
 
   return (
-    <Collapsible.Root className="group/tool-group pl-5 text-base leading-7" onOpenChange={onOpenChange} open={open}>
+    <Collapsible.Root className="group/tool-group text-base leading-5" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
-        className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-6 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
       >
         <ToolFailureDot failed={false} />
@@ -92,7 +92,12 @@ export function SafePatchPreview({ patch }: { patch: string }): React.JSX.Elemen
     <PatchPreviewErrorBoundary patch={patch}>
       <div className="space-y-2">
         {filePatches.map((filePatch) => (
-          <PatchDiff key={patchPreviewKey(filePatch)} patch={filePatch} options={toolPreviewDiffOptions} disableWorkerPool />
+          <PatchDiff
+            key={patchPreviewKey(filePatch)}
+            patch={filePatch}
+            options={toolPreviewDiffOptions}
+            disableWorkerPool
+          />
         ))}
       </div>
     </PatchPreviewErrorBoundary>
@@ -177,9 +182,9 @@ function ToolEditItem({ message, onOpenChange, open, status, summary }: ToolEdit
   const Title = status === "running" ? ShimmerText : "span";
 
   return (
-    <Collapsible.Root className="group/edit-tool pl-5 text-base leading-7" onOpenChange={onOpenChange} open={open}>
+    <Collapsible.Root className="group/edit-tool text-base leading-5" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
-        className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-6 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
       >
         <ToolFailureDot failed={status === "failed"} />
