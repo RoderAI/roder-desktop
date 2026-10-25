@@ -17,7 +17,7 @@ test("browser overlay bounds line up with renderer coordinates", () => {
 test("browser overlay fallback stays usable", () => {
   expect(scaleRendererBounds()).toEqual({
     x: 0,
-    y: 52,
+    y: 48,
     width: 720,
     height: 640,
   });

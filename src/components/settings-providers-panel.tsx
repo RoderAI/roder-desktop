@@ -1,5 +1,6 @@
 import { Check, ChevronRight, KeyRound, Plus, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSearch } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { isProviderConfigured, modelKey, providerName, visibleModelIdsFor } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
@@ -7,6 +8,7 @@ import type { ProviderDescriptor, ProviderModelDescriptor, RoderModel } from "@/
 import { cn } from "@/lib/utils";
 
 export function ProvidersSettingsPanel(): React.JSX.Element {
+  const { setupProvider } = useSearch({ from: "/settings/$section" });
   const providers = useRoderStore((state) => state.providers);
   const models = useRoderStore((state) => state.models);
   const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
@@ -14,7 +16,7 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
   const configureProvider = useRoderStore((state) => state.configureProvider);
   const [query, setQuery] = useState("");
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(setupProvider ?? null);
   const [refreshing, setRefreshing] = useState(false);
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});

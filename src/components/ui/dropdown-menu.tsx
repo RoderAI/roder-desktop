@@ -9,9 +9,9 @@ export const DropdownMenuGroup = Menu.Group;
 export const DropdownMenuCheckboxItem = Menu.CheckboxItem;
 export const DropdownMenuCheckboxItemIndicator = Menu.CheckboxItemIndicator;
 export const dropdownMenuContentClassName =
-  "dropdown-menu-popup min-w-40 overflow-hidden rounded-xl bg-popover p-1.5 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none";
+  "dropdown-menu-popup min-w-40 overflow-hidden rounded-xl bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none";
 export const dropdownMenuItemClassName =
-  "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 text-base outline-none data-[highlighted]:bg-accent";
+  "relative flex min-h-7 cursor-default select-none items-center gap-1.5 rounded-lg px-2 py-1 text-base outline-none data-[highlighted]:bg-accent";
 
 export const dropdownMenuTriggerVariants = cva(
   "outline-none disabled:pointer-events-none disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-ring",
@@ -19,7 +19,7 @@ export const dropdownMenuTriggerVariants = cva(
     variants: {
       variant: {
         unstyled: "",
-        pill: "group inline-flex h-8 items-center justify-center gap-2 rounded-full bg-card/70 px-3 font-medium text-foreground transition-colors hover:bg-card data-[popup-open]:bg-card",
+        pill: "group inline-flex h-7 items-center justify-center gap-1.5 rounded-full bg-card/70 px-2.5 font-medium text-foreground transition-colors hover:bg-card data-[popup-open]:bg-card",
       },
     },
     defaultVariants: {

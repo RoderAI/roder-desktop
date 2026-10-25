@@ -1,6 +1,9 @@
 import * as React from "react";
 import type { CSSProperties } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Bot, Check, Plus, X } from "lucide-react";
+import { subagentThreadShortcuts } from "@/lib/thread-list-subagents";
+import { useRoderStore } from "@/stores/roder-store";
+import type { SubagentTraceView } from "@/types/roder";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +35,8 @@ type RightWorkspacePanelShellProps = {
   tabs: RouteWorkspacePanel[];
   activePanel: RouteWorkspacePanel | null;
   entries: RightWorkspacePanelEntry[];
+  threadId?: string;
+  onSelectThread?: (threadId: string) => void;
   freezeLayout?: boolean;
   layoutWidth?: number;
   onAddPanel: (panel: RouteWorkspacePanel) => void;
@@ -48,6 +53,8 @@ export function RightWorkspacePanelShell({
   tabs,
   activePanel,
   entries,
+  threadId,
+  onSelectThread,
   freezeLayout = false,
   layoutWidth,
   onAddPanel,
@@ -92,6 +99,8 @@ export function RightWorkspacePanelShell({
           onAddPanel={onAddPanel}
           onMenuBoundsChange={setAddMenuOcclusion}
           onMenuOpenChange={setAddMenuOpen}
+          threadId={threadId}
+          onSelectThread={onSelectThread}
         />
         {openEntries.length > 0 ? (
           <>
@@ -203,6 +212,8 @@ function PanelAddMenu({
   onAddPanel,
   onMenuBoundsChange,
   onMenuOpenChange,
+  threadId,
+  onSelectThread,
 }: {
   entries: RightWorkspacePanelEntry[];
   menuOpen: boolean;
@@ -210,8 +221,14 @@ function PanelAddMenu({
   onAddPanel: (panel: RouteWorkspacePanel) => void;
   onMenuBoundsChange: (bounds: NativeOverlayOcclusion | null) => void;
   onMenuOpenChange: (open: boolean) => void;
+  threadId?: string;
+  onSelectThread?: (threadId: string) => void;
 }): React.JSX.Element {
   const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const traces = useRoderStore((state) =>
+    threadId ? (state.subagentTracesByThread[threadId] ?? emptyTraces) : emptyTraces,
+  );
+  const shortcuts = subagentThreadShortcuts(traces);
 
   React.useLayoutEffect(() => {
     if (!menuOpen) {
@@ -261,7 +278,13 @@ function PanelAddMenu({
       >
         <Plus />
       </DropdownMenuTrigger>
-      <DropdownMenuContent ref={contentRef} align="end" side="bottom" sideOffset={8} className="w-80 p-1.5">
+      <DropdownMenuContent
+        ref={contentRef}
+        align="end"
+        side="bottom"
+        sideOffset={8}
+        className="max-h-[min(80vh,40rem)] w-80 overflow-y-auto p-1.5"
+      >
         <DropdownMenuGroup>
           {entries.map((entry) => (
             <DropdownMenuItem
@@ -286,10 +309,32 @@ function PanelAddMenu({
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
+        {shortcuts.length > 0 && onSelectThread ? (
+          <DropdownMenuGroup aria-label="Subagents" className="mt-1 border-t border-border pt-1">
+            <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">Subagents · {shortcuts.length}</div>
+            {shortcuts.map((trace) => (
+              <DropdownMenuItem
+                key={trace.childThreadId}
+                className="min-h-12 rounded-lg p-2"
+                onSelect={() => onSelectThread(trace.childThreadId)}
+              >
+                <Bot className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{trace.title}</span>
+                  <span className="block truncate text-sm text-muted-foreground">
+                    {[trace.role, trace.model, trace.status.replace(/_/gu, " ")].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+
+const emptyTraces: SubagentTraceView[] = [];
 
 function WorkspacePanelEmptyState({
   entries,

@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
 import type { RoderStatus, RoderThread, RoderThreadGoal } from "@/types/roder";
 import { Button } from "@/components/ui/button";
+import { ThreadCostPopover } from "@/components/thread-cost-popover";
 import { chromeIconButtonClassNameForState } from "@/components/ui/chrome-icon-button";
 import {
   DropdownMenu,
@@ -130,6 +131,7 @@ export function TopBar({
           <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
         </h1>
         <div className="flex min-w-0 items-center justify-end gap-2">
+          {thread && status.state === "ready" && <ThreadCostPopover key={thread.id} threadId={thread.id} />}
           {(status.state === "error" || status.state === "stopped") && (
             <Button variant="outline" size="sm" onClick={onRestart}>
               Restart
@@ -201,7 +203,13 @@ export function TopBar({
           />
         )}
       </div>
-      <div className="no-drag ml-auto flex items-center gap-2">
+      <div
+        className={cn(
+          "no-drag ml-auto flex items-center gap-2",
+          extensionSidebarVisible && workspacePanelToggleVisible && "mr-12",
+        )}
+      >
+        {thread && status.state === "ready" && <ThreadCostPopover key={thread.id} threadId={thread.id} />}
         {(status.state === "error" || status.state === "stopped") && (
           <Button variant="outline" size="sm" onClick={onRestart}>
             Restart

@@ -17,6 +17,8 @@ const messagesByThread = new WeakMap<RoderThread, ConversationMessage[]>();
 // untouched turns keep identity and their messages can be reused as-is.
 const messagesByTurn = new WeakMap<RoderTurn, { threadId: string; messages: ConversationMessage[] }>();
 const duplicateItemIdMarker = "::duplicate-";
+const modelSwitchSummaryPattern =
+  /^Model switch summary: previous profile \S+ used edit tool \S+\. Current profile \S+ uses edit tool \S+\. Available tools now: [^\r\n]+\.$/u;
 
 export function sortThreadsByUpdatedAt(threads: RoderThread[]): RoderThread[] {
   return threads.toSorted((left, right) => right.updatedAt - left.updatedAt);
@@ -367,11 +369,7 @@ function turnsWithVisibleRoutingDecisions(turns: RoderTurn[], showRoutingDecisio
   let changed = false;
   const filteredTurns = turns.map((turn) => {
     const cached = filteredTurnsCache.get(turn);
-    if (
-      cached &&
-      cached.showRoutingDecisions === showRoutingDecisions &&
-      cached.inSignature === lastRoutingSignature
-    ) {
+    if (cached && cached.showRoutingDecisions === showRoutingDecisions && cached.inSignature === lastRoutingSignature) {
       lastRoutingSignature = cached.outSignature;
       if (cached.turn !== turn) {
         changed = true;
@@ -490,6 +488,7 @@ export function messagesFromRoderItem(
 
   if (item.type === "userMessage") {
     const images = userMessageImages(item);
+    if (images.length === 0 && modelSwitchSummaryPattern.test(text)) return [];
     return [
       {
         id: item.id,
@@ -994,7 +993,8 @@ function toolSubject(
     canonicalName === "multi_edit" ||
     canonicalName === "apply_patch"
   ) {
-    const patchSummary = canonicalName === "apply_patch" ? summarizeApplyPatch(applyPatchPreview(input, payload)) : null;
+    const patchSummary =
+      canonicalName === "apply_patch" ? summarizeApplyPatch(applyPatchPreview(input, payload)) : null;
     const path = toolPath(input, payload) ?? patchSummary?.files[0];
     return path ? basename(path) : undefined;
   }

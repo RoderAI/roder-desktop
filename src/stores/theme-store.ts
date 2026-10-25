@@ -35,7 +35,6 @@ export type TerminalThemeSettings = {
 export type SettingsSection =
   | "general"
   | "appearance"
-  | "components"
   | "providers"
   | "models"
   | "skills"
@@ -182,11 +181,11 @@ export const defaultThemeSettings: ThemeSettings = {
     customJson: "",
   },
   pointerCursors: false,
-  uiFontSize: 14,
+  uiFontSize: 13,
   codeFontSize: 13,
 };
 
-const themeStorageVersion = 5;
+const themeStorageVersion = 6;
 
 export const useThemeStore = create<ThemeStore>()(
   persist(
@@ -265,7 +264,9 @@ function migratePersistedTheme(persisted: unknown, version: number): unknown {
     settings: {
       ...settings,
       uiFontSize:
-        version < 4 && (settings.uiFontSize == null || settings.uiFontSize === 14 || settings.uiFontSize === 18)
+        settings.uiFontSize == null ||
+        (version < 4 && settings.uiFontSize === 18) ||
+        (version < 6 && settings.uiFontSize === 14)
           ? defaultThemeSettings.uiFontSize
           : settings.uiFontSize,
       codeFontSize:

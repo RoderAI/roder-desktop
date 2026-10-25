@@ -1,7 +1,25 @@
-import { Archive, CirclePlus, FolderPlus, Store } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import {
+  Archive,
+  ChevronDown,
+  ChevronRight,
+  CirclePlus,
+  Plus,
+  Search,
+  Settings,
+  Store,
+  ListTodo,
+  MessagesSquare,
+  X,
+} from "lucide-react";
+import { useMountEffect } from "@/hooks/use-mount-effect";
+import { PersistentAgentAvatar } from "@/components/persistent-agent-avatar";
+import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
+import { roderIpc } from "@/lib/roder-ipc";
+import type { PersistentAgent } from "@/types/persistent-agents";
+import { Link } from "@tanstack/react-router";
+import { useId, useReducer, useRef, useState } from "react";
+import { useRoderStore } from "@/stores/roder-store";
 import type { RoderThread } from "@/types/roder";
-import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,10 +28,83 @@ import { cn } from "@/lib/utils";
 import { groupThreadsByFolder, sidebarProjectOrder } from "@/lib/sidebar-thread-groups";
 import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 
+export function filterPersistentAgents<T extends Pick<PersistentAgent, "name" | "mission" | "workspaceId">>(
+  agents: T[],
+  query: string,
+  workspaces: { id: string; name: string }[],
+): T[] {
+  const search = query.trim().toLowerCase();
+  const workspaceNames = new Map(workspaces.map((workspace) => [workspace.id, workspace.name]));
+  return agents.filter((agent) =>
+    `${agent.name}\n${agent.mission}\n${workspaceNames.get(agent.workspaceId) ?? agent.workspaceId}`
+      .toLowerCase()
+      .includes(search),
+  );
+}
+
+export function ordinarySidebarThreads<T extends { id: string }>(threads: T[], agents: { threadId: string }[]): T[] {
+  const persistentThreadIds = new Set(agents.map((agent) => agent.threadId));
+  return threads.filter((thread) => !persistentThreadIds.has(thread.id));
+}
+
+type SidebarSearchState = { open: boolean; query: string };
+export function sidebarSearchReducer(
+  state: SidebarSearchState,
+  action: { type: "open" } | { type: "close" } | { type: "query"; query: string },
+): SidebarSearchState {
+  if (action.type === "close") return { open: false, query: "" };
+  if (action.type === "open") return { open: true, query: "" };
+  return state.open ? { open: true, query: action.query } : state;
+}
+
+export function SidebarSearchField({
+  search,
+  label,
+  onChange,
+  onClose,
+}: {
+  search: SidebarSearchState;
+  label: string;
+  onChange: (query: string) => void;
+  onClose: () => void;
+}): React.JSX.Element | null {
+  if (!search.open) return null;
+  return (
+    <div className="relative">
+      <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-2 size-4 text-sidebar-muted" />
+      <input
+        ref={(node) => {
+          node?.focus();
+        }}
+        aria-label={label}
+        placeholder={label + "…"}
+        value={search.query}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        className="h-8 w-full rounded-lg border border-border bg-background pl-8 pr-8 text-base outline-none placeholder:text-sidebar-muted focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <button
+        type="button"
+        aria-label="Close search"
+        onClick={onClose}
+        className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 type AppSidebarProps = {
   threads: RoderThread[];
   activeThreadId: string;
-  activeView: "chat" | "plugins";
+  activeView: "chat" | "plugins" | "threads" | "issues" | "persistentAgents";
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
   reserveTitlebarSpace: boolean;
@@ -44,10 +135,23 @@ export function AppSidebar({
   onOpenSettings,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
+  const [threadSearch, dispatchThreadSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
+  const {
+    persistentAgents,
+    error: persistentAgentsError,
+    loading: persistentAgentsLoading,
+    refresh: refreshPersistentAgents,
+  } = useSidebarPersistentAgents();
+  const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents);
+  const matchingThreads = ordinaryThreads.filter((thread) =>
+    `${thread.name ?? ""}\n${thread.preview}\n${thread.cwd}`
+      .toLowerCase()
+      .includes(threadSearch.query.trim().toLowerCase()),
+  );
   const projectOrderRef = useRef<string[]>([]);
-  const projectOrder = sidebarProjectOrder(threads, projectOrderRef.current);
+  const projectOrder = sidebarProjectOrder(ordinaryThreads, projectOrderRef.current);
   projectOrderRef.current = projectOrder;
-  const threadGroups = useMemo(() => groupThreadsByFolder(threads, projectOrder), [projectOrder, threads]);
+  const threadGroups = groupThreadsByFolder(matchingThreads, projectOrder);
 
   function handleThreadListScroll(event: React.UIEvent<HTMLDivElement>): void {
     if (!hasMoreThreads || loadingMoreThreads) {
@@ -85,11 +189,6 @@ export function AppSidebar({
     >
       {reserveTitlebarSpace && <div className="h-(--desktop-header-height)" />}
       <div className="no-drag flex flex-col gap-0.5 px-2">
-        <SidebarRowButton onClick={onNewProject}>
-          <FolderPlus className="size-4" />
-          <span className="min-w-0 flex-1 truncate">Add Project</span>
-          <Kbd className="ml-auto">⌘+O</Kbd>
-        </SidebarRowButton>
         <SidebarRowButton onClick={onNewThread}>
           <CirclePlus className="size-4" />
           <span className="min-w-0 flex-1 truncate">New Agent</span>
@@ -102,113 +201,176 @@ export function AppSidebar({
           <Store className="size-4" />
           <span className="min-w-0 flex-1 truncate">Plugins</span>
         </SidebarRowButton>
+        {(
+          [
+            { view: "threads", to: "/threads", label: "Threads", Icon: MessagesSquare },
+            { view: "issues", to: "/issues", label: "Issues", Icon: ListTodo },
+          ] as const
+        ).map(({ view, to, label, Icon }) => (
+          <Link
+            key={view}
+            to={to}
+            search={true}
+            aria-current={activeView === view ? "page" : undefined}
+            className={cn(
+              "flex h-8 items-center gap-2 rounded-xl px-2 text-base font-medium hover:bg-sidebar-active/20 focus-visible:ring-2 focus-visible:ring-ring",
+              activeView === view && "bg-sidebar-active/20 text-sidebar-active-foreground",
+            )}
+          >
+            <Icon className="size-4" />
+            <span>{label}</span>
+          </Link>
+        ))}
       </div>
 
       <div
-        className="sidebar-scroll no-drag mt-5 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4"
+        className="sidebar-scroll no-drag mt-3 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3"
         onScroll={handleThreadListScroll}
       >
-        <div className="flex flex-col gap-5">
-          {threadGroups.length > 0 ? (
-            threadGroups.map((group) => {
-              const expanded = expandedGroupKeys.has(group.key);
-              const visibility = visibleThreadsForGroup(group.threads, expanded);
-              return (
-                <section key={group.key}>
-                  <div className="group squircle-corners relative flex h-8 items-center rounded-xl text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
-                    <button
-                      type="button"
-                      className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-8 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
-                      title={group.path || group.title}
-                      aria-label={`New agent in ${group.title}`}
-                      onClick={() => onNewThreadInFolder(group.path)}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                      {group.title}
-                      </span>
-                    </button>
-                    <Tooltip>
-                      <TooltipTrigger
+        <div className="flex flex-col gap-4">
+          <PersistentAgentLinks
+            persistentAgents={persistentAgents}
+            error={persistentAgentsError}
+            loading={persistentAgentsLoading}
+            onRetry={() => void refreshPersistentAgents()}
+            activeThreadId={activeView === "chat" ? activeThreadId : ""}
+            activeManagement={activeView === "persistentAgents"}
+            onSelectThread={onSelectThread}
+          />
+          <section aria-label="Projects" className="space-y-1">
+            <div className="flex h-7 items-center gap-2 px-2.5 text-sidebar-heading">
+              <h2 className="min-w-0 flex-1 text-base font-medium">Projects</h2>
+              <button
+                type="button"
+                aria-label={threadSearch.open ? "Close project search" : "Search projects"}
+                aria-expanded={threadSearch.open}
+                className="flex size-6 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => dispatchThreadSearch({ type: threadSearch.open ? "close" : "open" })}
+              >
+                <Search className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Add project"
+                title="Add project"
+                className="flex size-6 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={onNewProject}
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
+            <SidebarSearchField
+              search={threadSearch}
+              label="Search projects"
+              onChange={(query) => dispatchThreadSearch({ type: "query", query })}
+              onClose={() => dispatchThreadSearch({ type: "close" })}
+            />
+            {threadGroups.length > 0 ? (
+              threadGroups.map((group) => {
+                const expanded = expandedGroupKeys.has(group.key);
+                const visibility = visibleThreadsForGroup(group.threads, expanded);
+                return (
+                  <section key={group.key}>
+                    <div className="group squircle-corners relative flex h-7 items-center rounded-xl text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
+                      <button
                         type="button"
-                        className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+                        className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-8 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+                        title={group.path || group.title}
                         aria-label={`New agent in ${group.title}`}
                         onClick={() => onNewThreadInFolder(group.path)}
                       >
-                        <CirclePlus className="size-3.5" />
-                      </TooltipTrigger>
-                      <TooltipContent side="right">New agent</TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="mt-2 flex flex-col gap-0.5">
-                    {visibility.primaryThreads.map((thread) => (
-                      <ThreadRow
-                        key={thread.id}
-                        thread={thread}
-                        active={activeView === "chat" && thread.id === activeThreadId}
-                        running={isThreadRunning(thread)}
-                        onSelectThread={onSelectThread}
-                        onArchiveThread={onArchiveThread}
-                      />
-                    ))}
-                    {visibility.canShowMore && (
-                      <SidebarRowButton
-                        className="text-base text-sidebar-muted hover:text-sidebar-foreground"
-                        onClick={() => showMoreForGroup(group.key)}
-                      >
-                        <span className="min-w-0 flex-1 truncate">Show more</span>
-                        <span className="shrink-0 text-base">+{visibility.hiddenCount}</span>
-                      </SidebarRowButton>
-                    )}
-                    {visibility.overflowThreads.length > 0 && (
-                      <div
-                        className="thread-overflow-region"
-                        data-expanded={expanded ? "true" : undefined}
-                        aria-hidden={!expanded}
-                      >
-                        <div className="thread-overflow-region-inner flex flex-col gap-0.5">
-                          {visibility.overflowThreads.map((thread) => (
-                            <ThreadRow
-                              key={thread.id}
-                              thread={thread}
-                              active={activeView === "chat" && thread.id === activeThreadId}
-                              running={isThreadRunning(thread)}
-                              onSelectThread={onSelectThread}
-                              onArchiveThread={onArchiveThread}
-                              disabled={!expanded}
-                            />
-                          ))}
-                          {visibility.canShowLess && (
-                            <SidebarRowButton
-                              className="text-base text-sidebar-muted hover:text-sidebar-foreground"
-                              onClick={() => showLessForGroup(group.key)}
-                            >
-                              <span className="min-w-0 flex-1 truncate">Show less</span>
-                            </SidebarRowButton>
-                          )}
+                        <span className="min-w-0 flex-1 truncate">{group.title}</span>
+                      </button>
+                      <Tooltip>
+                        <TooltipTrigger
+                          type="button"
+                          className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+                          aria-label={`New agent in ${group.title}`}
+                          onClick={() => onNewThreadInFolder(group.path)}
+                        >
+                          <CirclePlus className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">New agent</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      {visibility.primaryThreads.map((thread) => (
+                        <ThreadRow
+                          key={thread.id}
+                          thread={thread}
+                          active={activeView === "chat" && thread.id === activeThreadId}
+                          running={isThreadRunning(thread)}
+                          onSelectThread={onSelectThread}
+                          onArchiveThread={onArchiveThread}
+                        />
+                      ))}
+                      {visibility.canShowMore && (
+                        <SidebarRowButton
+                          className="text-base text-sidebar-muted hover:text-sidebar-foreground"
+                          onClick={() => showMoreForGroup(group.key)}
+                        >
+                          <span className="min-w-0 flex-1 truncate">Show more</span>
+                          <span className="shrink-0 text-base">+{visibility.hiddenCount}</span>
+                        </SidebarRowButton>
+                      )}
+                      {visibility.overflowThreads.length > 0 && (
+                        <div
+                          className="thread-overflow-region"
+                          data-expanded={expanded ? "true" : undefined}
+                          aria-hidden={!expanded}
+                        >
+                          <div className="thread-overflow-region-inner flex flex-col gap-0.5">
+                            {visibility.overflowThreads.map((thread) => (
+                              <ThreadRow
+                                key={thread.id}
+                                thread={thread}
+                                active={activeView === "chat" && thread.id === activeThreadId}
+                                running={isThreadRunning(thread)}
+                                onSelectThread={onSelectThread}
+                                onArchiveThread={onArchiveThread}
+                                disabled={!expanded}
+                              />
+                            ))}
+                            {visibility.canShowLess && (
+                              <SidebarRowButton
+                                className="text-base text-sidebar-muted hover:text-sidebar-foreground"
+                                onClick={() => showLessForGroup(group.key)}
+                              >
+                                <span className="min-w-0 flex-1 truncate">Show less</span>
+                              </SidebarRowButton>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              );
-            })
-          ) : (
-            <div className="px-3 py-2 text-base text-sidebar-heading">No sessions yet</div>
-          )}
-          {hasMoreThreads || loadingMoreThreads ? (
-            <SidebarRowButton
-              className="text-base text-sidebar-muted hover:text-sidebar-foreground"
-              disabled={loadingMoreThreads}
-              onClick={onLoadMoreThreads}
-            >
-              <span className="min-w-0 flex-1 truncate">
-                {loadingMoreThreads ? "Loading sessions..." : "Load more"}
-              </span>
-            </SidebarRowButton>
-          ) : null}
+                      )}
+                    </div>
+                  </section>
+                );
+              })
+            ) : (
+              <div className="px-3 py-2 text-sm text-sidebar-muted">
+                {threadSearch.query.trim() ? "No matching threads" : "No threads yet"}
+              </div>
+            )}
+            {hasMoreThreads || loadingMoreThreads ? (
+              <SidebarRowButton
+                className="text-base text-sidebar-muted hover:text-sidebar-foreground"
+                disabled={loadingMoreThreads}
+                onClick={onLoadMoreThreads}
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {loadingMoreThreads ? "Loading sessions..." : "Load more"}
+                </span>
+              </SidebarRowButton>
+            ) : null}
+          </section>
         </div>
       </div>
-      <SidebarAccountMenu onOpenSettings={onOpenSettings} />
+      <div className="no-drag shrink-0 px-2 pb-2">
+        <SidebarRowButton className="focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenSettings}>
+          <Settings className="size-4" />
+          <span>Settings</span>
+        </SidebarRowButton>
+      </div>
     </aside>
   );
 }
@@ -245,7 +407,7 @@ function ThreadRow({
         <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
         <span
           className={cn(
-            "thread-row-age absolute right-2.5 text-base text-sidebar-muted",
+            "thread-row-age absolute right-2.5 text-sm text-sidebar-muted",
             running && "flex h-6 w-6 -translate-x-px items-center justify-end",
           )}
           aria-label={running ? "Turn running" : undefined}
@@ -266,6 +428,179 @@ function ThreadRow({
         <TooltipContent side="right">Archive</TooltipContent>
       </Tooltip>
     </div>
+  );
+}
+
+function useSidebarPersistentAgents() {
+  const [persistentAgents, setPersistentAgents] = useState<PersistentAgent[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const refreshRef = useRef<() => Promise<void>>(async () => undefined);
+  useMountEffect(() => {
+    let mounted = true;
+    let revision = 0;
+    async function refresh(): Promise<void> {
+      setLoading(true);
+      revision = revision + 1;
+      const request = revision;
+      try {
+        const result = await persistentAgentsIpc.list();
+        if (mounted && request === revision) {
+          setPersistentAgents(result.persistentAgents);
+          setError(null);
+          setLoading(false);
+        }
+      } catch (cause) {
+        if (mounted && request === revision) {
+          setError(cause instanceof Error ? cause.message : String(cause));
+          setLoading(false);
+        }
+      }
+    }
+    refreshRef.current = refresh;
+    const unsubscribe = roderIpc.onNotification((notification) => {
+      if (notification.method === "desktop/persistent-agents/changed") void refresh();
+    });
+    void refresh();
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  });
+  return { persistentAgents, error, loading, refresh: () => refreshRef.current() };
+}
+
+function PersistentAgentLinks({
+  persistentAgents,
+  error,
+  loading,
+  onRetry,
+  activeThreadId,
+  activeManagement,
+  onSelectThread,
+}: {
+  persistentAgents: PersistentAgent[];
+  error: string | null;
+  loading: boolean;
+  onRetry: () => void;
+  activeThreadId: string;
+  activeManagement: boolean;
+  onSelectThread: (threadId: string) => void;
+}): React.JSX.Element {
+  const [expanded, setExpanded] = useState(true);
+  const [search, dispatchSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
+  const workspaces = useRoderStore((state) => state.workspaces);
+  const listId = useId();
+  const filtered = filterPersistentAgents(persistentAgents, search.query, workspaces);
+  return (
+    <section aria-label="Persistent Agents">
+      <div className="flex h-7 items-center gap-1 text-sidebar-heading">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={listId}
+          aria-label={expanded ? "Collapse persistent agents" : "Expand persistent agents"}
+          className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-sidebar-active/20 focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => {
+            setExpanded(!expanded);
+            dispatchSearch({ type: "close" });
+          }}
+        >
+          {expanded ? (
+            <ChevronDown aria-hidden="true" className="size-3.5" />
+          ) : (
+            <ChevronRight aria-hidden="true" className="size-3.5" />
+          )}
+        </button>
+        <h2 className="min-w-0 flex-1 text-base font-medium">
+          <Link
+            to="/persistent-agents"
+            search={{ create: undefined }}
+            aria-current={activeManagement ? "page" : undefined}
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-lg px-1 hover:bg-sidebar-active/20 focus-visible:ring-2 focus-visible:ring-ring",
+              activeManagement && "bg-sidebar-active/20 text-sidebar-active-foreground",
+            )}
+          >
+            <span className="truncate">Persistent Agents</span>
+            <span className="ml-auto text-sm text-sidebar-muted">{persistentAgents.length}</span>
+          </Link>
+        </h2>
+        <button
+          type="button"
+          aria-label={search.open ? "Close persistent agent search" : "Search persistent agents"}
+          aria-expanded={search.open}
+          className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => {
+            setExpanded(true);
+            dispatchSearch({ type: search.open ? "close" : "open" });
+          }}
+        >
+          <Search className="size-4" />
+        </button>
+        <Link
+          to="/persistent-agents"
+          search={{ create: true }}
+          aria-label="Add persistent agent"
+          title="Add persistent agent"
+          className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Plus className="size-4" />
+        </Link>
+      </div>
+      <div id={listId} hidden={!expanded} className="mt-1 space-y-1">
+        <SidebarSearchField
+          search={search}
+          label="Search persistent agents"
+          onChange={(query) => dispatchSearch({ type: "query", query })}
+          onClose={() => dispatchSearch({ type: "close" })}
+        />
+        <div className="space-y-0.5">
+          {filtered.map((persistentAgent) => (
+            <SidebarRowButton
+              key={persistentAgent.id}
+              className={cn(
+                "h-11 focus-visible:ring-2 focus-visible:ring-ring",
+                persistentAgent.threadId === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
+              )}
+              onClick={() => onSelectThread(persistentAgent.threadId)}
+            >
+              <PersistentAgentAvatar id={persistentAgent.id} sprite={persistentAgent.sprite} />
+              <span className="min-w-0 flex-1" title={persistentAgent.mission}>
+                <span className="block truncate">{persistentAgent.name}</span>
+                <span className="block truncate text-sm font-normal text-sidebar-muted">{persistentAgent.mission}</span>
+              </span>
+            </SidebarRowButton>
+          ))}
+        </div>
+        {loading && !persistentAgents.length ? (
+          <p role="status" className="px-2.5 text-sm text-sidebar-muted">
+            Loading persistent agents…
+          </p>
+        ) : null}
+        {!loading && !error && !filtered.length ? (
+          <div className="px-2.5 text-sm text-sidebar-muted">
+            {persistentAgents.length ? (
+              "No matching persistent agents"
+            ) : (
+              <p>No persistent agents yet. Use + to add one.</p>
+            )}
+          </div>
+        ) : null}
+        {error ? (
+          <p role="alert" className="px-2.5 py-1 text-sm text-destructive">
+            Couldn’t load persistent agents: {error}{" "}
+            <button
+              type="button"
+              className="rounded-md underline focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={onRetry}
+            >
+              Retry
+            </button>
+          </p>
+        ) : null}
+      </div>
+    </section>
   );
 }
 

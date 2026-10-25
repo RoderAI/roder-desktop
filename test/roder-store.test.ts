@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import type { RoderThread } from "../src/types/roder";
 
 async function loadRoderStore(
   request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(),
@@ -54,6 +55,66 @@ async function loadRoderStore(
   });
   return module.useRoderStore;
 }
+
+test("external persistentAgent promotion refreshes cached model controls without losing the active transcript", async () => {
+  const cached: RoderThread = {
+    id: "thread-1",
+    preview: "Project",
+    model: "old-model",
+    modelProvider: "old-provider",
+    cwd: "/workspace",
+    createdAt: 1,
+    updatedAt: 1,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    turns: [{ id: "prior-turn", items: [], itemsView: "default", status: "completed" }],
+  };
+  const refreshed: RoderThread = {
+    ...cached,
+    turns: undefined,
+    model: "new-model",
+    modelProvider: "new-provider",
+    selectionMode: { type: "manual", provider: "new-provider", model: "new-model", reasoning: "high" },
+  };
+  const request = vi
+    .fn<(method: string, params?: unknown) => Promise<unknown>>()
+    .mockResolvedValue({ thread: refreshed });
+  const store = await loadRoderStore(request);
+  const defaultModel = store.getState().defaultModel;
+  store.setState({
+    threads: [cached],
+    threadDetails: { [cached.id]: cached },
+    selectedModel: "old-model",
+    selectedModelProvider: "old-provider",
+    threadControlsByThread: {
+      [cached.id]: {
+        model: "old-model",
+        modelProvider: "old-provider",
+        reasoning: "low",
+        policyMode: "plan",
+        agentSwarmMode: false,
+        selectionMode: { type: "manual", provider: "old-provider", model: "old-model" },
+      },
+    },
+  });
+  await store.getState().refreshThreadModel(cached.id);
+  expect(request).toHaveBeenCalledWith("thread/read", { threadId: cached.id, includeTurns: false });
+  expect(store.getState()).toMatchObject({
+    selectedModel: "new-model",
+    selectedModelProvider: "new-provider",
+    selectedReasoning: "high",
+    defaultModel,
+  });
+  expect(store.getState().threadDetails[cached.id].turns).toEqual(cached.turns);
+  expect(store.getState().threadControlsByThread[cached.id]).toMatchObject({
+    model: "new-model",
+    modelProvider: "new-provider",
+    reasoning: "high",
+    policyMode: "plan",
+  });
+  store.setState({ activeThreadId: "other", selectedModel: "other-model" });
+  await store.getState().refreshThreadModel(cached.id);
+  expect(store.getState().selectedModel).toBe("other-model");
+});
 
 test("newProject creates a configured multi-root workspace and starts in the default root", async () => {
   const workspace = {

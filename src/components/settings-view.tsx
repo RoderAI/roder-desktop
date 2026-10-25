@@ -3,7 +3,6 @@ import {
   Bot,
   Braces,
   Cog,
-  Component,
   Cpu,
   Database,
   GitBranch,
@@ -25,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ExtensionsSettingsPanel } from "@/components/extensions/extensions-settings-panel";
-import { ComponentsSettingsPanel } from "@/components/settings-components-panel";
 import { SettingsBrowserPanel } from "@/components/settings-browser-panel";
 import { SettingsComputerUsePanel } from "@/components/settings-computer-use-panel";
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
@@ -59,16 +57,16 @@ export function SettingsView({
 
   return (
     <div className="fixed inset-0 z-[80] flex bg-background text-foreground">
-      <aside className="drag-region flex w-[318px] shrink-0 flex-col border-r border-border bg-sidebar px-3 pb-5 pt-[62px] text-sidebar-foreground">
+      <aside className="drag-region flex min-h-0 w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar px-2 pb-4 pt-14 text-sidebar-foreground">
         <button
           type="button"
-          className="squircle-corners no-drag mb-8 flex h-9 w-full items-center gap-3 rounded-xl px-2 text-left text-base text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className="squircle-corners no-drag mb-4 flex h-8 w-full items-center gap-2 rounded-xl px-2 text-left text-base text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
           onClick={onClose}
         >
           <ArrowLeft className="size-4" />
           Back to app
         </button>
-        <nav className="no-drag flex flex-col gap-1">
+        <nav className="no-drag flex flex-col gap-0.5">
           <SettingsNavItem
             id="general"
             active={section === "general"}
@@ -81,13 +79,6 @@ export function SettingsView({
             active={section === "appearance"}
             icon={<Paintbrush className="size-4" />}
             label="Appearance"
-            onClick={onSectionChange}
-          />
-          <SettingsNavItem
-            id="components"
-            active={section === "components"}
-            icon={<Component className="size-4" />}
-            label="Components"
             onClick={onSectionChange}
           />
           <SettingsNavItem
@@ -176,14 +167,12 @@ export function SettingsView({
           />
         </nav>
       </aside>
-      <main className="min-w-0 flex-1 overflow-y-auto px-10 py-12">
-        <div className="mx-auto w-full max-w-[860px]">
+      <main className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="@container mx-auto w-full max-w-[860px]">
           {section === "general" ? (
             <GeneralSettingsPanel />
           ) : section === "appearance" ? (
             <AppearancePanel onReset={resetTheme} />
-          ) : section === "components" ? (
-            <ComponentsSettingsPanel />
           ) : section === "providers" ? (
             <ProvidersSettingsPanel />
           ) : section === "models" ? (
@@ -226,7 +215,7 @@ function SettingsNavItem({
     <button
       type="button"
       className={cn(
-        "squircle-corners flex h-9 items-center gap-3 rounded-xl px-2 text-left text-base",
+        "squircle-corners flex h-8 items-center gap-2 rounded-xl px-2 text-left text-base",
         active ? "bg-sidebar-active text-sidebar-active-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent",
       )}
       onClick={() => onClick(id)}
@@ -240,7 +229,7 @@ function SettingsNavItem({
 function SettingsPlaceholder({ section }: { section: SettingsSection }): React.JSX.Element {
   const title = sectionLabel(section);
   return (
-    <section className="rounded-xl bg-card p-5 shadow-sm ring-1 ring-border/70">
+    <section className="rounded-xl bg-card p-4 shadow-sm ring-1 ring-border/70">
       <h1 className="text-base font-medium">{title}</h1>
       <p className="mt-2 max-w-[560px] text-base text-muted-foreground">
         This section is wired into settings navigation. Controls for {title.toLowerCase()} can be added here without
@@ -267,12 +256,12 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
 
   return (
     <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
-      <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-4 py-3">
         <div>
           <h1 className="text-base font-medium">Theme</h1>
           <p className="mt-1 text-base text-muted-foreground">Use light, dark, or match your system</p>
         </div>
-        <div className="flex rounded-xl bg-muted p-1">
+        <div className="flex flex-wrap rounded-xl bg-muted p-1">
           <ModeButton mode="light" active={settings.mode === "light"} onClick={() => setMode("light")} />
           <ModeButton mode="dark" active={settings.mode === "dark"} onClick={() => setMode("dark")} />
           <ModeButton mode="system" active={settings.mode === "system"} onClick={() => setMode("system")} />
@@ -281,7 +270,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
 
       <ThemePreview light={settings.light} dark={settings.dark} />
 
-      <div className="flex items-center justify-end gap-2 border-y border-border px-5 py-3">
+      <div className="flex items-center justify-end gap-2 border-y border-border px-4 py-2">
         <Button variant="ghost" size="sm" onClick={() => void copyTheme()}>
           Copy theme
         </Button>
@@ -308,7 +297,7 @@ function AppearancePanel({ onReset }: { onReset: () => void }): React.JSX.Elemen
         onChange={(patch) => updatePalette("dark", patch)}
       />
 
-      <div className="divide-y divide-border border-t border-border px-5">
+      <div className="divide-y divide-border border-t border-border px-4">
         <SettingsRow
           label="Use pointer cursors"
           description="Change the cursor when hovering over interactive elements"
@@ -355,7 +344,7 @@ function ModeButton({
     <button
       type="button"
       className={cn(
-        "flex h-8 items-center gap-2 rounded-lg px-3 text-base text-muted-foreground",
+        "flex h-8 items-center gap-2 rounded-lg px-2 text-base text-muted-foreground",
         active && "bg-card text-foreground shadow-sm",
       )}
       onClick={onClick}
@@ -378,7 +367,7 @@ function ThemePreview({ light, dark }: { light: ThemePalette; dark: ThemePalette
 function PreviewPane({ palette, side }: { palette: ThemePalette; side: "left" | "right" }): React.JSX.Element {
   return (
     <div
-      className={cn("px-4 py-3", side === "left" ? "border-r border-border" : "")}
+      className={cn("px-3 py-2", side === "left" ? "border-r border-border" : "")}
       style={{ background: palette.background, color: palette.foreground }}
     >
       <div className="mb-2 text-muted-foreground">const themePreview: ThemeConfig = {"{"}</div>
@@ -430,13 +419,13 @@ function ThemeEditor({
   const hasSelectedPreset = palette.presetId === "custom" || presets.some((preset) => preset.id === palette.presetId);
   const selectedLabel = selectedPresetLabel(scheme, palette, extensionThemePresets);
   return (
-    <section className="border-b border-border px-5 py-4">
+    <section className="border-b border-border px-4 py-3">
       <div className="mb-3 flex items-center gap-3">
         <h2 className="min-w-0 flex-1 text-base text-muted-foreground">{title}</h2>
         <select
           value={palette.presetId}
           aria-label={`${title} preset`}
-          className="h-8 w-[210px] rounded-lg border border-border bg-muted px-3 text-base text-foreground outline-none"
+          className="h-8 w-[210px] max-w-full rounded-lg border border-border bg-muted px-3 text-base text-foreground outline-none"
           onChange={(event) => onPreset(event.currentTarget.value)}
         >
           <option value="custom">Custom</option>
@@ -462,7 +451,7 @@ function ThemeEditor({
           />
         </SettingsRow>
         <SettingsRow label="Contrast">
-          <div className="flex min-w-[260px] items-center gap-4">
+          <div className="flex w-64 max-w-full items-center gap-3">
             <input
               type="range"
               min={0}
@@ -529,7 +518,7 @@ function TextRow({
       <input
         aria-label={label}
         value={value}
-        className="h-8 w-[260px] rounded-lg border border-border bg-transparent px-3 font-mono text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 w-[260px] max-w-full rounded-lg border border-border bg-transparent px-3 font-mono text-base text-foreground outline-none focus:ring-2 focus:ring-ring"
         onChange={(event) => onChange(event.currentTarget.value)}
       />
     </SettingsRow>
@@ -546,7 +535,7 @@ function SettingsRow({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex min-h-11 items-center gap-5 py-2">
+    <div className="flex min-h-10 flex-col items-start gap-2 py-1.5 @lg:flex-row @lg:items-center @lg:gap-4">
       <div className="min-w-0 flex-1">
         <div className="text-base text-foreground">{label}</div>
         {description && <div className="mt-0.5 text-base text-muted-foreground">{description}</div>}
@@ -595,7 +584,7 @@ function TerminalSettingsPanel(): React.JSX.Element {
 
   return (
     <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
-      <header className="border-b border-border px-5 py-4">
+      <header className="border-b border-border px-4 py-3">
         <h1 className="text-base font-medium">Terminal</h1>
         <p className="mt-1 text-base text-muted-foreground">
           Choose a truecolour xterm theme or paste custom xterm.js theme JSON.
@@ -604,14 +593,14 @@ function TerminalSettingsPanel(): React.JSX.Element {
 
       <TerminalThemePreview theme={effectiveTheme} />
 
-      <div className="divide-y divide-border border-t border-border px-5">
+      <div className="divide-y divide-border border-t border-border px-4">
         <SettingsRow label="Theme" description="Applies to the embedded workspace terminal">
           <Select
             items={Object.fromEntries(terminalThemePresets.map((preset) => [preset.id, preset.name]))}
             value={terminalTheme.presetId}
             onValueChange={(value) => setTerminalThemePreset(value ?? "catppuccin-mocha")}
           >
-            <SelectTrigger className="w-[240px] border border-border bg-card">
+            <SelectTrigger className="w-[240px] max-w-full border border-border bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -627,7 +616,7 @@ function TerminalSettingsPanel(): React.JSX.Element {
         </SettingsRow>
 
         {terminalTheme.presetId === "custom" && (
-          <div className="py-4">
+          <div className="py-3">
             <div className="mb-2 flex items-baseline justify-between gap-4">
               <div>
                 <div className="text-base text-foreground">Custom theme JSON</div>
@@ -653,8 +642,8 @@ function TerminalSettingsPanel(): React.JSX.Element {
 
 function TerminalThemePreview({ theme }: { theme: ReturnType<typeof terminalThemeForSettings> }): React.JSX.Element {
   return (
-    <div className="p-5" style={{ background: theme.background, color: theme.foreground }}>
-      <div className="rounded-lg bg-black/10 p-4 font-mono text-sm shadow-inner ring-1 ring-white/10">
+    <div className="p-4" style={{ background: theme.background, color: theme.foreground }}>
+      <div className="rounded-lg bg-black/10 p-3 font-mono text-sm shadow-inner ring-1 ring-white/10">
         <div className="mb-3 flex items-center gap-2 text-xs opacity-75">
           <span className="size-2 rounded-full" style={{ background: theme.red }} />
           <span className="size-2 rounded-full" style={{ background: theme.yellow }} />

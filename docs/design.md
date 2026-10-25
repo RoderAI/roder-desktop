@@ -14,7 +14,7 @@ Start here before inventing a new treatment.
 - Use the existing Base UI primitives and local shadcn-style wrappers.
 - Use semantic Tailwind tokens before raw colors.
 - Use `text-base` for normal UI text. In this app `text-base` maps to
-  `--font-size-ui`, currently `14px`.
+  `--font-size-ui`, currently `13px`.
 - Use `font-medium` by default for product UI text.
 - Use `bg-background`, `bg-card`, `bg-popover`, or `bg-white` for primary
   surfaces. In the light theme these are white.
@@ -36,6 +36,11 @@ Start here before inventing a new treatment.
 ## Typography
 
 - Default to `text-base`.
+- Keep interface text at 13px, secondary `text-sm` at 12px, and compact `text-xs`
+  at 11px. These sizes must stay distinct rather than inheriting Tailwind's
+  default 14px `text-sm` beside a custom-sized `text-base`.
+- Use `text-reading` (14px) for conversation content. Keep code at 13px and
+  composer input at 15px so tightening chrome does not shrink long-form reading.
 - Use `text-sm` for secondary metadata, timestamps, keyboard hints, and compact
   status labels.
 - Use `text-xs` rarely, only where space is genuinely constrained.
@@ -114,6 +119,13 @@ or solve a measured visual mismatch.
 
 Roder should fit real work on screen without feeling cramped.
 
+- Use 32px default controls and navigation rows, 28px small controls, and a 48px
+  desktop header. Two-line agent rows can use 44px to retain readable metadata.
+- Keep the natural Electron zoom and 16px root rem scale. Tighten component
+  spacing directly; global zoom or spacing-scale changes can misalign native
+  window controls and embedded browser bounds.
+- Prefer 16px page insets and section gaps, 12px card padding, and 16–20px dialog
+  insets instead of repeatedly nesting 24–32px padding.
 - Use tight gaps for controls in the same action group.
 - Use moderate gaps between independent controls.
 - Use larger gaps between major regions.

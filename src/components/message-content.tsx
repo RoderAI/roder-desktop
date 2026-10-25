@@ -161,7 +161,7 @@ export function MessageContent({
 
   return (
     <Streamdown
-      className="message-markdown font-medium text-base leading-[1.55]"
+      className="message-markdown font-medium text-reading leading-[1.55]"
       components={components}
       controls={{ code: { copy: true, download: false }, table: { copy: true, download: false, fullscreen: false } }}
       isAnimating={isStreaming}

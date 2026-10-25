@@ -3,7 +3,12 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { modelKey, providerName, selectedModelRecord as resolveSelectedModelRecord, visibleModelsFor } from "@/lib/roder-models";
+import {
+  modelKey,
+  providerName,
+  selectedModelRecord as resolveSelectedModelRecord,
+  visibleModelsFor,
+} from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type {
   InferenceRoutingOptionDescriptor,
@@ -96,7 +101,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
 
   return (
     <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
-      <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
+      <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
         <div>
           <h1 className="text-base font-medium">General</h1>
           <p className="mt-1 text-base text-muted-foreground">Defaults for new work</p>
@@ -107,7 +112,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
         </Button>
       </header>
 
-      <div className="divide-y divide-border px-5">
+      <div className="divide-y divide-border px-4">
         <SettingsRow label="Model" description={selectedModelDescription(defaultSelectionMode, selectedModelRecord)}>
           <Select
             items={modelItems}
@@ -123,10 +128,10 @@ export function GeneralSettingsPanel(): React.JSX.Element {
               setDefaultModel(model?.id ?? "", model?.modelProvider);
             }}
           >
-            <SelectTrigger className="w-[300px] border border-border bg-card">
+            <SelectTrigger className="w-[260px] max-w-full border border-border bg-card">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="w-[340px]">
+            <SelectContent className="w-[300px]">
               <SelectGroup>
                 {routingOptions.map((option) => (
                   <SelectItem key={autoModelValue(option)} value={autoModelValue(option)}>
@@ -149,7 +154,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
             value={defaultReasoning}
             onValueChange={(value) => setDefaultReasoning((value ?? "medium") as ReasoningEffort)}
           >
-            <SelectTrigger className="w-[220px] border border-border bg-card">
+            <SelectTrigger className="w-[220px] max-w-full border border-border bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -173,7 +178,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
             value={defaultPolicyMode}
             onValueChange={(value) => setDefaultPolicyMode((value ?? "default") as PolicyMode)}
           >
-            <SelectTrigger className="w-[220px] border border-border bg-card">
+            <SelectTrigger className="w-[220px] max-w-full border border-border bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -189,7 +194,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
         </SettingsRow>
       </div>
 
-      {error && <div className="border-t border-border px-5 py-3 text-base text-destructive">{error}</div>}
+      {error && <div className="border-t border-border px-4 py-2 text-base text-destructive">{error}</div>}
     </section>
   );
 }
@@ -204,10 +209,10 @@ function SettingsRow({
   children: ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6 py-4">
+    <div className="grid grid-cols-1 items-start gap-2 py-3 @lg:grid-cols-[minmax(0,1fr)_auto] @lg:items-center @lg:gap-4">
       <div className="min-w-0">
         <div className="text-base font-medium">{label}</div>
-        <div className="mt-1 max-w-[440px] text-base text-muted-foreground">{description}</div>
+        <div className="mt-0.5 max-w-[440px] text-base text-muted-foreground">{description}</div>
       </div>
       {children}
     </div>

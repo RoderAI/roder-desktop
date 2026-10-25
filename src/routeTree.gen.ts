@@ -10,12 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as NewRouteImport } from './routes/new'
+import { Route as PersistentAgentsRouteImport } from './routes/persistent-agents'
 import { Route as PluginsRouteImport } from './routes/plugins'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PluginsExploreRouteImport } from './routes/plugins.explore'
 import { Route as PluginsInstalledRouteImport } from './routes/plugins.installed'
 import { Route as SettingsSectionRouteImport } from './routes/settings.$section'
+import { Route as ThreadsIndexRouteImport } from './routes/threads.index'
 import { Route as ThreadsThreadIdRouteImport } from './routes/threads.$threadId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,9 +26,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IssuesRoute = IssuesRouteImport.update({
+  id: '/issues',
+  path: '/issues',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewRoute = NewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PersistentAgentsRoute = PersistentAgentsRouteImport.update({
+  id: '/persistent-agents',
+  path: '/persistent-agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PluginsRoute = PluginsRouteImport.update({
@@ -53,6 +66,11 @@ const SettingsSectionRoute = SettingsSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => SettingsRoute,
 } as any)
+const ThreadsIndexRoute = ThreadsIndexRouteImport.update({
+  id: '/threads/',
+  path: '/threads/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ThreadsThreadIdRoute = ThreadsThreadIdRouteImport.update({
   id: '/threads/$threadId',
   path: '/threads/$threadId',
@@ -61,74 +79,95 @@ const ThreadsThreadIdRoute = ThreadsThreadIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/issues': typeof IssuesRoute
   '/new': typeof NewRoute
+  '/persistent-agents': typeof PersistentAgentsRoute
   '/plugins': typeof PluginsRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/plugins/explore': typeof PluginsExploreRoute
   '/plugins/installed': typeof PluginsInstalledRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/threads/$threadId': typeof ThreadsThreadIdRoute
+  '/threads/': typeof ThreadsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/issues': typeof IssuesRoute
   '/new': typeof NewRoute
+  '/persistent-agents': typeof PersistentAgentsRoute
   '/plugins': typeof PluginsRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/plugins/explore': typeof PluginsExploreRoute
   '/plugins/installed': typeof PluginsInstalledRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/threads/$threadId': typeof ThreadsThreadIdRoute
+  '/threads': typeof ThreadsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/issues': typeof IssuesRoute
   '/new': typeof NewRoute
+  '/persistent-agents': typeof PersistentAgentsRoute
   '/plugins': typeof PluginsRouteWithChildren
   '/settings': typeof SettingsRouteWithChildren
   '/plugins/explore': typeof PluginsExploreRoute
   '/plugins/installed': typeof PluginsInstalledRoute
   '/settings/$section': typeof SettingsSectionRoute
   '/threads/$threadId': typeof ThreadsThreadIdRoute
+  '/threads/': typeof ThreadsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/issues'
     | '/new'
+    | '/persistent-agents'
     | '/plugins'
     | '/settings'
     | '/plugins/explore'
     | '/plugins/installed'
     | '/settings/$section'
     | '/threads/$threadId'
+    | '/threads/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/issues'
     | '/new'
+    | '/persistent-agents'
     | '/plugins'
     | '/settings'
     | '/plugins/explore'
     | '/plugins/installed'
     | '/settings/$section'
     | '/threads/$threadId'
+    | '/threads'
   id:
     | '__root__'
     | '/'
+    | '/issues'
     | '/new'
+    | '/persistent-agents'
     | '/plugins'
     | '/settings'
     | '/plugins/explore'
     | '/plugins/installed'
     | '/settings/$section'
     | '/threads/$threadId'
+    | '/threads/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  IssuesRoute: typeof IssuesRoute
   NewRoute: typeof NewRoute
+  PersistentAgentsRoute: typeof PersistentAgentsRoute
   PluginsRoute: typeof PluginsRouteWithChildren
   SettingsRoute: typeof SettingsRouteWithChildren
   ThreadsThreadIdRoute: typeof ThreadsThreadIdRoute
+  ThreadsIndexRoute: typeof ThreadsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -140,11 +179,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/issues': {
+      id: '/issues'
+      path: '/issues'
+      fullPath: '/issues'
+      preLoaderRoute: typeof IssuesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/new': {
       id: '/new'
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof NewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/persistent-agents': {
+      id: '/persistent-agents'
+      path: '/persistent-agents'
+      fullPath: '/persistent-agents'
+      preLoaderRoute: typeof PersistentAgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plugins': {
@@ -181,6 +234,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/$section'
       preLoaderRoute: typeof SettingsSectionRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/threads/': {
+      id: '/threads/'
+      path: '/threads'
+      fullPath: '/threads/'
+      preLoaderRoute: typeof ThreadsIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/threads/$threadId': {
       id: '/threads/$threadId'
@@ -219,10 +279,13 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  IssuesRoute: IssuesRoute,
   NewRoute: NewRoute,
+  PersistentAgentsRoute: PersistentAgentsRoute,
   PluginsRoute: PluginsRouteWithChildren,
   SettingsRoute: SettingsRouteWithChildren,
   ThreadsThreadIdRoute: ThreadsThreadIdRoute,
+  ThreadsIndexRoute: ThreadsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

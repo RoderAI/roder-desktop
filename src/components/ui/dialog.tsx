@@ -43,7 +43,7 @@ export function DialogContent({
       <DialogPrimitive.Popup
         ref={ref}
         className={cn(
-          "dialog-popup fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-theme(spacing.12))] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg bg-popover p-5 text-base text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none",
+          "dialog-popup fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-theme(spacing.12))] w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-lg bg-popover p-4 text-base text-popover-foreground shadow-lg ring-1 ring-foreground/10 outline-none",
           className,
         )}
         {...props}
@@ -51,7 +51,7 @@ export function DialogContent({
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
-            className="absolute right-3 top-3 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Close"
           >
             <X className="size-4" />
@@ -63,11 +63,11 @@ export function DialogContent({
 }
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
-  return <div className={cn("flex flex-col gap-1.5 pr-8", className)} {...props} />;
+  return <div className={cn("flex flex-col gap-1 pr-7", className)} {...props} />;
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
-  return <div className={cn("flex justify-end gap-2", className)} {...props} />;
+  return <div className={cn("flex justify-end gap-1.5", className)} {...props} />;
 }
 
 export function DialogTitle({
@@ -88,6 +88,6 @@ export function DialogDescription({
   ref?: React.Ref<React.ElementRef<typeof DialogPrimitive.Description>>;
 }): React.JSX.Element {
   return (
-    <DialogPrimitive.Description ref={ref} className={cn("leading-6 text-muted-foreground", className)} {...props} />
+    <DialogPrimitive.Description ref={ref} className={cn("leading-5 text-muted-foreground", className)} {...props} />
   );
 }

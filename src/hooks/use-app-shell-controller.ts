@@ -11,13 +11,20 @@ import { mergedCommandDescriptors } from "@/lib/native-commands";
 import type { NativeCommandOutput } from "@/lib/native-command-formatters";
 import { runNativeCommandInvocation, type LocalTranscriptOffset } from "@/lib/native-command-router";
 import { roderIpc } from "@/lib/roder-ipc";
-import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
+import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
+import {
+  createProjectPersistentAgent,
+  type ProjectPersistentAgentConfig,
+  type CreatedProjectThread,
+} from "@/lib/project-persistent-agent";
+import { useRoderStore } from "@/stores/roder-store";
 import { commandInvocation, slashCommandLikeText, type CommandInvocation } from "@/lib/roder-commands";
 import { useThemeApplication } from "@/hooks/use-theme-application";
 import {
   activeWorkspaceContextForRoute,
   archiveRouteAfterThreadRemoval,
   defaultPluginsRoute,
+  fullPageRouteForPathname,
   isNewRoutePath,
   isPluginsRoutePath,
 } from "@/lib/route-selection";
@@ -81,6 +88,8 @@ export function useAppShellController(): AppShellController {
   const [projectConfigOpen, setProjectConfigOpen] = useState(false);
   const [projectInitialFolders, setProjectInitialFolders] = useState<string[]>([]);
   const [projectCreating, setProjectCreating] = useState(false);
+  const [projectCreationError, setProjectCreationError] = useState<string | null>(null);
+  const [createdProjectThread, setCreatedProjectThread] = useState<CreatedProjectThread | null>(null);
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchSelectionIntent, setFileSearchSelectionIntent] = useState<FilePanelSelectionIntent | null>(null);
   const activePanel = routeSearch.panelActive;
@@ -179,32 +188,47 @@ export function useAppShellController(): AppShellController {
     [followBottom, navigate, stageAgentNewThread],
   );
   const newProject = useCallback(() => {
+    if (projectCreating) return;
     followBottom();
     void roderIpc.openWorkspaceFolder(activeWorkspaceCwd || selectedWorkspaceCwd || status.cwd).then((folder) => {
       if (!folder) {
         return;
       }
       setProjectInitialFolders([folder]);
+      setProjectCreationError(null);
+      setCreatedProjectThread(null);
       setProjectConfigOpen(true);
     });
-  }, [activeWorkspaceCwd, followBottom, selectedWorkspaceCwd, status.cwd]);
-  const createConfiguredProject = useCallback(
-    (params: WorkspaceCreateParams) => {
+  }, [activeWorkspaceCwd, followBottom, projectCreating, selectedWorkspaceCwd, status.cwd]);
+  async function createConfiguredProject(params: ProjectPersistentAgentConfig): Promise<void> {
+    if (projectCreating) return;
+    setProjectCreating(true);
+    setProjectCreationError(null);
+    try {
+      const project = await createProjectPersistentAgent(
+        params,
+        {
+          createProject: createProjectThread,
+          promote: persistentAgentsIpc.promote,
+          snapshot: useRoderStore.getState,
+          onCreated: (project) => {
+            setCreatedProjectThread(project);
+            void navigate({ to: "/threads/$threadId", params: { threadId: project.threadId }, search: true });
+          },
+        },
+        createdProjectThread,
+      );
+      await useRoderStore.getState().refreshThreadModel(project.threadId);
       followBottom();
-      setProjectCreating(true);
-      void navigate({ to: "/new", search: true });
-      void createProjectThread(params)
-        .then(() => {
-          setProjectConfigOpen(false);
-          setProjectInitialFolders([]);
-          setProjectCreating(false);
-        })
-        .catch(() => {
-          setProjectCreating(false);
-        });
-    },
-    [createProjectThread, followBottom, navigate],
-  );
+      await navigate({ to: "/threads/$threadId", params: { threadId: project.threadId }, search: true });
+      setProjectConfigOpen(false);
+      setProjectInitialFolders([]);
+      setCreatedProjectThread(null);
+    } catch (cause) {
+      setProjectCreationError(cause instanceof Error ? cause.message : String(cause));
+    }
+    setProjectCreating(false);
+  }
   useEffect(() => {
     return window.roderDesktop.onAppCommand((appCommand) => {
       if (appCommand.command === "newProject") {
@@ -446,6 +470,7 @@ export function useAppShellController(): AppShellController {
       attachToComposer,
       closeNativeModelPicker,
       followBottom,
+      newProject,
       openReview,
       selectNativeCommandModel,
       sendCommandInvocation,
@@ -467,6 +492,7 @@ export function useAppShellController(): AppShellController {
       folderOptions,
       followBottom,
       followSignal,
+      newProject,
       hunkSummary,
       openReview,
       routeSearch,
@@ -494,6 +520,7 @@ export function useAppShellController(): AppShellController {
       activeWorkspaceRoots,
       folderOptions,
       isPluginsRoute,
+      fullPageRoute: fullPageRouteForPathname(pathname),
       hunkSummary,
       hasMoreThreads: agent.hasMoreThreads,
       loadingMoreThreads: agent.loadingMoreThreads,
@@ -513,6 +540,8 @@ export function useAppShellController(): AppShellController {
       workspacePanelOpen,
       projectConfigOpen,
       projectCreating,
+      projectCreationError,
+      projectCreated: createdProjectThread !== null,
       projectInitialFolders,
       onArchiveThread: archiveThread,
       onLoadMoreThreads: agent.loadMoreThreads,

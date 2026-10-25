@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Combobox } from "@base-ui/react/combobox";
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import type {
   DesktopAttachment,
   InferenceRoutingOptionDescriptor,
@@ -34,7 +35,14 @@ import {
   dropdownMenuTriggerVariants,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { groupModelsByProvider, providerName, reasoningEffortsFor, resolveReasoningEffort } from "@/lib/roder-models";
+import { providerName, reasoningEffortsFor, resolveReasoningEffort } from "@/lib/roder-models";
+import {
+  buildModelPickerGroups,
+  chooseModelPickerItem,
+  type ModelPickerGroup,
+  type ModelPickerItem,
+} from "@/lib/model-picker";
+import { useRoderStore } from "@/stores/roder-store";
 import { cn } from "@/lib/utils";
 
 export const pickerMenuSurfaceClassName = "bg-card text-card-foreground ring-border/70";
@@ -259,14 +267,20 @@ export function ModelPicker({
   onReasoningChange: (reasoning: ReasoningEffort) => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const providers = useRoderStore((state) => state.providers);
+  const navigate = useNavigate();
   const visibleModels: RoderModel[] = models.length > 0 ? models : [];
-  const modelItems = visibleModels.map((model): ModelPickerItem => ({ type: "model", model }));
+  const groups = buildModelPickerGroups(visibleModels, providers, routingOptions);
+  const catalogModels = groups.flatMap((group) =>
+    group.items.flatMap((item) => (item.type === "auto" ? [] : [item.model])),
+  );
   const autoItems = routingOptions.map((option) => ({ type: "auto" as const, option }));
-  const items = [...autoItems, ...modelItems];
   const selectedModelItem =
     visibleModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
-    visibleModels.find((model) => model.id === selectedModel) ??
-    visibleModels[0];
+    catalogModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
+    (!selectedModelProvider ? visibleModels.find((model) => model.id === selectedModel) : undefined) ??
+    (selectedModel ? { id: selectedModel, name: selectedModel, modelProvider: selectedModelProvider } : undefined) ??
+    groups.flatMap((group) => group.items).find((item) => item.type === "model")?.model;
   const selectedAutoItem =
     selectedSelectionMode.type === "auto"
       ? autoItems.find((item) => item.option.id === selectedSelectionMode.optionId)
@@ -278,7 +292,6 @@ export function ModelPicker({
   const reasoningChoices = reasoningEffortsFor(selectedModelItem);
   const shownReasoning = resolveReasoningEffort(selectedModelItem, selectedReasoning) ?? selectedReasoning;
   const showReasoningPicker = !selectedAutoItem && reasoningChoices.length > 0;
-  const modelGroups = groupModelsByProvider(visibleModels);
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-foreground">
@@ -286,7 +299,7 @@ export function ModelPicker({
         open={open}
         onOpenChange={setOpen}
         value={selected}
-        items={items}
+        items={groups}
         itemToStringLabel={modelPickerItemName}
         itemToStringValue={modelPickerItemValue}
         isItemEqualToValue={(item, value) => modelPickerItemValue(item) === modelPickerItemValue(value)}
@@ -295,11 +308,19 @@ export function ModelPicker({
           return haystack.includes(inputValue.trim().toLowerCase());
         }}
         onValueChange={(item) => {
-          if (item?.type === "auto") {
-            onAutoChange(item.option.id);
-          } else if (item?.type === "model") {
-            onChange(item.model.id, item.model.modelProvider);
-          }
+          if (item)
+            chooseModelPickerItem(item, {
+              onChange,
+              onAutoChange,
+              onProviderSetup: (provider) => {
+                setOpen(false);
+                void navigate({
+                  to: "/settings/$section",
+                  params: { section: "providers" },
+                  search: (previous) => ({ ...previous, setupProvider: provider }),
+                });
+              },
+            });
         }}
       >
         <Combobox.Trigger className={cn(dropdownMenuTriggerVariants({ variant: "pill" }))} aria-label="Choose model">
@@ -323,14 +344,14 @@ export function ModelPicker({
               </div>
               <Combobox.Empty>
                 <div className="px-3.5 py-4 text-base text-muted-foreground">
-                  {models.length === 0 ? "Configure a provider in Settings to choose models" : "No matching models"}
+                  {providers.length === 0 ? "Loading provider status…" : "No matching models"}
                 </div>
               </Combobox.Empty>
               <Combobox.List className="max-h-[286px] overflow-y-auto p-1.5">
-                {autoItems.length > 0 && (
-                  <Combobox.Group items={autoItems}>
+                {(group: ModelPickerGroup) => (
+                  <Combobox.Group key={group.id} items={group.items}>
                     <Combobox.GroupLabel className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Auto routing
+                      {group.label}
                     </Combobox.GroupLabel>
                     <Combobox.Collection>
                       {(item: ModelPickerItem) => (
@@ -339,8 +360,15 @@ export function ModelPicker({
                           value={item}
                           className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
                         >
-                          <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+                          {item.type !== "auto" ? (
+                            <ProviderLogo provider={item.model.modelProvider} />
+                          ) : (
+                            <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+                          )}
                           <span className="min-w-0 flex-1 truncate text-foreground">{modelPickerItemName(item)}</span>
+                          {item.type === "setup" ? (
+                            <span className="shrink-0 text-sm text-muted-foreground">Set up {item.providerLabel}</span>
+                          ) : null}
                           <Combobox.ItemIndicator
                             keepMounted
                             className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
@@ -352,34 +380,6 @@ export function ModelPicker({
                     </Combobox.Collection>
                   </Combobox.Group>
                 )}
-                {modelGroups.map((group) => (
-                  <Combobox.Group
-                    key={group.provider}
-                    items={group.models.map((model): ModelPickerItem => ({ type: "model", model }))}
-                  >
-                    <Combobox.GroupLabel className="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {providerName(group.provider)}
-                    </Combobox.GroupLabel>
-                    <Combobox.Collection>
-                      {(item: ModelPickerItem) => (
-                        <Combobox.Item
-                          key={modelPickerItemValue(item)}
-                          value={item}
-                          className={cn(dropdownMenuItemClassName, "h-9 data-[selected]:font-medium")}
-                        >
-                          {item.type === "model" && <ProviderLogo provider={item.model.modelProvider} />}
-                          <span className="min-w-0 flex-1 truncate text-foreground">{modelPickerItemName(item)}</span>
-                          <Combobox.ItemIndicator
-                            keepMounted
-                            className="ml-0.5 grid size-3.5 place-items-center text-primary opacity-0 data-[selected]:opacity-100"
-                          >
-                            <Check className="size-3.5" />
-                          </Combobox.ItemIndicator>
-                        </Combobox.Item>
-                      )}
-                    </Combobox.Collection>
-                  </Combobox.Group>
-                ))}
               </Combobox.List>
             </Combobox.Popup>
           </Combobox.Positioner>
@@ -411,10 +411,6 @@ export function ModelPicker({
   );
 }
 
-type ModelPickerItem =
-  | { type: "auto"; option: InferenceRoutingOptionDescriptor }
-  | { type: "model"; model: RoderModel };
-
 function modelPickerItemName(item: ModelPickerItem): string {
   return item.type === "auto" ? item.option.label : modelName(item.model);
 }
@@ -424,14 +420,14 @@ function modelPickerLabel(item: ModelPickerItem | null): string {
 }
 
 function modelPickerItemValue(item: ModelPickerItem): string {
-  return item.type === "auto" ? `auto:${item.option.id}` : `model:${item.model.modelProvider}:${item.model.id}`;
+  return item.type === "auto" ? `auto:${item.option.id}` : `${item.type}:${item.model.modelProvider}:${item.model.id}`;
 }
 
 function modelPickerItemSearchText(item: ModelPickerItem): string {
   if (item.type === "auto") {
     return `${item.option.label} ${item.option.id} ${item.option.routerId} auto`;
   }
-  return `${item.model.displayName ?? ""} ${item.model.name} ${item.model.id} ${item.model.modelProvider}`;
+  return `${item.model.displayName ?? ""} ${item.model.name} ${item.model.id} ${item.model.modelProvider} ${item.type === "setup" ? item.providerLabel : ""}`;
 }
 
 type ProviderLogoDefinition = {

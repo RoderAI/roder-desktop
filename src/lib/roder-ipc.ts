@@ -54,6 +54,7 @@ import type {
   WorkspaceFilesStatusResult,
   WorkspaceRoot,
 } from "@/types/roder";
+import type { ModelTokenUsage } from "@/lib/thread-cost";
 
 export type ThreadListResult = {
   data: RoderThread[];
@@ -423,6 +424,11 @@ export type VcsChangesReadOptions = {
 };
 
 export const roderIpc = {
+  threadTokenUsage: (threadId: string) =>
+    window.roderDesktop.request("stats/tokens", {
+      filter: { threadId, limit: 1000 },
+      group: "model",
+    }) as Promise<{ rows: ModelTokenUsage[] }>,
   start: () => window.roderDesktop.start(),
   restart: () => window.roderDesktop.restart(),
   status: () => window.roderDesktop.status(),
@@ -697,11 +703,7 @@ export const roderIpc = {
       threadId,
       turnId,
     }) as Promise<SubagentTracesListResult>,
-  readSubagentTrace: (
-    threadId: string,
-    traceId: string,
-    options: { offset?: number; limit?: number } = {},
-  ) =>
+  readSubagentTrace: (threadId: string, traceId: string, options: { offset?: number; limit?: number } = {}) =>
     window.roderDesktop.request("turn/subagentTrace/read", {
       threadId,
       traceId,
@@ -752,8 +754,9 @@ export const roderIpc = {
     diarization?: boolean;
   }) => window.roderDesktop.request("speech/transcribe", params) as Promise<SpeechTranscribeResult>,
   onStatus: (callback: (status: RoderStatus) => void) => window.roderDesktop.onStatus(callback),
-  onNotification: window.roderDesktop.onNotification,
-  onStderr: window.roderDesktop.onStderr,
+  onNotification: (callback: Parameters<typeof window.roderDesktop.onNotification>[0]) =>
+    window.roderDesktop.onNotification(callback),
+  onStderr: (callback: Parameters<typeof window.roderDesktop.onStderr>[0]) => window.roderDesktop.onStderr(callback),
   onAppearance: (callback: (appearance: SystemAppearance) => void) => window.roderDesktop.onAppearance(callback),
 };
 

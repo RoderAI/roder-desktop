@@ -44,3 +44,32 @@ test("runtime popover surfaces follow the active theme", () => {
   expect(darkVariables["--color-popover-foreground"]).toBe(darkVariables["--color-foreground"]);
   expect(darkVariables["--color-popover"]).not.toBe("#ffffff");
 });
+
+test("compact defaults keep conversation text readable and secondary interface text smaller", () => {
+  const variables = themeVariables(
+    defaultThemeSettings.light,
+    "light",
+    defaultThemeSettings.uiFontSize,
+    defaultThemeSettings.codeFontSize,
+  );
+
+  expect(variables).toMatchObject({
+    "--font-size-ui": "13px",
+    "--font-size-small": "12px",
+    "--font-size-caption": "11px",
+    "--font-size-reading": "14px",
+    "--font-size-composer": "15px",
+    "--font-size-code": "13px",
+  });
+});
+
+test("custom interface font sizes scale reading, composer, and secondary typography together", () => {
+  expect(themeVariables(defaultThemeSettings.light, "light", 17, 15)).toMatchObject({
+    "--font-size-ui": "17px",
+    "--font-size-small": "16px",
+    "--font-size-caption": "15px",
+    "--font-size-reading": "18px",
+    "--font-size-composer": "19px",
+    "--font-size-code": "15px",
+  });
+});

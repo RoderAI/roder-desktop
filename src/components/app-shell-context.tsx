@@ -32,6 +32,7 @@ export type AppShellContextValue = {
   attachToComposer: (attachment: DesktopAttachment) => void;
   closeNativeModelPicker: () => void;
   followBottom: () => void;
+  newProject: () => void;
   openReview: (scope: RouteReviewScope, turnId?: string) => void;
   selectNativeCommandModel: (modelId: string, modelProvider?: string) => void;
   sendCommandInvocation: (invocation: CommandInvocation) => Promise<void>;

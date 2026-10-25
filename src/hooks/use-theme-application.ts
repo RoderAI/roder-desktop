@@ -40,6 +40,7 @@ export function themeVariables(
   const border = mix(bg, fg, isDark ? 20 + contrast * 0.12 : 6 + contrast * 0.04);
   const activeSidebar = mix(sidebar, fg, isDark ? 12 + contrast * 0.12 : 10 + contrast * 0.12);
   const sidebarAlpha = palette.translucentSidebar ? " / 0.82" : "";
+  const interfaceSize = clamp(uiFontSize, 11, 24);
 
   return {
     "--color-background": bg,
@@ -71,8 +72,11 @@ export function themeVariables(
     "--color-sidebar-dot": mix(fg, sidebar, 58),
     "--font-ui": palette.uiFont,
     "--font-code": palette.codeFont,
-    "--font-size-ui": `${clamp(uiFontSize, 11, 24)}px`,
-    "--font-size-composer": `${clamp(uiFontSize + 3, 14, 27)}px`,
+    "--font-size-ui": `${interfaceSize}px`,
+    "--font-size-small": `${Math.max(11, interfaceSize - 1)}px`,
+    "--font-size-caption": `${Math.max(10, interfaceSize - 2)}px`,
+    "--font-size-reading": `${interfaceSize + 1}px`,
+    "--font-size-composer": `${interfaceSize + 2}px`,
     "--font-size-code": `${clamp(codeFontSize, 11, 18)}px`,
   };
 }

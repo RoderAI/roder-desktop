@@ -1255,6 +1255,7 @@ declare global {
       setMinWindowWidth: (width: number) => Promise<void>;
       start: () => Promise<RoderStatus>;
       restart: () => Promise<RoderStatus>;
+      configureImageGeneration: (params: { apiKey: string }) => Promise<{ configured: boolean }>;
       status: () => Promise<RoderStatus>;
       appearance: () => Promise<SystemAppearance>;
       openExternal: (url: string) => Promise<void>;

@@ -25,10 +25,7 @@ import {
 } from "@/components/composer-controls";
 import { CommandCompletionPopup, commandCompletionOptionId } from "@/components/command-completion-popup";
 import { ComposerSketchPad } from "@/components/composer-sketch-pad";
-import {
-  McpServerCompletionPopup,
-  mcpServerCompletionOptionId,
-} from "@/components/mcp-server-completion-popup";
+import { McpServerCompletionPopup, mcpServerCompletionOptionId } from "@/components/mcp-server-completion-popup";
 import { SkillCompletionPopup, skillCompletionOptionId } from "@/components/skill-completion-popup";
 import {
   DropdownMenu,
@@ -466,10 +463,7 @@ export function Composer({
   const activeCompletionOptionId = commandCompletion.showCommandCompletionMenu
     ? commandCompletionOptionId(commandCompletionListboxId, commandCompletion.highlightedCommandIndex)
     : mcpServerCompletion.showMcpServerCompletionMenu
-      ? mcpServerCompletionOptionId(
-          mcpServerCompletionListboxId,
-          mcpServerCompletion.highlightedMcpServerIndex,
-        )
+      ? mcpServerCompletionOptionId(mcpServerCompletionListboxId, mcpServerCompletion.highlightedMcpServerIndex)
       : skillCompletion.showSkillCompletionMenu
         ? skillCompletionOptionId(skillCompletionListboxId, skillCompletion.highlightedSkillIndex)
         : undefined;
@@ -477,7 +471,7 @@ export function Composer({
   return (
     <div
       ref={speechLifecycleRef}
-      className="mx-auto w-full max-w-3xl px-5 pb-5 pt-0"
+      className="mx-auto w-full max-w-3xl px-4 pb-3 pt-0"
       onDragEnter={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
           setDragActive(true);
@@ -498,7 +492,7 @@ export function Composer({
     >
       <div
         className={cn(
-          "relative mt-3 rounded-3xl bg-card/95 shadow-sm ring-1 ring-border/70 backdrop-blur-md transition-[background-color,box-shadow]",
+          "relative mt-2 rounded-2xl bg-card/95 shadow-sm ring-1 ring-border/70 backdrop-blur-md transition-[background-color,box-shadow]",
           dragActive && "bg-card shadow-md ring-2 ring-ring/30",
         )}
       >
@@ -513,7 +507,7 @@ export function Composer({
           />
         )}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
+          <div className="flex flex-wrap gap-2 border-b border-border px-3 py-2">
             {attachments.map((attachment) => (
               <AttachmentChip
                 key={attachment.id}
@@ -576,7 +570,7 @@ export function Composer({
             onPaste={handlePaste}
           />
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
-          <div className="mt-1 flex min-h-9 items-center justify-between gap-2">
+          <div className="mt-1 flex min-h-8 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -815,7 +809,7 @@ function SkillPromptEditor({
         suppressContentEditableWarning
         spellCheck={false}
         tabIndex={0}
-        className="skill-prompt-editor relative min-h-16 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-[1.45em]"
+        className="skill-prompt-editor relative min-h-12 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-[1.45em]"
         onKeyDownCapture={onKeyDownCapture}
         onPaste={onPaste}
       />

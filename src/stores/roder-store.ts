@@ -119,10 +119,11 @@ type RoderStore = {
   refreshThreads: () => Promise<void>;
   loadMoreThreads: () => Promise<void>;
   selectThread: (threadId: string, options?: { pushHistory?: boolean; deferRead?: boolean }) => Promise<void>;
+  refreshThreadModel: (threadId: string) => Promise<void>;
   archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
   goForward: () => Promise<void>;
-  newProject: (params?: WorkspaceCreateParams) => Promise<void>;
+  newProject: (params?: WorkspaceCreateParams) => Promise<{ threadId: string; workspaceId: string } | void>;
   newThread: () => Promise<void>;
   stageNewThread: (cwd: string) => void;
   runCommandInvocation: (invocation: CommandInvocation) => Promise<void>;
@@ -691,6 +692,43 @@ export const useRoderStore = create<RoderStore>()(
         }
       },
 
+      refreshThreadModel: async (threadId) => {
+        const result = await roderIpc.readThread(threadId, false);
+        if (!result.thread || result.thread.id !== threadId)
+          throw new Error("Could not refresh the project thread model");
+        const incoming = normalizeThreadCwd(result.thread, get().status.cwd);
+        set((state) => {
+          const prior = state.threadControlsByThread[threadId];
+          const selectionMode =
+            incoming.selectionMode ??
+            manualSelection(incoming.modelProvider, incoming.model, prior?.reasoning ?? state.defaultReasoning);
+          const reasoning = normalizeReasoningEffort(
+            selectionMode.reasoning ?? prior?.reasoning ?? state.defaultReasoning,
+          );
+          const thread = { ...incoming, turns: incoming.turns ?? state.threadDetails[threadId]?.turns };
+          return {
+            threads: upsertThread(state.threads, thread),
+            threadDetails: { ...state.threadDetails, [threadId]: thread },
+            threadControlsByThread: setThreadControls(state.threadControlsByThread, threadId, {
+              model: thread.model,
+              modelProvider: thread.modelProvider,
+              selectionMode,
+              reasoning,
+              policyMode: prior?.policyMode ?? state.defaultPolicyMode,
+              agentSwarmMode: prior?.agentSwarmMode ?? state.agentSwarmMode,
+            }),
+            ...(state.activeThreadId === threadId
+              ? {
+                  selectedModel: thread.model,
+                  selectedModelProvider: thread.modelProvider,
+                  selectedSelectionMode: selectionMode,
+                  selectedReasoning: reasoning,
+                }
+              : {}),
+          };
+        });
+      },
+
       archiveThread: async (threadId) => {
         if (!threadId) {
           return;
@@ -782,7 +820,8 @@ export const useRoderStore = create<RoderStore>()(
             selectedRootId: created.workspace.defaultRootId,
             selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? defaultRootPath,
           }));
-          await startThreadForSelection(set, get);
+          const threadId = await createThreadForPrompt(set, get, undefined, { recordHistory: true, clearBusy: true });
+          return { threadId, workspaceId: created.workspace.id };
         } catch (error) {
           set({ busy: false, error: (error as Error).message });
         }

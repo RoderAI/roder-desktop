@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex min-w-0 items-center justify-center gap-2 rounded-full text-base font-medium whitespace-nowrap transition-colors outline-none disabled:pointer-events-none disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-ring",
+  "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full text-base font-medium whitespace-nowrap transition-colors outline-none disabled:pointer-events-none disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-ring",
   {
     variants: {
       variant: {
@@ -18,11 +18,11 @@ const buttonVariants = cva(
         subtle: "bg-card/70 text-foreground shadow-sm ring-1 ring-border/70 hover:bg-card",
       },
       size: {
-        default: "h-10 px-4",
-        sm: "h-8 px-3",
+        default: "h-8 px-3",
+        sm: "h-7 px-2.5",
         icon: "size-8",
-        "icon-xs": "size-5",
-        compact: "h-8 px-3",
+        "icon-xs": "size-6",
+        compact: "h-7 px-2.5",
       },
     },
     defaultVariants: {
@@ -47,7 +47,7 @@ export function Button({
   ...props
 }: ButtonProps & { ref?: React.Ref<React.ElementRef<typeof BaseButton>> }): React.JSX.Element {
   const hasIconWithText = buttonHasIconWithText(children);
-  const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-3 pr-4 [&_svg]:size-3.5" : undefined;
+  const iconBalanceClass = hasIconWithText && size !== "icon" ? "pl-2.5 pr-3 [&_svg]:size-3.5" : undefined;
 
   if (asChild && React.isValidElement(children)) {
     return (

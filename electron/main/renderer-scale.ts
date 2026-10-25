@@ -3,7 +3,7 @@ import type { Rectangle } from "electron";
 export const rendererZoomFactor = 1;
 
 export function scaleRendererBounds(bounds?: Rectangle): Rectangle {
-  const fallback = { x: 0, y: 52, width: 720, height: 640 };
+  const fallback = { x: 0, y: 48, width: 720, height: 640 };
   const source = bounds ?? fallback;
   return {
     x: Math.round(source.x * rendererZoomFactor),

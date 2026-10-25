@@ -11,6 +11,12 @@ import {
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FileDiff } from "lucide-react";
+import { TranscriptNavigation } from "@/components/transcript-navigation";
+import {
+  activeTranscriptNavigationId,
+  buildTranscriptNavigation,
+  transcriptNavigationTarget,
+} from "@/lib/transcript-navigation";
 import type { ConversationMessage, SkillDescriptor, SubagentLifecycleEvent } from "@/types/roder";
 import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { Button } from "@/components/ui/button";
@@ -99,6 +105,7 @@ export function Transcript({
   const userScrollIntentTimeoutRef = useRef<number | null>(null);
   const [disclosureOpenByKey, setDisclosureOpenByKey] = useState<TranscriptDisclosureState>({});
   const [pinnedToEnd, setPinnedToEnd] = useState(true);
+  const [selectedNavigation, setSelectedNavigation] = useState<{ threadKey: string; id: string } | null>(null);
 
   const messageVersion = useMemo(() => {
     const lastMessage = messages.at(-1);
@@ -127,14 +134,7 @@ export function Transcript({
     );
     previousTranscriptRowsRef.current = rows;
     return rows;
-  }, [
-    activeTurnId,
-    messages,
-    onReviewTurnChanges,
-    showWorkingIndicator,
-    subagentLifecycleEvents,
-    turnChangeSummaries,
-  ]);
+  }, [activeTurnId, messages, onReviewTurnChanges, showWorkingIndicator, subagentLifecycleEvents, turnChangeSummaries]);
   const transcriptRowKeys = useMemo(() => transcriptRows.map((row) => row.key), [transcriptRows]);
   const rowKeyVersion = useMemo(() => transcriptRowKeys.join("\u0000"), [transcriptRowKeys]);
   const transcriptVersion = useMemo(() => [messageVersion, rowKeyVersion].join("\n"), [messageVersion, rowKeyVersion]);
@@ -324,6 +324,7 @@ export function Transcript({
     viewportRef.current = viewport;
   }, []);
   const markUserScrollIntent = useCallback(() => {
+    setSelectedNavigation(null);
     userScrollIntentRef.current = true;
     if (userScrollIntentTimeoutRef.current !== null) {
       window.clearTimeout(userScrollIntentTimeoutRef.current);
@@ -434,6 +435,7 @@ export function Transcript({
     });
 
     if (followAction.kind === "explicit") {
+      setSelectedNavigation(null);
       setPinnedToEndState(true);
       reportCanScrollToBottom(false);
       scheduleScrollToEnd(followAction.behavior);
@@ -461,11 +463,36 @@ export function Transcript({
     });
   }, [mountedRowKeysVersion, transcriptRows]);
   const suppressAutoFollowScrollbar = transcriptHasActiveStreaming && pinnedToEnd;
+  const navigationItems = buildTranscriptNavigation(transcriptRows);
+  const activeNavigationId = activeTranscriptNavigationId(
+    navigationItems,
+    rowVirtualizer.range?.startIndex ?? 0,
+    pinnedToEnd,
+    selectedNavigation?.threadKey === scrollStateKey ? selectedNavigation.id : null,
+  );
+
+  function jumpToMessage(id: string): void {
+    const index = transcriptNavigationTarget(navigationItems, id);
+    if (index === null) return;
+    cancelPendingScrollFrame();
+    scrollObservationVersionRef.current += 1;
+    markUserScrollIntent();
+    setSelectedNavigation({ threadKey: scrollStateKey, id });
+    setPinnedToEndState(false);
+    rowVirtualizer.scrollToIndex(index, { align: "start", behavior: "auto" });
+  }
 
   return (
     <div className="relative min-h-0 flex-1">
       <TranscriptSearchMirror text={transcriptSearchText} />
       <TranscriptWorkingLiveRegion active={showWorkingIndicator} />
+      <TranscriptNavigation
+        key={scrollStateKey}
+        items={navigationItems}
+        activeId={activeNavigationId}
+        bottomInsetPx={bottomInsetPx}
+        onSelect={jumpToMessage}
+      />
       <ScrollArea
         className="h-full"
         viewportClassName={cn(
@@ -474,13 +501,14 @@ export function Transcript({
         )}
         viewportProps={{
           onKeyDownCapture: handleViewportKeyDownCapture,
+          onPointerDownCapture: markUserScrollIntent,
           onTouchStartCapture: markUserScrollIntent,
           onWheelCapture: handleViewportWheelCapture,
         }}
         viewportRef={setViewportNode}
         onViewportScroll={syncCanScrollToBottom}
       >
-        <main className="mx-auto w-full max-w-3xl px-5 pt-2">
+        <main className="mx-auto w-full max-w-3xl px-4 pt-2">
           <div
             style={{
               height: rowVirtualizer.getTotalSize(),

@@ -87,12 +87,34 @@ test("settings route accepts known sections and falls back to general", () => {
   expect(normalizeSettingsSectionParam(undefined)).toBe("general");
 });
 
+test("removed Components debug settings links resolve to General without changing supported settings", () => {
+  expect(normalizeSettingsSectionParam("components")).toBe("general");
+  for (const section of [
+    "general",
+    "appearance",
+    "providers",
+    "models",
+    "skills",
+    "extensions",
+    "browser",
+    "computer-use",
+    "terminal",
+    "configuration",
+    "personalization",
+    "mcp",
+    "git",
+    "usage",
+  ]) {
+    expect(normalizeSettingsSectionParam(section)).toBe(section);
+  }
+});
+
 test("empty route redirects to the new agent route after hydration", () => {
   expect(defaultRouteForHydratedState()).toBe("/new");
 });
 
 test("plugins installed and explore views are route-owned pages", () => {
-  expect(defaultPluginsRoute()).toBe("/plugins/installed");
+  expect(defaultPluginsRoute()).toBe("/plugins/explore");
   expect(pluginsRouteForSection("installed")).toBe("/plugins/installed");
   expect(pluginsRouteForSection("explore")).toBe("/plugins/explore");
   expect(isPluginsRoutePath("/plugins")).toBe(true);

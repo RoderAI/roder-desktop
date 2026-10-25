@@ -116,6 +116,29 @@ test("theme store preserves custom font sizes during compact density migration",
   expect(useThemeStore.getState().settings.codeFontSize).toBe(15);
 });
 
+test.each([
+  { version: 5, fontSize: 14, expected: 13 },
+  { version: 5, fontSize: 17, expected: 17 },
+  { version: 6, fontSize: 14, expected: 14 },
+])(
+  "compact defaults preserve custom sizing for version $version and size $fontSize",
+  async ({ version, fontSize, expected }) => {
+    const storage = installStorageMock();
+    storage.set(
+      "roder-desktop-theme",
+      JSON.stringify({
+        state: { settings: { ...legacyThemeSettings(13), uiFontSize: fontSize } },
+        version,
+      }),
+    );
+
+    const { useThemeStore } = await loadThemeStore();
+
+    expect(useThemeStore.getState().settings.uiFontSize).toBe(expected);
+    expect(useThemeStore.getState().settings.codeFontSize).toBe(13);
+  },
+);
+
 function legacyThemeSettings(codeFontSize: number) {
   return {
     mode: "system",

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
+import { Check, ChevronDown, Folder, FolderPlus, MessageSquare } from "lucide-react";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { McpAuthWaitCards } from "@/components/mcp-auth-wait-card";
 import { useAppShell } from "@/components/app-shell-context";
@@ -8,6 +8,7 @@ import { Composer } from "@/components/composer";
 import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
 import { Transcript } from "@/components/transcript";
+import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     composerFocusSignal,
     nativeModelPickerOpen,
     nativeCommandOutput,
+    newProject,
     followSignal,
     folderOptions,
     hunkSummary,
@@ -182,6 +184,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           projects={projectOptionsForEmptyState(agent.workspaces, folderOptions, agent.selectedWorkspaceCwd)}
           recentThreads={recentThreadsForEmptyState(agent.threads)}
           composerBottomInsetPx={transcriptBottomInsetPx}
+          onNewProject={newProject}
           onSelectFolder={(path) => {
             agent.stageNewThread(path);
           }}
@@ -284,6 +287,7 @@ function NewAgentEmptyState({
   composerBottomInsetPx,
   onSelectFolder,
   onSelectThread,
+  onNewProject,
 }: {
   activeFolderPath: string;
   projects: ProjectOption[];
@@ -291,6 +295,7 @@ function NewAgentEmptyState({
   composerBottomInsetPx: number;
   onSelectFolder: (path: string) => void;
   onSelectThread: (threadId: string) => void;
+  onNewProject: () => void;
 }): React.JSX.Element {
   const activeFolderKey = normalizeWorkspacePath(activeFolderPath);
   const activeProject = projects.find((project) => normalizeWorkspacePath(project.path) === activeFolderKey);
@@ -312,6 +317,7 @@ function NewAgentEmptyState({
             activeFolderPath={activeFolderPath}
             activeFolderLabel={activeProjectLabel}
             onSelectFolder={onSelectFolder}
+            onNewProject={onNewProject}
           />
         </div>
         <RecentThreads threads={recentThreads} onSelectThread={onSelectThread} />
@@ -320,30 +326,32 @@ function NewAgentEmptyState({
   );
 }
 
-function ProjectPicker({
+export function ProjectPicker({
   projects,
   activeFolderPath,
   activeFolderLabel,
   onSelectFolder,
+  onNewProject,
 }: {
   projects: ProjectOption[];
   activeFolderPath: string;
   activeFolderLabel: string;
   onSelectFolder: (path: string) => void;
+  onNewProject: () => void;
 }): React.JSX.Element {
   const activeFolderKey = normalizeWorkspacePath(activeFolderPath);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         variant="pill"
-        className="h-9 max-w-[320px] bg-card px-3 text-base shadow-sm ring-1 ring-border/70 hover:bg-card"
+        className="h-8 max-w-[320px] bg-card px-3 text-base shadow-sm ring-1 ring-border/70 hover:bg-card"
         aria-label={`Choose project: ${activeFolderLabel}`}
         title={activeFolderPath}
       >
         <Folder className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 truncate">{activeFolderLabel}</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" side="bottom" sideOffset={8} className="w-[340px] rounded-xl p-1.5">
+      <DropdownMenuContent align="center" side="bottom" sideOffset={8} className="w-[340px] rounded-xl p-1">
         <DropdownMenuGroup className="max-h-[300px] overflow-y-auto">
           <div className="px-2 pb-1 pt-1 text-base font-medium text-muted-foreground">Projects</div>
           {projects.length > 0 ? (
@@ -353,7 +361,7 @@ function ProjectPicker({
                 <DropdownMenuItem
                   key={project.path}
                   selected={selected}
-                  className="h-10 rounded-lg px-2 text-base"
+                  className="h-8 rounded-lg px-2 text-base"
                   onSelect={() => onSelectFolder(project.path)}
                 >
                   <Folder className="size-4 shrink-0 text-muted-foreground" />
@@ -369,6 +377,11 @@ function ProjectPicker({
             <div className="px-2 py-4 text-base text-muted-foreground">No projects yet</div>
           )}
         </DropdownMenuGroup>
+        <Separator className="my-1" />
+        <DropdownMenuItem aria-label="Add project" className="h-8 rounded-lg px-2 text-base" onSelect={onNewProject}>
+          <FolderPlus className="size-4 shrink-0 text-muted-foreground" />
+          <span>Add project</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

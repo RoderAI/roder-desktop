@@ -112,6 +112,8 @@ const api = {
   setMinWindowWidth: (width: number) => ipcRenderer.invoke("window:setMinWidth", width) as Promise<void>,
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
   restart: () => ipcRenderer.invoke("roder:restart") as Promise<RoderStatus>,
+  configureImageGeneration: (params: { apiKey: string }) =>
+    ipcRenderer.invoke("imageGeneration:configure", params) as Promise<{ configured: boolean }>,
   status: () => ipcRenderer.invoke("roder:status") as Promise<RoderStatus>,
   appearance: () => ipcRenderer.invoke("roder:appearance") as Promise<SystemAppearance>,
   openExternal: (url: string) => ipcRenderer.invoke("openExternal", url) as Promise<void>,
@@ -232,8 +234,10 @@ const api = {
     return () => ipcRenderer.removeListener("mcp:authRequested", listener);
   },
   onMcpOAuthCallback: (callback: (payload: { id: string; status: "complete" | "failed"; error?: string }) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: { id: string; status: "complete" | "failed"; error?: string }) =>
-      callback(payload);
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: { id: string; status: "complete" | "failed"; error?: string },
+    ) => callback(payload);
     ipcRenderer.on("mcp:oauthCallback", listener);
     return () => ipcRenderer.removeListener("mcp:oauthCallback", listener);
   },

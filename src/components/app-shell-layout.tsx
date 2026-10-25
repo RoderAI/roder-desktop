@@ -1,4 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
+import { PanelLeft } from "lucide-react";
+import type { FullPageRoute } from "@/lib/route-selection";
 import { useLayoutEffect, useRef, useState } from "react";
 import {
   Group,
@@ -34,7 +36,7 @@ import {
   type FilePanelIndexedPath,
   type FilePanelSelectionIntent,
 } from "@/lib/file-panel";
-import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
+import type { ProjectPersistentAgentConfig } from "@/lib/project-persistent-agent";
 import { toolPanelWidthBounds, type RouteReviewScope, type RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
@@ -65,6 +67,7 @@ export type AppShellLayoutProps = {
   activeWorkspaceRoots: WorkspaceRoot[];
   folderOptions: FolderOption[];
   isPluginsRoute: boolean;
+  fullPageRoute?: FullPageRoute | null;
   hunkSummary: ThreadHunkSummary;
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
@@ -79,6 +82,8 @@ export type AppShellLayoutProps = {
   initialWorkspacePanelWidth: number;
   projectConfigOpen: boolean;
   projectCreating: boolean;
+  projectCreationError?: string | null;
+  projectCreated?: boolean;
   projectInitialFolders: string[];
   sidebarOpen: boolean;
   status: RoderStatus;
@@ -88,7 +93,7 @@ export type AppShellLayoutProps = {
   onArchiveThread: (threadId: string) => void;
   onLoadMoreThreads: () => void;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
-  onCreateProject: (params: WorkspaceCreateParams) => void;
+  onCreateProject: (params: ProjectPersistentAgentConfig) => Promise<void>;
   onFileSearchOpenChange: (open: boolean) => void;
   onFileSearchSelect: (indexedPath: FilePanelIndexedPath) => void;
   onProjectConfigOpenChange: (open: boolean) => void;
@@ -123,6 +128,7 @@ export function AppShellLayout({
   activeWorkspaceRoots,
   folderOptions,
   isPluginsRoute,
+  fullPageRoute = isPluginsRoute ? "plugins" : null,
   hunkSummary,
   hasMoreThreads,
   loadingMoreThreads,
@@ -137,6 +143,8 @@ export function AppShellLayout({
   initialWorkspacePanelWidth,
   projectConfigOpen,
   projectCreating,
+  projectCreationError,
+  projectCreated,
   projectInitialFolders,
   sidebarOpen,
   status,
@@ -171,9 +179,11 @@ export function AppShellLayout({
   onToggleSidebar,
 }: AppShellLayoutProps): React.JSX.Element {
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
-  const workspacePanelRequested = shouldRenderWorkspacePanel({ isPluginsRoute, workspacePanelOpen });
+  const isFullPageRoute = fullPageRoute !== null;
+  const fullPageTitle = fullPageRoute === "persistentAgents" ? "Persistent Agents" : fullPageRoute;
+  const workspacePanelRequested = shouldRenderWorkspacePanel({ isPluginsRoute: isFullPageRoute, workspacePanelOpen });
   const extensions = useExtensionsStore((state) => state.extensions);
-  const extensionSidebarVisible = !isPluginsRoute && getSidebarExtensions(extensions).length > 0;
+  const extensionSidebarVisible = !isFullPageRoute && getSidebarExtensions(extensions).length > 0;
   const appChromeGroupRef = useGroupRef();
   const workspacePanelRef = usePanelRef();
   const { defaultLayout, onLayoutChanged: saveLayout } = useDefaultLayout({
@@ -406,7 +416,7 @@ export function AppShellLayout({
         <AppSidebar
           threads={threads}
           activeThreadId={activeThreadId}
-          activeView={isPluginsRoute ? "plugins" : "chat"}
+          activeView={fullPageRoute ?? "chat"}
           hasMoreThreads={hasMoreThreads}
           loadingMoreThreads={loadingMoreThreads}
           reserveTitlebarSpace={!useWindowTopBar}
@@ -442,10 +452,25 @@ export function AppShellLayout({
       className="min-h-0 min-w-0"
     >
       <section className="flex h-full min-w-0 flex-col">
-        {isPluginsRoute ? (
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <Outlet />
-          </div>
+        {isFullPageRoute ? (
+          <>
+            {!useWindowTopBar ? (
+              <div className="drag-region flex h-(--desktop-header-height) shrink-0 items-center gap-3 border-b border-border px-4">
+                <button
+                  type="button"
+                  aria-label="Toggle sidebar"
+                  className={`no-drag grid size-7 place-items-center rounded-md hover:bg-accent/60 ${!sidebarOpen ? "ml-16" : ""}`}
+                  onClick={onToggleSidebar}
+                >
+                  <PanelLeft className="size-4" />
+                </button>
+                <span className="text-base font-medium capitalize">{fullPageTitle}</span>
+              </div>
+            ) : null}
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Outlet />
+            </div>
+          </>
         ) : (
           <>
             {!useWindowTopBar && (
@@ -495,11 +520,13 @@ export function AppShellLayout({
       className="min-h-0 min-w-0"
     >
       <RightWorkspacePanelShell
+        threadId={activeThreadId}
+        onSelectThread={onSelectThread}
         open={workspacePanelVisible}
         tabs={panelTabs}
         activePanel={activePanel}
         entries={rightWorkspacePanelEntries}
-        freezeLayout={!isPluginsRoute && shellLayoutAnimating}
+        freezeLayout={!isFullPageRoute && shellLayoutAnimating}
         layoutWidth={shellAnimationState.frozenWorkspacePanelWidth ?? measuredWorkspacePanelWidth}
         onAddPanel={onOpenWorkspacePanel}
         onClosePanel={onCloseWorkspacePanel}
@@ -532,7 +559,7 @@ export function AppShellLayout({
     </Panel>
   );
 
-  const workspacePanelToggle = !useWindowTopBar && workspacePanelToggleVisible && (
+  const workspacePanelToggle = !isFullPageRoute && !useWindowTopBar && workspacePanelToggleVisible && (
     <WorkspacePanelToggleButton
       open={workspacePanelOpen}
       className={`fixed top-[11px] z-[100] size-7 rounded-full pointer-events-auto [&_svg]:size-4 ${
@@ -562,7 +589,7 @@ export function AppShellLayout({
     </Group>
   );
 
-  const extensionActivityRail = !isPluginsRoute && (
+  const extensionActivityRail = !isFullPageRoute && (
     <ExtensionActivityRail
       active={activePanel === "extensions"}
       activeExtensionId={selectedExtensionId}
@@ -577,6 +604,8 @@ export function AppShellLayout({
       defaultPath={activeWorkspaceCwd || status.cwd}
       initialFolders={projectInitialFolders}
       creating={projectCreating}
+      error={projectCreationError}
+      projectCreated={projectCreated}
       onOpenChange={onProjectConfigOpenChange}
       onCreateProject={onCreateProject}
     />
@@ -614,27 +643,41 @@ export function AppShellLayout({
       {projectDialog}
       {fileSearchDialog}
       <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
-        <TopBar
-          thread={activeThread}
-          goal={activeThreadGoal}
-          threads={threadOptions}
-          folders={folderOptions}
-          activeFolderPath={activeWorkspaceCwd}
-          status={status}
-          workspacePanelOpen={workspacePanelOpen}
-          workspacePanelToggleVisible={workspacePanelToggleVisible}
-          extensionSidebarVisible={extensionSidebarVisible}
-          sidebarOpen={sidebarOpen}
-          placement="window"
-          onNewProject={onNewProject}
-          onNewThread={onNewThread}
-          onOpenSettings={() => onOpenSettings("general")}
-          onRestart={onRestart}
-          onToggleSidebar={onToggleSidebar}
-          onSelectFolder={onSelectFolder}
-          onSelectThread={onSelectThread}
-          onToggleWorkspacePanelShell={onToggleWorkspacePanelShell}
-        />
+        {isFullPageRoute ? (
+          <div className="drag-region flex h-(--desktop-header-height) shrink-0 items-center gap-3 border-b border-border px-4">
+            <button
+              type="button"
+              aria-label="Toggle sidebar"
+              className="no-drag grid size-7 place-items-center rounded-md hover:bg-accent/60"
+              onClick={onToggleSidebar}
+            >
+              <PanelLeft className="size-4" />
+            </button>
+            <span className="text-base font-medium capitalize">{fullPageTitle}</span>
+          </div>
+        ) : (
+          <TopBar
+            thread={activeThread}
+            goal={activeThreadGoal}
+            threads={threadOptions}
+            folders={folderOptions}
+            activeFolderPath={activeWorkspaceCwd}
+            status={status}
+            workspacePanelOpen={workspacePanelOpen}
+            workspacePanelToggleVisible={workspacePanelToggleVisible}
+            extensionSidebarVisible={extensionSidebarVisible}
+            sidebarOpen={sidebarOpen}
+            placement="window"
+            onNewProject={onNewProject}
+            onNewThread={onNewThread}
+            onOpenSettings={() => onOpenSettings("general")}
+            onRestart={onRestart}
+            onToggleSidebar={onToggleSidebar}
+            onSelectFolder={onSelectFolder}
+            onSelectThread={onSelectThread}
+            onToggleWorkspacePanelShell={onToggleWorkspacePanelShell}
+          />
+        )}
         <div className="flex min-h-0 flex-1">
           {sidebarRegion}
           {sidebarResizeHandle}

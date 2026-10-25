@@ -39,7 +39,6 @@ export type PluginRoutePath = "/plugins/installed" | "/plugins/explore";
 const validSettingsSections = new Set<SettingsSection>([
   "general",
   "appearance",
-  "components",
   "providers",
   "models",
   "skills",
@@ -139,7 +138,7 @@ export function defaultRouteForHydratedState(): string {
 }
 
 export function defaultPluginsRoute(): PluginRoutePath {
-  return "/plugins/installed";
+  return "/plugins/explore";
 }
 
 export function pluginsRouteForSection(section: PluginSection): PluginRoutePath {
@@ -149,6 +148,16 @@ export function pluginsRouteForSection(section: PluginSection): PluginRoutePath 
 export function isPluginsRoutePath(pathname: string): boolean {
   const normalizedPathname = pathname.replace(/\/+$/u, "") || "/";
   return normalizedPathname === "/plugins" || normalizedPathname.startsWith("/plugins/");
+}
+
+export type FullPageRoute = "threads" | "issues" | "persistentAgents" | "plugins";
+
+export function fullPageRouteForPathname(pathname: string): FullPageRoute | null {
+  const normalized = pathname.replace(/\/+$/u, "") || "/";
+  if (normalized === "/threads") return "threads";
+  if (normalized === "/issues") return "issues";
+  if (normalized === "/persistent-agents") return "persistentAgents";
+  return isPluginsRoutePath(normalized) ? "plugins" : null;
 }
 
 export function isNewRoutePath(pathname: string): boolean {
