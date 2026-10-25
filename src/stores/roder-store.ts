@@ -1055,10 +1055,10 @@ export const useRoderStore = create<RoderStore>()(
         const threadId = state.activeThreadId;
         const activeThread = state.threadDetails[threadId] ?? state.threads.find((thread) => thread.id === threadId);
         const activeTurnId = activeTurnIdForThread(activeThread);
-        if (!threadId || !activeTurnId || !isThreadRunning(activeThread)) {
-          return;
-        }
         try {
+          if (!threadId || !activeTurnId || !isThreadRunning(activeThread)) {
+            throw new Error("No running turn to steer");
+          }
           await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
         } catch (error) {
           set({ error: (error as Error).message });
@@ -1757,16 +1757,25 @@ function removeQueuedPrompt(
   threadId: string,
   queuedPromptId: string,
 ): Record<string, QueuedPrompt[]> {
-  const nextQueue = (queuedPromptsByThread[threadId] ?? []).filter(
-    (queuedPrompt) => queuedPrompt.id !== queuedPromptId,
-  );
+  // A new-thread send can finish after thread creation has migrated its queue.
+  const queueKey =
+    threadId === queueKeyForThread("") &&
+    !queuedPromptsByThread[threadId]?.some((queuedPrompt) => queuedPrompt.id === queuedPromptId)
+      ? Object.keys(queuedPromptsByThread).find((key) =>
+          queuedPromptsByThread[key].some((queuedPrompt) => queuedPrompt.id === queuedPromptId),
+        )
+      : threadId;
+  if (!queueKey || !queuedPromptsByThread[queueKey]?.some((queuedPrompt) => queuedPrompt.id === queuedPromptId)) {
+    return queuedPromptsByThread;
+  }
+  const nextQueue = queuedPromptsByThread[queueKey].filter((queuedPrompt) => queuedPrompt.id !== queuedPromptId);
   if (nextQueue.length === 0) {
-    const { [threadId]: _removed, ...remaining } = queuedPromptsByThread;
+    const { [queueKey]: _removed, ...remaining } = queuedPromptsByThread;
     return remaining;
   }
   return {
     ...queuedPromptsByThread,
-    [threadId]: nextQueue,
+    [queueKey]: nextQueue,
   };
 }
 

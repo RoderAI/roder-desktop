@@ -280,9 +280,13 @@ export function Composer({
   }
 
   async function steerQueuedPrompt(item: QueuedPrompt): Promise<void> {
-    await onSteer(item.prompt, item.attachments);
-    setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
-    onRemoveQueuedPrompt(activeQueueKey, item.id);
+    try {
+      await onSteer(item.prompt, item.attachments);
+      setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
+      onRemoveQueuedPrompt(activeQueueKey, item.id);
+    } catch {
+      // The store surfaces the error; retain the message when steering fails.
+    }
   }
 
   const skillCompletion = useSkillCompletion({
