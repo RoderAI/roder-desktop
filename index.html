@@ -5,8 +5,105 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Roder</title>
+    <style>
+      /* Boot splash: visible from first paint until the app hydrates. Inline so it renders before the bundle. */
+      @property --boot-wave {
+        syntax: "<length>";
+        inherits: false;
+        initial-value: 0px;
+      }
+
+      #boot-splash {
+        --boot-dot: rgb(0 0 0 / 0.14);
+        --boot-dot-live: rgb(0 0 0 / 0.42);
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: hsl(0 0% 100%);
+        transition: opacity 160ms ease-out;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        #boot-splash {
+          --boot-dot: rgb(255 255 255 / 0.14);
+          --boot-dot-live: rgb(255 255 255 / 0.4);
+          background: hsl(0 0% 8%);
+        }
+      }
+
+      #boot-splash.is-leaving {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .boot-splash-dots,
+      .boot-splash-dots::after {
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(circle, var(--boot-dot) 1.2px, transparent 1.7px);
+        background-size: 22px 22px;
+      }
+
+      /* A ring of brighter dots travels outward from the logo while the app loads. */
+      .boot-splash-dots::after {
+        content: "";
+        background-image: radial-gradient(circle, var(--boot-dot-live) 1.4px, transparent 1.9px);
+        mask-image: radial-gradient(
+          circle at 50% 50%,
+          transparent calc(var(--boot-wave) - 90px),
+          #000 var(--boot-wave),
+          transparent calc(var(--boot-wave) + 90px)
+        );
+        animation: boot-splash-wave 1.8s ease-out infinite;
+      }
+
+      @keyframes boot-splash-wave {
+        from {
+          --boot-wave: 0px;
+        }
+        to {
+          --boot-wave: 80vmax;
+        }
+      }
+
+      .boot-splash-logo {
+        position: relative;
+        width: 96px;
+        height: 96px;
+        animation: boot-splash-logo-in 240ms ease-out both;
+      }
+
+      /* The logo is black on light; invert it so it stays visible on the dark background. */
+      @media (prefers-color-scheme: dark) {
+        .boot-splash-logo {
+          filter: invert(1);
+        }
+      }
+
+      @keyframes boot-splash-logo-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash-dots::after {
+          display: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash" role="status" aria-label="Loading Roder">
+      <div class="boot-splash-dots" aria-hidden="true"></div>
+      <img class="boot-splash-logo" src="/roder-logo-black.png" alt="" width="96" height="96" />
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
