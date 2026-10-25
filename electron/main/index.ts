@@ -17,8 +17,18 @@ import {
   type BrowserToolProvider,
 } from "../browser/browser-tool-proxy";
 import { ChromeBridgeManager } from "../browser/chrome-bridge-manager";
-import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
+import {
+  cancelCodexLogin,
+  getCodexAccountSnapshot,
+  logoutCodex,
+  openRateLimitHelp,
+  startCodexLogin,
+} from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
+import { redactSecrets } from "../app-server-redaction";
+import { findClaudeCli } from "../onboarding/claude-cli";
+import { detectEnvironmentProviders } from "../onboarding/environment";
+import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } from "../onboarding/record";
 import { ExtensionHost } from "../extensions/extension-host";
 import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
@@ -252,7 +262,16 @@ ipcMain.handle("clipboard:saveImage", (_event, dataUrl: string) =>
 ipcMain.handle("codex:account", () => getCodexAccountSnapshot());
 ipcMain.handle("codex:login", () => startCodexLogin());
 ipcMain.handle("codex:logout", () => logoutCodex());
+ipcMain.handle("codex:cancelLogin", () => cancelCodexLogin());
 ipcMain.handle("codex:openRateLimitHelp", () => openRateLimitHelp());
+ipcMain.handle("claude:cliStatus", () =>
+  findClaudeCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
+);
+ipcMain.handle("onboarding:state", () => readOnboardingRecord(onboardingRecordPath(process.env, homedir())));
+ipcMain.handle("onboarding:complete", () =>
+  writeOnboardingRecord(onboardingRecordPath(process.env, homedir()), new Date().toISOString()),
+);
+ipcMain.handle("onboarding:environment", () => detectEnvironmentProviders(process.env));
 ipcMain.handle("extensions:list", () => getExtensionCatalog().list());
 ipcMain.handle("extensions:installFromFolder", async (_event, folderPath: string) => {
   await getExtensionCatalog().installFromFolder(folderPath);
@@ -563,7 +582,8 @@ function getExtensionHost(): ExtensionHost {
 }
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
-  recordAppServerEvent("request", method, params ?? {});
+  // Requests carry credentials (providers/configure), so their params are redacted before recording.
+  recordAppServerEvent("request", method, redactSecrets(params ?? {}));
   const requestedBrowserProvider = browserProviderFromRequestParams(params);
   if (requestedBrowserProvider) {
     sessionBrowserProvider = requestedBrowserProvider;

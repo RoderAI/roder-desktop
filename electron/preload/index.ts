@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
+import type { ClaudeCliStatus } from "../onboarding/claude-cli";
+import type { EnvironmentProvider } from "../onboarding/environment";
+import type { OnboardingRecord } from "../onboarding/record";
 
 export type RoderNotification = {
   method: string;
@@ -146,6 +149,11 @@ const api = {
   codexAccount: () => ipcRenderer.invoke("codex:account") as Promise<CodexAccountSnapshot>,
   codexLogin: () => ipcRenderer.invoke("codex:login") as Promise<CodexAccountSnapshot>,
   codexLogout: () => ipcRenderer.invoke("codex:logout") as Promise<CodexAccountSnapshot>,
+  codexCancelLogin: () => ipcRenderer.invoke("codex:cancelLogin") as Promise<CodexAccountSnapshot>,
+  claudeCliStatus: () => ipcRenderer.invoke("claude:cliStatus") as Promise<ClaudeCliStatus>,
+  onboardingState: () => ipcRenderer.invoke("onboarding:state") as Promise<OnboardingRecord>,
+  onboardingComplete: () => ipcRenderer.invoke("onboarding:complete") as Promise<void>,
+  onboardingEnvironment: () => ipcRenderer.invoke("onboarding:environment") as Promise<EnvironmentProvider[]>,
   codexOpenRateLimitHelp: () => ipcRenderer.invoke("codex:openRateLimitHelp") as Promise<void>,
   extensionsList: () => ipcRenderer.invoke("extensions:list") as Promise<ExtensionCatalogSnapshot>,
   extensionsInstallFromFolder: (folderPath: string) =>
