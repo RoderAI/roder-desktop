@@ -1,10 +1,16 @@
-import { Check, ChevronRight, KeyRound, Plus, RefreshCw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, ChevronRight, RefreshCw, Search } from "lucide-react";
+import { useState } from "react";
+import { ProviderConnectCard } from "@/components/providers/provider-connect-card";
+import { ProviderLogo } from "@/components/provider-logo";
+import { errorMessage } from "@/components/onboarding/onboarding-primitives";
 import { Button } from "@/components/ui/button";
-import { isProviderConfigured, modelKey, providerName, visibleModelIdsFor } from "@/lib/roder-models";
-import { useRoderStore } from "@/stores/roder-store";
-import type { ProviderDescriptor, ProviderModelDescriptor, RoderModel } from "@/types/roder";
+import { useProviderSetupState } from "@/hooks/use-provider-setup-state";
+import { isProviderReady, providerSetupKind, providerStatusLabel } from "@/lib/onboarding";
+import { providerCopy, authTypeLabel } from "@/lib/provider-copy";
+import { modelKey, providerName, visibleModelIdsFor } from "@/lib/roder-models";
 import { cn } from "@/lib/utils";
+import { useRoderStore } from "@/stores/roder-store";
+import type { ClaudeCliStatus, ProviderDescriptor, ProviderModelDescriptor, RoderModel } from "@/types/roder";
 
 export function ProvidersSettingsPanel(): React.JSX.Element {
   const providers = useRoderStore((state) => state.providers);
@@ -12,26 +18,24 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
   const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
   const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
-  const configureProvider = useRoderStore((state) => state.configureProvider);
+  const { claudeCli, environment, recheckClaudeCli } = useProviderSetupState();
   const [query, setQuery] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [savingProvider, setSavingProvider] = useState<string | null>(null);
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const filteredProviders = useMemo(() => filterProviders(providers, query), [providers, query]);
-  const selectedProvider = useMemo(
-    () =>
-      filteredProviders.find((provider) => provider.id === selectedProviderId) ??
-      providers.find((provider) => provider.id === selectedProviderId) ??
-      filteredProviders[0] ??
-      providers[0],
-    [filteredProviders, providers, selectedProviderId],
+  // The internal mock provider is not something users set up, so it stays out of Settings too.
+  const visibleProviders = providers.filter((provider) => providerSetupKind(provider) !== "hidden");
+  const filteredProviders = filterProviders(visibleProviders, query);
+  const selectedProvider =
+    filteredProviders.find((provider) => provider.id === selectedProviderId) ?? filteredProviders[0] ?? null;
+
+  const environmentVars = new Map(environment.map((found) => [found.providerId, found.envVar]));
+  const readyProviderIds = new Set(
+    visibleProviders.filter((provider) => isProviderReady(provider, claudeCli)).map((provider) => provider.id),
   );
-  const visibleIds = useMemo(() => visibleModelIdsFor(models, hiddenModelIds), [models, hiddenModelIds]);
-  const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
-  const configuredCount = providers.filter(isProviderConfigured).length;
+  const visibleIds = visibleModelIdsFor(models, hiddenModelIds);
+  const visibleSet = new Set(visibleIds);
 
   async function refresh(): Promise<void> {
     setRefreshing(true);
@@ -39,27 +43,9 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
     try {
       await refreshProviders();
     } catch (refreshError) {
-      setError((refreshError as Error).message);
+      setError(errorMessage(refreshError));
     } finally {
       setRefreshing(false);
-    }
-  }
-
-  async function saveApiKey(providerId: string): Promise<void> {
-    const apiKey = apiKeys[providerId]?.trim() ?? "";
-    if (!apiKey) {
-      setError("Enter an API key before saving.");
-      return;
-    }
-    setSavingProvider(providerId);
-    setError(null);
-    try {
-      await configureProvider(providerId, apiKey);
-      setApiKeys((current) => ({ ...current, [providerId]: "" }));
-    } catch (saveError) {
-      setError((saveError as Error).message);
-    } finally {
-      setSavingProvider(null);
     }
   }
 
@@ -69,7 +55,7 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
         <div>
           <h1 className="text-base font-medium">Providers</h1>
           <p className="mt-1 text-base text-muted-foreground">
-            Configure API keys, OAuth providers, and model catalogs. {configuredCount} configured.
+            Sign in, paste an API key, or use what is already set up on this machine. {readyProviderIds.size} connected.
           </p>
         </div>
         <Button variant="ghost" size="sm" disabled={refreshing} onClick={() => void refresh()}>
@@ -84,12 +70,16 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
           value={query}
           aria-label="Search providers and models"
           className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
-          placeholder="Search providers, Agent SDK providers, models..."
+          placeholder="Search providers and models..."
           onChange={(event) => setQuery(event.currentTarget.value)}
         />
       </div>
 
-      {error && <div className="border-b border-border px-5 py-3 text-base text-destructive">{error}</div>}
+      {error && (
+        <div role="alert" className="border-b border-border px-5 py-3 text-base text-destructive">
+          {error}
+        </div>
+      )}
 
       {providers.length === 0 ? (
         <div className="px-5 py-8 text-base text-muted-foreground">
@@ -99,11 +89,14 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
         <div className="px-5 py-8 text-base text-muted-foreground">No matching providers.</div>
       ) : (
         <div className="grid min-h-[560px] grid-cols-[minmax(240px,300px)_1fr] divide-x divide-border">
-          <nav className="space-y-2 p-4" aria-label="Provider configuration menu">
+          <nav className="space-y-2 p-4" aria-label="Provider list">
             {filteredProviders.map((provider) => (
               <ProviderMenuItem
                 key={provider.id}
                 provider={provider}
+                ready={readyProviderIds.has(provider.id)}
+                environmentVar={environmentVars.get(provider.id)}
+                modelCount={provider.models?.length ?? 0}
                 selected={provider.id === selectedProvider?.id}
                 onSelect={() => setSelectedProviderId(provider.id)}
               />
@@ -112,13 +105,14 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
           {selectedProvider && (
             <ProviderDetails
               provider={selectedProvider}
+              ready={readyProviderIds.has(selectedProvider.id)}
+              environmentVar={environmentVars.get(selectedProvider.id)}
+              claudeCli={claudeCli}
               models={models}
               visibleIds={visibleIds}
               visibleSet={visibleSet}
-              apiKey={apiKeys[selectedProvider.id] ?? ""}
-              saving={savingProvider === selectedProvider.id}
-              onApiKeyChange={(apiKey) => setApiKeys((current) => ({ ...current, [selectedProvider.id]: apiKey }))}
-              onSave={() => void saveApiKey(selectedProvider.id)}
+              onRecheckClaudeCli={recheckClaudeCli}
+              onError={setError}
               onToggleModel={(modelId, visible) => setModelVisibility(modelId, visible)}
             />
           )}
@@ -130,37 +124,38 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
 
 function ProviderMenuItem({
   provider,
+  ready,
+  environmentVar,
+  modelCount,
   selected,
   onSelect,
 }: {
   provider: ProviderDescriptor;
+  ready: boolean;
+  environmentVar: string | undefined;
+  modelCount: number;
   selected: boolean;
   onSelect: () => void;
 }): React.JSX.Element {
-  const configured = isProviderConfigured(provider);
-  const modelCount = provider.models?.length ?? 0;
+  const title = providerCopy[provider.id]?.title ?? (provider.name || providerName(provider.id));
 
   return (
     <button
       type="button"
+      aria-pressed={selected}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors",
         selected ? "border-primary/40 bg-primary/10" : "border-transparent hover:bg-accent/70",
       )}
       onClick={onSelect}
     >
-      <span
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full",
-          configured ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-        )}
-      >
-        {configured ? <Check className="size-4" /> : <Plus className="size-4" />}
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/50">
+        <ProviderLogo provider={provider.id} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-base font-medium">{provider.name || providerName(provider.id)}</span>
-        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-          {configured ? "Configured" : "Add provider"} · {modelCount} {modelCount === 1 ? "model" : "models"}
+        <span className="block truncate text-base font-medium">{title}</span>
+        <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+          {providerStatusLabel({ ready, environmentVar })} · {modelCount} {modelCount === 1 ? "model" : "models"}
         </span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -170,106 +165,67 @@ function ProviderMenuItem({
 
 function ProviderDetails({
   provider,
+  ready,
+  environmentVar,
+  claudeCli,
   models,
   visibleIds,
   visibleSet,
-  apiKey,
-  saving,
-  onApiKeyChange,
-  onSave,
+  onRecheckClaudeCli,
+  onError,
   onToggleModel,
 }: {
   provider: ProviderDescriptor;
+  ready: boolean;
+  environmentVar: string | undefined;
+  claudeCli: ClaudeCliStatus | null;
   models: RoderModel[];
   visibleIds: string[];
   visibleSet: Set<string>;
-  apiKey: string;
-  saving: boolean;
-  onApiKeyChange: (apiKey: string) => void;
-  onSave: () => void;
+  onRecheckClaudeCli: () => Promise<void>;
+  onError: (message: string | null) => void;
   onToggleModel: (modelId: string, visible: boolean) => void;
 }): React.JSX.Element {
-  const configured = isProviderConfigured(provider);
-  const authType = provider.authType ?? "unknown";
-  const supportsApiKey = authType === "api_key";
-
   return (
-    <section className="px-6 py-5">
-      <div className="flex items-start justify-between gap-6">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate text-lg font-semibold">{provider.name || providerName(provider.id)}</h2>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-xs",
-                configured ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-              )}
-            >
-              {configured ? "Configured" : "Not configured"}
-            </span>
-            {provider.recommended && <span className="rounded-full bg-muted px-2 py-0.5 text-xs">Recommended</span>}
-          </div>
-          <p className="mt-1 max-w-[560px] text-base text-muted-foreground">
-            {provider.description || `${providerName(provider.id)} provider`}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full bg-muted px-2 py-1">ID: {provider.id}</span>
-            <span className="rounded-full bg-muted px-2 py-1">Auth: {authLabel(authType)}</span>
-            {provider.authLabel && <span className="rounded-full bg-muted px-2 py-1">{provider.authLabel}</span>}
-            {provider.authDetail && <span className="rounded-full bg-muted px-2 py-1">{provider.authDetail}</span>}
-          </div>
-        </div>
-        {configured && <Check className="mt-1 size-4 shrink-0 text-primary" />}
-      </div>
-
-      {supportsApiKey && (
-        <div className="mt-5 rounded-xl border border-border bg-background/60 p-4">
-          <div className="text-base font-medium">API key</div>
-          <p className="mt-1 text-base text-muted-foreground">
-            {configured ? "Update the saved key for this provider." : "Paste a key to configure this provider."}
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3">
-              <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-              <input
-                type="password"
-                value={apiKey}
-                aria-label={`${provider.name || provider.id} API key`}
-                className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-                placeholder={provider.authLabel ? `Paste ${provider.authLabel}` : "Paste API key"}
-                onChange={(event) => onApiKeyChange(event.currentTarget.value)}
-              />
-            </div>
-            <Button size="sm" disabled={saving || apiKey.trim().length === 0} onClick={onSave}>
-              {saving ? "Saving..." : configured ? "Update key" : "Configure"}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {!supportsApiKey && authType !== "oauth" && (
-        <div className="mt-5 rounded-xl border border-border bg-background/60 p-4 text-base text-muted-foreground">
-          {configured
-            ? "This provider is available without additional setup."
-            : "This provider cannot be configured from the desktop UI yet."}
-        </div>
-      )}
-
-      {authType === "oauth" && (
-        <div className="mt-5 rounded-xl border border-border bg-background/60 p-4 text-base text-muted-foreground">
-          OAuth setup is handled by the provider runtime. Refresh after signing in to update model availability.
-        </div>
-      )}
-
+    <section className="flex flex-col gap-5 px-6 py-5">
+      <ProviderConnectCard
+        provider={provider}
+        ready={ready}
+        environmentVar={environmentVar}
+        claudeCli={claudeCli}
+        onRecheckClaudeCli={onRecheckClaudeCli}
+        onError={onError}
+      />
+      <ProviderMeta provider={provider} />
       <ModelAccessList
         provider={provider}
-        configured={configured}
+        configured={ready}
         models={models}
         visibleIds={visibleIds}
         visibleSet={visibleSet}
         onToggleModel={onToggleModel}
       />
     </section>
+  );
+}
+
+function ProviderMeta({ provider }: { provider: ProviderDescriptor }): React.JSX.Element {
+  const chips = [
+    `ID: ${provider.id}`,
+    `Auth: ${authTypeLabel(provider.authType)}`,
+    provider.authLabel,
+    provider.authDetail,
+    provider.recommended ? "Recommended" : null,
+  ].filter((chip): chip is string => Boolean(chip));
+
+  return (
+    <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+      {chips.map((chip) => (
+        <span key={chip} className="rounded-full bg-muted px-2 py-1">
+          {chip}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -294,14 +250,14 @@ function ModelAccessList({
   const enabledCount = availableModels.filter((model) => visibleSet.has(modelKey(model))).length;
 
   return (
-    <section className="mt-5 rounded-xl border border-border bg-background/60">
+    <section className="rounded-xl border border-border bg-background/60">
       <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
         <div>
-          <h3 className="text-base font-medium">Model access</h3>
+          <h2 className="text-base font-medium">Model access</h2>
           <p className="mt-1 text-base text-muted-foreground">
             {configured
               ? `${enabledCount} of ${availableModels.length} available in the composer.`
-              : "Configure this provider before enabling individual models."}
+              : "Connect this provider before enabling individual models."}
           </p>
         </div>
         {configured && availableModels.length > 0 && (
@@ -339,7 +295,7 @@ function ModelAccessList({
         <div className="divide-y divide-border">
           {providerModels.map((providerModel) => {
             const model = availableById.get(providerModel.id);
-            const key = model ? modelKey(model) : providerModelKey(provider.id, providerModel.id);
+            const key = model ? modelKey(model) : `${provider.id || "roder"}:${providerModel.id}`;
             const visible = visibleSet.has(key);
             const disabled = !configured || !model || (visible && visibleIds.length <= 1);
             return (
@@ -386,15 +342,15 @@ function ProviderModelRow({
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <span className="truncate text-base font-medium">{providerModel.name || providerModel.id}</span>
-          {providerModel.isDefault && <span className="rounded-full bg-muted px-2 py-0.5 text-xs">Default</span>}
+          {providerModel.isDefault && <span className="rounded-full bg-muted px-2 py-0.5 text-sm">Default</span>}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{providerModel.id}</span>
+        <span className="mt-0.5 block truncate text-sm text-muted-foreground">{providerModel.id}</span>
         {providerModel.description && (
           <span className="mt-1 block line-clamp-2 text-base text-muted-foreground">{providerModel.description}</span>
         )}
         {unavailable && (
-          <span className="mt-1 block text-xs text-muted-foreground">
-            Configure this provider to make this model available.
+          <span className="mt-1 block text-sm text-muted-foreground">
+            Connect this provider to make this model available.
           </span>
         )}
       </span>
@@ -408,7 +364,7 @@ function VisibilitySwitch({ checked, disabled }: { checked: boolean; disabled: b
     <span
       className={cn(
         "relative h-6 w-10 shrink-0 rounded-full transition-colors",
-        checked ? "bg-primary" : "bg-muted",
+        checked ? "bg-primary" : "bg-muted-foreground/80",
         disabled && "opacity-50",
       )}
     >
@@ -422,10 +378,6 @@ function VisibilitySwitch({ checked, disabled }: { checked: boolean; disabled: b
   );
 }
 
-function providerModelKey(providerId: string, modelId: string): string {
-  return `${providerId || "roder"}:${modelId}`;
-}
-
 function filterProviders(providers: ProviderDescriptor[], query: string): ProviderDescriptor[] {
   const needle = query.trim().toLowerCase();
   if (!needle) {
@@ -437,17 +389,4 @@ function filterProviders(providers: ProviderDescriptor[], query: string): Provid
       .toLowerCase()
       .includes(needle);
   });
-}
-
-function authLabel(authType: string): string {
-  if (authType === "api_key") {
-    return "API key";
-  }
-  if (authType === "oauth") {
-    return "OAuth";
-  }
-  if (authType === "none") {
-    return "None";
-  }
-  return authType;
 }

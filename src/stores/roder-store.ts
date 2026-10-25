@@ -147,7 +147,8 @@ type RoderStore = {
   refreshProviders: () => Promise<void>;
   configureProvider: (provider: string, apiKey: string) => Promise<void>;
   setSelectedWorkspaceCwd: (cwd: string) => void;
-  openWorkspaceFolder: () => Promise<void>;
+  openWorkspaceFolder: () => Promise<Workspace | null>;
+  selectDefaultModel: (model: string, provider: string) => Promise<void>;
   resolveApproval: (request: ApprovalWaitRequest, approved: boolean) => Promise<void>;
   resolveUserInput: (request: UserInputWaitRequest, answers: Record<string, string>) => Promise<void>;
   exitPlan: (request: PlanExitWaitRequest, approved: boolean) => Promise<void>;
@@ -1243,15 +1244,41 @@ export const useRoderStore = create<RoderStore>()(
       openWorkspaceFolder: async () => {
         const state = get();
         const folder = await roderIpc.openWorkspaceFolder(state.selectedWorkspaceCwd || state.status.cwd);
-        if (folder) {
-          const created = await roderIpc.createWorkspace({ roots: [{ path: folder }], defaultRootPath: folder });
-          set((state) => ({
-            workspaces: upsertWorkspace(state.workspaces, created.workspace),
-            selectedWorkspaceId: created.workspace.id,
-            selectedRootId: created.workspace.defaultRootId,
-            selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? folder,
-          }));
+        if (!folder) {
+          return null;
         }
+        const created = await roderIpc.createWorkspace({ roots: [{ path: folder }], defaultRootPath: folder });
+        set((state) => ({
+          workspaces: upsertWorkspace(state.workspaces, created.workspace),
+          selectedWorkspaceId: created.workspace.id,
+          selectedRootId: created.workspace.defaultRootId,
+          selectedWorkspaceCwd: selectedRootForWorkspace(created.workspace)?.path ?? folder,
+        }));
+        return created.workspace;
+      },
+      selectDefaultModel: async (defaultModel, defaultModelProvider) => {
+        const state = get();
+        const reasoning =
+          reasoningForModel(state.models, defaultModelProvider, defaultModel, state.defaultReasoning) ??
+          state.defaultReasoning;
+        const selectionMode = manualSelection(defaultModelProvider, defaultModel, reasoning);
+        set({ error: null });
+        const result = await roderIpc.selectModel(modelSelectChoice(selectionMode, reasoning, state.models));
+        const savedReasoning = normalizeReasoningEffort(result.reasoning || reasoning);
+        set((current) => ({
+          defaultModel: result.model || defaultModel,
+          defaultModelProvider: result.provider || defaultModelProvider,
+          defaultSelectionMode: result.selectionMode,
+          defaultReasoning: savedReasoning,
+          ...(current.activeThreadId
+            ? {}
+            : {
+                selectedModel: result.model || defaultModel,
+                selectedModelProvider: result.provider || defaultModelProvider,
+                selectedSelectionMode: result.selectionMode,
+                selectedReasoning: savedReasoning,
+              }),
+        }));
       },
       resolveApproval: async (request, approved) => {
         markWaitRequestResolving(set, request.threadId, request.id, true);
