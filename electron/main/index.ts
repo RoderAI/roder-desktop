@@ -58,7 +58,7 @@ let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
 const appServerEvents: AppServerEvent[] = [];
 const appName = "Roder";
-const mainDir = dirname(fileURLToPath(import.meta.url));
+const mainDir = __dirname;
 
 type AppServerEvent = {
   id: number;
@@ -69,6 +69,12 @@ type AppServerEvent = {
 };
 
 app.setName(appName);
+// Dev runs and installed builds would otherwise share one Chromium profile. A second instance then
+// waits on the profile the first one holds, which stalled a packaged launch for about 4 seconds
+// while a dev window was open.
+if (!app.isPackaged) {
+  app.setPath("userData", join(app.getPath("appData"), `${appName} Dev`));
+}
 app.setAboutPanelOptions({ applicationName: appName });
 if (!app.commandLine.hasSwitch("remote-debugging-port")) {
   app.commandLine.appendSwitch("remote-debugging-port", cdpPort);

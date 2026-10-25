@@ -32,11 +32,10 @@ export function useOnboardingGate(): OnboardingGate {
     hasExistingSetup: existingSetup,
   });
 
-  useEffect(() => {
-    if (gate === "onboarding" && !flowStarted) {
-      setFlowStarted(true);
-    }
-  }, [gate, flowStarted]);
+  // Latch during render, not in an effect: the flow stays up once it has been shown.
+  if (gate === "onboarding" && !flowStarted) {
+    setFlowStarted(true);
+  }
 
   useEffect(() => {
     if (loaded && !completed && hydrated && existingSetup && !flowStarted) {

@@ -11,7 +11,7 @@ allowBuilds:
   msgpackr-extract: false
   node-pty: true
 
-minimumReleaseAge: 1440
+minimumReleaseAge: 0
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 1440
 
