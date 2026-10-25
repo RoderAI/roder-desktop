@@ -495,7 +495,7 @@ export function Transcript({
         onSelect={jumpToMessage}
       />
       <ScrollArea
-        className="h-full"
+        className={cn("h-full", navigationItems.length > 0 && "ml-8")}
         viewportClassName={cn(
           "workspace-scrollbar transcript-viewport",
           suppressAutoFollowScrollbar && "transcript-viewport-auto-following",
