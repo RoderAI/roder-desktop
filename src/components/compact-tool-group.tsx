@@ -20,9 +20,9 @@ export function CompactToolGroup({
   const Title = status === "running" ? ShimmerText : "span";
 
   return (
-    <Collapsible.Root className="group/tool-group pl-5 text-base leading-7" onOpenChange={onOpenChange} open={open}>
+    <Collapsible.Root className="group/tool-group text-base leading-5" onOpenChange={onOpenChange} open={open}>
       <Collapsible.Trigger
-        className="flex min-h-7 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-6 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         type="button"
       >
         <ToolFailureDot failed={status === "failed"} />
@@ -32,8 +32,8 @@ export function CompactToolGroup({
           <span className="shrink-0 text-muted-foreground">{groupStatusLabel(messages)}</span>
         ) : null}
       </Collapsible.Trigger>
-      <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">
-        <ul className="space-y-0.5 py-1">
+      <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-5 text-muted-foreground">
+        <ul className="py-1">
           {messages.map((message) => (
             <li
               className="min-w-0 truncate"
