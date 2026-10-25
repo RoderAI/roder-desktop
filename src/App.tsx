@@ -1,10 +1,19 @@
+import { useEffect } from "react";
 import { Agentation } from "agentation";
 import { AppShellProvider } from "@/components/app-shell-context";
 import { AppShellLayout } from "@/components/app-shell-layout";
 import { useAppShellController } from "@/hooks/use-app-shell-controller";
+import { dismissBootSplash } from "@/lib/boot-splash";
 
 export function App(): React.JSX.Element {
   const { appShellContext, layoutProps } = useAppShellController();
+  const hydrated = appShellContext.agent.hydrated;
+
+  useEffect(() => {
+    if (hydrated) {
+      dismissBootSplash();
+    }
+  }, [hydrated]);
 
   return (
     <>

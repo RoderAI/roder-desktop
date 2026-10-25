@@ -2,8 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { app, shell } from "electron";
 import { findLatestCodexRateLimits } from "./codex-rate-limits";
 
@@ -74,7 +73,7 @@ type RawRateWindow = {
   resets_at?: number;
 };
 
-const thisDir = dirname(fileURLToPath(import.meta.url));
+const thisDir = __dirname;
 let loginPending = false;
 
 export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {

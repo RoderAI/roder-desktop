@@ -17,11 +17,12 @@ type SpawnMock = (
   args: string[],
   options: { env?: Record<string, string | undefined> },
 ) => MockChildProcess;
-type SpawnSyncMock = (
+type ExecFileMock = (
   command: string,
   args: string[],
   options: { env?: Record<string, string | undefined>; timeout?: number },
-) => { status: number; stdout: string };
+  callback: (error: Error | null, stdout: string) => void,
+) => void;
 
 const mockState = vi.hoisted(() => ({
   app: {
@@ -34,11 +35,14 @@ const mockState = vi.hoisted(() => ({
     args: string[];
     options: { env?: Record<string, string | undefined> };
   }>,
-  spawnSyncCalls: [] as Array<{
+  execFileCalls: [] as Array<{
     command: string;
     args: string[];
     options: { env?: Record<string, string | undefined>; timeout?: number };
   }>,
+  // When set, schema probe callbacks wait in pendingSchemaProbes until a test finishes them.
+  deferSchemaProbe: false,
+  pendingSchemaProbes: [] as Array<() => void>,
   schemaManifest: {
     methods: [
       { method: "initialize" },
@@ -107,9 +111,15 @@ vi.mock("node:child_process", async (importOriginal) => {
       mockState.children.push(child);
       return child;
     }),
-    spawnSync: vi.fn<SpawnSyncMock>((command, args, options) => {
-      mockState.spawnSyncCalls.push({ command, args, options });
-      return { status: 0, stdout: JSON.stringify(mockState.schemaManifest) };
+    execFile: vi.fn<ExecFileMock>((command, args, options, callback) => {
+      mockState.execFileCalls.push({ command, args, options });
+      const finish = () => callback(null, JSON.stringify(mockState.schemaManifest));
+      if (mockState.deferSchemaProbe) {
+        mockState.pendingSchemaProbes.push(finish);
+      } else {
+        queueMicrotask(finish);
+      }
+      return {} as never;
     }),
   };
 });
@@ -120,7 +130,9 @@ beforeEach(() => {
   mockState.app.getVersion.mockReturnValue("9.8.7");
   mockState.existsSync.mockReturnValue(true);
   mockState.spawned.length = 0;
-  mockState.spawnSyncCalls.length = 0;
+  mockState.execFileCalls.length = 0;
+  mockState.deferSchemaProbe = false;
+  mockState.pendingSchemaProbes.length = 0;
   mockState.requests.length = 0;
   mockState.children.length = 0;
   mockState.silentMethods.clear();
@@ -207,7 +219,7 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
     "vcs/changes/read",
     "workspace/changes/list",
   ]);
-  expect(mockState.spawnSyncCalls).toEqual([
+  expect(mockState.execFileCalls).toEqual([
     expect.objectContaining({
       args: ["app-server", "schema", "--format", "manifest"],
       options: expect.objectContaining({
@@ -239,6 +251,32 @@ test("starts the app-server over stdio and initializes desktop capabilities", as
         },
       },
     },
+  ]);
+});
+
+test("spawns the engine without waiting on the schema probe, then reports the probed methods", async () => {
+  mockState.deferSchemaProbe = true;
+  const { RoderAppServerClient } = await import("../electron/roder/app-server-client");
+
+  const client = new RoderAppServerClient();
+  const started = client.start();
+
+  expect(mockState.spawned).toHaveLength(1);
+  expect(mockState.execFileCalls).toHaveLength(1);
+  await vi.waitFor(() => expect(mockState.requests.map((request) => request.method)).toContain("initialize"));
+  expect(client.status().state).toBe("starting");
+
+  for (const finish of mockState.pendingSchemaProbes.splice(0)) {
+    finish();
+  }
+  const status = await started;
+  expect(status.state).toBe("ready");
+  expect(status.appServerMethods).toEqual([
+    "initialize",
+    "thread/list",
+    "vcs/changes/list",
+    "vcs/changes/read",
+    "workspace/changes/list",
   ]);
 });
 
@@ -417,6 +455,25 @@ test("starts a fresh engine on the next request after a failed initialize", asyn
   await expect(client.request("thread/list", {})).resolves.toEqual({ ok: true });
   expect(mockState.spawned).toHaveLength(2);
   expect(client.status().state).toBe("ready");
+});
+
+test("keeps the stopped status when stop lands while the schema probe is pending", async () => {
+  mockState.deferSchemaProbe = true;
+  const { RoderAppServerClient } = await import("../electron/roder/app-server-client");
+
+  const client = new RoderAppServerClient();
+  const startOutcome = client.start().then(
+    () => "started",
+    (error: Error) => error.message,
+  );
+  await vi.waitFor(() => expect(mockState.requests.map((request) => request.method)).toContain("initialize"));
+  await client.stop();
+  for (const finish of mockState.pendingSchemaProbes.splice(0)) {
+    finish();
+  }
+
+  await expect(startOutcome).resolves.toBe("roder app-server stopped");
+  expect(client.status().state).toBe("stopped");
 });
 
 test("keeps the stopped status when stop interrupts startup", async () => {
