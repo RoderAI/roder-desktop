@@ -887,6 +887,24 @@ export type CodexRateWindow = {
   resetLabel: string;
 };
 
+export type OnboardingRecord = {
+  onboarded: boolean;
+  completedAt: string | null;
+};
+
+export type EnvironmentProvider = {
+  providerId: string;
+  label: string;
+  envVar: string;
+};
+
+export type ClaudeCliStatus = {
+  installed: boolean;
+  onPath: boolean;
+  runnable: boolean;
+  path: string | null;
+};
+
 export type CodexAccountSnapshot = {
   signedIn: boolean;
   roderSignedIn: boolean;
@@ -1286,6 +1304,11 @@ declare global {
       codexAccount: () => Promise<CodexAccountSnapshot>;
       codexLogin: () => Promise<CodexAccountSnapshot>;
       codexLogout: () => Promise<CodexAccountSnapshot>;
+      codexCancelLogin: () => Promise<CodexAccountSnapshot>;
+      claudeCliStatus: () => Promise<ClaudeCliStatus>;
+      onboardingState: () => Promise<OnboardingRecord>;
+      onboardingComplete: () => Promise<void>;
+      onboardingEnvironment: () => Promise<EnvironmentProvider[]>;
       codexOpenRateLimitHelp: () => Promise<void>;
       extensionsList: () => Promise<ExtensionCatalogSnapshot>;
       extensionsInstallFromFolder: (folderPath: string) => Promise<ExtensionCatalogSnapshot>;

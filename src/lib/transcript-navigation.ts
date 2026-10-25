@@ -38,6 +38,11 @@ export function transcriptNavigationTarget(items: readonly TranscriptNavigationI
   return items.find((item) => item.id === id)?.rowIndex ?? null;
 }
 
+export function transcriptNavigationPreview(text: string): { title: string; body: string } {
+  const [title, ...lines] = text.trim().slice(0, 640).split(/\r?\n/u);
+  return { title, body: lines.join("\n").trim() };
+}
+
 export function transcriptNavigationKeyIndex(key: string, index: number, count: number): number | null {
   if (!count) return null;
   if (key === "ArrowUp") return Math.max(0, index - 1);

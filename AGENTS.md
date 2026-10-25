@@ -15,16 +15,6 @@
   when choosing typography, font weight, surfaces, hover states, radius, spacing,
   borders/rings, or component interaction patterns.
 
-## Dependency Security
-
-Use pnpm's default `minimumReleaseAge` of 1 day for dependency installs in this
-project. Do not bypass or disable package-manager supply-chain protections with
-override flags or config such as `--config.minimumReleaseAge=0`, do not add
-package exceptions to get around the policy, and do not otherwise force
-installation of dependencies that the policy blocks. If a dependency is too new,
-choose a version that satisfies the policy or wait for the configured
-release-age window to pass.
-
 ## Project Terminology
 
 When the user says "thread", "last thread", "session", "conversation", or asks

@@ -489,6 +489,7 @@ export function Transcript({
       <TranscriptNavigation
         key={scrollStateKey}
         items={navigationItems}
+        messages={messages}
         activeId={activeNavigationId}
         bottomInsetPx={bottomInsetPx}
         onSelect={jumpToMessage}

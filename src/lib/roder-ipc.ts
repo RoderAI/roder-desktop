@@ -431,6 +431,7 @@ export const roderIpc = {
     }) as Promise<{ rows: ModelTokenUsage[] }>,
   start: () => window.roderDesktop.start(),
   restart: () => window.roderDesktop.restart(),
+  startProviderOAuth: (method: string) => window.roderDesktop.request(method, {}),
   status: () => window.roderDesktop.status(),
   appearance: () => window.roderDesktop.appearance(),
   openWorkspaceFolder: (defaultPath?: string) => window.roderDesktop.openWorkspaceFolder(defaultPath),

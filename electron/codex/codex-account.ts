@@ -1,9 +1,8 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { app, shell } from "electron";
 import { findLatestCodexRateLimits } from "./codex-rate-limits";
 
@@ -74,8 +73,9 @@ type RawRateWindow = {
   resets_at?: number;
 };
 
-const thisDir = dirname(fileURLToPath(import.meta.url));
+const thisDir = __dirname;
 let loginPending = false;
+let loginChild: ChildProcess | null = null;
 
 export async function getCodexAccountSnapshot(): Promise<CodexAccountSnapshot> {
   try {
@@ -128,12 +128,27 @@ export async function startCodexLogin(): Promise<CodexAccountSnapshot> {
       stdio: "ignore",
     });
     child.unref();
-    child.once("exit", () => {
-      loginPending = false;
-    });
-    child.once("error", () => {
-      loginPending = false;
-    });
+    loginChild = child;
+    const finish = () => {
+      // A cancelled or superseded login must not clear the pending flag of a newer one.
+      if (loginChild === child) {
+        loginChild = null;
+        loginPending = false;
+      }
+    };
+    child.once("exit", finish);
+    child.once("error", finish);
+  }
+  return getCodexAccountSnapshot();
+}
+
+/** Stops an in-flight `roder auth login codex` so the user can start a fresh sign-in. */
+export async function cancelCodexLogin(): Promise<CodexAccountSnapshot> {
+  const child = loginChild;
+  loginChild = null;
+  loginPending = false;
+  if (child && child.exitCode === null) {
+    child.kill();
   }
   return getCodexAccountSnapshot();
 }

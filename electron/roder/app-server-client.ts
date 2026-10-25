@@ -1,8 +1,7 @@
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
+import { join, resolve } from "node:path";
+import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
 import { app } from "electron";
 
 export type RoderStatus = {
@@ -42,7 +41,7 @@ type DesktopNotification = {
   params: unknown;
 };
 
-const thisDir = dirname(fileURLToPath(import.meta.url));
+const thisDir = __dirname;
 const schemaProbeTimeoutMs = 5_000;
 
 // Deadlines for short-latency engine methods. Methods not listed here have no
@@ -93,8 +92,12 @@ export class RoderAppServerClient extends EventEmitter {
 
   async #startProcess(): Promise<RoderStatus> {
     const target = this.#resolveSpawnTarget();
-    const appServerMethods = readAppServerMethods(target);
-    this.#setStatus({ state: "starting", binary: target.label, appServerMethods, cwd: target.cwd });
+    // The method list is probed off the main thread and overlaps the engine handshake. A freshly
+    // installed engine binary can take seconds on its first run, and waiting for that before the
+    // spawn would stall the main process ahead of the engine.
+    const methodsProbe = readAppServerMethods(target);
+    let appServerMethods: string[] | undefined;
+    this.#setStatus({ state: "starting", binary: target.label, cwd: target.cwd });
 
     // Each listener below belongs to one spawned engine. Once that engine is no
     // longer the current child (after stop or restart), its events must not touch
@@ -164,6 +167,7 @@ export class RoderAppServerClient extends EventEmitter {
           experimentalApi: true,
         },
       });
+      appServerMethods = await methodsProbe;
     } catch (error) {
       // The handshake failed, so nothing owns this engine. Kill it, and touch shared
       // state only if it is still the current child: a stop or a newer start may
@@ -184,6 +188,10 @@ export class RoderAppServerClient extends EventEmitter {
       throw error;
     }
 
+    if (this.#child !== child) {
+      // stop() ran while the method probe was pending, so this engine is no longer the current one.
+      throw new Error("roder app-server stopped");
+    }
     this.#setStatus({ state: "ready", binary: target.label, appServerMethods, cwd: target.cwd });
     return this.#status;
   }
@@ -368,25 +376,36 @@ function desktopNotificationsFromMessage(method: string, params: unknown): Deskt
   return [{ method, params: params ?? {} }];
 }
 
-function readAppServerMethods(target: SpawnTarget): string[] {
-  const result = spawnSync(target.command, ["app-server", "schema", "--format", "manifest"], {
-    cwd: target.cwd,
-    encoding: "utf8",
-    env: process.env,
-    timeout: schemaProbeTimeoutMs,
+// Resolves with the engine's method list, or [] when the probe fails. It never rejects.
+function readAppServerMethods(target: SpawnTarget): Promise<string[]> {
+  return new Promise((resolve) => {
+    execFile(
+      target.command,
+      ["app-server", "schema", "--format", "manifest"],
+      {
+        cwd: target.cwd,
+        encoding: "utf8",
+        env: process.env,
+        timeout: schemaProbeTimeoutMs,
+      },
+      (error, stdout) => {
+        if (error || !stdout) {
+          resolve([]);
+          return;
+        }
+        try {
+          const manifest = JSON.parse(stdout) as {
+            methods?: Array<{ method?: unknown }>;
+          };
+          resolve(
+            (manifest.methods ?? [])
+              .map((method) => method.method)
+              .filter((method): method is string => typeof method === "string"),
+          );
+        } catch {
+          resolve([]);
+        }
+      },
+    );
   });
-  if (result.error || result.status !== 0 || !result.stdout) {
-    return [];
-  }
-
-  try {
-    const manifest = JSON.parse(result.stdout) as {
-      methods?: Array<{ method?: unknown }>;
-    };
-    return (manifest.methods ?? [])
-      .map((method) => method.method)
-      .filter((method): method is string => typeof method === "string");
-  } catch {
-    return [];
-  }
 }

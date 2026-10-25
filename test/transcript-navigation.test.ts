@@ -4,6 +4,7 @@ import {
   activeTranscriptNavigationId,
   buildTranscriptNavigation,
   transcriptNavigationKeyIndex,
+  transcriptNavigationPreview,
   transcriptNavigationTarget,
 } from "../src/lib/transcript-navigation";
 import type { ConversationMessage } from "../src/types/roder";
@@ -64,4 +65,21 @@ test("clicking an already-visible or bottom-clamped message preserves its select
   expect(activeTranscriptNavigationId(entries, 0, false, "last")).toBe("last");
   expect(activeTranscriptNavigationId(entries, 0, false, null)).toBe("first");
   expect(activeTranscriptNavigationId(entries, 0, false, "removed-message")).toBe("first");
+});
+
+test("hover previews preserve the message heading, paragraphs, and list indentation", () => {
+  expect(
+    transcriptNavigationPreview(
+      "  **GitHub verification worked**\n\nCompleted and verified:\n\n  • Google callback\n    and authorized domains  ",
+    ),
+  ).toEqual({
+    title: "**GitHub verification worked**",
+    body: "Completed and verified:\n\n  • Google callback\n    and authorized domains",
+  });
+  expect(transcriptNavigationPreview("A short question")).toEqual({ title: "A short question", body: "" });
+  expect(transcriptNavigationPreview("Heading\r\n\r\nWindows paragraph")).toEqual({
+    title: "Heading",
+    body: "Windows paragraph",
+  });
+  expect(transcriptNavigationPreview("x".repeat(2_000)).title).toHaveLength(640);
 });

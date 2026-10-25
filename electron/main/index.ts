@@ -28,8 +28,18 @@ import {
   type BrowserToolProvider,
 } from "../browser/browser-tool-proxy";
 import { ChromeBridgeManager } from "../browser/chrome-bridge-manager";
-import { getCodexAccountSnapshot, logoutCodex, openRateLimitHelp, startCodexLogin } from "../codex/codex-account";
+import {
+  cancelCodexLogin,
+  getCodexAccountSnapshot,
+  logoutCodex,
+  openRateLimitHelp,
+  startCodexLogin,
+} from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
+import { redactSecrets } from "../app-server-redaction";
+import { findClaudeCli } from "../onboarding/claude-cli";
+import { detectEnvironmentProviders } from "../onboarding/environment";
+import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } from "../onboarding/record";
 import { ExtensionHost } from "../extensions/extension-host";
 import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
@@ -77,7 +87,7 @@ let persistentAgentStartPromise: Promise<void> | null = null;
 let desktopAgentTools: DesktopAgentTools | null = null;
 const appServerEvents: AppServerEvent[] = [];
 const appName = "Roder";
-const mainDir = dirname(fileURLToPath(import.meta.url));
+const mainDir = __dirname;
 
 type AppServerEvent = {
   id: number;
@@ -88,6 +98,12 @@ type AppServerEvent = {
 };
 
 app.setName(appName);
+// Dev runs and installed builds would otherwise share one Chromium profile. A second instance then
+// waits on the profile the first one holds, which stalled a packaged launch for about 4 seconds
+// while a dev window was open.
+if (!app.isPackaged) {
+  app.setPath("userData", join(app.getPath("appData"), `${appName} Dev`));
+}
 app.setAboutPanelOptions({ applicationName: appName });
 if (!app.commandLine.hasSwitch("remote-debugging-port")) {
   app.commandLine.appendSwitch("remote-debugging-port", cdpPort);
@@ -313,7 +329,16 @@ ipcMain.handle("clipboard:saveImage", (_event, dataUrl: string) =>
 ipcMain.handle("codex:account", () => getCodexAccountSnapshot());
 ipcMain.handle("codex:login", () => startCodexLogin());
 ipcMain.handle("codex:logout", () => logoutCodex());
+ipcMain.handle("codex:cancelLogin", () => cancelCodexLogin());
 ipcMain.handle("codex:openRateLimitHelp", () => openRateLimitHelp());
+ipcMain.handle("claude:cliStatus", () =>
+  findClaudeCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
+);
+ipcMain.handle("onboarding:state", () => readOnboardingRecord(onboardingRecordPath(process.env, homedir())));
+ipcMain.handle("onboarding:complete", () =>
+  writeOnboardingRecord(onboardingRecordPath(process.env, homedir()), new Date().toISOString()),
+);
+ipcMain.handle("onboarding:environment", () => detectEnvironmentProviders(process.env));
 ipcMain.handle("extensions:list", () => getExtensionCatalog().list());
 ipcMain.handle("extensions:installFromFolder", async (_event, folderPath: string) => {
   await getExtensionCatalog().installFromFolder(folderPath);
@@ -772,7 +797,7 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
 }
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
-  recordAppServerEvent("request", method, params ?? {});
+  recordAppServerEvent("request", method, redactSecrets(params ?? {}));
   if (method.startsWith("desktop/issues/") || method.startsWith("desktop/projects/")) {
     return getIssuesService().request(method, params ?? {});
   }

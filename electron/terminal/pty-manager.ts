@@ -3,7 +3,7 @@ import os from "node:os";
 import { createRequire } from "node:module";
 import type { IPty } from "node-pty";
 
-const require = createRequire(import.meta.url);
+const require = createRequire(__filename);
 const nodePty = require("node-pty") as typeof import("node-pty");
 const terminalName = "xterm-direct";
 

@@ -1,10 +1,16 @@
 import { useRef, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { transcriptNavigationKeyIndex, type TranscriptNavigationItem } from "@/lib/transcript-navigation";
+import {
+  transcriptNavigationKeyIndex,
+  transcriptNavigationPreview,
+  type TranscriptNavigationItem,
+} from "@/lib/transcript-navigation";
+import type { ConversationMessage } from "@/types/roder";
 import { cn } from "@/lib/utils";
 
 type TranscriptNavigationProps = {
   items: TranscriptNavigationItem[];
+  messages: readonly ConversationMessage[];
   activeId: string | null;
   bottomInsetPx: number;
   onSelect: (id: string) => void;
@@ -12,12 +18,14 @@ type TranscriptNavigationProps = {
 
 export function TranscriptNavigation({
   items,
+  messages,
   activeId,
   bottomInsetPx,
   onSelect,
 }: TranscriptNavigationProps): React.JSX.Element | null {
   const navigationRef = useRef<HTMLElement | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const messageTextById = new Map(messages.map((message) => [message.id, message.text]));
   const tabStopId = items.some((item) => item.id === focusedId) ? focusedId : (activeId ?? items[0]?.id);
   if (!items.length) return null;
 
@@ -33,6 +41,7 @@ export function TranscriptNavigation({
           {items.map((item, index) => {
             const active = item.id === activeId;
             const role = item.role === "user" ? "You" : item.role === "assistant" ? "Assistant" : "System";
+            const preview = transcriptNavigationPreview(messageTextById.get(item.id)?.trim() || item.preview);
             return (
               <Tooltip key={item.id}>
                 <TooltipTrigger
@@ -65,15 +74,22 @@ export function TranscriptNavigation({
                 </TooltipTrigger>
                 <TooltipContent
                   side="right"
-                  sideOffset={8}
-                  className="max-w-80 rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-border/70"
+                  sideOffset={12}
+                  className="w-80 max-w-[calc(100vw-3rem)] rounded-xl bg-popover p-3 font-mono text-base text-popover-foreground shadow-md ring-1 ring-border/70"
                 >
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {role} · Message {index + 1}
+                  <p
+                    className={cn(
+                      "font-medium leading-relaxed",
+                      preview.body ? "truncate" : "line-clamp-4 break-words",
+                    )}
+                  >
+                    {preview.title}
                   </p>
-                  <p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words text-base font-normal">
-                    {item.preview}
-                  </p>
+                  {preview.body ? (
+                    <p className="mt-1 line-clamp-4 whitespace-pre-wrap break-words font-normal leading-relaxed text-muted-foreground">
+                      {preview.body}
+                    </p>
+                  ) : null}
                 </TooltipContent>
               </Tooltip>
             );
