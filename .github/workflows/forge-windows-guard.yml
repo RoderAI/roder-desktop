@@ -1,0 +1,47 @@
+name: Windows packaging guard
+
+# Fails when a dependency change would stop the Windows release job from loading forge.config.ts.
+# The check installs the repo the way a Windows host does, from a Linux runner, so it catches the
+# problem before a tag is pushed.
+
+on:
+  pull_request:
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "forge.config.ts"
+      - "scripts/check-windows-makers.mjs"
+      - ".github/workflows/forge-windows-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.5.0"
+
+jobs:
+  windows-makers:
+    name: Load every Forge maker for win32
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Check win32 maker resolution
+        run: node scripts/check-windows-makers.mjs .
