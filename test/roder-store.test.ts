@@ -1667,6 +1667,43 @@ test("queued prompts are stored per thread and persisted", async () => {
   }
 });
 
+test("steerPrompt rejects without consuming queued input when the turn has ended", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async () => ({}));
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({ activeThreadId: "thread-ended", busy: false });
+  const queued = useRoderStore.getState().addQueuedPrompt("thread-ended", "keep this message");
+
+  await expect(useRoderStore.getState().steerPrompt(queued.prompt)).rejects.toThrow("No running turn to steer");
+
+  expect(request).not.toHaveBeenCalled();
+  expect(useRoderStore.getState().error).toBe("No running turn to steer");
+  expect(useRoderStore.getState().queuedPromptsByThread["thread-ended"]).toEqual([queued]);
+});
+
+test("removing a migrated prompt uses its original queue key without affecting other messages", async () => {
+  const useRoderStore = await loadRoderStore();
+  const sent = useRoderStore.getState().addQueuedPrompt("", "sent message");
+  const pending = useRoderStore.getState().addQueuedPrompt("", "pending message");
+  const other = useRoderStore.getState().addQueuedPrompt("thread-other", "unrelated message");
+  // Thread creation moves the queue while the composer's onSend is still pending.
+  useRoderStore.setState({
+    queuedPromptsByThread: { "thread-created": [sent, pending], "thread-other": [other] },
+  });
+  const newDraft = useRoderStore.getState().addQueuedPrompt("", "another new thread");
+
+  useRoderStore.getState().removeQueuedPrompt("new-thread", sent.id);
+  useRoderStore.getState().removeQueuedPrompt("new-thread", sent.id);
+
+  expect(useRoderStore.getState().queuedPromptsByThread).toEqual({
+    "thread-created": [pending],
+    "thread-other": [other],
+    "new-thread": [newDraft],
+  });
+  // An ordinary thread key must never remove another thread's messages.
+  useRoderStore.getState().removeQueuedPrompt("thread-other", pending.id);
+  expect(useRoderStore.getState().queuedPromptsByThread["thread-created"]).toEqual([pending]);
+});
+
 test("queued prompts staged on the new-thread route move to the created thread", async () => {
   const workspace = {
     id: "ws-1",
