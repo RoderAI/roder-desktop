@@ -6,6 +6,7 @@ import type {
   PagedHunkDiff,
   WorkspaceChangeObservation,
   WorkspaceObservedFile,
+  RoderTurn,
 } from "@/types/roder";
 
 const reviewDiffContextLines = 3;
@@ -47,6 +48,56 @@ export type ReviewTurnChangeSummary = {
   deletions: number;
   files: ReviewMergedChangedFile[];
 };
+
+export function finishedReviewTurnKey(turns: RoderTurn[] = []): string {
+  return turns.filter((turn) => turn.status !== "inProgress").map((turn) => turn.id).join("\0");
+}
+
+export function finishedFolderTurnSummaries(
+  summaries: Record<string, ReviewTurnChangeSummary>,
+  finishedTurnIds: ReadonlySet<string>,
+  activeTurnId: string,
+  folderPath: string,
+  rootPath: string,
+): Record<string, ReviewTurnChangeSummary> {
+  return Object.fromEntries(
+    Object.entries(summaries).flatMap(([turnId, summary]) => {
+      if (turnId === activeTurnId || !finishedTurnIds.has(turnId)) return [];
+      const files = summary.files.filter((file) => reviewFileInFolder(file.path, folderPath, rootPath));
+      if (files.length === 0) return [];
+      return [[
+        turnId,
+        {
+          files,
+          additions: files.reduce((total, file) => total + file.additions, 0),
+          deletions: files.reduce((total, file) => total + file.deletions, 0),
+        },
+      ]];
+    }),
+  );
+}
+
+function reviewFileInFolder(path: string, folderPath: string, rootPath: string): boolean {
+  const folder = normalizedReviewPath(folderPath);
+  const root = normalizedReviewPath(rootPath);
+  const file = normalizedReviewPath(path);
+  if (!folder || !file) return false;
+  const caseInsensitive = /^[a-z]:\//i.test(folder) || folder.startsWith("//");
+  const compare = (value: string) => caseInsensitive ? value.toLowerCase() : value;
+  const inside = (child: string, parent: string) =>
+    compare(child).startsWith(`${compare(parent).replace(/\/$/, "")}/`);
+  if (file.split("/").includes("..")) return false;
+  if (/^(?:\/|[a-z]:\/)/i.test(file)) return inside(file, folder);
+  if (!root) return false;
+  if (compare(folder) !== compare(root) && !inside(folder, root)) return false;
+  const relativeFolder = compare(folder) === compare(root) ? "" : folder.slice(root.replace(/\/$/, "").length + 1);
+  return !relativeFolder || inside(file, relativeFolder);
+}
+
+function normalizedReviewPath(path: string): string {
+  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  return normalized || (path.startsWith("/") ? "/" : "");
+}
 
 export type HunkSummary = {
   fileCount: number;

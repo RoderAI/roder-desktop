@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { roderIpc } from "@/lib/roder-ipc";
+import { createForegroundSnapshot } from "@/lib/foreground-snapshot";
+import { useWindowForeground } from "@/hooks/use-window-foreground";
 import { activeTurnIdForThread, messagesFromThread, shouldShowThreadWorkingIndicator } from "@/lib/roder-thread";
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
@@ -38,7 +40,12 @@ function activeThreadForState(state: RoderStoreState) {
 /** Messages of the store-active thread. Subscribes narrowly so only consumers
  * of the transcript re-render on streaming deltas. */
 export function useActiveThreadMessages(): ConversationMessage[] {
-  return useRoderStore((state) => messagesFromThread(activeThreadForState(state)));
+  const foreground = useWindowForeground();
+  const selectMessages = useMemo(
+    () => createForegroundSnapshot((state: RoderStoreState) => messagesFromThread(activeThreadForState(state)), []),
+    [],
+  );
+  return useRoderStore((state) => selectMessages(state, foreground));
 }
 
 /** Snapshot (non-reactive) of the active thread's messages, for event handlers. */
@@ -49,7 +56,9 @@ export function activeThreadMessagesSnapshot(): ConversationMessage[] {
 /** Working-indicator flag derived inside the selector so streaming deltas only
  * re-render subscribers when the boolean actually flips. */
 export function useShowWorkingIndicator(routeActiveThreadId: string): boolean {
+  const foreground = useWindowForeground();
   return useRoderStore((state) => {
+    if (!foreground) return false;
     const routeThread = state.threads.find((thread) => thread.id === routeActiveThreadId);
     const waitRequests = waitRequestsForThread(state.pendingWaitRequestsByThread, state.activeThreadId);
     const messages = messagesFromThread(activeThreadForState(state));
