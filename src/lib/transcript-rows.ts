@@ -290,6 +290,7 @@ function transcriptEntriesEquivalent(left: TranscriptMessageEntry, right: Transc
   }
   if (left.kind === "activityGroup" && right.kind === "activityGroup") {
     return (
+      left.live === right.live &&
       sameActivitySummary(left.summary, right.summary) &&
       left.entries.length === right.entries.length &&
       left.entries.every((entry, index) => transcriptEntriesEquivalent(entry, right.entries[index]))

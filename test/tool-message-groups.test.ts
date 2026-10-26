@@ -1,11 +1,103 @@
 import { expect, test } from "vitest";
 import { groupToolMessagesForTranscript } from "../src/lib/tool-message-groups";
 
-test("adjacent read-file tool messages collapse into one transcript group", () => {
+test("old mixed tools between user messages collapse into one activity row", () => {
+  const tools = [
+    createToolMessage("patch-1", "apply_patch", "Edited app.ts", "turn-1"),
+    createToolMessage("browser-1", "chrome_click", "Clicked save", "turn-1"),
+    createToolMessage("shell-1", "shell", "Ran tests", "turn-1"),
+  ];
+  const rows = groupToolMessagesForTranscript(
+    [createUserMessage("Working"), ...tools, createUserMessage("Next request")],
+    { activeTurnId: "turn-1" },
+  );
+  expect(rows).toHaveLength(3);
+  expect(rows[1]).toMatchObject({ kind: "activityGroup" });
+  expect(rows[1]).not.toHaveProperty("live");
+});
+
+test("assistant messages neither split the tool group nor collapse the latest activity", () => {
+  const rows = groupToolMessagesForTranscript(
+    [
+      createUserMessage("Work"),
+      createToolMessage("one", "read_file", "Read one.ts", "turn-1"),
+      createAssistantMessage("Progress"),
+      createToolMessage("two", "shell", "Tests passed", "turn-1"),
+      createAssistantMessage("More progress"),
+    ],
+    { activeTurnId: "turn-1" },
+  );
+  const groups = rows.filter((row) => row.kind === "activityGroup");
+  expect(groups).toHaveLength(1);
+  expect(groups[0]).toMatchObject({
+    live: true,
+    entries: [{ message: { toolCallId: "one" } }, { message: { toolCallId: "two" } }],
+  });
+  expect(rows.filter((row) => row.kind === "message" && row.message.role === "assistant")).toHaveLength(2);
+});
+
+test("the next user message closes one shared history group across assistant updates", () => {
+  const rows = groupToolMessagesForTranscript(
+    [
+      createUserMessage("First request"),
+      createToolMessage("one", "read_file", "Read one.ts", "first"),
+      createAssistantMessage("Progress"),
+      createToolMessage("two", "shell", "Tests passed", "first"),
+      createAssistantMessage("Done"),
+      createUserMessage("Second request"),
+      createToolMessage("three", "shell", "Next command", "second"),
+    ],
+    { activeTurnId: "second" },
+  );
+  const groups = rows.filter((row) => row.kind === "activityGroup");
+  expect(groups).toHaveLength(2);
+  expect(groups[0]).not.toHaveProperty("live");
+  expect(groups[0]).toMatchObject({
+    entries: [{ message: { toolCallId: "one" } }, { message: { toolCallId: "two" } }],
+  });
+  expect(groups[1]).toMatchObject({ live: true, entries: [{ message: { toolCallId: "three" } }] });
+});
+
+test("the latest active tool run is a single live scroll region with a stable key", () => {
+  const tools = Array.from({ length: 8 }, (_, index) =>
+    createToolMessage(`tool-${index}`, "shell", `Command ${index}`, "turn-1"),
+  );
+  const rows = groupToolMessagesForTranscript(tools, { activeTurnId: "turn-1" });
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ kind: "activityGroup", live: true });
+  if (rows[0].kind !== "activityGroup") throw Error("Expected a live tool group");
+  expect(rows[0].entries).toHaveLength(8);
+  const next = groupToolMessagesForTranscript(
+    [...tools, createToolMessage("tool-next", "shell", "Another command", "turn-1")],
+    { activeTurnId: "turn-1" },
+  );
+  expect(next[0]).toHaveProperty("id", rows[0].id);
+  const finished = groupToolMessagesForTranscript([...tools, createAssistantMessage("Done")]);
+  expect(finished[0]).toMatchObject({ kind: "activityGroup" });
+  expect(finished[0]).not.toHaveProperty("live");
+  expect(finished[0]).not.toHaveProperty("id", rows[0].id);
+});
+
+test("a live tail never absorbs tools from before the next user message", () => {
+  const rows = groupToolMessagesForTranscript(
+    [
+      createToolMessage("old-1", "read_file", "Read old.ts", "old"),
+      createToolMessage("old-2", "read_file", "Read old2.ts", "old"),
+      createUserMessage("Next request"),
+      createToolMessage("new-1", "read_file", "Read new.ts", "new"),
+    ],
+    { activeTurnId: "new" },
+  );
+  expect(rows).toHaveLength(3);
+  expect(rows[0]).not.toHaveProperty("live");
+  expect(rows[2]).toMatchObject({ live: true, entries: [{ message: { turnId: "new" } }] });
+});
+
+test("read-file tools on separate user requests stay in separate groups", () => {
   const grouped = groupToolMessagesForTranscript([
     createToolMessage("tool-1", "read_file", "Read README.md"),
     createToolMessage("tool-2", "read_file", "Read package.json"),
-    createAssistantMessage("Done."),
+    createUserMessage("Next request"),
     createToolMessage("tool-3", "read_file", "Read tsconfig.json"),
   ]);
 
@@ -32,7 +124,7 @@ test("adjacent read-file tool messages collapse into one transcript group", () =
     },
     {
       kind: "message",
-      message: createAssistantMessage("Done."),
+      message: createUserMessage("Next request"),
     },
     {
       kind: "message",
@@ -282,20 +374,16 @@ test("running tool runs stay expanded while progress is active", () => {
     },
   ]);
 
-  expect(plain(grouped)).toEqual([
-    {
-      id: "tool-group:read_file:tool-1:tool-2",
-      kind: "readFileGroup",
-      messages: [
-        createToolMessage("tool-1", "read_file", "Read README.md"),
-        {
-          ...createToolMessage("tool-2", "read_file", "Reading package.json"),
-          status: "streaming",
-          toolStatus: "running",
-        },
-      ],
-    },
-  ]);
+  expect(grouped).toHaveLength(1);
+  expect(grouped[0]).toMatchObject({
+    id: "live-activity-group:tool-1",
+    kind: "activityGroup",
+    live: true,
+    entries: [
+      { kind: "message", message: { toolCallId: "tool-1" } },
+      { kind: "message", message: { toolCallId: "tool-2", toolStatus: "running" } },
+    ],
+  });
 });
 
 test("completed tools stay expanded while their turn is still active", () => {
@@ -307,16 +395,15 @@ test("completed tools stay expanded while their turn is still active", () => {
     { activeTurnId: "turn-1" },
   );
 
-  expect(plain(grouped)).toEqual([
-    {
-      kind: "message",
-      message: createToolMessage("tool-1", "read_file", "Read README.md", "turn-1"),
-    },
-    {
-      kind: "message",
-      message: createToolMessage("tool-2", "grep", 'Searched for "Transcript" in src', "turn-1"),
-    },
-  ]);
+  expect(grouped).toHaveLength(1);
+  expect(grouped[0]).toMatchObject({
+    kind: "activityGroup",
+    live: true,
+    entries: [
+      { kind: "message", message: { toolCallId: "tool-1" } },
+      { kind: "message", message: { toolCallId: "tool-2" } },
+    ],
+  });
 });
 
 test("failed tool activity stays inside the completed exploration group", () => {

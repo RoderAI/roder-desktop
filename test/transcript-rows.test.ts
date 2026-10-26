@@ -183,11 +183,15 @@ test("preserves disclosure keys for active-turn compact tool groups", () => {
   });
 
   expect(rows[0]).toMatchObject({
-    disclosureKey: "disclosure:tool-group:read_file:tool-1:tool-2",
-    key: "tool-group:read_file:tool-1:tool-2",
+    disclosureKey: "disclosure:live-activity-group:tool-1",
+    key: "live-activity-group:tool-1",
     kind: "entry",
   });
-  expect(transcriptRowDisclosureKeys(rows[0])).toEqual(["disclosure:tool-group:read_file:tool-1:tool-2"]);
+  expect(transcriptRowDisclosureKeys(rows[0])).toEqual([
+    "disclosure:live-activity-group:tool-1",
+    "disclosure:live-activity-group:tool-1:nested:disclosure:message:tool:tool-1",
+    "disclosure:live-activity-group:tool-1:nested:disclosure:message:tool:tool-2",
+  ]);
 });
 
 test("preserves disclosure keys for active-turn completed shell tools", () => {
@@ -202,11 +206,14 @@ test("preserves disclosure keys for active-turn completed shell tools", () => {
   });
 
   expect(rows[0]).toMatchObject({
-    disclosureKey: "disclosure:message:tool:tool-1",
-    key: "message:tool:tool-1",
+    disclosureKey: "disclosure:live-activity-group:tool-1",
+    key: "live-activity-group:tool-1",
     kind: "entry",
   });
-  expect(transcriptRowDisclosureKeys(rows[0])).toEqual(["disclosure:message:tool:tool-1"]);
+  expect(transcriptRowDisclosureKeys(rows[0])).toEqual([
+    "disclosure:live-activity-group:tool-1",
+    "disclosure:live-activity-group:tool-1:nested:disclosure:message:tool:tool-1",
+  ]);
 });
 
 test("builds searchable text for virtualized rows that are not mounted", () => {

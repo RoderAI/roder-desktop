@@ -607,12 +607,14 @@ const TranscriptEntryView = memo(function TranscriptEntryView({
   const entry = row.entry;
   const message = entry.kind === "message" ? entry.message : undefined;
   const isPhaseMessage = message?.role === "assistant" && Boolean(message.phase && message.phase !== "final_answer");
-  const getDisclosureControl = (key: string) => ({
+  const getDisclosureControl = (key: string, defaultOpen = false) => ({
     onOpenChange: (open: boolean) => onDisclosureOpenChange(key, open),
-    open: disclosureOpenByKey[key] ?? false,
+    open: disclosureOpenByKey[key] ?? defaultOpen,
   });
   const rowDisclosureKey = row.disclosureKey;
-  const disclosureControl = rowDisclosureKey ? getDisclosureControl(rowDisclosureKey) : {};
+  const disclosureControl = rowDisclosureKey
+    ? getDisclosureControl(rowDisclosureKey, entry.kind === "activityGroup" && Boolean(entry.live))
+    : {};
   const getEntryDisclosureControl =
     rowDisclosureKey && entry.kind === "activityGroup"
       ? (activityEntry: (typeof entry.entries)[number]) => {
@@ -628,6 +630,7 @@ const TranscriptEntryView = memo(function TranscriptEntryView({
       {entry.kind === "activityGroup" ? (
         <ToolActivityGroup
           entries={entry.entries}
+          live={entry.live}
           getEntryDisclosureControl={getEntryDisclosureControl}
           summary={entry.summary}
           {...disclosureControl}
