@@ -145,7 +145,7 @@ export function selectedModelRecord(
 
 // GPT-5.x models are retired from every picker. Dynamically discovered providers (OpenCode, Cursor)
 // keep reporting them until a roder release without them is pinned, so the desktop filters them too.
-const retiredModelIdPattern = /(?:^|\/)gpt-5(?:[.-]|$)/i;
+const retiredModelIdPattern = /(?:^|\/)(?:gpt-5(?:[.-]|$)|gpt-6-sol(?:[-:]|$))/i;
 
 export function isRetiredModel(model: Pick<RoderModel, "id">): boolean {
   return retiredModelIdPattern.test(model.id);

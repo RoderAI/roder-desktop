@@ -48,6 +48,11 @@ import { DesktopAgentTools } from "../agents/desktop-agent-tools";
 import { IssuesService } from "../issues/service";
 import { handleIssueToolCall, issueToolDefinitions } from "../issues/tools";
 import { persistentAgentToolDefinitions, createPersistentAgentService } from "../persistent-agents/service";
+import {
+  createPersistentAgentFromTool,
+  mergePersistentAgentSkill,
+  persistentAgentCreateTool,
+} from "../persistent-agents/creation-tool";
 import { createPersistentAgentSpriteManager, createSpriteImageNormalizer } from "../persistent-agents/sprites";
 import { createCodexImageGenerator } from "../persistent-agents/codex-image-generator";
 import { createImageGenerationCredentials, configureImageGenerationKey } from "../persistent-agents/image-credentials";
@@ -770,6 +775,11 @@ function getDesktopAgentTools(): DesktopAgentTools {
           return getPersistentAgentService().handleTool(tool.name, args, context);
         },
       })),
+      {
+        ...persistentAgentCreateTool,
+        execute: (args: unknown, context: { threadId: string }) =>
+          createPersistentAgentFromTool(args, context.threadId, handleRoderRequest),
+      },
     ],
     (method, params) => roder.request(method, params),
   );
@@ -863,7 +873,7 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
   if (method === "skills/list") {
     try {
       const baseSkills = await roder.request(method, params);
-      const result = mergeDesktopBrowserSkill(baseSkills);
+      const result = mergePersistentAgentSkill(mergeDesktopBrowserSkill(baseSkills));
       recordAppServerEvent("response", method, result);
       return result;
     } catch (error) {

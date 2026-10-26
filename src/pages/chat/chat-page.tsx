@@ -8,6 +8,7 @@ import { Composer } from "@/components/composer";
 import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
 import { Transcript } from "@/components/transcript";
+import { finishedFolderTurnSummaries, finishedReviewTurnKey } from "@/lib/review-changes";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -71,6 +72,24 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
   const routeActiveThreadId = threadId || (route === "new" ? "" : activeThreadId);
+  const reviewThread = useRoderStore(
+    (state) => state.threadDetails[routeActiveThreadId] ?? state.threads.find((thread) => thread.id === routeActiveThreadId),
+  );
+  const reviewWorkspace = agent.workspaces.find((workspace) => workspace.id === reviewThread?.workspaceId);
+  const reviewRoot = reviewWorkspace?.roots.find(
+    (root) => root.id === (reviewThread?.rootId ?? reviewWorkspace.defaultRootId),
+  );
+  const finishedReviewTurnIds = finishedReviewTurnKey(reviewThread?.turns);
+  const reviewSummaries = useMemo(
+    () => finishedFolderTurnSummaries(
+      hunkSummary.turnChangeSummaries,
+      new Set(finishedReviewTurnIds.split("\0")),
+      reviewThread?.status.activeTurnId ?? "",
+      reviewThread?.cwd ?? "",
+      reviewRoot?.path ?? "",
+    ),
+    [hunkSummary.turnChangeSummaries, finishedReviewTurnIds, reviewThread?.status.activeTurnId, reviewThread?.cwd, reviewRoot?.path],
+  );
   const messages = useActiveThreadMessages();
   const showWorkingIndicator = useShowWorkingIndicator(routeActiveThreadId);
   const subagentLifecycleEvents = useRoderStore(
@@ -202,7 +221,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           scrollStateKey={activeThreadId || "new-thread"}
           showWorkingIndicator={showWorkingIndicator}
           subagentLifecycleEvents={subagentLifecycleEvents}
-          turnChangeSummaries={hunkSummary.turnChangeSummaries}
+          turnChangeSummaries={reviewSummaries}
           onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
           onReviewTurnChanges={openTurnChanges}
         />

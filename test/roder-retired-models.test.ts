@@ -17,13 +17,19 @@ test("recognises retired GPT-5.x model ids, including routed and variant ids", (
   }
 });
 
-test("keeps GPT-6 models and unrelated ids", () => {
-  for (const id of ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol", "gpt-oss-120b", "claude-sonnet-5-5"]) {
+test("retires GPT-6 Sol across providers and variants", () => {
+  for (const id of ["gpt-6-sol", "openai/gpt-6-sol", "gpt-6-sol-pro", "openai/gpt-6-sol:batch"]) {
+    expect(isRetiredModel({ id })).toBe(true);
+  }
+});
+
+test("keeps GPT-6.1 Sol, other GPT-6 models and unrelated ids", () => {
+  for (const id of ["gpt-6-astra", "gpt-6-luna", "gpt-6.1-sol", "openai/gpt-6.1-sol-pro", "gpt-oss-120b", "claude-sonnet-5-5"]) {
     expect({ id, retired: isRetiredModel({ id }) }).toEqual({ id, retired: false });
   }
 });
 
-test("the store catalog drops retired GPT-5.x models after a providers refresh", async () => {
+test("the store catalog drops retired GPT-5.x and GPT-6 Sol models after a providers refresh", async () => {
   vi.resetModules();
   const storage = {
     getItem: () => null,
@@ -44,12 +50,13 @@ test("the store catalog drops retired GPT-5.x models after a providers refresh",
       sort_order: 10,
       models: [
         {
-          id: "gpt-6-sol",
-          name: "GPT-6 Sol",
+          id: "gpt-6.1-sol",
+          name: "GPT-6.1 Sol",
           default_reasoning: "medium",
           supported_reasoning: [{ effort: "medium" }],
         },
         { id: "gpt-5.5", name: "GPT-5.5", default_reasoning: "medium", supported_reasoning: [{ effort: "medium" }] },
+        { id: "gpt-6-sol", name: "GPT-6 Sol", default_reasoning: "medium", supported_reasoning: [] },
       ],
     },
     {
@@ -86,7 +93,7 @@ test("the store catalog drops retired GPT-5.x models after a providers refresh",
         if (method === "providers/list") {
           return {
             active_provider: "codex",
-            active_model: "gpt-6-sol",
+            active_model: "gpt-6.1-sol",
             active_reasoning: "medium",
             providers,
             routingOptions: [],
@@ -105,5 +112,5 @@ test("the store catalog drops retired GPT-5.x models after a providers refresh",
   const { useRoderStore } = await import("../src/stores/roder-store");
   await useRoderStore.getState().refreshProviders();
 
-  expect(useRoderStore.getState().models.map((model) => model.id)).toEqual(["gpt-6-sol"]);
+  expect(useRoderStore.getState().models.map((model) => model.id)).toEqual(["gpt-6.1-sol"]);
 });

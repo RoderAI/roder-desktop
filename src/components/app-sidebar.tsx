@@ -25,7 +25,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { isThreadRunning } from "@/lib/roder-thread";
 import { cn } from "@/lib/utils";
-import { groupThreadsByFolder, sidebarProjectOrder } from "@/lib/sidebar-thread-groups";
+import { groupThreadsByFolder, moveSidebarProject, sidebarProjectOrder } from "@/lib/sidebar-thread-groups";
 import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 
 export function filterPersistentAgents<T extends Pick<PersistentAgent, "name" | "mission" | "workspaceId">>(
@@ -148,10 +148,30 @@ export function AppSidebar({
       .toLowerCase()
       .includes(threadSearch.query.trim().toLowerCase()),
   );
-  const projectOrderRef = useRef<string[]>([]);
-  const projectOrder = sidebarProjectOrder(ordinaryThreads, projectOrderRef.current);
-  projectOrderRef.current = projectOrder;
+  const [manualProjectOrder, setManualProjectOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved: unknown = JSON.parse(window.localStorage.getItem("sidebar-project-order") ?? "[]");
+      return Array.isArray(saved) && saved.every((key) => typeof key === "string") ? saved : [];
+    } catch {
+      return [];
+    }
+  });
+  const projectOrder = sidebarProjectOrder(ordinaryThreads, manualProjectOrder);
   const threadGroups = groupThreadsByFolder(matchingThreads, projectOrder);
+
+  function handleProjectDrop(event: React.DragEvent<HTMLElement>, target: string): void {
+    event.preventDefault();
+    const source = event.dataTransfer.getData("application/x-roder-sidebar-project");
+    const next = moveSidebarProject(projectOrder, source, target);
+    if (next === projectOrder) return;
+    setManualProjectOrder(next);
+    try {
+      window.localStorage.setItem("sidebar-project-order", JSON.stringify(next));
+    } catch {
+      // The in-memory order still works if storage is unavailable.
+    }
+  }
 
   function handleThreadListScroll(event: React.UIEvent<HTMLDivElement>): void {
     if (!hasMoreThreads || loadingMoreThreads) {
@@ -271,7 +291,21 @@ export function AppSidebar({
                 const visibility = visibleThreadsForGroup(group.threads, expanded);
                 return (
                   <section key={group.key}>
-                    <div className="group squircle-corners relative flex h-7 items-center rounded-xl text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20">
+                    <div
+                      className="group squircle-corners relative flex h-7 cursor-grab items-center rounded-xl text-base text-sidebar-heading outline-none hover:bg-sidebar-active/20 active:cursor-grabbing"
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("application/x-roder-sidebar-project", group.key);
+                      }}
+                      onDragOver={(event) => {
+                        if (event.dataTransfer.types.includes("application/x-roder-sidebar-project")) {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }
+                      }}
+                      onDrop={(event) => handleProjectDrop(event, group.key)}
+                    >
                       <button
                         type="button"
                         className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-8 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
