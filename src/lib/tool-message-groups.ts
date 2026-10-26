@@ -2,7 +2,6 @@ import type { ConversationMessage } from "@/types/roder";
 import {
   compactToolGroup,
   isCommandActivityTool,
-  isExplorationActivityTool,
   isFileActivityTool,
   isHiddenTranscriptTool,
   isSearchActivityTool,
@@ -42,6 +41,7 @@ export type TranscriptMessageEntry =
   | {
       id: string;
       kind: "activityGroup";
+      live?: boolean;
       entries: TranscriptToolEntry[];
       summary: ActivitySummary;
     };
@@ -57,7 +57,7 @@ export function groupToolMessagesForTranscript(
   const visibleMessages = messages.filter(
     (message) => !(message.role === "tool" && isHiddenTranscriptTool(message.toolName)),
   );
-  return groupCompletedActivityRuns(groupAdjacentToolMessages(visibleMessages), options);
+  return groupToolActivityRuns(groupAdjacentToolMessages(visibleMessages), options);
 }
 
 function groupAdjacentToolMessages(messages: ConversationMessage[]): TranscriptToolEntry[] {
@@ -88,7 +88,10 @@ function groupAdjacentToolMessages(messages: ConversationMessage[]): TranscriptT
   for (const message of messages) {
     const groupKind = message.role === "tool" ? compactToolGroup(message.toolName) : null;
     if (groupKind) {
-      if (pendingGroup && pendingGroup.kind !== groupKind.entryKind) {
+      if (
+        pendingGroup &&
+        (pendingGroup.kind !== groupKind.entryKind || pendingGroup.messages[0].turnId !== message.turnId)
+      ) {
         flushGroup();
       }
       pendingGroup ??= { kind: groupKind.entryKind, messages: [], toolFamily: groupKind.family };
@@ -104,45 +107,59 @@ function groupAdjacentToolMessages(messages: ConversationMessage[]): TranscriptT
   return entries;
 }
 
-function groupCompletedActivityRuns(
+function groupToolActivityRuns(
   entries: TranscriptToolEntry[],
   options: ToolMessageGroupingOptions,
 ): TranscriptMessageEntry[] {
   const grouped: TranscriptMessageEntry[] = [];
   let pendingEntries: TranscriptToolEntry[] = [];
 
-  const flushActivity = () => {
+  const flushActivity = (atTail = false) => {
     if (pendingEntries.length === 0) {
       return;
     }
 
-    const summary = summarizeActivity(pendingEntries);
-    if (shouldCollapseActivity(pendingEntries, summary)) {
-      const messages = pendingEntries.flatMap(toolMessagesFromEntry);
-      grouped.push({
-        id: activityGroupId(messages),
-        kind: "activityGroup",
-        summary,
-        entries: pendingEntries,
-      });
-    } else {
-      grouped.push(...pendingEntries);
+    const toolEntries = pendingEntries.filter((entry) => toolMessagesFromEntry(entry).length > 0);
+    const summary = summarizeActivity(toolEntries);
+    const messages = toolEntries.flatMap(toolMessagesFromEntry);
+    const live =
+      atTail &&
+      messages.some(
+        (message) =>
+          message.toolStatus === "running" ||
+          message.status === "streaming" ||
+          Boolean(options.activeTurnId && message.turnId === options.activeTurnId),
+      );
+    const activity: TranscriptMessageEntry | undefined =
+      live || messages.length > 1
+        ? {
+            id: live ? `live-activity-group:${toolMessageStableId(messages[0])}` : activityGroupId(messages),
+            kind: "activityGroup",
+            ...(live ? { live: true } : {}),
+            summary,
+            entries: live ? messages.map((message) => ({ kind: "message" as const, message })) : toolEntries,
+          }
+        : toolEntries[0];
+    // Keep assistant text visible; put the shared activity at the last tool's position.
+    const lastTool = toolEntries.at(-1);
+    for (const entry of pendingEntries) {
+      if (toolMessagesFromEntry(entry).length === 0) grouped.push(entry);
+      else if (entry === lastTool && activity) grouped.push(activity);
     }
 
     pendingEntries = [];
   };
 
   for (const entry of entries) {
-    if (isCompletedToolEntry(entry, options)) {
-      pendingEntries.push(entry);
+    if (entry.kind === "message" && entry.message.role === "user") {
+      flushActivity();
+      grouped.push(entry);
       continue;
     }
-
-    flushActivity();
-    grouped.push(entry);
+    pendingEntries.push(entry);
   }
 
-  flushActivity();
+  flushActivity(true);
   return grouped;
 }
 
@@ -160,25 +177,6 @@ function activityGroupId(messages: ConversationMessage[]): string {
 
 function toolMessageStableId(message: ConversationMessage): string {
   return message.toolCallId || message.id;
-}
-
-function isCompletedToolEntry(entry: TranscriptToolEntry, options: ToolMessageGroupingOptions): boolean {
-  const messages = toolMessagesFromEntry(entry);
-  return (
-    messages.length > 0 &&
-    messages.every(
-      (message) =>
-        isExplorationActivity(message) &&
-        !(options.activeTurnId && message.turnId === options.activeTurnId) &&
-        message.toolStatus !== "running" &&
-        message.status !== "streaming",
-    )
-  );
-}
-
-function shouldCollapseActivity(entries: TranscriptToolEntry[], summary: ActivitySummary): boolean {
-  const toolCount = entries.flatMap(toolMessagesFromEntry).length;
-  return toolCount > 1 && (summary.files > 0 || summary.searches > 0 || summary.commands > 0);
 }
 
 function summarizeActivity(entries: TranscriptToolEntry[]): ActivitySummary {
@@ -235,8 +233,4 @@ function toolMessagesFromEntry(entry: TranscriptToolEntry): ConversationMessage[
     return entry.message.role === "tool" ? [entry.message] : [];
   }
   return entry.messages;
-}
-
-function isExplorationActivity(message: ConversationMessage): boolean {
-  return isExplorationActivityTool(message.toolName);
 }
