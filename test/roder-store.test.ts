@@ -686,7 +686,7 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
               id: "thread-1",
               preview: "Existing thread",
               modelProvider: "openai",
-              model: "gpt-6-sol",
+              model: "gpt-6.1-sol",
               createdAt: 1770000000,
               updatedAt: 1770000100,
               status: { type: "idle", activeTurnId: null, activeFlags: [] },
@@ -699,8 +699,8 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
         return {
           models: [
             {
-              id: "gpt-6-sol",
-              name: "GPT-6 Sol",
+              id: "gpt-6.1-sol",
+              name: "GPT-6.1 Sol",
               modelProvider: "openai",
               isDefault: true,
               defaultReasoningEffort: "medium",
@@ -711,7 +711,7 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
       case "settings/get":
         return {
           default_provider: "openai",
-          default_model: "gpt-6-sol",
+          default_model: "gpt-6.1-sol",
           default_reasoning: "medium",
           default_mode: "accept_all",
         };
@@ -723,7 +723,7 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
             id: "thread-1",
             preview: "Existing thread",
             modelProvider: "openai",
-            model: "gpt-6-sol",
+            model: "gpt-6.1-sol",
             createdAt: 1770000000,
             updatedAt: 1770000100,
             status: { type: "idle", activeTurnId: null, activeFlags: [] },
