@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 import {
   changeCountsByTurn,
+  finishedFolderTurnSummaries,
+  finishedReviewTurnKey,
   groupHunksByFile,
   groupObservedChangesByFile,
   hunkPagesToReviewPatch,
@@ -15,7 +17,62 @@ import {
   summarizeHunks,
   trimReviewPatchContext,
 } from "../src/lib/review-changes";
-import type { HunkRecord, PagedHunkDiff, WorkspaceChangeObservation } from "../src/types/roder";
+import type { HunkRecord, PagedHunkDiff, RoderTurn, WorkspaceChangeObservation } from "../src/types/roder";
+
+test("only terminal turn states qualify for a review card", () => {
+  const turns: RoderTurn[] = [
+    { id: "running", status: "inProgress", items: [], itemsView: "default" },
+    { id: "done", status: "completed", items: [], itemsView: "default" },
+    { id: "failed", status: "failed", items: [], itemsView: "default" },
+    { id: "stopped", status: "interrupted", items: [], itemsView: "default" },
+  ];
+  expect(finishedReviewTurnKey(turns).split("\0")).toEqual(["done", "failed", "stopped"]);
+});
+
+test("review card waits for a finished turn and includes only files inside its folder", () => {
+  const summaries = reviewTurnSummaries(
+    [
+      makeHunk({ turnId: "turn-1", path: "project/src/app.ts" }),
+      makeHunk({ turnId: "turn-1", path: "project-other/sibling.ts" }),
+      makeHunk({ turnId: "turn-2", path: "project/src/next.ts" }),
+    ],
+  );
+  expect(finishedFolderTurnSummaries(summaries, new Set(["turn-2"]), "turn-1", "/repo/project", "/repo")).toMatchObject({
+    "turn-2": { files: [expect.objectContaining({ path: "project/src/next.ts" })] },
+  });
+  expect(finishedFolderTurnSummaries(summaries, new Set(["turn-2"]), "turn-2", "/repo/project", "/repo")).toEqual({});
+  const finished = finishedFolderTurnSummaries(summaries, new Set(["turn-1", "turn-2"]), "", "/repo/project", "/repo");
+  expect(finished["turn-1"].files.map((file) => file.path)).toEqual(["project/src/app.ts"]);
+  expect(finished["turn-1"].additions).toBe(0);
+});
+
+test("review card rejects outside, traversal and unknown-root paths", () => {
+  const summaries = reviewTurnSummaries([
+    makeHunk({ turnId: "turn-1", path: "/repo/project/src/app.ts" }),
+    makeHunk({ turnId: "turn-1", path: "/repo/project-else/no.ts" }),
+    makeHunk({ turnId: "turn-1", path: "/repo/project/../outside.ts" }),
+    makeHunk({ turnId: "turn-1", path: "../project/escape.ts" }),
+  ]);
+  const withRoot = finishedFolderTurnSummaries(summaries, new Set(["turn-1"]), "", "/repo/project", "/repo");
+  expect(withRoot["turn-1"].files.map((file) => file.path)).toEqual(["/repo/project/src/app.ts"]);
+  const noRoot = finishedFolderTurnSummaries(summaries, new Set(["turn-1"]), "", "/repo/project", "");
+  expect(noRoot["turn-1"].files.map((file) => file.path)).toEqual(["/repo/project/src/app.ts"]);
+});
+
+test("review card accepts Windows paths only within the selected folder", () => {
+  const summaries = reviewTurnSummaries([
+    makeHunk({ turnId: "turn-1", path: "Project\\src\\app.ts" }),
+    makeHunk({ turnId: "turn-1", path: "Project-else\\other.ts" }),
+  ]);
+  const result = finishedFolderTurnSummaries(
+    summaries,
+    new Set(["turn-1"]),
+    "",
+    "C:\\repo\\project",
+    "C:\\repo",
+  );
+  expect(result["turn-1"].files.map((file) => file.path)).toEqual(["Project\\src\\app.ts"]);
+});
 
 test("hunkToUnifiedPatch converts recorded hunk lines into a minimal unified patch", () => {
   const record = makeHunk({
