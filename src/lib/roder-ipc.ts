@@ -1,3 +1,4 @@
+import { attachmentImageType } from "@/lib/attachment-preparation";
 import type {
   CommandsListResult,
   CommandsRunResult,
@@ -768,7 +769,10 @@ function turnInput(prompt: string, attachments: DesktopAttachment[]): TurnInputI
     input.push({ type: "text", text });
   }
   for (const attachment of attachments) {
-    if (attachment.imageUrl && attachment.type.startsWith("image/")) {
+    if (attachmentImageType(attachment)) {
+      if (!attachment.imageUrl) {
+        throw new Error(`Image "${attachment.name}" is not ready to send. Please remove it and reattach it.`);
+      }
       input.push({ type: "image", imageUrl: attachment.imageUrl });
     } else if (attachment.path) {
       input.push({ type: "local_file", path: attachment.path });

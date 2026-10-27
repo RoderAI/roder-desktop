@@ -12,11 +12,12 @@ import {
 } from "electron";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { watch as fsWatch } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
+import { savePngDataUrl } from "../attachment-images";
 import {
   browserProviderFromRequestParams,
   browserToolThreadId,
@@ -620,29 +621,6 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
-
-async function savePngDataUrl(
-  dataUrl: string,
-  filePrefix: string,
-  tempDirName: string,
-): Promise<{ name: string; path: string; type: string; size: number }> {
-  const prefix = "data:image/png;base64,";
-  if (!dataUrl.startsWith(prefix)) {
-    throw new Error("Image attachment must be a PNG data URL");
-  }
-  const data = Buffer.from(dataUrl.slice(prefix.length), "base64");
-  const dir = join(tmpdir(), tempDirName);
-  await mkdir(dir, { recursive: true });
-  const name = `${filePrefix}-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-  const path = join(dir, name);
-  await writeFile(path, data);
-  return {
-    name: basename(path),
-    path,
-    type: "image/png",
-    size: data.byteLength,
-  };
-}
 
 function getExtensionCatalog(): ExtensionCatalog {
   extensionCatalog ??= new ExtensionCatalog({

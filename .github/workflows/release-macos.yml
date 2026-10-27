@@ -221,13 +221,11 @@ jobs:
           ditto -c -k --keepParent "${app}" dist/Roder-macos-arm64.zip
 
           dmg="dist/Roder-macos-arm64.dmg"
-          rm -f "${dmg}"
-          hdiutil create \
-            -volname "Roder" \
-            -srcfolder "${app}" \
-            -ov \
-            -format UDZO \
-            "${dmg}"
+          pnpm exec electron-installer-dmg "${app}" Roder-macos-arm64 \
+            --out dist \
+            --title Roder \
+            --icon resources/icon.icns \
+            --overwrite
 
           codesign --force \
             --sign "${APPLE_SIGNING_IDENTITY}" \
@@ -257,6 +255,7 @@ jobs:
             find dist -maxdepth 2 -print >&2
             exit 1
           fi
+          bash scripts/verify-desktop-dmg.sh dist/Roder-macos-arm64.dmg
 
           (
             cd dist
