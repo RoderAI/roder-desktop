@@ -262,6 +262,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           )}
           <Composer
             activeThreadId={activeThreadId}
+            attachmentContextKey={`${agent.selectedWorkspaceId}:${agent.selectedRootId}:${agent.selectedWorkspaceCwd}`}
             busy={activeThreadBusy}
             queueBusy={composerQueueBusy}
             commands={mergedCommands}

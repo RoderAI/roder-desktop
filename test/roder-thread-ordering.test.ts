@@ -143,6 +143,39 @@ test("user message images are projected into transcript messages", () => {
   ]);
 });
 
+test("image-only prompts remain visible in the transcript", () => {
+  const current = {
+    ...thread("thread-a", 100),
+    turns: [
+      {
+        id: "turn-a",
+        itemsView: "default",
+        status: "completed",
+        items: [
+          {
+            id: "message-a",
+            type: "userMessage",
+            text: "",
+            images: [{ image_url: "data:image/png;base64,YWJj" }],
+          },
+        ],
+      },
+    ],
+  };
+
+  expect(messagesFromThread(current)).toEqual([
+    {
+      id: "message-a",
+      threadId: "thread-a",
+      turnId: "turn-a",
+      role: "user",
+      text: "",
+      images: [{ imageUrl: "data:image/png;base64,YWJj" }],
+      status: "complete",
+    },
+  ]);
+});
+
 test("typed item events keep reasoning items hidden and project commentary updates", () => {
   let current = {
     ...thread("thread-a", 100),

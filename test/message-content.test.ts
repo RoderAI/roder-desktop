@@ -11,6 +11,29 @@ test("renders markdown links without harden origin errors", () => {
   ).not.toThrow();
 });
 
+test("renders HTTPS download links instead of replacing them with blocked markers", () => {
+  const url = "https://github.com/RoderAI/roder-desktop/releases/download/v0.1.7/Roder-macos-arm64.dmg";
+  const html = renderToStaticMarkup(
+    React.createElement(MessageContent, { text: `[Download the signed macOS DMG](${url})` }),
+  );
+  expect(html).toContain('data-streamdown="link"');
+  expect(html).toContain("Download the signed macOS DMG");
+  expect(html).not.toContain("[blocked]");
+});
+
+test("keeps dangerous links and unsolicited remote images blocked", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MessageContent, {
+      text: "[Script](javascript:alert%281%29)\n\n[Local](file:///tmp/app)\n\n[Data](data:text/html,unsafe)\n\n![remote](https://example.com/tracker.png)",
+    }),
+  );
+  expect(html).not.toContain('href="javascript:');
+  expect(html).not.toContain('href="file:');
+  expect(html).not.toContain('href="data:');
+  expect(html).not.toContain('data-streamdown="link"');
+  expect(html).not.toContain("<img");
+});
+
 test("renders known skill references as pills in plain text", () => {
   const html = renderToStaticMarkup(
     React.createElement(React.Fragment, null, renderTextWithSkillTokens("tell me about $interface-craft", [skill()])),

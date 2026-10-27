@@ -83,6 +83,7 @@ export type DroppedFile = {
   path: string;
   type: string;
   size: number;
+  imageUrl?: string;
 };
 
 export type AppServerEvent = {

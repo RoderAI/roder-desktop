@@ -1,7 +1,5 @@
 import { BrowserWindow, WebContentsView, type Rectangle, type WebContents } from "electron";
-import { mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { savePngAttachment } from "../attachment-images";
 import { installNewThreadShortcut } from "../main/shortcuts";
 
 export type BrowserSnapshot = {
@@ -18,6 +16,7 @@ export type BrowserCapture = {
   path: string;
   type: string;
   size: number;
+  imageUrl: string;
 };
 
 export type BrowserPageSnapshot = {
@@ -194,18 +193,7 @@ export class BrowserManager {
   async captureScreenshot(): Promise<BrowserCapture> {
     this.#ensureView();
     const image = await this.#view!.webContents.capturePage();
-    const data = image.toPNG();
-    const dir = join(tmpdir(), "roder-desktop-browser");
-    await mkdir(dir, { recursive: true });
-    const name = `browser-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-    const path = join(dir, name);
-    await writeFile(path, data);
-    return {
-      name: basename(path),
-      path,
-      type: "image/png",
-      size: data.byteLength,
-    };
+    return savePngAttachment(image.toPNG(), "browser", "roder-desktop-browser");
   }
 
   async toggleAnnotation(): Promise<BrowserSnapshot> {

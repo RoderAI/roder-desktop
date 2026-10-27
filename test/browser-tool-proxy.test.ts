@@ -59,6 +59,28 @@ test("browser tool proxy executes calls through BrowserManager", async () => {
   });
 });
 
+test("browser screenshot tool responses retain file metadata without inlining attachment bytes", async () => {
+  const browser = {
+    ensureVisible: () => ({ visible: true }),
+    captureScreenshot: async () => ({
+      name: "screenshot.png",
+      path: "/tmp/screenshot.png",
+      type: "image/png",
+      size: 3,
+      imageUrl: "data:image/png;base64,cG5n",
+    }),
+  };
+  const result = await callDesktopBrowserTool(browser as never, "browser_screenshot", { arguments: {} });
+  expect(result.is_error).toBe(false);
+  expect(result.data).toEqual({
+    name: "screenshot.png",
+    path: "/tmp/screenshot.png",
+    type: "image/png",
+    size: 3,
+  });
+  expect(result.text).not.toContain("base64");
+});
+
 test("browser tool proxy reports invalid input as tool errors", async () => {
   const result = await callDesktopBrowserTool(
     { ensureVisible: () => ({ visible: true }) } as never,

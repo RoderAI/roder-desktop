@@ -19,8 +19,8 @@ const safeRehypePlugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
     harden,
     {
       defaultOrigin: "https://roder.local",
-      allowedProtocols: ["http", "https", "mailto"],
-      allowedLinkPrefixes: ["http://", "https://", "mailto:"],
+      allowedProtocols: ["http:", "https:", "mailto:"],
+      allowedLinkPrefixes: ["*"],
       allowedImagePrefixes: [],
       allowDataImages: false,
     },
