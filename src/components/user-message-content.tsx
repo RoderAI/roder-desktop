@@ -18,7 +18,7 @@ export function UserMessageContent({ images = emptyImages, skills, text }: UserM
             <img
               key={`${image.imageUrl}:${index}`}
               src={image.imageUrl}
-              alt="Sketch attachment"
+              alt={`Attachment ${index + 1}`}
               className="max-h-56 max-w-full rounded-lg border border-border bg-background object-contain"
             />
           ))}

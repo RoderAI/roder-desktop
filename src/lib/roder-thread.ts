@@ -482,12 +482,12 @@ export function messagesFromRoderItem(
   }
 
   const text = extractItemText(item);
-  if (!text) {
+  const images = userMessageImages(item);
+  if (!text && images.length === 0) {
     return [];
   }
 
   if (item.type === "userMessage") {
-    const images = userMessageImages(item);
     if (images.length === 0 && modelSwitchSummaryPattern.test(text)) return [];
     return [
       {

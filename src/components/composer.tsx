@@ -1,6 +1,7 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   CommandDescriptor,
   DesktopAttachment,
@@ -73,6 +74,7 @@ const scrollButtonAnimationStyle: ComposerScrollButtonStyle = {
 
 type ComposerProps = {
   activeThreadId: string;
+  attachmentContextKey?: string;
   busy: boolean;
   queueBusy?: boolean;
   commands: CommandDescriptor[];
@@ -125,6 +127,7 @@ async function imageFileToPngDataUrl(file: File): Promise<string> {
 
 export function Composer({
   activeThreadId,
+  attachmentContextKey = "",
   busy,
   queueBusy = busy,
   commands,
@@ -162,6 +165,28 @@ export function Composer({
   const [dragActive, setDragActive] = useState(false);
   const [sketchOpen, setSketchOpen] = useState(false);
   const [caretPosition, setCaretPosition] = useState(0);
+  const [attachmentPreparation] = useState(() => new AttachmentPreparation());
+  const attachmentContext = JSON.stringify([activeThreadId, attachmentContextKey]);
+  const [attachmentStatus, setAttachmentStatus] = useState({
+    context: attachmentContext,
+    generation: attachmentPreparation.generation,
+    pending: 0,
+    errors: [] as string[],
+  });
+  const attachmentStatusCurrent =
+    attachmentStatus.context === attachmentContext && attachmentStatus.generation === attachmentPreparation.generation;
+  const preparingAttachments = attachmentStatusCurrent ? attachmentStatus.pending : 0;
+  const attachmentErrors = attachmentStatusCurrent ? attachmentStatus.errors : [];
+  const attachmentsRef = useRef(attachments);
+  const changeAttachmentsRef = useRef(onAttachmentsChange);
+  useLayoutEffect(() => {
+    return () => attachmentPreparation.invalidate();
+  }, [attachmentPreparation, activeThreadId, attachmentContextKey]);
+  // Async preparation must merge into the latest committed composer, not its starting snapshot.
+  useLayoutEffect(() => {
+    attachmentsRef.current = attachments;
+    changeAttachmentsRef.current = onAttachmentsChange;
+  }, [attachments, onAttachmentsChange]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const skillPromptEditor = useMemo(() => createSkillPromptEditor(), []);
   const skillCompletionListboxId = useId();
@@ -223,7 +248,7 @@ export function Composer({
     },
     [clearRecordingError, recordingError],
   );
-  const canSubmit = prompt.trim().length > 0 || attachments.length > 0;
+  const canSubmit = preparingAttachments === 0 && (prompt.trim().length > 0 || attachments.length > 0);
   const activeQueueKey = activeThreadId || "new-thread";
   const hasQueuedPrompts = queuedPrompts.length > 0;
 
@@ -231,11 +256,17 @@ export function Composer({
     setPrompt(nextPrompt);
     setCaretPosition(nextPrompt.length);
     writeSkillPromptEditorText(skillPromptEditor, nextPrompt, skills, nextPrompt.length);
-    onAttachmentsChange(nextAttachments);
+    changeAttachments(nextAttachments);
   }
 
   useEffect(() => {
-    if (queueBusy || drainingQueuedPromptId || queuedPrompts.length === 0) {
+    if (
+      queueBusy ||
+      attachmentPreparation.pending > 0 ||
+      preparingAttachments > 0 ||
+      drainingQueuedPromptId ||
+      queuedPrompts.length === 0
+    ) {
       return;
     }
     const nextQueuedPrompt = queuedPrompts[0];
@@ -261,6 +292,8 @@ export function Composer({
     onRemoveQueuedPrompt,
     onSend,
     queueBusy,
+    preparingAttachments,
+    attachmentPreparation,
     queuedPrompts,
   ]);
 
@@ -270,7 +303,7 @@ export function Composer({
     setPrompt(item.prompt);
     setCaretPosition(item.prompt.length);
     writeSkillPromptEditorText(skillPromptEditor, item.prompt, skills, item.prompt.length);
-    onAttachmentsChange([...item.attachments]);
+    changeAttachments([...item.attachments]);
     skillPromptEditor.focus();
   }
 
@@ -280,6 +313,7 @@ export function Composer({
   }
 
   async function steerQueuedPrompt(item: QueuedPrompt): Promise<void> {
+    if (attachmentPreparation.pending > 0) return;
     try {
       await onSteer(item.prompt, item.attachments);
       setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
@@ -315,15 +349,16 @@ export function Composer({
   });
 
   async function submit(): Promise<void> {
+    if (attachmentPreparation.pending > 0) return;
     const value = prompt.trim();
-    if (!value && attachments.length === 0) {
+    if (!value && attachmentsRef.current.length === 0) {
       return;
     }
-    const submittedAttachments = attachments;
+    const submittedAttachments = attachmentsRef.current;
     setPrompt("");
     setCaretPosition(0);
     writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
-    onAttachmentsChange([]);
+    changeAttachments([]);
     if (queueBusy) {
       onQueuePrompt(activeQueueKey, value, submittedAttachments);
       return;
@@ -337,11 +372,12 @@ export function Composer({
   }
 
   async function submitCommand(invocation: CommandInvocation): Promise<void> {
+    if (attachmentPreparation.pending > 0) return;
     const commandText = commandInvocationText(invocation);
     setPrompt("");
     setCaretPosition(0);
     writeSkillPromptEditorText(skillPromptEditor, "", skills, 0);
-    onAttachmentsChange([]);
+    changeAttachments([]);
     if (queueBusy) {
       onQueuePrompt(activeQueueKey, commandText, []);
       return;
@@ -380,25 +416,17 @@ export function Composer({
     }
   }
 
+  function changeAttachments(nextAttachments: DesktopAttachment[]): void {
+    attachmentsRef.current = nextAttachments;
+    changeAttachmentsRef.current(nextAttachments);
+  }
+
   function addAttachments(nextAttachments: DesktopAttachment[]): void {
-    const seen = new Set(attachments.map((attachment) => attachment.path));
-    onAttachmentsChange([
-      ...attachments,
-      ...nextAttachments.flatMap((attachment) =>
-        attachment.path && !seen.has(attachment.path)
-          ? [
-              {
-                ...attachment,
-                id: attachment.id || crypto.randomUUID(),
-              },
-            ]
-          : [],
-      ),
-    ]);
+    changeAttachments(mergeAttachments(attachmentsRef.current, nextAttachments));
   }
 
   function removeAttachment(id: string): void {
-    onAttachmentsChange(attachments.filter((attachment) => attachment.id !== id));
+    changeAttachments(attachmentsRef.current.filter((attachment) => attachment.id !== id));
   }
 
   function attachSketch(attachment: DesktopAttachment): void {
@@ -414,32 +442,72 @@ export function Composer({
     });
   }
 
-  function attachFiles(files: FileList | File[]): void {
-    const resolved = window.roderDesktop
-      .resolveDroppedFiles(Array.from(files))
-      .map((file) => ({ ...file, id: crypto.randomUUID(), source: "file" as const }));
-    addAttachments(resolved);
+  async function attachFiles(files: FileList | File[]): Promise<void> {
+    await prepareAttachments(Array.from(files), async (source) => {
+      const [file] = window.roderDesktop.resolveDroppedFiles([source]);
+      if (!file) throw new Error(`Could not attach ${source.name}: no local file path`);
+      let imageUrl: string | undefined;
+      if (attachmentImageType(source)) {
+        imageUrl = await imageFileToPngDataUrl(source);
+      }
+      return {
+        ...file,
+        type: imageUrl ? "image/png" : file.type,
+        id: crypto.randomUUID(),
+        imageUrl,
+        source: "file" as const,
+      };
+    });
   }
 
   async function attachPastedImages(files: File[]): Promise<void> {
-    const resolved = await Promise.all(
-      files.map(async (file) => {
-        const dataUrl = await imageFileToPngDataUrl(file);
-        const saved = await window.roderDesktop.clipboardSaveImage(dataUrl);
-        return {
-          ...saved,
-          name: file.name || saved.name,
-          id: crypto.randomUUID(),
-          imageUrl: dataUrl,
-          source: "clipboard" as const,
-        };
-      }),
-    );
-    addAttachments(resolved);
+    await prepareAttachments(files, async (file) => {
+      const dataUrl = await imageFileToPngDataUrl(file);
+      const saved = await window.roderDesktop.clipboardSaveImage(dataUrl);
+      return {
+        ...saved,
+        name: file.name || saved.name,
+        id: crypto.randomUUID(),
+        imageUrl: dataUrl,
+        source: "clipboard" as const,
+      };
+    });
+  }
+
+  async function prepareAttachments(files: File[], prepare: (file: File) => Promise<DesktopAttachment>): Promise<void> {
+    const work = attachmentPreparation.prepare(files, async (file) => {
+      try {
+        return await prepare(file);
+      } catch (error) {
+        throw new Error(
+          `${file.name || "Image"}: ${error instanceof Error ? error.message : "Could not prepare attachment"}`,
+        );
+      }
+    });
+    setAttachmentStatus({
+      context: attachmentContext,
+      generation: attachmentPreparation.generation,
+      pending: attachmentPreparation.pending,
+      errors: [],
+    });
+    const result = await work;
+    if (!result) return;
+    addAttachments(result.attachments);
+    setAttachmentStatus((status) => ({
+      context: attachmentContext,
+      generation: attachmentPreparation.generation,
+      pending: attachmentPreparation.pending,
+      errors: [
+        ...(status.context === attachmentContext && status.generation === attachmentPreparation.generation
+          ? status.errors
+          : []),
+        ...result.errors,
+      ],
+    }));
   }
 
   function handlePaste(event: React.ClipboardEvent<HTMLDivElement>): void {
-    const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+    const imageFiles = Array.from(event.clipboardData.files).filter((file) => attachmentImageType(file));
     if (imageFiles.length === 0) {
       return;
     }
@@ -451,7 +519,7 @@ export function Composer({
     event.preventDefault();
     setDragActive(false);
     if (event.dataTransfer.files.length > 0) {
-      attachFiles(event.dataTransfer.files);
+      void attachFiles(event.dataTransfer.files);
     }
   }
 
@@ -555,7 +623,7 @@ export function Composer({
             className="hidden"
             onChange={(event) => {
               if (event.currentTarget.files) {
-                attachFiles(event.currentTarget.files);
+                void attachFiles(event.currentTarget.files);
               }
               event.currentTarget.value = "";
             }}
@@ -574,6 +642,18 @@ export function Composer({
             onPaste={handlePaste}
           />
           {recordingError && <div className="text-sm text-destructive px-1 pb-2">{recordingError}</div>}
+          {preparingAttachments > 0 && (
+            <div role="status" className="px-1 pb-2 text-sm text-muted-foreground">
+              Preparing {preparingAttachments} attachment{preparingAttachments === 1 ? "" : "s"}...
+            </div>
+          )}
+          {attachmentErrors.length > 0 && (
+            <div role="alert" className="px-1 pb-2 text-sm text-destructive">
+              {attachmentErrors.map((error, index) => (
+                <div key={`${index}:${error}`}>{error}</div>
+              ))}
+            </div>
+          )}
           <div className="mt-1 flex min-h-8 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <DropdownMenu>

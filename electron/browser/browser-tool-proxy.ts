@@ -271,8 +271,10 @@ async function execute(browser: BrowserManager, toolName: string, input: JsonObj
       });
     case "browser_evaluate":
       return browser.evaluate(requiredString(input, "expression"));
-    case "browser_screenshot":
-      return browser.captureScreenshot();
+    case "browser_screenshot": {
+      const capture = await browser.captureScreenshot();
+      return { name: capture.name, path: capture.path, type: capture.type, size: capture.size };
+    }
     default:
       throw new Error(`Unknown desktop browser tool: ${toolName}`);
   }
