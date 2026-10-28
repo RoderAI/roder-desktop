@@ -117,6 +117,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-channel"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "924ed96dd52d1b75e9c1a3e6275715fd320f5f9439fb5a4a11fa51f4221158d2"
+dependencies = [
+ "concurrent-queue",
+ "event-listener-strategy",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -215,6 +227,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
+name = "base64-simd"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "339abbe78e73178762e23bea9dfd08e697eb3f3301cd4be981c0f78ba5859195"
+dependencies = [
+ "outref",
+ "vsimd",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -251,6 +273,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
+name = "bitvec"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddcec3d12c579d40898fe0a9a358a803c23e9c52ca3c425707f81c9436211837"
+dependencies = [
+ "funty",
+ "radium",
+ "tap",
+ "wyz",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -270,27 +304,29 @@ dependencies = [
 
 [[package]]
 name = "boa_ast"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6339a700715bda376f5ea65c76e8fe8fc880930d8b0638cea68e7f3da6538e0a"
+checksum = "9221b0a090572b4a118b46c5874c0781fe4bc9546b85f0a615b8bfb609ca4ed7"
 dependencies = [
  "bitflags 2.13.2",
  "boa_interner",
  "boa_macros",
  "boa_string",
  "indexmap 2.14.2",
- "num-bigint",
+ "num-bigint 0.5.1",
  "rustc-hash",
+ "strum 0.28.0",
 ]
 
 [[package]]
 name = "boa_engine"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1521be326f8a5c8887e95d4ce7f002917a002a23f7b93b9a6a2bf50ed4157824"
+checksum = "5d6aaf7fdc4299df68adb67e1a5440a51d34630a1f5271b9698fd74bc97b60d9"
 dependencies = [
  "aligned-vec",
  "arrayvec",
+ "async-channel",
  "bitflags 2.13.2",
  "boa_ast",
  "boa_gc",
@@ -304,21 +340,21 @@ dependencies = [
  "dashmap",
  "dynify",
  "fast-float2",
- "futures-channel",
  "futures-concurrency",
  "futures-lite",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "icu_normalizer",
  "indexmap 2.14.2",
  "intrusive-collections",
- "itertools",
- "num-bigint",
+ "itertools 0.15.0",
+ "num-bigint 0.5.1",
  "num-integer",
  "num-traits",
  "num_enum",
- "paste",
+ "oneshot",
+ "pastey",
  "portable-atomic",
- "rand 0.9.5",
+ "rand 0.10.3",
  "regress",
  "rustc-hash",
  "ryu-js",
@@ -335,51 +371,52 @@ dependencies = [
 
 [[package]]
 name = "boa_gc"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17323a98cf2e631afacf1a6d659c1212c48a68bacfa85afab0a66ade80582e51"
+checksum = "af82119558ab1002d1978c8459b53a3ebb506177d29a3aca37c07c1777b1d966"
 dependencies = [
+ "arrayvec",
  "boa_macros",
  "boa_string",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "thin-vec",
 ]
 
 [[package]]
 name = "boa_interner"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20510b8b02bcde9b0a01cf34c0c308c56156503d1d91cdab4c8cfbd292b747ea"
+checksum = "317c631e791f5cb7d0017e43c0a758b0eaffd40c34c4c360e2a6be7752b78cd1"
 dependencies = [
  "boa_gc",
  "boa_macros",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "indexmap 2.14.2",
  "once_cell",
- "phf 0.13.1",
+ "phf 0.14.0",
  "rustc-hash",
  "static_assertions",
 ]
 
 [[package]]
 name = "boa_macros"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5822cb4f146d243060e588bc5a5f2e709683fdad3d7111f42c48e6b5c921d23d"
+checksum = "b882fd440dc0f4b7441367cf89567bb077920356750c9a76a16c002d8ec2fa5c"
 dependencies = [
  "cfg-if",
  "cow-utils",
  "proc-macro2",
  "quote",
- "syn 2.0.119",
- "synstructure 0.13.2",
+ "syn 3.0.9",
+ "synstructure 0.14.0",
 ]
 
 [[package]]
 name = "boa_parser"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35bd957fa9fa93e3a001a8aba5a5cd40c2bbfde486378be4c4b472fd304aaddb"
+checksum = "641e81b3c8cbb7a2140547fb3ea534e9edf210b4e8c920b5fa864a919e11fbcf"
 dependencies = [
  "bitflags 2.13.2",
  "boa_ast",
@@ -387,7 +424,7 @@ dependencies = [
  "boa_macros",
  "fast-float2",
  "icu_properties",
- "num-bigint",
+ "num-bigint 0.5.1",
  "num-traits",
  "regress",
  "rustc-hash",
@@ -395,13 +432,13 @@ dependencies = [
 
 [[package]]
 name = "boa_string"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca2da1d7f4a76fd9040788a122f0d807910800a7b86f5952e9244848c36511de"
+checksum = "30bf86c2bcff5bf2547acbfc516c5d3108ca527cb131511d749bf6fbef762c0e"
 dependencies = [
  "fast-float2",
  "itoa",
- "paste",
+ "pastey",
  "rustc-hash",
  "ryu-js",
  "static_assertions",
@@ -605,6 +642,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "concurrent-queue"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -686,9 +732,9 @@ checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
 name = "croner"
-version = "3.0.1"
+version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4aa42bcd3d846ebf66e15bd528d1087f75d1c6c1c66ebff626178a106353c576"
+checksum = "26d09284075f5c87675790d1ad74212a7863eb8bdf228cdbd364f08a152fc62d"
 dependencies = [
  "chrono",
  "derive_builder",
@@ -741,7 +787,7 @@ dependencies = [
  "document-features",
  "mio",
  "parking_lot",
- "rustix 1.1.5",
+ "rustix 1.1.6",
  "signal-hook",
  "signal-hook-mio",
  "winapi",
@@ -787,9 +833,9 @@ dependencies = [
 
 [[package]]
 name = "ctutils"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d28fb6aa7dd680b3ffd1a3e64e115c177bdba63c0ae7f9cd48129ff05c4fa0"
+checksum = "fe3e9d21d39e6f39ff46e03d5b621424f88ee23d8a1672c6bfc9ccc7f2da4f6a"
 dependencies = [
  "cmov",
 ]
@@ -929,7 +975,7 @@ dependencies = [
  "asn1-rs",
  "displaydoc",
  "nom",
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-traits",
  "rusticata-macros",
 ]
@@ -1030,9 +1076,9 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "6.0.0"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+checksum = "8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f"
 dependencies = [
  "dirs-sys 0.5.0",
 ]
@@ -1191,6 +1237,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-listener-strategy"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
+dependencies = [
+ "event-listener",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "fallible-iterator"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1315,6 +1371,12 @@ name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
+
+[[package]]
+name = "funty"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "futures"
@@ -1741,7 +1803,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -1755,12 +1817,13 @@ dependencies = [
 
 [[package]]
 name = "icu_collections"
-version = "2.0.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "200072f5d0e3614556f94a9930d5dc3e0662a652823904c3a75dc3b0af7fee47"
+checksum = "fa68d21081c4a05d5a901a1c62add574c77048b6a1c67be3b50ce0b60d4ca513"
 dependencies = [
  "displaydoc",
  "potential_utf",
+ "utf8_iter",
  "yoke",
  "zerofrom",
  "zerovec",
@@ -1774,7 +1837,6 @@ checksum = "25d29b57c17c6528d0dc4c2141cfa2d08200465acb537a3909c8b9b8a4a984c0"
 dependencies = [
  "displaydoc",
  "litemap",
- "serde",
  "tinystr",
  "writeable",
  "zerovec",
@@ -1782,11 +1844,10 @@ dependencies = [
 
 [[package]]
 name = "icu_normalizer"
-version = "2.0.1"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b24a59706036ba941c9476a55cd57b82b77f38a3c667d637ee7cabbc85eaedc"
+checksum = "12f9cf5f235641ed274641dd81c3f28d870e276763d0797aeeab72317b1c646f"
 dependencies = [
- "displaydoc",
  "icu_collections",
  "icu_normalizer_data",
  "icu_properties",
@@ -1799,31 +1860,30 @@ dependencies = [
 
 [[package]]
 name = "icu_normalizer_data"
-version = "2.0.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00210d6893afc98edb752b664b8890f0ef174c8adbb8d0be9710fa66fbbf72d3"
+checksum = "1563da1ed3e0b3bf3d74c9b85917ac9c56464d2f57242270c09c9e752f8021a0"
 
 [[package]]
 name = "icu_properties"
-version = "2.0.2"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5a97b8ac6235e69506e8dacfb2adf38461d2ce6d3e9bd9c94c4cbc3cd4400a4"
+checksum = "7e7ca276ad3145661a65914e6daf131ca5120cd3dcee8f8f3214b8875184a148"
 dependencies = [
  "displaydoc",
  "icu_collections",
  "icu_locale_core",
  "icu_properties_data",
  "icu_provider",
- "potential_utf",
  "zerotrie",
  "zerovec",
 ]
 
 [[package]]
 name = "icu_properties_data"
-version = "2.0.1"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "298459143998310acd25ffe6810ed544932242d3f07083eee1084d83a71bd632"
+checksum = "e590f038c1464a96894fd6d10127e90a8be4509f56ff7ecef851b15cee0b7caa"
 
 [[package]]
 name = "icu_provider"
@@ -1833,13 +1893,21 @@ checksum = "413099315636c588ee8f011190b329b971a09a8fae9d157e01dcae8379468514"
 dependencies = [
  "displaydoc",
  "icu_locale_core",
- "serde",
- "stable_deref_trait",
  "writeable",
  "yoke",
  "zerofrom",
  "zerotrie",
  "zerovec",
+]
+
+[[package]]
+name = "icy_sixel"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bfb5a63225620b59df34a235d1fb56ff7b766909c3212a8ff927511a22b181d"
+dependencies = [
+ "quantette",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -1861,9 +1929,9 @@ dependencies = [
 
 [[package]]
 name = "idna_adapter"
-version = "1.2.1"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3acae9609540aa318d1bc588455225fb2085b9ed0c4f6bd0d9d5bcd86f1a0344"
+checksum = "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
@@ -1903,11 +1971,22 @@ checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
+ "image-webp",
  "moxcms",
  "num-traits",
- "png 0.18.1",
+ "png",
  "zune-core",
  "zune-jpeg",
+]
+
+[[package]]
+name = "image-webp"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3"
+dependencies = [
+ "byteorder-lite",
+ "quick-error",
 ]
 
 [[package]]
@@ -1957,12 +2036,9 @@ dependencies = [
 
 [[package]]
 name = "intrusive-collections"
-version = "0.9.7"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "189d0897e4cbe8c75efedf3502c18c887b05046e59d28404d4d8e46cbc4d1e86"
-dependencies = [
- "memoffset",
-]
+checksum = "4275b20e6057cd7733fd8df8a5a31701e4fe44497dad0f3fa0e1c4fb971506be"
 
 [[package]]
 name = "ipnet"
@@ -1975,6 +2051,15 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -2155,9 +2240,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.38.2"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1d20bef17f513b9b3004532233187769cd072d790971f4e4da0e346eb6401e8"
+checksum = "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3"
 dependencies = [
  "cc",
  "pkg-config",
@@ -2375,6 +2460,16 @@ checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
 dependencies = [
  "num-integer",
  "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0"
+dependencies = [
+ "num-integer",
+ "num-traits",
  "serde",
 ]
 
@@ -2411,6 +2506,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -2460,10 +2556,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "openssl-probe"
+name = "oneshot"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+checksum = "cfe21416a02c693fb9f980befcb230ecc70b0b3d1cc4abf88b9675c4c1457f0c"
+
+[[package]]
+name = "openssl-probe"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e036b411754132fd6b74e94b74e9a13c5cf606fa93d1885c35860d3060820b1"
 
 [[package]]
 name = "option-ext"
@@ -2481,12 +2583,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "5.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f59006ce1e204c30956638535b74d317bca99477b9356dfaec54c37f6f600ab"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "outref"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
+
+[[package]]
 name = "palette"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddeed8580d347d2abf3dcf06a5f0b3dc020258338526b277847cd4248a70fc64"
 dependencies = [
  "approx",
+ "bytemuck",
  "libm",
  "palette_derive",
  "palette_math",
@@ -2543,10 +2661,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.15"
+name = "pastey"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
 
 [[package]]
 name = "pem"
@@ -2566,21 +2684,20 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "pest"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd47a460a9cbc3b3429c7e22bf0d76653e779319bae45a499ca010c9a990bb23"
+checksum = "a8db75153506001cb36ed924f08cadc862eb3f8c4d0d534139f29074769d7660"
 dependencies = [
  "memchr",
- "psm",
- "stacker",
+ "pest_stack_guard",
  "ucd-trie",
 ]
 
 [[package]]
 name = "pest_derive"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "203e46697708f7519ab1608393cf89239cafb46b8e6d08a8ffe359359b11ef44"
+checksum = "20aa17e11fb35664b67d5214a0afac57a360d231b6ec53d6eba0700b27d933b4"
 dependencies = [
  "pest",
  "pest_generator",
@@ -2588,9 +2705,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e84ae6340a458d3d6cfc73cf328cf3cfe90b2484cd0de25eb66aa954615ed4d5"
+checksum = "626ec5afccf44ccbfeb2b232316510bb55b4bf34d891afcb0fb07d2b17d7fe9d"
 dependencies = [
  "pest",
  "pest_meta",
@@ -2601,11 +2718,21 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b57f92f32b3dbce6598fd8f5cdf1f06a6072570b8103fa21728fa9036923e710"
+checksum = "b3f45b6caa65c1b08186832745159c2529994146340a7bf44168095469720f5d"
 dependencies = [
  "pest",
+]
+
+[[package]]
+name = "pest_stack_guard"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97e6cd2217057fa86b6eaa512917e58089d875b957a31e35e7ab729977e0a5f2"
+dependencies = [
+ "psm",
+ "stacker",
 ]
 
 [[package]]
@@ -2629,12 +2756,12 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
+checksum = "010378780309880b08997fae13be7834dba947d36393bd372f2b1556deb2a2f6"
 dependencies = [
- "phf_macros 0.13.1",
- "phf_shared 0.13.1",
+ "phf_macros 0.14.0",
+ "phf_shared 0.14.0",
 ]
 
 [[package]]
@@ -2659,12 +2786,12 @@ dependencies = [
 
 [[package]]
 name = "phf_generator"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135ace3a761e564ec88c03a77317a7c6b80bb7f7135ef2544dbe054243b89737"
+checksum = "aeb62e0959d5a1bebc965f4d15d9e2b7cea002b6b0f5ba8cde6cc26738467100"
 dependencies = [
  "fastrand",
- "phf_shared 0.13.1",
+ "phf_shared 0.14.0",
 ]
 
 [[package]]
@@ -2682,12 +2809,12 @@ dependencies = [
 
 [[package]]
 name = "phf_macros"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812f032b54b1e759ccd5f8b6677695d5268c588701effba24601f6932f8269ef"
+checksum = "5fa8d0ca26d424d27630da600c6624696e7dec8bf7b3b492b383c5dc49e5e085"
 dependencies = [
- "phf_generator 0.13.1",
- "phf_shared 0.13.1",
+ "phf_generator 0.14.0",
+ "phf_shared 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -2713,9 +2840,9 @@ dependencies = [
 
 [[package]]
 name = "phf_shared"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
+checksum = "c6fd9027e2d9319be6349febd1db4e8d02aa544921200c9b777720ac34a3aa89"
 dependencies = [
  "siphasher",
 ]
@@ -2751,19 +2878,6 @@ name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
-
-[[package]]
-name = "png"
-version = "0.17.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82151a2fc869e011c153adc57cf2789ccb8d9906ce52c0b39a6b5697749d7526"
-dependencies = [
- "bitflags 1.3.2",
- "crc32fast",
- "fdeflate",
- "flate2",
- "miniz_oxide 0.8.9",
-]
 
 [[package]]
 name = "png"
@@ -2857,6 +2971,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
 
 [[package]]
+name = "quantette"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba5d37e94c17b8870a5b936001d2845a6782a22ebdb1706c84294eca777f6729"
+dependencies = [
+ "bitvec",
+ "bytemuck",
+ "libm",
+ "num-traits",
+ "ordered-float 5.5.1",
+ "palette",
+ "rand 0.10.3",
+ "rand_xoshiro",
+ "ref-cast",
+ "wide",
+]
+
+[[package]]
+name = "quick-error"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
+
+[[package]]
 name = "quinn"
 version = "0.11.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2935,22 +3073,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "radium"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
+
+[[package]]
 name = "rand"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
- "rand_core 0.6.4",
-]
-
-[[package]]
-name = "rand"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
-dependencies = [
+ "libc",
  "rand_chacha",
- "rand_core 0.9.5",
+ "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -2966,12 +3102,12 @@ dependencies = [
 
 [[package]]
 name = "rand_chacha"
-version = "0.9.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
- "rand_core 0.9.5",
+ "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -2979,14 +3115,8 @@ name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
-
-[[package]]
-name = "rand_core"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
 dependencies = [
- "getrandom 0.3.4",
+ "getrandom 0.2.17",
 ]
 
 [[package]]
@@ -3000,6 +3130,15 @@ name = "rand_pcg"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caa0f4137e1c0a72f4c651489402276c8e8e1cf081f3b0ba156d2cbeef09e86a"
+dependencies = [
+ "rand_core 0.10.1",
+]
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "662effc7698e08ea324d3acccf8d9d7f7bf79b9785e270a174ea36e56900c91d"
 dependencies = [
  "rand_core 0.10.1",
 ]
@@ -3030,7 +3169,7 @@ dependencies = [
  "compact_str",
  "critical-section",
  "hashbrown 0.17.1",
- "itertools",
+ "itertools 0.14.0",
  "kasuari",
  "lru",
  "palette",
@@ -3052,6 +3191,24 @@ dependencies = [
  "crossterm",
  "instability",
  "ratatui-core",
+]
+
+[[package]]
+name = "ratatui-image"
+version = "11.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9593d10c61ec2007f429d1fafc4f4a19fecdbae4d06b531a2d505227fb82f5ea"
+dependencies = [
+ "base64-simd",
+ "flate2",
+ "icy_sixel",
+ "image",
+ "rand 0.8.8",
+ "ratatui",
+ "rustix 0.38.44",
+ "self_cell",
+ "thiserror 1.0.69",
+ "windows",
 ]
 
 [[package]]
@@ -3095,7 +3252,7 @@ dependencies = [
  "hashbrown 0.17.1",
  "indoc",
  "instability",
- "itertools",
+ "itertools 0.14.0",
  "line-clipping",
  "ratatui-core",
  "serde",
@@ -3200,11 +3357,10 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "regress"
-version = "0.10.5"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2057b2325e68a893284d1538021ab90279adac1139957ca2a74426c6f118fb48"
+checksum = "32eef8b209c3c1c15dbad02c1f30f9539f00dc7253e0cbcdaae442a50a09d7c1"
 dependencies = [
- "hashbrown 0.16.1",
  "memchr",
 ]
 
@@ -3268,13 +3424,13 @@ dependencies = [
 
 [[package]]
 name = "roder"
-version = "0.3.17"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "agent-client-protocol-schema",
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "crossterm",
  "ratatui",
  "roder-api",
@@ -3318,12 +3474,12 @@ dependencies = [
 
 [[package]]
 name = "roder-api"
-version = "0.2.12"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "futures",
  "semver",
  "serde",
@@ -3335,7 +3491,7 @@ dependencies = [
 [[package]]
 name = "roder-api-transcript"
 version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "serde",
@@ -3345,14 +3501,14 @@ dependencies = [
 
 [[package]]
 name = "roder-app-server"
-version = "0.6.6"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.7.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "agent-client-protocol-schema",
  "anyhow",
  "async-trait",
- "base64 0.22.1",
- "dirs 6.0.0",
+ "base64 0.23.1",
+ "dirs 7.0.0",
  "futures",
  "httparse",
  "if-addrs",
@@ -3372,6 +3528,7 @@ dependencies = [
  "roder-dynamic-workflows",
  "roder-evals",
  "roder-ext-kimi-code",
+ "roder-ext-mcp",
  "roder-ext-webwright",
  "roder-extension-host",
  "roder-protocol",
@@ -3395,8 +3552,8 @@ dependencies = [
 
 [[package]]
 name = "roder-automations"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3412,8 +3569,8 @@ dependencies = [
 
 [[package]]
 name = "roder-code-index"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "ignore",
@@ -3427,12 +3584,12 @@ dependencies = [
 
 [[package]]
 name = "roder-codex-auth"
-version = "0.1.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.2.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
- "dirs 6.0.0",
+ "base64 0.23.1",
+ "dirs 7.0.0",
  "rand 0.10.3",
  "reqwest",
  "roder-api",
@@ -3444,8 +3601,8 @@ dependencies = [
 
 [[package]]
 name = "roder-commands"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3459,11 +3616,11 @@ dependencies = [
 
 [[package]]
 name = "roder-config"
-version = "0.2.4"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "reqwest",
  "roder-api",
  "roder-skills",
@@ -3478,8 +3635,8 @@ dependencies = [
 
 [[package]]
 name = "roder-context"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3494,12 +3651,12 @@ dependencies = [
 
 [[package]]
 name = "roder-core"
-version = "0.3.11"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "futures",
  "regex",
  "roder-api",
@@ -3525,8 +3682,8 @@ dependencies = [
 
 [[package]]
 name = "roder-dynamic-workflows"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3542,7 +3699,7 @@ dependencies = [
 [[package]]
 name = "roder-edit-core"
 version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "serde",
@@ -3553,8 +3710,8 @@ dependencies = [
 
 [[package]]
 name = "roder-evals"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3575,8 +3732,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-anthropic"
-version = "0.2.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3594,8 +3751,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-browser-use"
-version = "0.1.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.2.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3611,8 +3768,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-chrome"
-version = "0.2.4"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3630,8 +3787,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-claude-code"
-version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3647,8 +3804,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-codex-backend"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3660,13 +3817,13 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-cua"
-version = "0.1.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.2.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
- "png 0.17.16",
+ "base64 0.23.1",
+ "png",
  "roder-api",
  "roder-config",
  "semver",
@@ -3678,15 +3835,15 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-cursor"
-version = "0.2.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "futures",
  "reqwest",
  "roder-api",
@@ -3699,8 +3856,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-deepseek"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3712,8 +3869,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-disk-context"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3724,8 +3881,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-firecrawl-search"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3739,8 +3896,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-fireworks"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3751,8 +3908,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-fork-rift"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3765,8 +3922,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-gemini"
-version = "0.2.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3781,8 +3938,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-git"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3795,8 +3952,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-github-review"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3812,8 +3969,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-google-embeddings"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3826,12 +3983,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-google-images"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "reqwest",
  "roder-api",
  "semver",
@@ -3842,12 +3999,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-google-speech"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "reqwest",
  "roder-api",
  "semver",
@@ -3858,8 +4015,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-honcho"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3876,8 +4033,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-inference-router"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3889,12 +4046,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-jev"
-version = "0.4.5"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.5.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "futures",
  "iana-time-zone",
@@ -3916,15 +4073,17 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-jsonl-thread-store"
-version = "0.2.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
  "roder-api",
+ "rusqlite",
  "semver",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "time",
  "tokio",
  "uuid",
@@ -3932,12 +4091,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-kimi-code"
-version = "0.2.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "reqwest",
  "roder-api",
  "roder-ext-openai-chat-completions",
@@ -3950,8 +4109,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-knowledge-md"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3968,8 +4127,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-mcp"
-version = "0.2.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3984,8 +4143,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-memory"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4002,8 +4161,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-mysql-session"
-version = "0.4.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.5.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4020,8 +4179,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-notify-desktop"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4031,8 +4190,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-notify-terminal"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4043,8 +4202,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-openai-chat-completions"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4060,8 +4219,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-openai-embeddings"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4074,12 +4233,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-openai-images"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "reqwest",
  "roder-api",
  "semver",
@@ -4090,14 +4249,14 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-openai-responses"
-version = "0.2.13"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
  "bytes",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "futures",
  "httpdate",
  "reqwest",
@@ -4112,8 +4271,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-openai-speech"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4126,13 +4285,13 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-opencode"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "futures",
  "reqwest",
  "roder-api",
@@ -4145,8 +4304,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-openrouter"
-version = "0.2.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4157,8 +4316,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-parallel-search"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4172,8 +4331,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-perplexity-search"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4187,8 +4346,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-plan-mode"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4201,13 +4360,13 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-poolside"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "futures",
  "reqwest",
  "roder-api",
@@ -4220,8 +4379,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-postgres-session"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4238,8 +4397,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-process-host"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4255,8 +4414,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-roder-cloud"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4272,8 +4431,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-blaxel"
-version = "0.2.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4289,8 +4448,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-cloudflare"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4300,8 +4459,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-daytona"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4311,8 +4470,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-docker"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4324,8 +4483,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-e2b"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4335,8 +4494,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-hosted-common"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4350,8 +4509,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-modal"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4361,8 +4520,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-runloop"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4372,8 +4531,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-sprites"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4392,8 +4551,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-unix-local"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4405,8 +4564,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-vercel"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4416,8 +4575,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-subagents"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4433,8 +4592,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-synthetic"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4448,8 +4607,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-synthetic-search"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4463,8 +4622,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-task-ledger"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4477,8 +4636,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-task-process"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4493,8 +4652,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-tavily-search"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4508,8 +4667,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-verification"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4521,13 +4680,13 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-vertex"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "futures",
  "reqwest",
@@ -4542,8 +4701,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-web-search"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4560,8 +4719,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-webwright"
-version = "0.2.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4576,8 +4735,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-xai"
-version = "0.2.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4590,12 +4749,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-xiaomi-mimo"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "futures",
  "reqwest",
  "roder-api",
@@ -4609,12 +4768,12 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-zeroentropy-embeddings"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "reqwest",
  "roder-api",
  "semver",
@@ -4624,8 +4783,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-zerolang"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4639,12 +4798,12 @@ dependencies = [
 
 [[package]]
 name = "roder-extension-host"
-version = "0.6.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.7.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "futures",
  "reqwest",
  "roder-api",
@@ -4726,8 +4885,8 @@ dependencies = [
 
 [[package]]
 name = "roder-protocol"
-version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4740,8 +4899,8 @@ dependencies = [
 
 [[package]]
 name = "roder-roadmap"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4754,8 +4913,8 @@ dependencies = [
 
 [[package]]
 name = "roder-sandbox"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4767,7 +4926,7 @@ dependencies = [
 [[package]]
 name = "roder-search"
 version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "ignore",
  "regex",
@@ -4777,8 +4936,8 @@ dependencies = [
 
 [[package]]
 name = "roder-skills"
-version = "0.2.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4791,12 +4950,12 @@ dependencies = [
 
 [[package]]
 name = "roder-supergrok-auth"
-version = "0.1.4"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.2.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
- "dirs 6.0.0",
+ "base64 0.23.1",
+ "dirs 7.0.0",
  "rand 0.10.3",
  "reqwest",
  "roder-api",
@@ -4809,8 +4968,8 @@ dependencies = [
 
 [[package]]
 name = "roder-tasks"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4824,7 +4983,7 @@ dependencies = [
 [[package]]
 name = "roder-theme"
 version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "ratatui",
  "thiserror 2.0.21",
@@ -4832,13 +4991,13 @@ dependencies = [
 
 [[package]]
 name = "roder-tools"
-version = "0.2.4"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
- "dirs 6.0.0",
+ "base64 0.23.1",
+ "dirs 7.0.0",
  "globset",
  "ignore",
  "libc",
@@ -4854,17 +5013,19 @@ dependencies = [
 
 [[package]]
 name = "roder-tui"
-version = "0.3.6"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.4.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "crossterm",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "futures",
  "ignore",
+ "image",
  "ratatui",
+ "ratatui-image",
  "roder-api",
  "roder-api-transcript",
  "roder-app-server",
@@ -4885,8 +5046,8 @@ dependencies = [
 
 [[package]]
 name = "roder-usage-analytics"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+version = "0.3.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4901,7 +5062,7 @@ dependencies = [
 [[package]]
 name = "roder-web-search"
 version = "0.1.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.3.17#58216c520b3ed2d33ce139a8067210312a60bee2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.1#defa3b5fbd7ed5388aea9a67599ab0a534d44fb2"
 dependencies = [
  "anyhow",
  "reqwest",
@@ -4912,19 +5073,18 @@ dependencies = [
 
 [[package]]
 name = "rsqlite-vfs"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
+checksum = "353b74f9810d5b085b6c42c9d86a5f0fdb795553235cdd48753b32e3809d18a7"
 dependencies = [
- "hashbrown 0.16.1",
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "rusqlite"
-version = "0.40.2"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23f2a97da3e3873c73cb2a2e71b35c40ff95e0b1eefa8d72d8499a6928c3b5b3"
+checksum = "9c026b4444579e8d754556c6c75d040d69c4a44283cdb648ab8a8d5965c2cfa8"
 dependencies = [
  "bitflags 2.13.2",
  "fallible-iterator",
@@ -4974,9 +5134,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "1.1.5"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891efababe418670775f199f0d233d84843c227a0949a883ce15b37c78d6629d"
+checksum = "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa"
 dependencies = [
  "bitflags 2.13.2",
  "errno",
@@ -5089,6 +5249,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04d056b875a9d2e6cb9a61d127afee9ac5999b9f87bcb32079d1318e505be714"
 
 [[package]]
+name = "safe_arch"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42c6efa15875e6ecb39ca61fb0b0c1a40b84fac5a5ffe71eef7d1000c8eb3f5f"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5171,6 +5340,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "self_cell"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab42ca02749e120097e328d91d415325bdf43b1c72c4c8badf37375fe40a813"
 
 [[package]]
 name = "semver"
@@ -5307,17 +5482,6 @@ dependencies = [
 
 [[package]]
 name = "sha1"
-version = "0.10.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a978451301f4db1d02937a4ab3ccce137717b81826e79b7d49ffe3244a13c3b8"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.2.17",
- "digest 0.10.7",
-]
-
-[[package]]
-name = "sha1"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
@@ -5416,9 +5580,9 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "similar"
-version = "3.2.0"
+version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f66ca1f7aca2474dc10c942eb22feffc897735f54cd1db90138c2fddb490987"
+checksum = "d2f8bec09ae8fae0f4f265a4559a9334be3929d8504e9b536df0a41302bd1733"
 dependencies = [
  "bstr",
 ]
@@ -5462,14 +5626,12 @@ dependencies = [
 
 [[package]]
 name = "sqlite-wasm-rs"
-version = "0.5.5"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc3efc0da82635d7e1ced0053bbbfa8c7ab9645d0bf36ceb4f7127bb85315d75"
+checksum = "36bd8e29bf08189a005b2df1df99823aa0861cabe9044e5f31ed54ca292ee618"
 dependencies = [
  "cc",
- "js-sys",
  "rsqlite-vfs",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -5526,7 +5688,7 @@ dependencies = [
  "log",
  "percent-encoding",
  "serde",
- "sha1 0.11.0",
+ "sha1",
  "sha2 0.11.1",
  "sqlx-core",
  "thiserror 2.0.21",
@@ -5777,7 +5939,7 @@ checksum = "9048a889effe34a5cddee0af7f53285198b16dca3be510858d38dfdb3e62a04e"
 dependencies = [
  "bitflags 2.13.2",
  "parking_lot",
- "rustix 1.1.5",
+ "rustix 1.1.6",
  "signal-hook",
  "windows-sys 0.61.2",
 ]
@@ -5824,7 +5986,7 @@ dependencies = [
  "nix 0.29.0",
  "num-derive",
  "num-traits",
- "ordered-float",
+ "ordered-float 4.6.0",
  "pest",
  "pest_derive",
  "phf 0.11.3",
@@ -5930,7 +6092,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abc840c238154d58f9e86b2792261edfde565a17696e1cda1a449de27979801a"
 dependencies = [
  "displaydoc",
- "serde_core",
  "zerovec",
 ]
 
@@ -5990,9 +6151,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.29.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f72a05e828585856dacd553fba484c242c46e391fb0e58917c942ee9202915c"
+checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
 dependencies = [
  "futures-util",
  "log",
@@ -6154,9 +6315,9 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tui-textarea-2"
-version = "0.11.0"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db511c6000af883f4140245239ff98ff212e32e8d2f0e6cfc9f5acc018f2b800"
+checksum = "fdf2865f7f32ae9e779f6185986fd920fa6b00ac878e906927ec7e78d32316ed"
 dependencies = [
  "crossterm",
  "portable-atomic",
@@ -6168,19 +6329,19 @@ dependencies = [
 
 [[package]]
 name = "tungstenite"
-version = "0.29.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c01152af293afb9c7c2a57e4b559c5620b421f6d133261c60dd2d0cdb38e6b8"
+checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
 dependencies = [
  "bytes",
  "data-encoding",
  "http",
  "httparse",
  "log",
- "rand 0.9.5",
+ "rand 0.10.3",
  "rustls",
  "rustls-pki-types",
- "sha1 0.10.7",
+ "sha1",
  "thiserror 2.0.21",
 ]
 
@@ -6241,7 +6402,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16b380a1238663e5f8a691f9039c73e1cdae598a30e9855f541d29b08b53e9a5"
 dependencies = [
- "itertools",
+ "itertools 0.14.0",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -6330,6 +6491,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vsimd"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c3082ca00d5a5ef149bb8b555a72ae84c9c59f7250f013ac822ac2e49b19c64"
 
 [[package]]
 name = "vtparse"
@@ -6532,7 +6699,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f2ab60e120fd6eaa68d9567f3226e876684639d22a4219b313ff69ec0ccd5ac"
 dependencies = [
  "log",
- "ordered-float",
+ "ordered-float 4.6.0",
  "strsim",
  "thiserror 1.0.69",
  "wezterm-dynamic-derive",
@@ -6590,6 +6757,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "626c4bac6755d76ffc12cb01b2eac751db1996b9e0041de9aa02c8c211ddc82c"
 
 [[package]]
+name = "wide"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d920ac99c3c8edce110cb8d07dbb324d6d026011dce85b1e9355b70f0adacc4f"
+dependencies = [
+ "bytemuck",
+ "safe_arch",
+]
+
+[[package]]
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6621,16 +6798,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
+name = "windows"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
+dependencies = [
+ "windows-core 0.58.0",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
+dependencies = [
+ "windows-implement 0.58.0",
+ "windows-interface 0.58.0",
+ "windows-result 0.2.0",
+ "windows-strings 0.1.0",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
 name = "windows-core"
 version = "0.62.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
 dependencies = [
- "windows-implement",
- "windows-interface",
+ "windows-implement 0.60.2",
+ "windows-interface 0.59.3",
  "windows-link",
- "windows-result",
- "windows-strings",
+ "windows-result 0.4.1",
+ "windows-strings 0.5.1",
+]
+
+[[package]]
+name = "windows-implement"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bbd5b46c938e506ecbce286b6628a02171d56153ba733b6c741fc627ec9579b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -6638,6 +6849,17 @@ name = "windows-implement"
 version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "windows-interface"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6668,8 +6890,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02752bf7fbdcce7f2a27a742f798510f3e5ad88dbe84871e5168e2120c3d5720"
 dependencies = [
  "windows-link",
- "windows-result",
- "windows-strings",
+ "windows-result 0.4.1",
+ "windows-strings 0.5.1",
+]
+
+[[package]]
+name = "windows-result"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d1043d8214f791817bab27572aaa8af63732e11bf84aa21a45a78d6c317ae0e"
+dependencies = [
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -6679,6 +6910,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "windows-strings"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd9b125c486025df0eabcb585e62173c6c9eddcec5d117d3b6e8c30e2ee4d10"
+dependencies = [
+ "windows-result 0.2.0",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -6881,6 +7122,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
+name = "wyz"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
+dependencies = [
+ "tap",
+]
+
+[[package]]
 name = "x509-parser"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6905,7 +7155,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
- "rustix 1.1.5",
+ "rustix 1.1.6",
 ]
 
 [[package]]
@@ -6997,7 +7247,6 @@ dependencies = [
  "displaydoc",
  "yoke",
  "zerofrom",
- "zerovec",
 ]
 
 [[package]]
@@ -7006,7 +7255,6 @@ version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f58a2799cfe9a1670c7ea8edbd52ef8edb93cb37a7f83bf31ba9e35d9dae6a40"
 dependencies = [
- "serde",
  "yoke",
  "zerofrom",
  "zerovec-derive",

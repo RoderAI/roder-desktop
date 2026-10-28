@@ -83,3 +83,25 @@ test("hover previews preserve the message heading, paragraphs, and list indentat
   });
   expect(transcriptNavigationPreview("x".repeat(2_000)).title).toHaveLength(640);
 });
+
+test("subagent updates have readable navigation previews instead of user-message protocol headers", () => {
+  const rows = buildTranscriptRows({
+    messages: [
+      {
+        id: "mailbox",
+        threadId: "thread",
+        role: "user",
+        status: "complete",
+        text: "Message Type: MESSAGE\nTask name: /root\nSender: /root/cloud_review\nPayload:\nRouting is verified.",
+      },
+    ],
+  });
+  expect(buildTranscriptNavigation(rows)).toEqual([
+    {
+      id: "mailbox",
+      role: "system",
+      preview: "Cloud review: Routing is verified.",
+      rowIndex: 0,
+    },
+  ]);
+});

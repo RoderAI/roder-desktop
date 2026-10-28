@@ -151,6 +151,9 @@ export type RoderThread = {
   modelProvider: string;
   model: string;
   selectionMode?: ModelSelectionMode | null;
+  parentThreadId?: string | null;
+  workspaceFork?: unknown;
+  usage?: RoderTokenUsage | null;
   createdAt: number;
   updatedAt: number;
   status: {
@@ -161,6 +164,12 @@ export type RoderThread = {
   workspaceId?: string | null;
   rootId?: string | null;
   cwd: string;
+  runner?: {
+    providerId: string;
+    workspace: string;
+    config?: Record<string, unknown>;
+    readRoots?: string[];
+  } | null;
   name?: string | null;
   messageCount?: number | null;
   turns?: RoderTurn[];
@@ -407,17 +416,27 @@ export type ProcessesStopAllResult = {
   results: ProcessesStopResult["result"][];
 };
 
+export type RoderTokenUsage = {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cached_prompt_tokens?: number;
+  cache_creation_prompt_tokens?: number;
+  service_tier?: string | null;
+};
+
 export type RoderTurn = {
   id: string;
   items: RoderItem[];
   itemsView: string;
-  status: "inProgress" | "completed" | "failed";
+  status: "inProgress" | "completed" | "failed" | "interrupted";
   error?: {
     message: string;
   } | null;
   startedAt?: number | null;
   completedAt?: number | null;
   durationMs?: number | null;
+  usage?: RoderTokenUsage | null;
 };
 
 export type RoderItemStatus = "inProgress" | "completed" | "failed";

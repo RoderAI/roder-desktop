@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { savePngDataUrl } from "../attachment-images";
+import { createThreadHistoryService, type ThreadHistoryPage } from "../threads/thread-history";
 import {
   browserProviderFromRequestParams,
   browserToolThreadId,
@@ -38,6 +39,8 @@ import {
 } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
 import { redactSecrets } from "../app-server-redaction";
+import { CloudMachinesService } from "../cloud-machines/service";
+import { cloudMachineThreadParams } from "../cloud-machines/thread-routing";
 import { findClaudeCli } from "../onboarding/claude-cli";
 import { detectEnvironmentProviders } from "../onboarding/environment";
 import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } from "../onboarding/record";
@@ -75,6 +78,9 @@ import { rendererZoomFactor, scaleRendererBounds } from "./renderer-scale";
 import { mainPanelMinWidth, mainWindowMinHeight, mainWindowMinWidth } from "./window-options";
 
 const roder = new RoderAppServerClient();
+const threadHistory = createThreadHistoryService({
+  request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
+});
 let changingImageCredentials = false;
 const terminal = new TerminalManager();
 const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
@@ -765,7 +771,20 @@ function getDesktopAgentTools(): DesktopAgentTools {
 }
 
 async function requestEngine(method: string, params: unknown, enrichPersistentAgentContext = true): Promise<unknown> {
-  if (method === "thread/start") return roder.request(method, getDesktopAgentTools().threadStartParams(params));
+  if (method === "thread/start") {
+    const input = await cloudMachineThreadParams(
+      params,
+      (id) => getCloudMachinesService().runnerFor(id),
+      async (input) => {
+        const result = (await roder.request("workspace/list", {})) as { workspaces: Workspace[] };
+        const workspace = result.workspaces.find((entry) => entry.id === input.workspaceId);
+        const root = workspace?.roots.find((entry) => entry.id === (input.rootId || workspace.defaultRootId));
+        if (!root) throw new Error("Select a workspace before starting a local thread.");
+        return root.path;
+      },
+    );
+    return roder.request(method, getDesktopAgentTools().threadStartParams(input));
+  }
   if (
     method === "turn/start" &&
     enrichPersistentAgentContext &&
@@ -784,8 +803,60 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
   return roder.request(method, params);
 }
 
+let cloudMachinesService: CloudMachinesService | undefined;
+
+function getCloudMachinesService(): CloudMachinesService {
+  return (cloudMachinesService ??= new CloudMachinesService({
+    filePath: join(app.getPath("userData"), "cloud-machines.enc"),
+    encrypt: (value) => safeStorage.encryptString(value),
+    decrypt: (value) => safeStorage.decryptString(value),
+    encryptionAvailable: () =>
+      safeStorage.isEncryptionAvailable() &&
+      (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"),
+  }));
+}
+
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
-  recordAppServerEvent("request", method, redactSecrets(params ?? {}));
+  if (method === "thread/history/read") {
+    const input = params as { threadId?: unknown; before?: unknown; limit?: unknown; maxBytes?: unknown } | null;
+    if (!input || typeof input.threadId !== "string" || !input.threadId) throw new Error("A thread ID is required");
+    if (input.before !== undefined && typeof input.before !== "string") throw new Error("Invalid history cursor");
+    if (input.limit !== undefined && typeof input.limit !== "number") throw new Error("Invalid history page size");
+    if (input.maxBytes !== undefined && typeof input.maxBytes !== "number")
+      throw new Error("Invalid history byte budget");
+    const page = await threadHistory.read({
+      threadId: input.threadId,
+      before: input.before as string | undefined,
+      limit: input.limit as number | undefined,
+      maxBytes: input.maxBytes as number | undefined,
+    });
+    recordAppServerEvent("response", method, {
+      threadId: input.threadId,
+      itemCount: page.thread?.turns?.reduce((count, turn) => count + turn.items.length, 0) ?? 0,
+      hasMore: page.hasMore,
+    });
+    return page;
+  }
+  // Config may contain pasted credentials even when validation later rejects it.
+  recordAppServerEvent(
+    "request",
+    method,
+    method === "desktop/cloud-machines/save" ? "[redacted]" : redactSecrets(params ?? {}),
+  );
+  if (method.startsWith("desktop/cloud-machines/")) {
+    const service = getCloudMachinesService();
+    const input = params && typeof params === "object" ? (params as Record<string, unknown>) : {};
+    if (method === "desktop/cloud-machines/list") return service.list();
+    if (method === "desktop/cloud-machines/save") {
+      const runners = (await roder.request("runners/list", {})) as { providers: { provider_id: string }[] };
+      if (!runners.providers.some((provider) => provider.provider_id === input.providerId)) {
+        throw new Error("This runner provider is not installed in the embedded Roder harness.");
+      }
+      return service.save(input);
+    }
+    if (method === "desktop/cloud-machines/remove" && typeof input.id === "string") return service.remove(input.id);
+    throw new Error("Invalid cloud machine request.");
+  }
   if (method.startsWith("desktop/issues/") || method.startsWith("desktop/projects/")) {
     return getIssuesService().request(method, params ?? {});
   }

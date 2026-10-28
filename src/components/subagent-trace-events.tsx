@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { CircleDot, MessageSquare, Terminal, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MessageContent } from "@/components/message-content";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { roderIpc } from "@/lib/roder-ipc";
+import { cn } from "@/lib/utils";
 import type { SubagentTraceDelta, SubagentTraceSummary } from "@/types/roder";
 
 export function TraceEvents({ trace }: { trace: SubagentTraceSummary }): React.JSX.Element {
@@ -27,14 +30,9 @@ export function TraceEvents({ trace }: { trace: SubagentTraceSummary }): React.J
     void load();
   });
   return (
-    <div className="mx-2 mt-2 max-h-80 overflow-auto rounded-lg bg-muted/30 p-3">
+    <div className="mx-2 mt-2 max-h-80 overflow-auto rounded-lg bg-background px-3 py-1 ring-1 ring-border/70">
       {events.map(({ event, position }) => (
-        <div key={`${event.traceId}:${position}`} className="border-b border-border py-2 last:border-0">
-          <span className="text-sm font-medium text-muted-foreground">{event.item.type}</span>
-          <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-sm font-normal">
-            {traceEventText(event)}
-          </pre>
-        </div>
+        <TraceEventContent key={`${event.traceId}:${position}`} event={event} />
       ))}
       {loading ? (
         <p role="status" className="text-sm text-muted-foreground">
@@ -58,12 +56,57 @@ export function TraceEvents({ trace }: { trace: SubagentTraceSummary }): React.J
   );
 }
 
-function traceEventText(event: SubagentTraceDelta): string {
-  const item = event.item;
-  if (item.type === "message" || item.type === "reasoning") return item.content.text;
-  if (item.type === "toolResult") return item.output.text;
-  if (item.type === "toolCall") return item.toolName;
-  return item.detail || statusLabel(item.status);
+export function TraceEventContent({ event }: { event: SubagentTraceDelta }): React.JSX.Element {
+  const { Icon, label, text, markdown, failed, truncated } = traceEventPresentation(event.item);
+
+  return (
+    <div className="min-w-0 border-b border-border/60 py-3 last:border-0">
+      <div
+        className={cn(
+          "mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground",
+          failed && "text-destructive",
+        )}
+      >
+        <Icon aria-hidden="true" className="size-3.5" />
+        {label}
+      </div>
+      {markdown ? (
+        <MessageContent text={text} />
+      ) : (
+        <pre className="whitespace-pre-wrap break-words font-mono text-sm font-normal">{text}</pre>
+      )}
+      {truncated && <p className="mt-2 text-sm text-muted-foreground">Content truncated by the runtime.</p>}
+    </div>
+  );
+}
+
+function traceEventPresentation(item: SubagentTraceDelta["item"]) {
+  const base = { Icon: Terminal, markdown: false, failed: false, truncated: false };
+  switch (item.type) {
+    case "message":
+    case "reasoning":
+      return {
+        ...base,
+        Icon: MessageSquare,
+        markdown: true,
+        label: item.type === "message" ? `${statusLabel(item.role)} message` : "Reasoning",
+        text: item.content.text,
+        truncated: Boolean(item.content.truncated),
+      };
+    case "toolResult":
+      return {
+        ...base,
+        Icon: item.isError ? XCircle : Terminal,
+        failed: item.isError,
+        label: item.isError ? "Tool error" : "Tool output",
+        text: item.output.text,
+        truncated: Boolean(item.output.truncated),
+      };
+    case "toolCall":
+      return { ...base, label: "Tool call", text: item.toolName };
+    case "status":
+      return { ...base, Icon: CircleDot, label: "Status", text: item.detail || statusLabel(item.status) };
+  }
 }
 
 function statusLabel(status: string): string {

@@ -231,7 +231,7 @@ test("changing selected policy mode applies it to the running thread immediately
   ]);
 });
 
-test("bootstrap does not wait for full active transcript read", async () => {
+test("bootstrap requests a bounded recent transcript without waiting for it", async () => {
   const threadReadParams: unknown[] = [];
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
     switch (method) {
@@ -276,7 +276,7 @@ test("bootstrap does not wait for full active transcript read", async () => {
         };
       case "workspace/list":
         return { workspaces: [] };
-      case "thread/read":
+      case "thread/history/read":
         threadReadParams.push(params);
         return {
           thread: {
@@ -307,7 +307,7 @@ test("bootstrap does not wait for full active transcript read", async () => {
   expect(useRoderStore.getState().busy).toBe(false);
   expect(useRoderStore.getState().activeThreadId).toBe("thread-active");
   await vi.waitFor(() => expect(threadReadParams.length).toBe(1));
-  expect(threadReadParams[0]).toEqual({ threadId: "thread-active", includeTurns: false });
+  expect(threadReadParams[0]).toEqual({ threadId: "thread-active", limit: 160 });
 });
 
 test("bootstrap stores display names for provider models", async () => {
@@ -469,6 +469,7 @@ test("staging a new thread keeps the clicked project when a previous thread read
   let resolveThreadRead: ((value: unknown) => void) | undefined;
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>((method) => {
     switch (method) {
+      case "thread/history/read":
       case "thread/read":
         return new Promise((resolve) => {
           resolveThreadRead = resolve;
@@ -624,10 +625,10 @@ test("switching projects after another thread in the same project updates worksp
   const projectBThread1 = storeThread("thread-b-1", "ws-b", "root-b", "/work/project-b");
   const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>((method, params) => {
     const threadId = (params as { threadId?: string } | undefined)?.threadId;
-    if (method === "thread/read" && threadId === "thread-a-2") {
+    if (method === "thread/history/read" && threadId === "thread-a-2") {
       return Promise.resolve({ thread: projectAThread2 });
     }
-    if (method === "thread/read" && threadId === "thread-b-1") {
+    if (method === "thread/history/read" && threadId === "thread-b-1") {
       return new Promise((resolve) => {
         resolveProjectBRead = resolve;
       });
@@ -686,7 +687,7 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
               id: "thread-1",
               preview: "Existing thread",
               modelProvider: "openai",
-              model: "gpt-6-sol",
+              model: "gpt-6.1-sol",
               createdAt: 1770000000,
               updatedAt: 1770000100,
               status: { type: "idle", activeTurnId: null, activeFlags: [] },
@@ -699,8 +700,8 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
         return {
           models: [
             {
-              id: "gpt-6-sol",
-              name: "GPT-6 Sol",
+              id: "gpt-6.1-sol",
+              name: "GPT-6.1 Sol",
               modelProvider: "openai",
               isDefault: true,
               defaultReasoningEffort: "medium",
@@ -711,19 +712,20 @@ test("bootstrap still loads core app data when workspace listing is unavailable"
       case "settings/get":
         return {
           default_provider: "openai",
-          default_model: "gpt-6-sol",
+          default_model: "gpt-6.1-sol",
           default_reasoning: "medium",
           default_mode: "accept_all",
         };
       case "workspace/list":
         throw new Error("method not found: workspace/list");
+      case "thread/history/read":
       case "thread/read":
         return {
           thread: {
             id: "thread-1",
             preview: "Existing thread",
             modelProvider: "openai",
-            model: "gpt-6-sol",
+            model: "gpt-6.1-sol",
             createdAt: 1770000000,
             updatedAt: 1770000100,
             status: { type: "idle", activeTurnId: null, activeFlags: [] },
@@ -1465,7 +1467,7 @@ test("team member notifications populate subagent traces on the active thread", 
 test("thread goal reads ignore goals from another thread", async () => {
   const useRoderStore = await loadRoderStore(async (method, params) => {
     const requestParams = params as { threadId?: string };
-    if (method === "thread/read") {
+    if (method === "thread/history/read") {
       return {
         thread: {
           id: requestParams.threadId,
@@ -1665,6 +1667,43 @@ test("queued prompts are stored per thread and persisted", async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("steerPrompt rejects without consuming queued input when the turn has ended", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async () => ({}));
+  const useRoderStore = await loadRoderStore(request);
+  useRoderStore.setState({ activeThreadId: "thread-ended", busy: false });
+  const queued = useRoderStore.getState().addQueuedPrompt("thread-ended", "keep this message");
+
+  await expect(useRoderStore.getState().steerPrompt(queued.prompt)).rejects.toThrow("No running turn to steer");
+
+  expect(request).not.toHaveBeenCalled();
+  expect(useRoderStore.getState().error).toBe("No running turn to steer");
+  expect(useRoderStore.getState().queuedPromptsByThread["thread-ended"]).toEqual([queued]);
+});
+
+test("removing a migrated prompt uses its original queue key without affecting other messages", async () => {
+  const useRoderStore = await loadRoderStore();
+  const sent = useRoderStore.getState().addQueuedPrompt("", "sent message");
+  const pending = useRoderStore.getState().addQueuedPrompt("", "pending message");
+  const other = useRoderStore.getState().addQueuedPrompt("thread-other", "unrelated message");
+  // Thread creation moves the queue while the composer's onSend is still pending.
+  useRoderStore.setState({
+    queuedPromptsByThread: { "thread-created": [sent, pending], "thread-other": [other] },
+  });
+  const newDraft = useRoderStore.getState().addQueuedPrompt("", "another new thread");
+
+  useRoderStore.getState().removeQueuedPrompt("new-thread", sent.id);
+  useRoderStore.getState().removeQueuedPrompt("new-thread", sent.id);
+
+  expect(useRoderStore.getState().queuedPromptsByThread).toEqual({
+    "thread-created": [pending],
+    "thread-other": [other],
+    "new-thread": [newDraft],
+  });
+  // An ordinary thread key must never remove another thread's messages.
+  useRoderStore.getState().removeQueuedPrompt("thread-other", pending.id);
+  expect(useRoderStore.getState().queuedPromptsByThread["thread-created"]).toEqual([pending]);
 });
 
 test("queued prompts staged on the new-thread route move to the created thread", async () => {

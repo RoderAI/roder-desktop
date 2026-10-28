@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { roderIpc } from "@/lib/roder-ipc";
 import { summarizeReviewChanges, type ReviewTurnChangeSummary } from "@/lib/review-changes";
+import { loadThreadHunks, threadHunkScopeKey } from "@/lib/thread-hunk-loading";
 import type { HunkRecord, WorkspaceChangeObservation } from "@/types/roder";
 
 export type ThreadHunkSummary = {
@@ -28,33 +29,43 @@ const emptySummary: ThreadHunkSummary = {
 type ThreadHunkSummaryState = ThreadHunkSummary & {
   hunkRevision: number;
   threadId: string;
+  scopeKey: string;
 };
 
-export function useThreadHunkSummary(threadId: string, hunkRevision = 0): ThreadHunkSummary {
+export function useThreadHunkSummary(
+  threadId: string,
+  hunkRevision: number,
+  turnIds: readonly string[] | undefined,
+): ThreadHunkSummary {
+  const scopeKey = threadHunkScopeKey(turnIds);
+  const hasScope = scopeKey !== "[]";
   const [summaryState, setSummaryState] = useState<ThreadHunkSummaryState | null>(null);
   const summary =
-    summaryState?.threadId === threadId && summaryState.hunkRevision === hunkRevision
+    summaryState?.threadId === threadId &&
+    summaryState.hunkRevision === hunkRevision &&
+    summaryState.scopeKey === scopeKey
       ? summaryState
-      : { ...emptySummary, loading: Boolean(threadId) };
+      : { ...emptySummary, loading: Boolean(threadId) && hasScope };
 
   useEffect(() => {
-    if (!threadId) {
+    if (!threadId || !hasScope) {
       return;
     }
 
     let disposed = false;
-    void Promise.all([roderIpc.listHunks(threadId), listObservedChanges(threadId)])
-      .then(([hunkResult, observedResult]) => {
+    void loadThreadHunks(roderIpc, threadId, scopeKey, () => disposed)
+      .then(({ hunks, observedChanges }) => {
         if (disposed) {
           return;
         }
-        const metadata = summarizeReviewChanges(hunkResult.hunks, observedResult.changes);
+        const metadata = summarizeReviewChanges(hunks, observedChanges);
         setSummaryState({
           ...metadata,
           hunkRevision,
           threadId,
-          hunks: hunkResult.hunks,
-          observedChanges: observedResult.changes,
+          scopeKey,
+          hunks,
+          observedChanges,
           loading: false,
           error: null,
         });
@@ -67,6 +78,7 @@ export function useThreadHunkSummary(threadId: string, hunkRevision = 0): Thread
           ...emptySummary,
           hunkRevision,
           threadId,
+          scopeKey,
           loading: false,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -75,18 +87,7 @@ export function useThreadHunkSummary(threadId: string, hunkRevision = 0): Thread
     return () => {
       disposed = true;
     };
-  }, [hunkRevision, threadId]);
+  }, [hasScope, hunkRevision, scopeKey, threadId]);
 
   return summary;
-}
-
-async function listObservedChanges(threadId: string): Promise<{ changes: WorkspaceChangeObservation[] }> {
-  try {
-    return await roderIpc.listWorkspaceChanges(threadId);
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("Method not found")) {
-      return { changes: [] };
-    }
-    throw error;
-  }
 }

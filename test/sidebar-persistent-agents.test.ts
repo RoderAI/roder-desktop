@@ -47,6 +47,40 @@ test("persistent threads stay separate regardless of search matches and preserve
   expect(ordinarySidebarThreads(threads, agents)).not.toContain(threads[1]);
 });
 
+test("sidebar hides child agents even when their parent is outside the loaded thread page", () => {
+  const threads = [
+    { id: "root" },
+    { id: "machine_ui", parentThreadId: "root" },
+    { id: "machine_storage", parentThreadId: "unloaded-parent" },
+    { id: "nested", parentThreadId: "machine_ui" },
+    { id: "cloud_review", parentThreadId: null },
+  ];
+
+  expect(ordinarySidebarThreads(threads, [])).toEqual([threads[0], threads[4]]);
+  expect(threads).toHaveLength(5);
+});
+
+test("sidebar also hides child identities learned from traces without removing their parent", () => {
+  const threads = [{ id: "parent" }, { id: "child" }, { id: "other" }];
+  const traces = {
+    parent: [{ childThreadId: "child" }, { childThreadId: "" }],
+    unloadedParent: [{ childThreadId: "other" }, { childThreadId: "child" }],
+  };
+
+  expect(ordinarySidebarThreads(threads, [], traces)).toEqual([threads[0]]);
+});
+
+test("sidebar hides parent-owned workspace forks because isolated subagents also use them", () => {
+  const threads = [
+    { id: "fork", parentThreadId: "root", workspaceFork: { id: "workspace-fork" } },
+    { id: "child", parentThreadId: "root", workspaceFork: null },
+    { id: "persistentAgent-one", parentThreadId: "root", workspaceFork: { id: "other-fork" } },
+  ];
+  const traces = { root: [{ childThreadId: "fork" }, { childThreadId: "child" }] };
+
+  expect(ordinarySidebarThreads(threads, agents, traces)).toEqual([]);
+});
+
 test("sidebar search is opt-in and closing or Escape cannot leave a hidden filter", () => {
   const initial = { open: false, query: "" };
   expect(sidebarSearchReducer(initial, { type: "query", query: "ignored while hidden" })).toEqual(initial);

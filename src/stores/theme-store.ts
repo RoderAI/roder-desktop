@@ -36,6 +36,7 @@ export type SettingsSection =
   | "general"
   | "appearance"
   | "providers"
+  | "cloud-machines"
   | "models"
   | "skills"
   | "extensions"

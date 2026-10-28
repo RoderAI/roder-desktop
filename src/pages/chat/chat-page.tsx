@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useShallow } from "zustand/react/shallow";
 import { Check, ChevronDown, Folder, FolderPlus, MessageSquare } from "lucide-react";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { McpAuthWaitCards } from "@/components/mcp-auth-wait-card";
@@ -9,6 +10,7 @@ import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
 import { Transcript } from "@/components/transcript";
 import { finishedFolderTurnSummaries, finishedReviewTurnKey } from "@/lib/review-changes";
+import { emptyThreadHistoryState } from "@/lib/thread-history-state";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -72,23 +74,42 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
   const routeActiveThreadId = threadId || (route === "new" ? "" : activeThreadId);
+  const history = useRoderStore((state) => state.threadHistoryByThread[routeActiveThreadId] ?? emptyThreadHistoryState);
+  const loadOlderHistory = useRoderStore((state) => state.loadOlderThreadHistory);
   const reviewThread = useRoderStore(
-    (state) => state.threadDetails[routeActiveThreadId] ?? state.threads.find((thread) => thread.id === routeActiveThreadId),
+    useShallow((state) => {
+      const thread =
+        state.threadDetails[routeActiveThreadId] ?? state.threads.find((thread) => thread.id === routeActiveThreadId);
+      return {
+        workspaceId: thread?.workspaceId,
+        rootId: thread?.rootId,
+        cwd: thread?.cwd,
+        activeTurnId: thread?.status.activeTurnId,
+        finishedTurnIds: finishedReviewTurnKey(thread?.turns),
+      };
+    }),
   );
-  const reviewWorkspace = agent.workspaces.find((workspace) => workspace.id === reviewThread?.workspaceId);
+  const reviewWorkspace = agent.workspaces.find((workspace) => workspace.id === reviewThread.workspaceId);
   const reviewRoot = reviewWorkspace?.roots.find(
-    (root) => root.id === (reviewThread?.rootId ?? reviewWorkspace.defaultRootId),
+    (root) => root.id === (reviewThread.rootId ?? reviewWorkspace.defaultRootId),
   );
-  const finishedReviewTurnIds = finishedReviewTurnKey(reviewThread?.turns);
+  const finishedReviewTurnIds = reviewThread.finishedTurnIds;
   const reviewSummaries = useMemo(
-    () => finishedFolderTurnSummaries(
+    () =>
+      finishedFolderTurnSummaries(
+        hunkSummary.turnChangeSummaries,
+        new Set(finishedReviewTurnIds.split("\0")),
+        reviewThread.activeTurnId ?? "",
+        reviewThread.cwd ?? "",
+        reviewRoot?.path ?? "",
+      ),
+    [
       hunkSummary.turnChangeSummaries,
-      new Set(finishedReviewTurnIds.split("\0")),
-      reviewThread?.status.activeTurnId ?? "",
-      reviewThread?.cwd ?? "",
-      reviewRoot?.path ?? "",
-    ),
-    [hunkSummary.turnChangeSummaries, finishedReviewTurnIds, reviewThread?.status.activeTurnId, reviewThread?.cwd, reviewRoot?.path],
+      finishedReviewTurnIds,
+      reviewThread.activeTurnId,
+      reviewThread.cwd,
+      reviewRoot?.path,
+    ],
   );
   const messages = useActiveThreadMessages();
   const showWorkingIndicator = useShowWorkingIndicator(routeActiveThreadId);
@@ -218,7 +239,14 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           messages={transcriptMessages}
           followSignal={followSignal}
           bottomInsetPx={transcriptBottomInsetPx}
-          scrollStateKey={activeThreadId || "new-thread"}
+          scrollStateKey={`${activeThreadId || "new-thread"}:${history.requestId}`}
+          historyCursor={history.before}
+          historyLoading={history.loading}
+          hasOlderHistory={history.hasMore}
+          loadingOlderHistory={history.loadingOlder}
+          historyError={history.error}
+          onLoadOlderHistory={() => loadOlderHistory(routeActiveThreadId)}
+          onRetryHistory={() => selectThread(routeActiveThreadId, { pushHistory: false, refreshHistory: true })}
           showWorkingIndicator={showWorkingIndicator}
           subagentLifecycleEvents={subagentLifecycleEvents}
           turnChangeSummaries={reviewSummaries}

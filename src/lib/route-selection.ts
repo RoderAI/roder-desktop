@@ -40,6 +40,7 @@ const validSettingsSections = new Set<SettingsSection>([
   "general",
   "appearance",
   "providers",
+  "cloud-machines",
   "models",
   "skills",
   "extensions",
@@ -61,6 +62,15 @@ export function threadSelectionForRoute(input: ThreadSelectionInput): ThreadSele
     return null;
   }
   return { threadId: input.threadId, pushHistory: false };
+}
+
+export async function stageNewThreadAfterNavigation(
+  navigateToNew: () => Promise<unknown>,
+  stageNewThread: (path: string) => void,
+  path: string,
+): Promise<void> {
+  await navigateToNew();
+  stageNewThread(path);
 }
 
 export function activeWorkspaceCwdForPathname({

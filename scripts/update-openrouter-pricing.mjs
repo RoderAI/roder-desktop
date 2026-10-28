@@ -22,6 +22,7 @@ const models = data
         prompt: pricing.prompt,
         completion: pricing.completion,
         ...(typeof pricing.input_cache_read === "string" ? { input_cache_read: pricing.input_cache_read } : {}),
+        ...(typeof pricing.input_cache_write === "string" ? { input_cache_write: pricing.input_cache_write } : {}),
       },
     };
   })

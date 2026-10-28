@@ -3,6 +3,7 @@ import {
   Bot,
   Braces,
   Cog,
+  Cloud,
   Cpu,
   Database,
   GitBranch,
@@ -29,6 +30,7 @@ import { SettingsComputerUsePanel } from "@/components/settings-computer-use-pan
 import { GeneralSettingsPanel } from "@/components/settings-general-panel";
 import { ModelsSettingsPanel } from "@/components/settings-models-panel";
 import { ProvidersSettingsPanel } from "@/components/settings-providers-panel";
+import { SettingsCloudMachinesPanel } from "@/components/settings-cloud-machines-panel";
 import { SkillsSettingsPanel } from "@/components/settings-skills-panel";
 import { SettingsMcpPanel } from "@/components/settings-mcp-panel";
 import { parseTerminalThemeJson, terminalThemeForSettings, terminalThemePresets } from "@/lib/terminal-theme";
@@ -86,6 +88,13 @@ export function SettingsView({
             active={section === "providers"}
             icon={<KeyRound className="size-4" />}
             label="Providers"
+            onClick={onSectionChange}
+          />
+          <SettingsNavItem
+            id="cloud-machines"
+            active={section === "cloud-machines"}
+            icon={<Cloud className="size-4" />}
+            label="Cloud Machines"
             onClick={onSectionChange}
           />
           <SettingsNavItem
@@ -175,6 +184,8 @@ export function SettingsView({
             <AppearancePanel onReset={resetTheme} />
           ) : section === "providers" ? (
             <ProvidersSettingsPanel />
+          ) : section === "cloud-machines" ? (
+            <SettingsCloudMachinesPanel />
           ) : section === "models" ? (
             <ModelsSettingsPanel />
           ) : section === "skills" ? (

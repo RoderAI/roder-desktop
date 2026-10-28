@@ -51,11 +51,20 @@ import { CompactToolGroup } from "./compact-tool-group";
 import { MessageContent } from "./message-content";
 import { PhaseMessage } from "./phase-message";
 import { SubagentLifecycleChip } from "./subagent-lifecycle-chip";
+import { SubagentMessageCard } from "./subagent-message-card";
+import { subagentMessagesForMessage } from "@/lib/subagent-messages";
 import { ToolActivityGroup } from "./tool-activity-group";
 import { ToolTimelineItem } from "./tool-timeline-item";
 import { ShimmerText } from "./tool-timeline-shared";
 import { UserMessageContent } from "@/components/user-message-content";
 import { useSkillsStore } from "@/stores/skills-store";
+import {
+  captureHistoryScrollAnchor,
+  restoreHistoryScrollAnchor,
+  shouldLoadOlderHistory,
+  nestedScrollConsumesUpwardGesture,
+  type HistoryScrollAnchor,
+} from "@/lib/transcript-history";
 
 type TranscriptProps = {
   messages: ConversationMessage[];
@@ -68,6 +77,13 @@ type TranscriptProps = {
   turnChangeSummaries?: Record<string, ReviewTurnChangeSummary>;
   onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
   onReviewTurnChanges?: (turnId: string) => void;
+  historyCursor?: string | null;
+  historyLoading?: boolean;
+  hasOlderHistory?: boolean;
+  loadingOlderHistory?: boolean;
+  historyError?: string | null;
+  onLoadOlderHistory?: () => Promise<void>;
+  onRetryHistory?: () => Promise<void>;
 };
 
 const emptySubagentLifecycleEvents: SubagentLifecycleEvent[] = [];
@@ -87,6 +103,13 @@ export function Transcript({
   turnChangeSummaries = emptyTurnChangeSummaries,
   onCanScrollToBottomChange,
   onReviewTurnChanges,
+  historyCursor = null,
+  historyLoading = false,
+  hasOlderHistory = false,
+  loadingOlderHistory = false,
+  historyError,
+  onLoadOlderHistory,
+  onRetryHistory,
 }: TranscriptProps): React.JSX.Element {
   const skills = useSkillsStore((state) => state.skills);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +126,7 @@ export function Transcript({
   const transcriptRowKeysRef = useRef<Array<string | number>>([]);
   const userScrollIntentRef = useRef(false);
   const userScrollIntentTimeoutRef = useRef<number | null>(null);
+  const historyAnchorRef = useRef<(HistoryScrollAnchor & { threadKey: string; cursor: string | null }) | null>(null);
   const [disclosureOpenByKey, setDisclosureOpenByKey] = useState<TranscriptDisclosureState>({});
   const [pinnedToEnd, setPinnedToEnd] = useState(true);
   const [selectedNavigation, setSelectedNavigation] = useState<{ threadKey: string; id: string } | null>(null);
@@ -188,6 +212,10 @@ export function Transcript({
         scrollTop: viewport.scrollTop,
       }),
     );
+    if (transcriptScrollStateByKey.size > 40) {
+      const oldest = transcriptScrollStateByKey.keys().next().value;
+      if (oldest) transcriptScrollStateByKey.delete(oldest);
+    }
   }, []);
 
   useEffect(() => {
@@ -261,13 +289,58 @@ export function Transcript({
     onChange: handleVirtualizerChange,
     overscan: 8,
     paddingEnd: bottomInsetPx,
+    paddingStart: hasOlderHistory || historyLoading || historyError ? 40 : 0,
     scrollEndThreshold: transcriptScrollAffordanceThresholdPx,
   });
+
+  // Shared by virtualizer/DOM scroll callbacks, so keep this handler's identity stable.
+  const loadOlderHistory = useCallback((): void => {
+    if (!onLoadOlderHistory || loadingOlderHistory || historyLoading) return;
+    const viewport = viewportRef.current;
+    if (viewport) {
+      historyAnchorRef.current = {
+        ...captureHistoryScrollAnchor(
+          rowVirtualizer.getVirtualItems(),
+          viewport.scrollTop,
+          rowVirtualizer.getTotalSize(),
+        ),
+        threadKey: scrollStateKey,
+        cursor: historyCursor,
+      };
+      pinnedToEndRef.current = false;
+      setPinnedToEnd(false);
+    }
+    void onLoadOlderHistory();
+  }, [onLoadOlderHistory, loadingOlderHistory, historyLoading, rowVirtualizer, scrollStateKey, historyCursor]);
 
   const syncCanScrollToBottom = useCallback(() => {
     scrollObservationVersionRef.current += 1;
     const currentScrollTop = viewportRef.current?.scrollTop ?? 0;
     const userScrolledTowardStart = currentScrollTop < previousScrollTopRef.current - 1;
+    const pendingAnchor = historyAnchorRef.current;
+    if (pendingAnchor?.threadKey === scrollStateKey && pendingAnchor.cursor === historyCursor) {
+      historyAnchorRef.current = {
+        ...captureHistoryScrollAnchor(
+          rowVirtualizer.getVirtualItems(),
+          currentScrollTop,
+          rowVirtualizer.getTotalSize(),
+        ),
+        threadKey: scrollStateKey,
+        cursor: historyCursor,
+      };
+    }
+    if (
+      shouldLoadOlderHistory({
+        hasMore: hasOlderHistory,
+        loading: loadingOlderHistory || historyLoading,
+        error: historyError,
+        userIntent: userScrollIntentRef.current || !pinnedToEndRef.current,
+        movingUp: userScrolledTowardStart,
+        scrollTop: currentScrollTop,
+      })
+    ) {
+      loadOlderHistory();
+    }
     previousScrollTopRef.current = currentScrollTop;
     syncTranscriptScrollState({
       source: rowVirtualizer,
@@ -279,7 +352,18 @@ export function Transcript({
       window.clearTimeout(userScrollIntentTimeoutRef.current);
       userScrollIntentTimeoutRef.current = null;
     }
-  }, [rememberTranscriptScrollState, rowVirtualizer, syncTranscriptScrollState]);
+  }, [
+    rememberTranscriptScrollState,
+    rowVirtualizer,
+    syncTranscriptScrollState,
+    hasOlderHistory,
+    loadingOlderHistory,
+    historyLoading,
+    historyError,
+    loadOlderHistory,
+    historyCursor,
+    scrollStateKey,
+  ]);
 
   const scheduleScrollToEnd = useCallback(
     (behavior: ScrollBehavior, expectedScrollObservationVersion?: number) => {
@@ -319,6 +403,33 @@ export function Transcript({
     },
     [cancelPendingScrollFrame, rowVirtualizer],
   );
+  useLayoutEffect(() => {
+    const anchor = historyAnchorRef.current;
+    if (!anchor) return;
+    if (anchor.threadKey !== scrollStateKey || historyError) {
+      historyAnchorRef.current = null;
+      return;
+    }
+    if (anchor.cursor === historyCursor) return;
+    historyAnchorRef.current = null;
+    if (pinnedToEndRef.current) return;
+    const offset = restoreHistoryScrollAnchor(
+      anchor,
+      transcriptRows.map((row) => row.key),
+      (index) => rowVirtualizer.getOffsetForIndex(index, "start")?.[0],
+      rowVirtualizer.getTotalSize(),
+    );
+    setPinnedToEndState(false);
+    scheduleScrollToOffset(offset);
+  }, [
+    historyCursor,
+    historyError,
+    scrollStateKey,
+    transcriptRows,
+    rowVirtualizer,
+    scheduleScrollToOffset,
+    setPinnedToEndState,
+  ]);
 
   const setViewportNode = useCallback((viewport: HTMLDivElement | null) => {
     viewportRef.current = viewport;
@@ -339,8 +450,23 @@ export function Transcript({
       if (event.deltaY < 0 || !pinnedToEndRef.current) {
         markUserScrollIntent();
       }
+      const viewport = viewportRef.current;
+      if (
+        viewport &&
+        shouldLoadOlderHistory({
+          hasMore: hasOlderHistory,
+          loading: historyLoading || loadingOlderHistory,
+          error: historyError,
+          userIntent: true,
+          movingUp: event.deltaY < 0,
+          scrollTop: viewport.scrollTop,
+        }) &&
+        !nestedScrollConsumesUpwardGesture(event.target instanceof HTMLElement ? event.target : null, viewport)
+      ) {
+        loadOlderHistory();
+      }
     },
-    [markUserScrollIntent],
+    [markUserScrollIntent, hasOlderHistory, historyLoading, loadingOlderHistory, historyError, loadOlderHistory],
   );
   const handleViewportKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -355,8 +481,24 @@ export function Transcript({
       ) {
         markUserScrollIntent();
       }
+      const movingUp = event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home";
+      const viewport = viewportRef.current;
+      if (
+        viewport &&
+        shouldLoadOlderHistory({
+          hasMore: hasOlderHistory,
+          loading: historyLoading || loadingOlderHistory,
+          error: historyError,
+          userIntent: true,
+          movingUp,
+          scrollTop: viewport.scrollTop,
+        }) &&
+        !nestedScrollConsumesUpwardGesture(event.target instanceof HTMLElement ? event.target : null, viewport)
+      ) {
+        loadOlderHistory();
+      }
     },
-    [markUserScrollIntent],
+    [markUserScrollIntent, hasOlderHistory, historyLoading, loadingOlderHistory, historyError, loadOlderHistory],
   );
 
   useEffect(
@@ -435,6 +577,7 @@ export function Transcript({
     });
 
     if (followAction.kind === "explicit") {
+      historyAnchorRef.current = null;
       setSelectedNavigation(null);
       setPinnedToEndState(true);
       reportCanScrollToBottom(false);
@@ -486,6 +629,14 @@ export function Transcript({
     <div className="relative min-h-0 flex-1">
       <TranscriptSearchMirror text={transcriptSearchText} />
       <TranscriptWorkingLiveRegion active={showWorkingIndicator} />
+      <TranscriptHistoryControls
+        hasMore={hasOlderHistory}
+        loading={historyLoading}
+        loadingOlder={loadingOlderHistory}
+        error={historyError}
+        onLoad={loadOlderHistory}
+        onRetry={onRetryHistory}
+      />
       <TranscriptNavigation
         key={scrollStateKey}
         items={navigationItems}
@@ -495,7 +646,7 @@ export function Transcript({
         onSelect={jumpToMessage}
       />
       <ScrollArea
-        className="h-full"
+        className={cn("h-full", navigationItems.length > 0 && "ml-8")}
         viewportClassName={cn(
           "workspace-scrollbar transcript-viewport",
           suppressAutoFollowScrollbar && "transcript-viewport-auto-following",
@@ -555,6 +706,52 @@ export function Transcript({
   );
 }
 
+function TranscriptHistoryControls({
+  hasMore,
+  loading,
+  loadingOlder,
+  error,
+  onLoad,
+  onRetry,
+}: {
+  hasMore: boolean;
+  loading: boolean;
+  loadingOlder: boolean;
+  error?: string | null;
+  onLoad: () => void;
+  onRetry?: () => Promise<void>;
+}): React.JSX.Element | null {
+  if (!hasMore && !loading && !error) return null;
+  const label = loading
+    ? "Loading recent messages..."
+    : loadingOlder
+      ? "Loading older messages..."
+      : "Load older messages";
+  return (
+    <div className="pointer-events-none absolute inset-x-10 top-1 z-10 flex justify-center">
+      <div className="pointer-events-auto rounded-lg bg-background/95 px-2 py-1 text-sm text-muted-foreground">
+        {error ? (
+          <div role="alert" className="flex items-center gap-2">
+            <span>{error}</span>
+            <Button size="sm" variant="ghost" onClick={() => (hasMore ? onLoad() : void onRetry?.())}>
+              Retry
+            </Button>
+            {hasMore && (
+              <Button size="sm" variant="ghost" onClick={() => void onRetry?.()}>
+                Reload recent
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Button size="sm" variant="ghost" disabled={loadingOlder || loading} onClick={onLoad}>
+            {label}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const TranscriptRowView = memo(function TranscriptRowView({
   disclosureOpenByKey,
   onDisclosureOpenChange,
@@ -606,6 +803,7 @@ const TranscriptEntryView = memo(function TranscriptEntryView({
 }): React.JSX.Element {
   const entry = row.entry;
   const message = entry.kind === "message" ? entry.message : undefined;
+  const subagentMessages = subagentMessagesForMessage(message);
   const isPhaseMessage = message?.role === "assistant" && Boolean(message.phase && message.phase !== "final_answer");
   const getDisclosureControl = (key: string, defaultOpen = false) => ({
     onOpenChange: (open: boolean) => onDisclosureOpenChange(key, open),
@@ -625,7 +823,10 @@ const TranscriptEntryView = memo(function TranscriptEntryView({
 
   return (
     <article
-      className={cn("text-foreground", message?.role === "user" && "rounded-[14px] bg-card px-4 py-3 text-base")}
+      className={cn(
+        "text-foreground",
+        message?.role === "user" && !subagentMessages && "rounded-[14px] bg-card px-4 py-3 text-base",
+      )}
     >
       {entry.kind === "activityGroup" ? (
         <ToolActivityGroup
@@ -641,6 +842,17 @@ const TranscriptEntryView = memo(function TranscriptEntryView({
         <CompactToolGroup kind="readSkill" messages={entry.messages} {...disclosureControl} />
       ) : entry.kind === "searchGroup" ? (
         <CompactToolGroup kind="search" messages={entry.messages} {...disclosureControl} />
+      ) : subagentMessages ? (
+        <div className="space-y-2">
+          {subagentMessages.map((delivery) => (
+            <SubagentMessageCard
+              key={delivery.id}
+              message={delivery}
+              skills={skills}
+              {...getDisclosureControl(`${rowDisclosureKey}:subagent:${delivery.id}`)}
+            />
+          ))}
+        </div>
       ) : message?.role === "tool" ? (
         <ToolTimelineItem message={message} {...disclosureControl} />
       ) : isPhaseMessage ? (
@@ -694,6 +906,10 @@ function estimateTranscriptRowSize(row: TranscriptRow | undefined): number {
   }
   if (row.entryIsTool) {
     return 36;
+  }
+  if (row.entry.kind === "message") {
+    const deliveries = subagentMessagesForMessage(row.entry.message);
+    if (deliveries) return deliveries.length * 164;
   }
   if (row.entry.kind === "message" && row.entry.message.role === "user") {
     return 72;
