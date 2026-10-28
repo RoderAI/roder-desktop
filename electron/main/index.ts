@@ -56,7 +56,10 @@ import {
   createPersistentAgentFromTool,
   mergePersistentAgentSkill,
   persistentAgentCreateTool,
+  persistentAgentSkillBody,
+  readPersistentAgentSkill,
 } from "../persistent-agents/creation-tool";
+import { configureDesktopFromTool, desktopConfigInstructions, desktopConfigTool } from "../agents/config-tool";
 import { createPersistentAgentSpriteManager, createSpriteImageNormalizer } from "../persistent-agents/sprites";
 import { createCodexImageGenerator } from "../persistent-agents/codex-image-generator";
 import { createImageGenerationCredentials, configureImageGenerationKey } from "../persistent-agents/image-credentials";
@@ -764,13 +767,20 @@ function getDesktopAgentTools(): DesktopAgentTools {
         execute: (args: unknown, context: { threadId: string }) =>
           createPersistentAgentFromTool(args, context.threadId, handleRoderRequest),
       },
+      {
+        ...desktopConfigTool,
+        execute: (args: unknown, context: { threadId: string }) =>
+          configureDesktopFromTool(args, handleRoderRequest, context.threadId),
+      },
     ],
     (method, params) => roder.request(method, params),
+    `${desktopConfigInstructions}\n\nDesktop built-in skill ($persistent-agent):\n${persistentAgentSkillBody}`,
   );
   return desktopAgentTools;
 }
 
 async function requestEngine(method: string, params: unknown, enrichPersistentAgentContext = true): Promise<unknown> {
+  if (method === "turn/start") params = getDesktopAgentTools().turnStartParams(params);
   if (method === "thread/start") {
     const input = await cloudMachineThreadParams(
       params,
@@ -915,6 +925,10 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       recordAppServerEvent(result.is_error ? "error" : "response", method, result);
       return result;
     }
+  }
+  if (method === "skills/read") {
+    const skill = readPersistentAgentSkill(params);
+    if (skill) return skill;
   }
   if (method === "skills/list") {
     try {
