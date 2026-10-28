@@ -1,9 +1,10 @@
-import type { ThreadRunner } from "../../src/lib/cloud-machines";
+import { WINDOWS_CLOUD_MACHINES_NOTICE, type ThreadRunner } from "../../src/lib/cloud-machines";
 
 export async function cloudMachineThreadParams(
   params: unknown,
   runnerFor: (id: string) => Promise<ThreadRunner>,
-  localWorkspaceFor?: (input: Record<string, unknown>) => Promise<string>,
+  activeRunnerFor?: () => Promise<unknown>,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<Record<string, unknown>> {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     throw new Error("Thread parameters must be an object.");
@@ -14,10 +15,15 @@ export async function cloudMachineThreadParams(
     throw new Error("Choose one valid cloud machine for this thread.");
   }
   if (desktopCloudMachineId === "") {
-    const workspace = typeof input.cwd === "string" && input.cwd ? input.cwd : await localWorkspaceFor?.(input);
-    if (!workspace) throw new Error("A workspace is required for local execution.");
-    // Omission inherits upstream's global remote destination; bind local explicitly instead.
-    return { ...input, runner: { providerId: "unix-local", workspace, config: {} } };
+    // Upstream has no per-thread native-local override for an active global runner.
+    // A unix-local binding is not equivalent: it changes shell and filesystem behavior.
+    if (!activeRunnerFor || (await activeRunnerFor()) !== null) {
+      throw new Error(
+        "Local execution is unavailable while a global runner is configured. Clear the global runner configuration and restart the app, or choose a cloud machine.",
+      );
+    }
+    return input;
   }
+  if (platform === "win32") throw new Error(WINDOWS_CLOUD_MACHINES_NOTICE);
   return { ...input, runner: await runnerFor(desktopCloudMachineId) };
 }

@@ -8,22 +8,47 @@ test("unmanaged thread creation leaves caller runner intent unchanged", async ()
   expect(runnerFor).not.toHaveBeenCalled();
 });
 
-test("an explicit local selection overrides inherited remote destinations without mutating global state", async () => {
-  const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>();
-  const params = await cloudMachineThreadParams({ desktopCloudMachineId: "", cwd: "/local" }, runnerFor);
-  expect(params).toEqual({ cwd: "/local", runner: { providerId: "unix-local", workspace: "/local", config: {} } });
-  expect(runnerFor).not.toHaveBeenCalled();
+test.each(["/local", "C:\\Users\\user\\project"])(
+  "an explicit local selection preserves native execution for %s",
+  async (cwd) => {
+    const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>();
+    const activeRunnerFor = vi.fn<() => Promise<null>>().mockResolvedValue(null);
+    const params = await cloudMachineThreadParams({ desktopCloudMachineId: "", cwd }, runnerFor, activeRunnerFor);
+    expect(params).toEqual({ cwd });
+    expect(params).not.toHaveProperty("runner");
+    expect(activeRunnerFor).toHaveBeenCalledOnce();
+    expect(runnerFor).not.toHaveBeenCalled();
+  },
+);
+
+test("local execution leaves workspace resolution to the native thread API", async () => {
+  expect(
+    await cloudMachineThreadParams({ desktopCloudMachineId: "", workspaceId: "ws" }, vi.fn(), async () => null),
+  ).toEqual({ workspaceId: "ws" });
 });
 
-test("local execution resolves the workspace root when cwd is omitted and fails closed without one", async () => {
-  const resolveRoot = vi.fn<(input: Record<string, unknown>) => Promise<string>>().mockResolvedValue("/local");
-  expect(
-    await cloudMachineThreadParams({ desktopCloudMachineId: "", workspaceId: "ws" }, vi.fn(), resolveRoot),
-  ).toEqual({ workspaceId: "ws", runner: { providerId: "unix-local", workspace: "/local", config: {} } });
-  expect(resolveRoot).toHaveBeenCalledWith({ workspaceId: "ws" });
-  await expect(cloudMachineThreadParams({ desktopCloudMachineId: "" }, vi.fn())).rejects.toThrow(
-    "A workspace is required",
+test.each([{ provider_id: "sprites", destination_id: "global" }, undefined])(
+  "local execution fails closed for an active or unknown global runner state: %j",
+  async (active) => {
+    const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>();
+    await expect(
+      cloudMachineThreadParams({ desktopCloudMachineId: "", cwd: "/local" }, runnerFor, async () => active),
+    ).rejects.toThrow("global runner");
+    expect(runnerFor).not.toHaveBeenCalled();
+  },
+);
+
+test("local execution fails closed if runner discovery is unavailable", async () => {
+  const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>();
+  await expect(cloudMachineThreadParams({ desktopCloudMachineId: "", cwd: "/local" }, runnerFor)).rejects.toThrow(
+    "global runner",
   );
+  await expect(
+    cloudMachineThreadParams({ desktopCloudMachineId: "", cwd: "/local" }, runnerFor, async () => {
+      throw new Error("Runner discovery failed");
+    }),
+  ).rejects.toThrow("Runner discovery failed");
+  expect(runnerFor).not.toHaveBeenCalled();
 });
 
 test("resolves a machine into a per-thread binding and strips the desktop-only field", async () => {
@@ -51,4 +76,29 @@ test("rejects an ambiguous explicit runner with a desktop machine selection", as
   await expect(cloudMachineThreadParams({ desktopCloudMachineId: "dev", runner: {} }, vi.fn())).rejects.toThrow(
     "Choose one valid cloud machine",
   );
+});
+
+test("Windows rejects cloud execution before resolving or launching the runner", async () => {
+  const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>();
+  const activeRunnerFor = vi.fn<() => Promise<null>>();
+  await expect(
+    cloudMachineThreadParams({ desktopCloudMachineId: "dev" }, runnerFor, activeRunnerFor, "win32"),
+  ).rejects.toThrow("Cloud machines are not supported on Windows yet");
+  expect(runnerFor).not.toHaveBeenCalled();
+  expect(activeRunnerFor).not.toHaveBeenCalled();
+});
+
+test("Windows local execution remains native and checks global runner state", async () => {
+  const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>();
+  const activeRunnerFor = vi.fn<() => Promise<null>>().mockResolvedValue(null);
+  expect(
+    await cloudMachineThreadParams(
+      { desktopCloudMachineId: "", cwd: "C:\\Users\\user\\project" },
+      runnerFor,
+      activeRunnerFor,
+      "win32",
+    ),
+  ).toEqual({ cwd: "C:\\Users\\user\\project" });
+  expect(runnerFor).not.toHaveBeenCalled();
+  expect(activeRunnerFor).toHaveBeenCalledOnce();
 });

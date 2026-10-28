@@ -775,12 +775,9 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
     const input = await cloudMachineThreadParams(
       params,
       (id) => getCloudMachinesService().runnerFor(id),
-      async (input) => {
-        const result = (await roder.request("workspace/list", {})) as { workspaces: Workspace[] };
-        const workspace = result.workspaces.find((entry) => entry.id === input.workspaceId);
-        const root = workspace?.roots.find((entry) => entry.id === (input.rootId || workspace.defaultRootId));
-        if (!root) throw new Error("Select a workspace before starting a local thread.");
-        return root.path;
+      async () => {
+        const result = (await roder.request("runners/list", {})) as { active?: unknown };
+        return result.active;
       },
     );
     return roder.request(method, getDesktopAgentTools().threadStartParams(input));

@@ -1,6 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { CloudMachine, CloudMachineInput, CloudRunnerProvider } from "../src/lib/cloud-machines";
 import { machineProviderHelp } from "../src/lib/cloud-machine-providers";
 
@@ -29,6 +29,31 @@ beforeEach(() => {
   snapshot.selectedMachineId = "";
   snapshot.error = "";
   snapshot.busy = false;
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+test("Windows disables cloud profile setup and selection while preserving local selection", () => {
+  vi.stubGlobal("window", { roderDesktop: { platform: "win32" } });
+  snapshot.providers = [{ provider_id: "sprites", capabilities: {} }];
+  snapshot.machines = [{ id: "dev", name: "Development", providerId: "sprites", workspace: "/work" }];
+  const settings = renderToStaticMarkup(React.createElement(SettingsCloudMachinesPanel));
+  expect(settings).toContain("Cloud machines are not supported on Windows yet");
+  expect(settings).toMatch(/<fieldset[^>]*disabled=""/);
+  const picker = renderToStaticMarkup(React.createElement(CloudMachinePicker));
+  expect(picker).toMatch(/<option value="dev" disabled="">Development \(unavailable on Windows\)/);
+  expect(picker).toMatch(/<option value="" selected="">Local machine/);
+  expect(picker).not.toMatch(/<select[^>]*disabled=""/);
+});
+
+test("Windows preserves an unavailable saved cloud selection rather than silently selecting local", () => {
+  vi.stubGlobal("window", { roderDesktop: { platform: "win32" } });
+  snapshot.providers = [{ provider_id: "sprites", capabilities: {} }];
+  snapshot.machines = [{ id: "dev", name: "Development", providerId: "sprites", workspace: "/work" }];
+  snapshot.selectedMachineId = "dev";
+  const picker = renderToStaticMarkup(React.createElement(CloudMachinePicker));
+  expect(picker).toMatch(/<option value="dev" disabled="" selected="">Development \(unavailable on Windows\)/);
+  expect(picker).not.toMatch(/<option value="" selected="">Local machine/);
 });
 
 test("empty settings explain local execution and disable unavailable provider setup", () => {

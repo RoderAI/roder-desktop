@@ -1,4 +1,5 @@
 import { useMountEffect } from "@/hooks/use-mount-effect";
+import { WINDOWS_CLOUD_MACHINES_NOTICE } from "@/lib/cloud-machines";
 import { cn } from "@/lib/utils";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useRoderStore } from "@/stores/roder-store";
@@ -32,6 +33,7 @@ export function CloudMachinePicker({
   const selectedMachineId = useCloudMachinesStore((state) => state.selectedMachineId);
   const select = useCloudMachinesStore((state) => state.select);
   const refresh = useCloudMachinesStore((state) => state.refresh);
+  const cloudSupported = typeof window === "undefined" || window.roderDesktop?.platform !== "win32";
 
   useMountEffect(() => {
     void refresh().catch(() => {
@@ -44,7 +46,11 @@ export function CloudMachinePicker({
   return (
     <select
       aria-label="Execution machine for new thread"
-      title="Choose where the new thread runs. Configure profiles in Settings > Cloud Machines."
+      title={
+        cloudSupported
+          ? "Choose where the new thread runs. Configure profiles in Settings > Cloud Machines."
+          : WINDOWS_CLOUD_MACHINES_NOTICE
+      }
       disabled={disabled}
       value={selectedMachineId}
       onChange={(event) => select(event.currentTarget.value)}
@@ -60,11 +66,11 @@ export function CloudMachinePicker({
         </option>
       )}
       {machines.map((machine) => {
-        const supported = providers.some((provider) => provider.provider_id === machine.providerId);
+        const supported = cloudSupported && providers.some((provider) => provider.provider_id === machine.providerId);
         return (
           <option key={machine.id} value={machine.id} disabled={!supported}>
             {machine.name}
-            {supported ? "" : " (provider unavailable)"}
+            {!cloudSupported ? " (unavailable on Windows)" : supported ? "" : " (provider unavailable)"}
           </option>
         );
       })}

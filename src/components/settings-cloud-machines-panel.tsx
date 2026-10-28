@@ -2,7 +2,7 @@ import { Cloud, RefreshCw, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useMountEffect } from "@/hooks/use-mount-effect";
-import { validateMachineConfig } from "@/lib/cloud-machines";
+import { validateMachineConfig, WINDOWS_CLOUD_MACHINES_NOTICE } from "@/lib/cloud-machines";
 import { machineProviderHelp } from "@/lib/cloud-machine-providers";
 import { cn } from "@/lib/utils";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
@@ -28,6 +28,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const formId = useId();
   const selectedProvider = providers.find((provider) => provider.provider_id === providerId) ?? providers[0];
   const providerHelp = machineProviderHelp(selectedProvider?.provider_id ?? "");
+  const cloudSupported = typeof window === "undefined" || window.roderDesktop?.platform !== "win32";
 
   useMountEffect(() => {
     void refresh().catch(() => {
@@ -38,6 +39,10 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   async function addMachine(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setFormError("");
+    if (!cloudSupported) {
+      setFormError(WINDOWS_CLOUD_MACHINES_NOTICE);
+      return;
+    }
     let config: Record<string, unknown>;
     try {
       const parsed: unknown = JSON.parse(configText);
@@ -172,6 +177,11 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         )}
       </div>
 
+      {!cloudSupported && (
+        <p className="px-5 pb-4 text-base text-muted-foreground" role="status">
+          {WINDOWS_CLOUD_MACHINES_NOTICE}
+        </p>
+      )}
       <form onSubmit={(event) => void addMachine(event)} className="space-y-4 border-t border-border px-5 py-4">
         <h2 className="text-base font-medium">Add a cloud machine</h2>
         {providers.length === 0 && (
@@ -181,7 +191,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
               : "No remote runner providers available. Connect to the app-server and refresh to discover supported providers."}
           </p>
         )}
-        <fieldset disabled={busy || providers.length === 0} className="space-y-4">
+        <fieldset disabled={!cloudSupported || busy || providers.length === 0} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label htmlFor={`${formId}-name`} className="space-y-1.5 text-base">
               <span>Machine name</span>

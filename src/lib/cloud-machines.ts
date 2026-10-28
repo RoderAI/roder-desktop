@@ -1,3 +1,6 @@
+export const WINDOWS_CLOUD_MACHINES_NOTICE =
+  "Cloud machines are not supported on Windows yet. Choose Local machine to use native Windows tools.";
+
 export type CloudMachine = {
   id: string;
   name: string;

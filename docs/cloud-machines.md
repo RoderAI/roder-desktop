@@ -5,13 +5,21 @@ installed runner provider, an absolute workspace path on that runner, and its
 non-secret JSON configuration. Provider-specific examples and authentication
 environment variables appear below the provider selector.
 
+Cloud machines are currently unavailable on Windows because the embedded
+runner validates remote POSIX paths using host path rules. Windows users can
+continue using **Local machine** with native Windows tools. Saved cloud profiles
+remain visible but cannot be selected or run on Windows.
+
 On a new thread, choose the profile from the execution-machine selector beside
 the policy controls. The default is **Local machine**. A thread's native coding
 tools use its chosen runner workspace. The binding is fixed when the thread is
 created and persists in Roder's thread metadata, including when the thread is
 reopened. Changing the new-thread selector does not move existing threads.
-Local selections explicitly bind the `unix-local` runner so they cannot inherit
-an upstream global cloud-runner destination.
+Local selections preserve the native host tools, shell, and workspace behavior.
+If an upstream global runner destination is configured, local thread creation
+fails rather than inheriting that destination. Clear the global runner
+configuration and restart the app, or choose a cloud machine. Selecting a
+desktop cloud profile does not change the upstream global runner configuration.
 
 The local project remains the thread's desktop workspace context. This feature
 does not upload or synchronize a local repository. Prepare the remote directory
