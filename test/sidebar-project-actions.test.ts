@@ -12,6 +12,10 @@ vi.mock("../src/stores/roder-store", () => ({
   useRoderStore: (selector: (state: { workspaces: [] }) => unknown) => selector({ workspaces: [] }),
 }));
 
+vi.mock("../src/components/sidebar-update-button", () => ({
+  SidebarUpdateButton: () => createElement("button", { type: "button", "data-update-pill": true }, "Update"),
+}));
+
 test("project creation lives in the Projects section instead of a duplicate top-level action", () => {
   const action = vi.fn<() => void>();
   const html = renderToStaticMarkup(
@@ -37,4 +41,6 @@ test("project creation lives in the Projects section instead of a duplicate top-
   expect(html).toContain('aria-label="Add project"');
   expect(html).not.toContain(">Add Project<");
   expect(html).toContain("New Agent");
+  // The update action belongs in the current footer, beside (not inside) Settings.
+  expect(html).toMatch(/Settings<\/span><\/button><button[^>]*data-update-pill="true"/);
 });
