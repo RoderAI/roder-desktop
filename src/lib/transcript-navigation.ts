@@ -1,9 +1,9 @@
 import type { TranscriptRow } from "@/lib/transcript-rows";
-import { subagentDisplayName, subagentMessageResult, subagentMessagesForMessage } from "@/lib/subagent-messages";
+import { subagentMessagesForMessage } from "@/lib/subagent-messages";
 
 export type TranscriptNavigationItem = {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user";
   preview: string;
   rowIndex: number;
 };
@@ -13,25 +13,21 @@ export function buildTranscriptNavigation(rows: readonly TranscriptRow[]): Trans
   rows.forEach((row, rowIndex) => {
     if (row.kind !== "entry" || row.entry.kind !== "message") return;
     const message = row.entry.message;
-    if (message.role === "tool") return;
-    const subagentMessages = subagentMessagesForMessage(message);
-    if (subagentMessages) {
-      const preview = subagentMessages
-        .map((delivery) => {
-          const agent = subagentDisplayName(delivery.kind === "NEW_TASK" ? delivery.recipient : delivery.sender);
-          return `${agent}: ${subagentMessageResult(delivery).body}`;
-        })
-        .join("\n\n")
-        .replace(/\s+/gu, " ")
-        .slice(0, 320);
-      items.push({ id: message.id, role: "system", preview, rowIndex });
-      return;
-    }
+    if (message.role !== "user" || subagentMessagesForMessage(message)) return;
     const preview = message.text.trim().replace(/\s+/gu, " ") || (message.images?.length ? "Image attachment" : "");
     if (!preview) return;
     items.push({ id: message.id, role: message.role, preview: preview.slice(0, 320), rowIndex });
   });
   return items;
+}
+
+export function mergeTranscriptNavigation(
+  older: readonly TranscriptNavigationItem[],
+  loaded: readonly TranscriptNavigationItem[],
+): TranscriptNavigationItem[] {
+  const loadedById = new Map(loaded.map((item) => [item.id, item]));
+  const olderById = new Map(older.filter((item) => !loadedById.has(item.id)).map((item) => [item.id, item]));
+  return [...olderById.values(), ...loadedById.values()];
 }
 
 export function activeTranscriptNavigationId(
@@ -43,13 +39,14 @@ export function activeTranscriptNavigationId(
   if (selectedId && items.some((item) => item.id === selectedId)) return selectedId;
   if (pinnedToEnd) return items.at(-1)?.id ?? null;
   for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (items[index].rowIndex <= firstVisibleRow) return items[index].id;
+    if (items[index].rowIndex >= 0 && items[index].rowIndex <= firstVisibleRow) return items[index].id;
   }
-  return items[0]?.id ?? null;
+  return items.find((item) => item.rowIndex >= 0)?.id ?? items[0]?.id ?? null;
 }
 
 export function transcriptNavigationTarget(items: readonly TranscriptNavigationItem[], id: string): number | null {
-  return items.find((item) => item.id === id)?.rowIndex ?? null;
+  const rowIndex = items.find((item) => item.id === id)?.rowIndex;
+  return rowIndex !== undefined && rowIndex >= 0 ? rowIndex : null;
 }
 
 export function transcriptNavigationPreview(text: string): { title: string; body: string } {

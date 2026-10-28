@@ -1,9 +1,17 @@
 import type { ConversationMessage, SubagentLifecycleEvent } from "@/types/roder";
+import { HISTORY_BLOCK_ITEMS, historyBlockRange } from "@/lib/sparse-transcript-history";
 import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { groupToolMessagesForTranscript, type TranscriptMessageEntry } from "@/lib/tool-message-groups";
 import { subagentMessagesForMessage } from "@/lib/subagent-messages";
 
 export type TranscriptRow =
+  | {
+      kind: "history";
+      key: string;
+      start: number;
+      end: number;
+      estimatedSize: number;
+    }
   | TranscriptEntryRow
   | {
       key: string;
@@ -31,6 +39,18 @@ export type TranscriptEntryRow = {
   previousIsTool: boolean;
   turnId?: string;
 };
+
+export function buildTranscriptHistoryRows(olderCount: number, itemSize: number): TranscriptRow[] {
+  return Array.from({ length: Math.ceil(olderCount / HISTORY_BLOCK_ITEMS) }, (_, block) => {
+    const range = historyBlockRange(block, olderCount);
+    return {
+      kind: "history",
+      key: `history:${range.start}`,
+      ...range,
+      estimatedSize: (range.end - range.start) * itemSize,
+    };
+  });
+}
 
 export type TranscriptRowsOptions = {
   activeTurnId?: string;
@@ -258,6 +278,8 @@ function transcriptRowsEquivalent(left: TranscriptRow, right: TranscriptRow): bo
   if (left.kind !== right.kind) {
     return false;
   }
+  if (left.kind === "history" && right.kind === "history")
+    return left.start === right.start && left.end === right.end && left.estimatedSize === right.estimatedSize;
   if (left.kind === "working" || right.kind === "working") {
     return true;
   }
@@ -374,6 +396,7 @@ function transcriptEntryMessages(entry: TranscriptMessageEntry | undefined): Con
 }
 
 function transcriptRowSearchText(row: TranscriptRow): string {
+  if (row.kind === "history") return "";
   if (row.kind === "turnReviewChanges") {
     return [reviewTurnChangeLabel(row.summary), reviewChangeDeltaText(row.summary)].filter(Boolean).join("\n");
   }

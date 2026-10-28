@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { PersistentAgentAvatar } from "@/components/persistent-agent-avatar";
+import { SidebarUpdateButton } from "@/components/sidebar-update-button";
 import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { PersistentAgent } from "@/types/persistent-agents";
@@ -411,11 +412,15 @@ export function AppSidebar({
           </section>
         </div>
       </div>
-      <div className="no-drag shrink-0 px-2 pb-2">
-        <SidebarRowButton className="focus-visible:ring-2 focus-visible:ring-ring" onClick={onOpenSettings}>
+      <div className="no-drag flex shrink-0 items-center gap-2 px-2 pb-2">
+        <SidebarRowButton
+          className="min-w-0 flex-1 focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={onOpenSettings}
+        >
           <Settings className="size-4" />
           <span>Settings</span>
         </SidebarRowButton>
+        <SidebarUpdateButton />
       </div>
     </aside>
   );

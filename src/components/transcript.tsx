@@ -6,10 +6,15 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type WheelEvent,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useMountEffect } from "@/hooks/use-mount-effect";
+import type { TranscriptHistoryIndex } from "@/components/indexed-transcript";
+import { sparseHistorySegments } from "@/lib/sparse-transcript-history";
+import { messagesFromThread } from "@/lib/roder-thread";
 import { FileDiff } from "lucide-react";
 import { TranscriptNavigation } from "@/components/transcript-navigation";
 import {
@@ -40,6 +45,7 @@ import {
 } from "@/lib/transcript-scroll";
 import {
   buildTranscriptRows,
+  buildTranscriptHistoryRows,
   reconcileTranscriptRows,
   transcriptNestedDisclosureKey,
   transcriptRowDisclosureKeys,
@@ -66,7 +72,7 @@ import {
   type HistoryScrollAnchor,
 } from "@/lib/transcript-history";
 
-type TranscriptProps = {
+export type TranscriptProps = {
   messages: ConversationMessage[];
   followSignal: number;
   bottomInsetPx?: number;
@@ -84,6 +90,9 @@ type TranscriptProps = {
   historyError?: string | null;
   onLoadOlderHistory?: () => Promise<void>;
   onRetryHistory?: () => Promise<void>;
+  navigationThreadId?: string;
+  onLoadNavigationMessage?: (id: string, isCancelled: () => boolean, signal: AbortSignal) => Promise<void>;
+  indexedHistory?: TranscriptHistoryIndex;
 };
 
 const emptySubagentLifecycleEvents: SubagentLifecycleEvent[] = [];
@@ -91,6 +100,14 @@ const emptySubagentLifecycleEvents: SubagentLifecycleEvent[] = [];
 const defaultTranscriptScrollStateKey = "default";
 const emptyTurnChangeSummaries: Record<string, ReviewTurnChangeSummary> = {};
 const transcriptScrollStateByKey = new Map<string, TranscriptScrollRestorationState>();
+
+function indexedTranscriptLayout(history?: TranscriptHistoryIndex): { rows: TranscriptRow[]; overscan: number } {
+  if (!history) return { rows: [], overscan: 8 };
+  return {
+    rows: buildTranscriptHistoryRows(history.index.olderCount, history.estimatedItemSize),
+    overscan: 1,
+  };
+}
 
 export function Transcript({
   activeTurnId,
@@ -110,6 +127,9 @@ export function Transcript({
   historyError,
   onLoadOlderHistory,
   onRetryHistory,
+  navigationThreadId,
+  onLoadNavigationMessage,
+  indexedHistory,
 }: TranscriptProps): React.JSX.Element {
   const skills = useSkillsStore((state) => state.skills);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -127,9 +147,11 @@ export function Transcript({
   const userScrollIntentRef = useRef(false);
   const userScrollIntentTimeoutRef = useRef<number | null>(null);
   const historyAnchorRef = useRef<(HistoryScrollAnchor & { threadKey: string; cursor: string | null }) | null>(null);
+  const pendingNavigationRef = useRef<{ threadKey: string; id: string; controller: AbortController } | null>(null);
   const [disclosureOpenByKey, setDisclosureOpenByKey] = useState<TranscriptDisclosureState>({});
   const [pinnedToEnd, setPinnedToEnd] = useState(true);
   const [selectedNavigation, setSelectedNavigation] = useState<{ threadKey: string; id: string } | null>(null);
+  const [navigationError, setNavigationError] = useState<{ threadKey: string; message: string } | null>(null);
 
   const messageVersion = useMemo(() => {
     const lastMessage = messages.at(-1);
@@ -145,20 +167,29 @@ export function Transcript({
     ].join(":");
   }, [bottomInsetPx, messages, showWorkingIndicator]);
   const previousTranscriptRowsRef = useRef<TranscriptRow[]>([]);
+  const { rows: indexedRows, overscan } = useMemo(() => indexedTranscriptLayout(indexedHistory), [indexedHistory]);
   const transcriptRows = useMemo(() => {
-    const rows = reconcileTranscriptRows(
-      previousTranscriptRowsRef.current,
-      buildTranscriptRows({
+    const rows = reconcileTranscriptRows(previousTranscriptRowsRef.current, [
+      ...indexedRows,
+      ...buildTranscriptRows({
         activeTurnId,
         messages,
         showWorkingIndicator,
         subagentLifecycleEvents,
         turnChangeSummaries: onReviewTurnChanges ? turnChangeSummaries : {},
       }),
-    );
+    ]);
     previousTranscriptRowsRef.current = rows;
     return rows;
-  }, [activeTurnId, messages, onReviewTurnChanges, showWorkingIndicator, subagentLifecycleEvents, turnChangeSummaries]);
+  }, [
+    activeTurnId,
+    messages,
+    onReviewTurnChanges,
+    showWorkingIndicator,
+    subagentLifecycleEvents,
+    turnChangeSummaries,
+    indexedRows,
+  ]);
   const transcriptRowKeys = useMemo(() => transcriptRows.map((row) => row.key), [transcriptRows]);
   const rowKeyVersion = useMemo(() => transcriptRowKeys.join("\u0000"), [transcriptRowKeys]);
   const transcriptVersion = useMemo(() => [messageVersion, rowKeyVersion].join("\n"), [messageVersion, rowKeyVersion]);
@@ -200,6 +231,9 @@ export function Transcript({
     );
   }, []);
   const rememberTranscriptScrollState = useCallback((key: string) => {
+    // Initial measurement happens before restoration. Do not replace the saved
+    // position with the temporary top-of-list viewport during that measurement.
+    if (restoredScrollStateKeyRef.current !== key) return;
     const viewport = viewportRef.current;
     if (!viewport) {
       return;
@@ -287,7 +321,9 @@ export function Transcript({
     getItemKey: getTranscriptRowKey,
     getScrollElement: getTranscriptScrollElement,
     onChange: handleVirtualizerChange,
-    overscan: 8,
+    // A history slot is a bounded page, not one message. Avoid fetching eight pages
+    // on either side of the viewport merely because the live tail uses that overscan.
+    overscan,
     paddingEnd: bottomInsetPx,
     paddingStart: hasOlderHistory || historyLoading || historyError ? 40 : 0,
     scrollEndThreshold: transcriptScrollAffordanceThresholdPx,
@@ -435,6 +471,8 @@ export function Transcript({
     viewportRef.current = viewport;
   }, []);
   const markUserScrollIntent = useCallback(() => {
+    pendingNavigationRef.current?.controller.abort();
+    pendingNavigationRef.current = null;
     setSelectedNavigation(null);
     userScrollIntentRef.current = true;
     if (userScrollIntentTimeoutRef.current !== null) {
@@ -514,7 +552,13 @@ export function Transcript({
 
   useLayoutEffect(() => {
     const key = scrollStateKeyRef.current;
-    return () => rememberTranscriptScrollState(key);
+    return () => {
+      rememberTranscriptScrollState(key);
+      if (pendingNavigationRef.current?.threadKey === key) {
+        pendingNavigationRef.current.controller.abort();
+        pendingNavigationRef.current = null;
+      }
+    };
   }, [rememberTranscriptScrollState, scrollStateKey]);
 
   useLayoutEffect(() => {
@@ -577,6 +621,8 @@ export function Transcript({
     });
 
     if (followAction.kind === "explicit") {
+      pendingNavigationRef.current?.controller.abort();
+      pendingNavigationRef.current = null;
       historyAnchorRef.current = null;
       setSelectedNavigation(null);
       setPinnedToEndState(true);
@@ -607,28 +653,55 @@ export function Transcript({
   }, [mountedRowKeysVersion, transcriptRows]);
   const suppressAutoFollowScrollbar = transcriptHasActiveStreaming && pinnedToEnd;
   const navigationItems = buildTranscriptNavigation(transcriptRows);
-  const activeNavigationId = activeTranscriptNavigationId(
-    navigationItems,
-    rowVirtualizer.range?.startIndex ?? 0,
-    pinnedToEnd,
-    selectedNavigation?.threadKey === scrollStateKey ? selectedNavigation.id : null,
-  );
+  const selectedNavigationId = selectedNavigation?.threadKey === scrollStateKey ? selectedNavigation.id : null;
+  const activeNavigationId =
+    selectedNavigationId ??
+    activeTranscriptNavigationId(navigationItems, rowVirtualizer.range?.startIndex ?? 0, pinnedToEnd);
+
+  useLayoutEffect(() => {
+    const pending = pendingNavigationRef.current;
+    if (!pending || pending.threadKey !== scrollStateKey) return;
+    const index = transcriptNavigationTarget(navigationItems, pending.id);
+    if (index === null) return;
+    pendingNavigationRef.current = null;
+    rowVirtualizer.scrollToIndex(index, { align: "start", behavior: "auto" });
+  }, [navigationItems, rowVirtualizer, scrollStateKey]);
 
   function jumpToMessage(id: string): void {
     const index = transcriptNavigationTarget(navigationItems, id);
-    if (index === null) return;
+    if (index === null && !onLoadNavigationMessage) return;
     cancelPendingScrollFrame();
+    historyAnchorRef.current = null;
     scrollObservationVersionRef.current += 1;
     markUserScrollIntent();
     setSelectedNavigation({ threadKey: scrollStateKey, id });
     setPinnedToEndState(false);
-    rowVirtualizer.scrollToIndex(index, { align: "start", behavior: "auto" });
+    setNavigationError(null);
+    if (index !== null) {
+      pendingNavigationRef.current = null;
+      rowVirtualizer.scrollToIndex(index, { align: "start", behavior: "auto" });
+      return;
+    }
+    const pending = { threadKey: scrollStateKey, id, controller: new AbortController() };
+    pendingNavigationRef.current = pending;
+    const isCancelled = () =>
+      pendingNavigationRef.current !== pending || scrollStateKeyRef.current !== pending.threadKey;
+    void onLoadNavigationMessage?.(id, isCancelled, pending.controller.signal).catch((error: unknown) => {
+      if (isCancelled()) return;
+      pendingNavigationRef.current = null;
+      setNavigationError({ threadKey: scrollStateKey, message: (error as Error).message });
+    });
   }
 
   return (
     <div className="relative min-h-0 flex-1">
       <TranscriptSearchMirror text={transcriptSearchText} />
       <TranscriptWorkingLiveRegion active={showWorkingIndicator} />
+      {navigationError?.threadKey === scrollStateKey && (
+        <p role="alert" className="absolute left-8 top-2 z-30 rounded bg-popover px-3 py-2 text-sm">
+          {navigationError.message}
+        </p>
+      )}
       <TranscriptHistoryControls
         hasMore={hasOlderHistory}
         loading={historyLoading}
@@ -638,12 +711,17 @@ export function Transcript({
         onRetry={onRetryHistory}
       />
       <TranscriptNavigation
-        key={scrollStateKey}
+        key={`${scrollStateKey}:${historyLoading ? "loading" : "ready"}`}
         items={navigationItems}
         messages={messages}
         activeId={activeNavigationId}
         bottomInsetPx={bottomInsetPx}
         onSelect={jumpToMessage}
+        history={
+          navigationThreadId && !historyLoading
+            ? { threadId: navigationThreadId, before: hasOlderHistory ? historyCursor : null }
+            : undefined
+        }
       />
       <ScrollArea
         className={cn("h-full", navigationItems.length > 0 && "ml-8")}
@@ -689,12 +767,16 @@ export function Transcript({
                     width: "100%",
                   }}
                 >
-                  <TranscriptRowView
+                  <TranscriptVirtualContent
+                    row={row}
+                    indexedHistory={indexedHistory}
+                    skills={skills}
+                    viewportRef={viewportRef}
+                    virtualSize={virtualItem.size}
+                    onReviewTurnChanges={onReviewTurnChanges}
+                    onReloadHistory={onRetryHistory}
                     disclosureOpenByKey={disclosureOpenByKey}
                     onDisclosureOpenChange={setDisclosureOpen}
-                    onReviewTurnChanges={onReviewTurnChanges}
-                    row={row}
-                    skills={skills}
                   />
                 </div>
               );
@@ -752,6 +834,198 @@ function TranscriptHistoryControls({
   );
 }
 
+function TranscriptVirtualContent({
+  row,
+  indexedHistory,
+  skills,
+  viewportRef,
+  virtualSize,
+  onReviewTurnChanges,
+  onReloadHistory,
+  disclosureOpenByKey,
+  onDisclosureOpenChange,
+}: {
+  row: TranscriptRow;
+  indexedHistory?: TranscriptHistoryIndex;
+  skills: SkillDescriptor[];
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  virtualSize: number;
+  onReviewTurnChanges?: (turnId: string) => void;
+  onReloadHistory?: () => Promise<void>;
+  disclosureOpenByKey: TranscriptDisclosureState;
+  onDisclosureOpenChange: (key: string, open: boolean) => void;
+}): React.JSX.Element {
+  if (row.kind === "history" && indexedHistory)
+    return (
+      <TranscriptHistoryBlock
+        row={row}
+        history={indexedHistory}
+        skills={skills}
+        viewportRef={viewportRef}
+        placeholderItemSize={virtualSize / (row.end - row.start)}
+        onReviewTurnChanges={onReviewTurnChanges}
+        onReloadHistory={onReloadHistory}
+      />
+    );
+  return (
+    <TranscriptRowView
+      row={row}
+      skills={skills}
+      disclosureOpenByKey={disclosureOpenByKey}
+      onDisclosureOpenChange={onDisclosureOpenChange}
+      onReviewTurnChanges={onReviewTurnChanges}
+    />
+  );
+}
+
+function TranscriptHistoryBlock({
+  row,
+  history,
+  skills,
+  viewportRef,
+  placeholderItemSize,
+  onReviewTurnChanges,
+  onReloadHistory,
+}: {
+  row: Extract<TranscriptRow, { kind: "history" }>;
+  history: TranscriptHistoryIndex;
+  skills: SkillDescriptor[];
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  placeholderItemSize: number;
+  onReviewTurnChanges?: (turnId: string) => void;
+  onReloadHistory?: () => Promise<void>;
+}): React.JSX.Element {
+  const snapshot = useSyncExternalStore(history.cache.subscribe, history.cache.getSnapshot, history.cache.getSnapshot);
+  useMountEffect(() => history.cache.retainRange(row.start, row.end));
+  const [disclosures, setDisclosures] = useState<TranscriptDisclosureState>({});
+  const onDisclosureOpenChange = useCallback((key: string, open: boolean) => {
+    setDisclosures((previous) => setTranscriptDisclosureOpen(previous, key, open));
+  }, []);
+  const segments = sparseHistorySegments(row, snapshot.windows);
+  return (
+    <section aria-label={`Conversation entries ${row.start + 1} to ${row.end}`} data-history-start={row.start}>
+      {segments.map((segment) =>
+        segment.page ? (
+          <HistoryPageRows
+            key={`${segment.start}:${segment.end}`}
+            thread={segment.page.thread}
+            skills={skills}
+            disclosures={disclosures}
+            onDisclosureOpenChange={onDisclosureOpenChange}
+            onReviewTurnChanges={onReviewTurnChanges}
+          />
+        ) : (
+          <TranscriptHistoryGap
+            key={`${segment.start}:${segment.end}`}
+            start={segment.start}
+            end={segment.end}
+            history={history}
+            viewportRef={viewportRef}
+            error={snapshot.errors[`${segment.start}:${segment.end}`]}
+            placeholderItemSize={placeholderItemSize}
+            onReloadHistory={onReloadHistory}
+          />
+        ),
+      )}
+    </section>
+  );
+}
+
+function HistoryPageRows({
+  thread,
+  skills,
+  disclosures,
+  onDisclosureOpenChange,
+  onReviewTurnChanges,
+}: {
+  thread: import("@/types/roder").RoderThread;
+  skills: SkillDescriptor[];
+  disclosures: TranscriptDisclosureState;
+  onDisclosureOpenChange: (key: string, open: boolean) => void;
+  onReviewTurnChanges?: (turnId: string) => void;
+}): React.JSX.Element {
+  const rows = useMemo(() => buildTranscriptRows({ messages: messagesFromThread(thread) }), [thread]);
+  return (
+    <>
+      {rows.map((row) => (
+        <div key={row.key} className={transcriptRowSpacing(row)}>
+          <TranscriptRowView
+            row={row}
+            skills={skills}
+            disclosureOpenByKey={disclosures}
+            onDisclosureOpenChange={onDisclosureOpenChange}
+            onReviewTurnChanges={onReviewTurnChanges}
+          />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function TranscriptHistoryGap({
+  start,
+  end,
+  history,
+  viewportRef,
+  error,
+  placeholderItemSize,
+  onReloadHistory,
+}: {
+  start: number;
+  end: number;
+  history: TranscriptHistoryIndex;
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  error?: string;
+  placeholderItemSize: number;
+  onReloadHistory?: () => Promise<void>;
+}): React.JSX.Element {
+  const element = useRef<HTMLDivElement | null>(null);
+  useMountEffect(() => {
+    if (!element.current) return;
+    let stopWatching: (() => void) | undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          stopWatching ??= history.cache.watchRange(start, end);
+        } else {
+          stopWatching?.();
+          stopWatching = undefined;
+        }
+      },
+      { root: viewportRef.current, rootMargin: "400px" },
+    );
+    observer.observe(element.current);
+    return () => {
+      observer.disconnect();
+      stopWatching?.();
+    };
+  });
+  return (
+    <div
+      ref={element}
+      style={{ minHeight: (end - start) * placeholderItemSize }}
+      className="flex items-center justify-center py-6 text-sm text-muted-foreground"
+      aria-busy={!error}
+    >
+      {error ? (
+        <div role="alert" className="max-w-sm text-center">
+          <p>Could not load this section.</p>
+          <Button variant="ghost" size="sm" onClick={() => history.cache.retry(start, end)}>
+            Retry section
+          </Button>
+          {onReloadHistory ? (
+            <Button variant="ghost" size="sm" onClick={() => void onReloadHistory()}>
+              Reload history
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <span role="status">Loading this section…</span>
+      )}
+    </div>
+  );
+}
+
 const TranscriptRowView = memo(function TranscriptRowView({
   disclosureOpenByKey,
   onDisclosureOpenChange,
@@ -765,6 +1039,7 @@ const TranscriptRowView = memo(function TranscriptRowView({
   row: TranscriptRow;
   skills: SkillDescriptor[];
 }): React.JSX.Element | null {
+  if (row.kind === "history") return null;
   if (row.kind === "turnReviewChanges") {
     if (!onReviewTurnChanges) {
       return null;
@@ -876,6 +1151,7 @@ const TranscriptEntryView = memo(function TranscriptEntryView({
 });
 
 function transcriptRowSpacing(row: TranscriptRow): string {
+  if (row.kind === "history") return "";
   if (row.kind === "turnReviewChanges") {
     return "py-3";
   }
@@ -894,10 +1170,11 @@ function transcriptRowSpacing(row: TranscriptRow): string {
   );
 }
 
-function estimateTranscriptRowSize(row: TranscriptRow | undefined): number {
+export function estimateTranscriptRowSize(row: TranscriptRow | undefined): number {
   if (!row) {
     return 72;
   }
+  if (row.kind === "history") return row.estimatedSize;
   if (row.kind === "turnReviewChanges") {
     return 88;
   }

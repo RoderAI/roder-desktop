@@ -8,9 +8,10 @@ import { useAppShell } from "@/components/app-shell-context";
 import { Composer } from "@/components/composer";
 import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
-import { Transcript } from "@/components/transcript";
+import { IndexedTranscript as Transcript } from "@/components/indexed-transcript";
 import { finishedFolderTurnSummaries, finishedReviewTurnKey } from "@/lib/review-changes";
 import { emptyThreadHistoryState } from "@/lib/thread-history-state";
+import { loadTranscriptNavigationMessage } from "@/lib/transcript-navigation-loading";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -245,6 +246,10 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           hasOlderHistory={history.hasMore}
           loadingOlderHistory={history.loadingOlder}
           historyError={history.error}
+          navigationThreadId={routeActiveThreadId}
+          onLoadNavigationMessage={(id, isCancelled, signal) =>
+            loadTranscriptNavigationMessage(routeActiveThreadId, id, isCancelled, signal)
+          }
           onLoadOlderHistory={() => loadOlderHistory(routeActiveThreadId)}
           onRetryHistory={() => selectThread(routeActiveThreadId, { pushHistory: false, refreshHistory: true })}
           showWorkingIndicator={showWorkingIndicator}
