@@ -54,10 +54,7 @@ export function ordinarySidebarThreads<
     Object.values(tracesByThread).flatMap((traces) => traces.map((trace) => trace.childThreadId).filter(Boolean)),
   );
   return threads.filter(
-    (thread) =>
-      !persistentThreadIds.has(thread.id) &&
-      !thread.parentThreadId &&
-      !childThreadIds.has(thread.id),
+    (thread) => !persistentThreadIds.has(thread.id) && !thread.parentThreadId && !childThreadIds.has(thread.id),
   );
 }
 
