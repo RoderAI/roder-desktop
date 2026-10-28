@@ -51,6 +51,29 @@ Installers are on [roder.sh/desktop](https://roder.sh/desktop/) and on the [GitH
 3. **Add a project.** Choose the folder agents should work in.
 4. **Send your first message.** Start the agent and watch it work in the transcript.
 
+## Configure Roder and create persistent agents from chat
+
+Ask Roder to configure itself, or invoke `$roder-config`. Desktop provides the
+`desktop_config` tool for live runtime settings, provider/model defaults, skill
+configuration, and MCP/workflow discovery and approval. The tool uses an
+allowlisted app-server bridge, not browser scripting or unrestricted RPC access.
+Credential changes and arbitrary Electron preferences are not exposed through
+this tool. Executable MCP integrations require explicit approval; restart-only
+settings are reported as such.
+
+Ask, for example, "Create a persistent agent named Release Watcher to monitor
+this project's releases," or invoke `$persistent-agent`. The model asks for
+missing name/mission details and calls `persistent_agent_create` in the current
+workspace. A different existing workspace and an explicit provider/model pair
+can be supplied. No creation dialog is required.
+
+The persistent-agent skill is bundled into Desktop and supplied to the model in
+every chat turn, including workspaces without this repository's `.agents` files.
+New agents are persisted **paused**; creation does not enable proactive work or
+start a run. Proactive execution requires enablement and a running Desktop app.
+After updating Desktop, start a new chat to receive newly added tools: the
+embedded harness fixes a thread's external tool definitions at creation.
+
 ## How it fits together
 
 Roder Desktop is an Electron shell around the Roder agent harness. The shell renders the workspace, and it starts the harness as a local process and talks to it over JSON-RPC on stdio. The harness version is pinned in `roder-distro-config.toml` and bundled into the app.

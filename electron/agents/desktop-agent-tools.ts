@@ -14,7 +14,20 @@ export class DesktopAgentTools {
   constructor(
     private readonly tools: DesktopAgentTool[],
     private readonly request: (method: string, params: unknown) => Promise<unknown>,
+    private readonly instructions = "",
   ) {}
+
+  turnStartParams(params: unknown): Record<string, unknown> {
+    const input = isRecord(params) ? params : {};
+    if (!this.instructions) return input;
+    const existing = typeof input.developerContext === "string" ? input.developerContext : "";
+    return {
+      ...input,
+      developerContext: existing.includes(this.instructions)
+        ? existing
+        : [this.instructions, existing].filter(Boolean).join("\n\n"),
+    };
+  }
 
   threadStartParams(params: unknown): Record<string, unknown> {
     const input = isRecord(params) ? params : {};

@@ -1625,6 +1625,105 @@ test("steerPrompt sends queued input to the active running turn", async () => {
   });
 });
 
+function runningThread(): RoderThread {
+  return {
+    id: "thread-1",
+    preview: "Running thread",
+    model: "gpt-5.2",
+    modelProvider: "openai",
+    status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
+    cwd: "/workspace",
+    turns: [{ id: "turn-1", items: [], itemsView: "default", status: "inProgress" }],
+  };
+}
+
+test("turn lifecycle synchronizes cached transcript status and composer busy state", async () => {
+  const store = await loadRoderStore();
+  const thread = runningThread();
+  thread.status = { type: "idle", activeTurnId: null, activeFlags: [] };
+  store.setState({ threads: [thread], threadDetails: { "thread-1": thread }, busy: false });
+
+  store.getState().applyNotification({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-1" } },
+  });
+  expect(store.getState().threadDetails["thread-1"].status).toEqual(store.getState().threads[0].status);
+  expect(store.getState().threadDetails["thread-1"].status.activeTurnId).toBe("turn-1");
+  expect(store.getState().busy).toBe(true);
+
+  store.getState().applyNotification({
+    method: "turn/completed",
+    params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } },
+  });
+  expect(store.getState().threadDetails["thread-1"].status.type).toBe("idle");
+  expect(store.getState().threadDetails["thread-1"].status).toEqual(store.getState().threads[0].status);
+  expect(store.getState().threadDetails["thread-1"].turns?.[0].status).toBe("completed");
+  expect(store.getState().busy).toBe(false);
+});
+
+test("an idle status notification releases the composer only for the active thread", async () => {
+  const store = await loadRoderStore();
+  const thread = runningThread();
+  store.setState({ threads: [thread], threadDetails: { "thread-1": thread }, busy: true });
+  for (const threadId of ["other-thread", "thread-1"]) {
+    store.getState().applyNotification({
+      method: "thread/status/changed",
+      params: { threadId, status: { type: "idle", activeTurnId: null, activeFlags: [] } },
+    });
+    expect(store.getState().busy).toBe(threadId !== "thread-1");
+  }
+  expect(store.getState().threadDetails["thread-1"].status.type).toBe("idle");
+});
+
+test("a stale steer releases working state without consuming the queued prompt", async () => {
+  const request = vi
+    .fn<(method: string, params?: unknown) => Promise<unknown>>()
+    .mockRejectedValue(new Error("Error invoking remote method 'roder:request': Error: no active turn to steer"));
+  const store = await loadRoderStore(request);
+  const thread = runningThread();
+  store.setState({ threads: [thread], threadDetails: { "thread-1": thread }, busy: true });
+  const queued = store.getState().addQueuedPrompt("thread-1", "are you still working?");
+
+  await expect(store.getState().steerPrompt(queued.prompt)).rejects.toThrow("no active turn to steer");
+  expect(store.getState().busy).toBe(false);
+  expect(store.getState().threads[0].status.type).toBe("idle");
+  expect(store.getState().threadDetails["thread-1"].status.type).toBe("idle");
+  expect(store.getState().queuedPromptsByThread["thread-1"]).toEqual([queued]);
+});
+
+test("a rejected steer does not clear a newer running turn", async () => {
+  let reject!: (error: Error) => void;
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(
+    () =>
+      new Promise((_, rejectRequest) => {
+        reject = rejectRequest;
+      }),
+  );
+  const store = await loadRoderStore(request);
+  const thread = runningThread();
+  store.setState({ threads: [thread], threadDetails: { "thread-1": thread }, busy: true });
+  const pending = store.getState().steerPrompt("follow up");
+  store.getState().applyNotification({
+    method: "turn/started",
+    params: { threadId: "thread-1", turn: { id: "turn-2" } },
+  });
+  reject(new Error("no active turn to steer"));
+  await expect(pending).rejects.toThrow("no active turn to steer");
+  expect(store.getState().busy).toBe(true);
+  expect(store.getState().threadDetails["thread-1"].status.activeTurnId).toBe("turn-2");
+});
+
+test("unrelated steer errors do not clear working state", async () => {
+  const store = await loadRoderStore(
+    vi.fn<(method: string, params?: unknown) => Promise<unknown>>().mockRejectedValue(new Error("connection lost")),
+  );
+  const thread = runningThread();
+  store.setState({ threads: [thread], threadDetails: { "thread-1": thread }, busy: true });
+  await expect(store.getState().steerPrompt("follow up")).rejects.toThrow("connection lost");
+  expect(store.getState().busy).toBe(true);
+  expect(store.getState().threadDetails["thread-1"].status.type).toBe("running");
+});
+
 test("queued prompts are stored per thread and persisted", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-06-11T12:00:00Z"));
@@ -1706,6 +1805,58 @@ test("removing a migrated prompt uses its original queue key without affecting o
   expect(useRoderStore.getState().queuedPromptsByThread["thread-created"]).toEqual([pending]);
 });
 
+test.each(["select", "stage"] as const)(
+  "%s new-thread navigation clears composer busy without stopping the background thread",
+  async (navigation) => {
+    const store = await loadRoderStore();
+    const thread = runningThread();
+    store.setState({ threads: [thread], threadDetails: { "thread-1": thread }, busy: true });
+    const queued = store.getState().addQueuedPrompt("thread-1", "background follow-up");
+
+    if (navigation === "select") {
+      await store.getState().selectThread("");
+    } else {
+      store.getState().stageNewThread("/workspace");
+    }
+
+    expect(store.getState().activeThreadId).toBe("");
+    expect(store.getState().busy).toBe(false);
+    expect(store.getState().threadDetails["thread-1"].status.type).toBe("running");
+    expect(store.getState().threads[0].status.type).toBe("running");
+    expect(store.getState().queuedPromptsByThread["thread-1"]).toEqual([queued]);
+
+    store.getState().applyNotification({
+      method: "turn/started",
+      params: { threadId: "thread-1", turn: { id: "background-turn" } },
+    });
+    expect(store.getState().busy).toBe(false);
+  },
+);
+
+test("switching chats derives composer busy from the selected thread", async () => {
+  const running = runningThread();
+  const idle: RoderThread = {
+    ...running,
+    id: "idle-thread",
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    turns: [],
+  };
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    const id = (params as { threadId?: string })?.threadId;
+    return method === "thread/goal/read" ? { goal: null } : { thread: id === idle.id ? idle : running };
+  });
+  const store = await loadRoderStore(request);
+  store.setState({
+    threads: [running, idle],
+    threadDetails: { [running.id]: running, [idle.id]: idle },
+    busy: true,
+  });
+  await store.getState().selectThread(idle.id);
+  expect(store.getState().busy).toBe(false);
+  await store.getState().selectThread(running.id);
+  expect(store.getState().busy).toBe(true);
+});
+
 test("queued prompts staged on the new-thread route move to the created thread", async () => {
   const workspace = {
     id: "ws-1",
@@ -1744,21 +1895,26 @@ test("queued prompts staged on the new-thread route move to the created thread",
   });
   const useRoderStore = await loadRoderStore(request);
   useRoderStore.setState({
-    activeThreadId: "",
+    activeThreadId: "thread-1",
+    busy: true,
     status: { state: "ready", binary: "test", cwd: "/workspace" },
     selectedWorkspaceCwd: "/workspace",
     models: [{ id: "gpt-5.5", name: "GPT-5.5", modelProvider: "codex", isDefault: true }],
     defaultModel: "gpt-5.5",
     selectedModel: "gpt-5.5",
-    threadDetails: {},
-    threads: [],
+    threadDetails: { "thread-1": runningThread() },
+    threads: [runningThread()],
     workspaces: [],
   });
 
+  await useRoderStore.getState().selectThread("");
+  expect(useRoderStore.getState().busy).toBe(false);
   const queuedPrompt = useRoderStore.getState().addQueuedPrompt("", "second prompt");
   await useRoderStore.getState().sendPrompt("first prompt");
 
   expect(useRoderStore.getState().activeThreadId).toBe("thread-created");
+  expect(request).toHaveBeenCalledWith("turn/start", expect.objectContaining({ threadId: "thread-created" }));
+  expect(useRoderStore.getState().threadDetails["thread-1"].status.type).toBe("running");
   expect(useRoderStore.getState().queuedPromptsByThread).toEqual({
     "thread-created": [queuedPrompt],
   });

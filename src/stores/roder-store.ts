@@ -622,6 +622,7 @@ export const useRoderStore = create<RoderStore>()(
         if (!threadId) {
           set({
             activeThreadId: "",
+            busy: false,
             backStack:
               options.pushHistory && current.activeThreadId
                 ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
@@ -662,6 +663,7 @@ export const useRoderStore = create<RoderStore>()(
           if (baseline) details[threadId] = baseline;
           return {
             activeThreadId: threadId,
+            busy: isThreadRunning(selectedThread),
             ...selectedWorkspacePatch,
             threadDetails: details,
             threadHistoryByThread: {
@@ -697,6 +699,7 @@ export const useRoderStore = create<RoderStore>()(
             const thread = mergeInitialThreadHistory(incoming, state.threadDetails[threadId], baseline);
             const threadIsActive = threadId === state.activeThreadId;
             return {
+              busy: threadIsActive ? isThreadRunning(thread) : state.busy,
               selectedModelProvider: threadIsActive
                 ? state.threadControlsByThread[threadId]?.modelProvider ||
                   thread.modelProvider ||
@@ -957,6 +960,7 @@ export const useRoderStore = create<RoderStore>()(
       stageNewThread: (cwd) => {
         set((state) => ({
           activeThreadId: "",
+          busy: false,
           ...workspaceSelectionPatchForCwd(state, cwd),
           error: null,
         }));
@@ -1178,7 +1182,22 @@ export const useRoderStore = create<RoderStore>()(
           }
           await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
         } catch (error) {
-          set({ error: (error as Error).message });
+          const message = (error as Error).message;
+          set((latest) => {
+            const thread = threadForState(latest, threadId);
+            // A rejected steer can reveal a missed completion notification. Do not
+            // clear a newer turn that started while the request was in flight.
+            if (/no active turn to steer/i.test(message) && activeTurnIdForThread(thread) === activeTurnId) {
+              const status: RoderThread["status"] = { type: "idle", activeTurnId: null, activeFlags: [] };
+              return {
+                error: message,
+                threads: markThreadStatus(latest.threads, threadId, status),
+                threadDetails: markThreadDetailStatus(latest.threadDetails, threadId, status),
+                busy: latest.activeThreadId === threadId ? false : latest.busy,
+              };
+            }
+            return { error: message };
+          });
           throw error;
         }
       },
@@ -2404,15 +2423,18 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       completedAt: null,
       durationMs: null,
     });
+    const status: RoderThread["status"] = {
+      type: "running",
+      activeTurnId: turnId || null,
+      activeFlags: [],
+    };
     return {
       ...waitPatch,
       activeThreadId: state.activeThreadId || threadId,
-      threads: markThreadStatus(state.threads, threadId, {
-        type: "running",
-        activeTurnId: turnId || null,
-        activeFlags: [],
-      }),
-      threadDetails: nextThread ? { ...state.threadDetails, [threadId]: nextThread } : state.threadDetails,
+      threads: markThreadStatus(state.threads, threadId, status),
+      threadDetails: nextThread
+        ? { ...state.threadDetails, [threadId]: { ...nextThread, status } }
+        : state.threadDetails,
       busy: threadId === state.activeThreadId ? true : state.busy,
     };
   }
@@ -2528,10 +2550,13 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const threadId = String(params.threadId ?? state.activeThreadId);
     const turnId = String(turn.id ?? "");
     const nextThread = completeTurn(threadForState(state, threadId), turnId, turn);
+    const status: RoderThread["status"] = { type: "idle", activeTurnId: null, activeFlags: [] };
     return {
       ...waitPatch,
-      threadDetails: nextThread ? { ...state.threadDetails, [threadId]: nextThread } : state.threadDetails,
-      threads: markThreadStatus(state.threads, threadId, { type: "idle", activeTurnId: null, activeFlags: [] }),
+      threadDetails: nextThread
+        ? { ...state.threadDetails, [threadId]: { ...nextThread, status } }
+        : state.threadDetails,
+      threads: markThreadStatus(state.threads, threadId, status),
       busy: threadId === state.activeThreadId ? false : state.busy,
     };
   }
@@ -2545,6 +2570,7 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
       ...waitPatch,
       threads: markThreadStatus(state.threads, threadId, status),
       threadDetails: markThreadDetailStatus(state.threadDetails, threadId, status),
+      busy: threadId === state.activeThreadId ? status.type === "running" : state.busy,
     };
   }
 
