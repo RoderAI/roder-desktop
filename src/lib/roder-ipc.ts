@@ -1,4 +1,5 @@
 import type { CloudMachine, CloudMachineInput, CloudRunnerProvider } from "@/lib/cloud-machines";
+import type { IndexedTranscriptHistory, IndexedTranscriptPage, HistoryRange } from "@/lib/sparse-transcript-history";
 import { attachmentImageType } from "@/lib/attachment-preparation";
 import type {
   CommandsListResult,
@@ -570,6 +571,13 @@ export const roderIpc = {
       threadId,
       ...options,
     }) as Promise<ThreadHistoryReadResult>,
+  readThreadHistoryIndex: (threadId: string, before: string | null) =>
+    window.roderDesktop.request("desktop/thread/history/index", { threadId, before }) as Promise<
+      IndexedTranscriptHistory | { supported: false; reason: string }
+    >,
+  readThreadHistoryRange: (
+    params: HistoryRange & Pick<IndexedTranscriptHistory, "threadId" | "before" | "olderCount">,
+  ) => window.roderDesktop.request("desktop/thread/history/range", params) as Promise<IndexedTranscriptPage>,
   threadGoal: (threadId: string) =>
     window.roderDesktop.request("thread/goal/get", { threadId }) as Promise<ThreadGoalGetResult>,
   createGoal: (threadId: string, objective: string) =>

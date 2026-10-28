@@ -19,6 +19,7 @@ import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { savePngDataUrl } from "../attachment-images";
 import { createThreadHistoryService, type ThreadHistoryPage } from "../threads/thread-history";
+import { createThreadHistoryIndexService } from "../threads/thread-history-index";
 import {
   browserProviderFromRequestParams,
   browserToolThreadId,
@@ -82,6 +83,9 @@ import { mainPanelMinWidth, mainWindowMinHeight, mainWindowMinWidth } from "./wi
 
 const roder = new RoderAppServerClient();
 const threadHistory = createThreadHistoryService({
+  request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
+});
+const threadHistoryIndex = createThreadHistoryIndexService({
   request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
 });
 let changingImageCredentials = false;
@@ -824,6 +828,25 @@ function getCloudMachinesService(): CloudMachinesService {
 }
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
+  if (method === "desktop/thread/history/index" || method === "desktop/thread/history/range") {
+    const input = params as Record<string, unknown> | null;
+    if (!input || typeof input.threadId !== "string" || !input.threadId) throw new Error("A thread ID is required");
+    if (input.before !== null && typeof input.before !== "string") throw new Error("Invalid history boundary");
+    const boundary = { threadId: input.threadId, before: input.before as string | null };
+    if (method === "desktop/thread/history/index") return threadHistoryIndex.index(boundary);
+    if (
+      ![input.start, input.end, input.olderCount].every(
+        (value) => typeof value === "number" && Number.isSafeInteger(value),
+      )
+    )
+      throw new Error("Invalid history range");
+    return threadHistoryIndex.read({
+      ...boundary,
+      start: input.start as number,
+      end: input.end as number,
+      olderCount: input.olderCount as number,
+    });
+  }
   if (method === "thread/history/read") {
     const input = params as { threadId?: unknown; before?: unknown; limit?: unknown; maxBytes?: unknown } | null;
     if (!input || typeof input.threadId !== "string" || !input.threadId) throw new Error("A thread ID is required");

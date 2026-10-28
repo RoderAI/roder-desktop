@@ -757,6 +757,38 @@ forwards bounded pages without caching or cloning complete transcripts. Older
 harnesses that lack this endpoint report an error; there is no unbounded fallback.
 Opening the full Review panel can still explicitly load thread-wide change history.
 
+### `desktop/thread/history/index` and `desktop/thread/history/range`
+
+These Desktop-only adapters support sparse transcript scrolling with the pinned
+JSONL harness store. They do not change the upstream RPC contract.
+
+- `index({ threadId, before })` returns
+  `{ supported: true, threadId, before, olderCount, totalCount }`, or
+  `{ supported: false, reason }`. `before` is the initial page's exclusive cursor.
+  Counts refer to persisted raw items, not grouped visual rows.
+- `range({ threadId, before, olderCount, start, end })` reads the absolute
+  half-open interval `[start, end)` before that boundary, with at most 64 items.
+  It returns `{ thread, start, end }`. A byte-capped response may have a later
+  `start`; the missing prefix remains unloaded, never silently skipped.
+
+The adapter synchronizes one bounded native tail page, then reads counts and
+cursor identities from `history.sqlite` in a read-only transaction. It does not
+read payload records or traverse predecessor pages to seek. Offset lookup scans
+index entries rather than full message/tool bodies. It validates the configured
+backend, schema, thread identity, and returned page identities; changed
+boundaries fail rather than placing a page at the wrong position.
+
+The renderer reserves estimated space for the full indexed history in 32-item
+sections. Only intersecting sections request data. Mounted sections retain their
+pages (including short byte-capped fragments); at most six additional offscreen
+pages are cached. Two reads run concurrently with a bounded pending queue.
+Measured section heights may refine estimates, but loading older sections does
+not add previously absent history to the scroll range. The indexed view does not
+run a full-payload background scan to populate navigation markers.
+
+Unsupported schemas or non-JSONL session stores retain bounded backward paging
+with an explicit UI notice; there is no full-snapshot fallback.
+
 ### `thread/read`
 
 Purpose: Read one desktop thread and optionally include turns/items.
