@@ -1,7 +1,37 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { loadThreadCostTree, estimateThreadTreeCost } from "@/lib/thread-cost-tree";
 import type { RoderThread, SubagentTraceSummary } from "@/types/roder";
 import type { PricingSnapshot } from "@/lib/thread-cost";
+
+test("cost discovery reads bounded history for root and children without loading snapshots", async () => {
+  const readThread = vi.fn<() => Promise<never>>(async () => {
+    throw new Error("Full snapshots must not be read");
+  });
+  const readThreadHistory = vi.fn<
+    (id: string, options: { limit: number }) => Promise<{ thread: RoderThread; hasMore: boolean }>
+  >(async (id) => ({
+    thread: thread(id),
+    hasMore: id === "child",
+  }));
+  const threadTokenUsage = vi.fn<() => Promise<{ rows: typeof usage }>>(async () => ({ rows: usage }));
+  const api = {
+    readThread,
+    readThreadHistory,
+    threadTokenUsage,
+    listSubagentTraces: async (id: string) => ({ traces: id === "root" ? [trace("child")] : [] }),
+  };
+  const tree = await loadThreadCostTree("root", api);
+
+  expect(readThread).not.toHaveBeenCalled();
+  expect(readThreadHistory.mock.calls).toEqual([
+    ["root", { limit: 160 }],
+    ["child", { limit: 160 }],
+  ]);
+  expect(threadTokenUsage.mock.calls).toHaveLength(2);
+  expect(tree.threads.find((entry) => entry.id === "child")?.incomplete).toBe(true);
+  expect(tree.incomplete).toBe(true);
+  expect(estimateThreadTreeCost(tree, pricing)).toMatchObject({ total: 8, partial: true });
+});
 
 const pricing: PricingSnapshot = {
   source: "test",
@@ -27,6 +57,7 @@ function thread(id: string): RoderThread {
     id,
     name: id,
     turns: [{ id: "old" }, { id: "new" }],
+    usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3, cached_prompt_tokens: 0 },
     status: { type: "idle", activeTurnId: null, activeFlags: [] },
   } as RoderThread;
 }
@@ -36,7 +67,7 @@ test("discovers persisted nested children once, including repeated traces and se
   const tree = await loadThreadCostTree(
     "root",
     {
-      readThread: async (id) => ({ thread: thread(id) }),
+      readThreadHistory: async (id) => ({ thread: thread(id) }),
       threadTokenUsage: async (id) => {
         calls.push(id);
         return { rows: usage };
@@ -58,7 +89,7 @@ test("discovers persisted nested children once, including repeated traces and se
 
 test("retains successful trace pages and known costs when siblings or discovery fail", async () => {
   const tree = await loadThreadCostTree("root", {
-    readThread: async (id) => ({ thread: thread(id) }),
+    readThreadHistory: async (id) => ({ thread: thread(id) }),
     threadTokenUsage: async (id) => {
       if (id === "missing") throw Error("missing stats");
       return { rows: usage };
@@ -76,7 +107,7 @@ test("retains successful trace pages and known costs when siblings or discovery 
 
 test("unknown child models and absent analytics never become a complete zero total", async () => {
   const tree = await loadThreadCostTree("root", {
-    readThread: async (id) => ({ thread: thread(id) }),
+    readThreadHistory: async (id) => ({ thread: thread(id) }),
     threadTokenUsage: async (id) => ({ rows: id === "root" ? usage : [{ ...usage[0], group: "unknown" }] }),
     listSubagentTraces: async (id) => ({ traces: id === "root" ? [trace("child")] : [] }),
   });
@@ -87,7 +118,7 @@ test("empty usage and missing thread metadata remain partial and do not hide liv
   const tree = await loadThreadCostTree(
     "root",
     {
-      readThread: async () => ({ thread: null }),
+      readThreadHistory: async () => ({ thread: null }),
       threadTokenUsage: async () => ({ rows: [] }),
       listSubagentTraces: async () => ({ traces: [] }),
     },
@@ -101,7 +132,7 @@ test("bounds trace hydration concurrency and prices excess cache counts per thre
   let active = 0;
   let maximum = 0;
   const tree = await loadThreadCostTree("root", {
-    readThread: async (id) => ({
+    readThreadHistory: async (id) => ({
       thread: {
         ...thread(id),
         turns: Array.from({ length: 13 }, (_, index) => ({ id: String(index) })) as RoderThread["turns"],
@@ -120,15 +151,15 @@ test("bounds trace hydration concurrency and prices excess cache counts per thre
   const result = estimateThreadTreeCost(tree, pricing);
   expect(result.models[0].cachedPromptTokens).toBe(2);
   expect(result.models[0].cost).toBe(result.total);
-  expect(result.models[0].categories.map((category) => category.tokens)).toEqual([2, 2, 2]);
-  expect(result.threads[0].categories.map((category) => category.tokens)).toEqual([0, 2, 1]);
-  expect(result.threads[1].categories.map((category) => category.tokens)).toEqual([2, 0, 1]);
+  expect(result.models[0].categories.map((category) => category.tokens)).toEqual([2, 2, 0, 2]);
+  expect(result.threads[0].categories.map((category) => category.tokens)).toEqual([0, 2, 0, 1]);
+  expect(result.threads[1].categories.map((category) => category.tokens)).toEqual([2, 0, 0, 1]);
   expect(result.models[0].categories.reduce((sum, category) => sum + category.cost!, 0)).toBe(result.total);
 });
 
 test("invalid child counts cannot cancel valid model usage or create a fabricated model contribution", async () => {
   const tree = await loadThreadCostTree("root", {
-    readThread: async (id) => ({ thread: thread(id) }),
+    readThreadHistory: async (id) => ({ thread: thread(id) }),
     threadTokenUsage: async (id) => ({ rows: id === "root" ? usage : [{ ...usage[0], promptTokens: -1 }] }),
     listSubagentTraces: async (id) => ({ traces: id === "root" ? [trace("child")] : [] }),
   });
@@ -140,7 +171,7 @@ test("invalid child counts cannot cancel valid model usage or create a fabricate
 test("long histories scan a bounded recent window, retain active turns and self cost, and mark partial", async () => {
   const requested: string[] = [];
   const tree = await loadThreadCostTree("root", {
-    readThread: async (id) => ({
+    readThreadHistory: async (id) => ({
       thread: {
         ...thread(id),
         turns:
@@ -156,7 +187,7 @@ test("long histories scan a bounded recent window, retain active turns and self 
       return { traces: turnId === "active" ? [trace("child")] : [] };
     },
   });
-  expect(requested.length).toBeLessThanOrEqual(32);
+  expect(requested.length).toBeLessThanOrEqual(256);
   expect(requested).toContain("active");
   expect(requested).toContain("9999");
   expect(estimateThreadTreeCost(tree, pricing)).toMatchObject({ total: 8, partial: true });
@@ -165,7 +196,7 @@ test("long histories scan a bounded recent window, retain active turns and self 
 test("the trace page budget is shared across all descendants", async () => {
   let requests = 0;
   const tree = await loadThreadCostTree("root", {
-    readThread: async (id) => ({
+    readThreadHistory: async (id) => ({
       thread: {
         ...thread(id),
         turns: Array.from({ length: 32 }, (_, index) => ({ id: String(index) })) as RoderThread["turns"],

@@ -6,6 +6,7 @@ import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
 import { activeThreadMessagesSnapshot, useRoderAgent } from "@/hooks/use-roder-agent";
 import { useThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import { loadedTurnIdsKey } from "@/lib/thread-hunk-loading";
 import type { FilePanelIndexedPath, FilePanelSelectionIntent } from "@/lib/file-panel";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
 import type { NativeCommandOutput } from "@/lib/native-command-formatters";
@@ -27,6 +28,7 @@ import {
   fullPageRouteForPathname,
   isNewRoutePath,
   isPluginsRoutePath,
+  stageNewThreadAfterNavigation,
 } from "@/lib/route-selection";
 import { isThreadRunning } from "@/lib/roder-thread";
 import {
@@ -126,7 +128,17 @@ export function useAppShellController(): AppShellController {
   const activeWorkspaceCwd = activeWorkspaceContext.cwd;
   const activeWorkspaceRef = activeWorkspaceContext.ref;
   const activeWorkspaceRoots = activeWorkspaceContext.roots;
-  const hunkSummary = useThreadHunkSummary(routeActiveThreadId, agent.hunkRevision);
+  const loadedTurnsKey = useRoderStore((state) => loadedTurnIdsKey(state.threadDetails[routeActiveThreadId]?.turns));
+  const loadedTurnIds = JSON.parse(loadedTurnsKey) as string[];
+  const hunkSummary = useThreadHunkSummary(
+    routeActiveThreadId,
+    agent.hunkRevision,
+    workspacePanelOpen && activePanel === "review" && routeSearch.reviewScope === "thread"
+      ? undefined
+      : workspacePanelOpen && activePanel === "review" && routeSearch.reviewScope === "turn" && routeSearch.reviewTurnId
+        ? [routeSearch.reviewTurnId]
+        : loadedTurnIds,
+  );
   const folderOptions = useMemo(() => buildFolderOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
@@ -182,8 +194,7 @@ export function useAppShellController(): AppShellController {
     (path: string) => {
       followBottom();
       setComposerFocusSignal((value) => value + 1);
-      stageAgentNewThread(path);
-      void navigate({ to: "/new", search: true });
+      void stageNewThreadAfterNavigation(() => navigate({ to: "/new", search: true }), stageAgentNewThread, path);
     },
     [followBottom, navigate, stageAgentNewThread],
   );

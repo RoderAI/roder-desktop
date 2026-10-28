@@ -1,3 +1,4 @@
+import type { CloudMachine, CloudMachineInput, CloudRunnerProvider } from "@/lib/cloud-machines";
 import { attachmentImageType } from "@/lib/attachment-preparation";
 import type {
   CommandsListResult,
@@ -67,9 +68,15 @@ export type ThreadReadResult = {
   thread: RoderThread | null;
 };
 
+export type ThreadHistoryReadResult = ThreadReadResult & {
+  before: string | null;
+  hasMore: boolean;
+};
+
 export type ThreadStartOptions = {
   initialPrompt?: string;
   selection?: ModelSelectChoice;
+  cloudMachineId?: string;
 };
 
 export type ThreadStartWorkspace = {
@@ -558,6 +565,11 @@ export const roderIpc = {
     window.roderDesktop.request("thread/list", { limit, cursor: cursor || undefined }) as Promise<ThreadListResult>,
   readThread: (threadId: string, includeTurns = true) =>
     window.roderDesktop.request("thread/read", { threadId, includeTurns }) as Promise<ThreadReadResult>,
+  readThreadHistory: (threadId: string, options: { before?: string; limit?: number; maxBytes?: number } = {}) =>
+    window.roderDesktop.request("thread/history/read", {
+      threadId,
+      ...options,
+    }) as Promise<ThreadHistoryReadResult>,
   threadGoal: (threadId: string) =>
     window.roderDesktop.request("thread/goal/get", { threadId }) as Promise<ThreadGoalGetResult>,
   createGoal: (threadId: string, objective: string) =>
@@ -586,10 +598,18 @@ export const roderIpc = {
         selection: options.selection ? modelSelectChoiceToWire(options.selection) : undefined,
         ephemeral: false,
         initialPrompt: options.initialPrompt || undefined,
+        ...(options.cloudMachineId === undefined ? {} : { desktopCloudMachineId: options.cloudMachineId }),
       })
       .then((result) => threadStartResultFromWire(result as WireThreadStartResult)) as Promise<ThreadStartResult>,
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
     window.roderDesktop.request("providers/select", { provider, model, reasoning }) as Promise<ProviderSelectResult>,
+  listRunners: () => window.roderDesktop.request("runners/list", {}) as Promise<{ providers: CloudRunnerProvider[] }>,
+  listCloudMachines: () =>
+    window.roderDesktop.request("desktop/cloud-machines/list", {}) as Promise<{ machines: CloudMachine[] }>,
+  saveCloudMachine: (input: CloudMachineInput) =>
+    window.roderDesktop.request("desktop/cloud-machines/save", input) as Promise<{ machine: CloudMachine }>,
+  removeCloudMachine: (id: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/remove", { id }) as Promise<{ removed: true }>,
   listProviders: () =>
     window.roderDesktop
       .request("providers/list", {})

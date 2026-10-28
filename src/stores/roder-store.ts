@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 import { roderIpc } from "@/lib/roder-ipc";
 import { commandInvocationText, type CommandInvocation } from "@/lib/roder-commands";
@@ -68,12 +69,20 @@ import type {
   WorkspaceRoot,
 } from "@/types/roder";
 import type { WorkspaceCreateParams } from "@/lib/roder-ipc";
+import {
+  emptyThreadHistoryState,
+  mergeInitialThreadHistory,
+  mergeOlderThreadHistory,
+  recentThreadItems,
+  type ThreadHistoryState,
+} from "@/lib/thread-history-state";
 
 type RoderStore = {
   status: RoderStatus;
   stderr: string[];
   threads: RoderThread[];
   threadDetails: Record<string, RoderThread>;
+  threadHistoryByThread: Record<string, ThreadHistoryState>;
   nextThreadCursor: string | null;
   loadingMoreThreads: boolean;
   threadGoalsByThread: Record<string, RoderThreadGoal>;
@@ -118,7 +127,11 @@ type RoderStore = {
   bootstrap: () => Promise<void>;
   refreshThreads: () => Promise<void>;
   loadMoreThreads: () => Promise<void>;
-  selectThread: (threadId: string, options?: { pushHistory?: boolean; deferRead?: boolean }) => Promise<void>;
+  selectThread: (
+    threadId: string,
+    options?: { pushHistory?: boolean; deferRead?: boolean; refreshHistory?: boolean },
+  ) => Promise<void>;
+  loadOlderThreadHistory: (threadId: string) => Promise<void>;
   refreshThreadModel: (threadId: string) => Promise<void>;
   archiveThread: (threadId: string) => Promise<void>;
   goBack: () => Promise<void>;
@@ -402,6 +415,8 @@ function patchThreadDetails(
   return { ...threadDetails, [threadId]: { ...thread, ...patch } };
 }
 
+let threadHistoryRequestId = 0;
+
 export const useRoderStore = create<RoderStore>()(
   persist(
     (set, get) => ({
@@ -409,6 +424,7 @@ export const useRoderStore = create<RoderStore>()(
       stderr: [],
       threads: [],
       threadDetails: {},
+      threadHistoryByThread: {},
       nextThreadCursor: null,
       loadingMoreThreads: false,
       threadGoalsByThread: {},
@@ -548,7 +564,7 @@ export const useRoderStore = create<RoderStore>()(
           });
 
           if (activeThreadId) {
-            void get().selectThread(activeThreadId, { pushHistory: false, deferRead: true });
+            void get().selectThread(activeThreadId, { pushHistory: false });
           }
 
           // Fire-and-forget: archive stale empty untitled threads without delaying boot.
@@ -615,23 +631,50 @@ export const useRoderStore = create<RoderStore>()(
           });
           return;
         }
-        if (threadId === current.activeThreadId && current.threadDetails[threadId]) {
+        if (
+          !options.refreshHistory &&
+          threadId === current.activeThreadId &&
+          current.threadHistoryByThread[threadId]?.loaded
+        ) {
           await syncThreadGoal(threadId, set);
-          void hydrateSubagentTracesForThread(threadId, current.threadDetails[threadId].turns ?? [], get, set);
+          return;
+        }
+        if (
+          !options.refreshHistory &&
+          threadId === current.activeThreadId &&
+          current.threadHistoryByThread[threadId]?.loading
+        ) {
           return;
         }
         const selectedThread = threadForState(current, threadId);
         const selectedWorkspacePatch = selectedThreadWorkspacePatch(current, selectedThread);
+        const requestId = ++threadHistoryRequestId;
+        const baseline = selectedThread ? recentThreadItems(selectedThread) : undefined;
 
-        set({
-          activeThreadId: threadId,
-          ...selectedWorkspacePatch,
-          backStack:
-            options.pushHistory && current.activeThreadId
-              ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
-              : current.backStack,
-          forwardStack: options.pushHistory ? [] : current.forwardStack,
-          error: null,
+        set((state) => {
+          const details = { ...state.threadDetails };
+          const histories = { ...state.threadHistoryByThread };
+          if (state.activeThreadId && state.activeThreadId !== threadId) {
+            const previous = details[state.activeThreadId];
+            if (previous) details[state.activeThreadId] = recentThreadItems(previous);
+            delete histories[state.activeThreadId];
+          }
+          if (baseline) details[threadId] = baseline;
+          return {
+            activeThreadId: threadId,
+            ...selectedWorkspacePatch,
+            threadDetails: details,
+            threadHistoryByThread: {
+              ...histories,
+              [threadId]: { ...emptyThreadHistoryState, requestId, loading: !options.deferRead },
+            },
+            backStack:
+              options.pushHistory && current.activeThreadId
+                ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
+                : current.backStack,
+            forwardStack: options.pushHistory ? [] : current.forwardStack,
+            error: null,
+          };
         });
 
         if (!threadId) {
@@ -640,14 +683,18 @@ export const useRoderStore = create<RoderStore>()(
 
         try {
           const [result, goalResult] = await Promise.all([
-            roderIpc.readThread(threadId, !options.deferRead),
+            options.deferRead
+              ? roderIpc.readThread(threadId, false)
+              : roderIpc.readThreadHistory(threadId, { limit: 160 }),
             readThreadGoal(threadId),
           ]);
           if (!result.thread) {
             throw new Error("roder app-server did not return a thread");
           }
-          const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+          const incoming = normalizeThreadCwd(result.thread, get().status.cwd);
           set((state) => {
+            if (state.threadHistoryByThread[threadId]?.requestId !== requestId) return {};
+            const thread = mergeInitialThreadHistory(incoming, state.threadDetails[threadId], baseline);
             const threadIsActive = threadId === state.activeThreadId;
             return {
               selectedModelProvider: threadIsActive
@@ -665,7 +712,17 @@ export const useRoderStore = create<RoderStore>()(
                   )
                 : state.selectedSelectionMode,
               threadDetails: { ...state.threadDetails, [threadId]: thread },
-              threads: upsertThread(state.threads, thread),
+              threads: upsertThread(state.threads, { ...thread, turns: undefined }),
+              threadHistoryByThread: {
+                ...state.threadHistoryByThread,
+                [threadId]: {
+                  ...emptyThreadHistoryState,
+                  requestId,
+                  loaded: !options.deferRead,
+                  before: "before" in result ? (result.before as string | null) : null,
+                  hasMore: "hasMore" in result && Boolean(result.hasMore),
+                },
+              },
               threadGoalsByThread: updateThreadGoal(state.threadGoalsByThread, threadId, goalResult.goal),
               selectedWorkspaceCwd: threadIsActive ? thread.cwd : state.selectedWorkspaceCwd,
               selectedWorkspaceId: threadIsActive
@@ -687,9 +744,67 @@ export const useRoderStore = create<RoderStore>()(
               workspaceRecents: upsertWorkspaceRecent(state.workspaceRecents, thread.cwd),
             };
           });
-          void hydrateSubagentTracesForThread(threadId, thread.turns ?? [], get, set);
+          if (!options.deferRead && get().threadHistoryByThread[threadId]?.requestId === requestId) {
+            void hydrateSubagentTracesForThread(threadId, incoming.turns ?? [], get, set);
+          }
         } catch (error) {
-          set({ error: (error as Error).message });
+          set((state) => {
+            const history = state.threadHistoryByThread[threadId];
+            if (history?.requestId !== requestId) return {};
+            const message = (error as Error).message;
+            return {
+              ...(state.activeThreadId === threadId ? { error: message } : {}),
+              threadHistoryByThread: {
+                ...state.threadHistoryByThread,
+                [threadId]: { ...history, loading: false, error: message },
+              },
+            };
+          });
+        }
+      },
+
+      loadOlderThreadHistory: async (threadId) => {
+        const history = get().threadHistoryByThread[threadId];
+        if (!history?.before || !history.hasMore || history.loading || history.loadingOlder) return;
+        const { before, requestId } = history;
+        set((state) => ({
+          threadHistoryByThread: {
+            ...state.threadHistoryByThread,
+            [threadId]: { ...history, loadingOlder: true, error: null },
+          },
+        }));
+        try {
+          const page = await roderIpc.readThreadHistory(threadId, { before, limit: 120 });
+          if (!page.thread) throw new Error("Thread history is no longer available");
+          const incoming = normalizeThreadCwd(page.thread, get().status.cwd);
+          set((state) => {
+            const latest = state.threadHistoryByThread[threadId];
+            if (latest?.requestId !== requestId || latest.before !== before) return {};
+            return {
+              threadDetails: {
+                ...state.threadDetails,
+                [threadId]: mergeOlderThreadHistory(state.threadDetails[threadId], incoming),
+              },
+              threadHistoryByThread: {
+                ...state.threadHistoryByThread,
+                [threadId]: { ...latest, before: page.before, hasMore: page.hasMore, loadingOlder: false },
+              },
+            };
+          });
+          if (get().threadHistoryByThread[threadId]?.requestId === requestId) {
+            void hydrateSubagentTracesForThread(threadId, incoming.turns ?? [], get, set);
+          }
+        } catch (error) {
+          set((state) => {
+            const latest = state.threadHistoryByThread[threadId];
+            if (latest?.requestId !== requestId || latest.before !== before) return {};
+            return {
+              threadHistoryByThread: {
+                ...state.threadHistoryByThread,
+                [threadId]: { ...latest, loadingOlder: false, error: (error as Error).message },
+              },
+            };
+          });
         }
       },
 
@@ -743,6 +858,7 @@ export const useRoderStore = create<RoderStore>()(
             current.activeThreadId === threadId ? firstThreadId(nextThreads, "") : current.activeThreadId;
           set((state) => {
             const { [threadId]: _archivedDetail, ...threadDetails } = state.threadDetails;
+            const { [threadId]: _archivedHistory, ...threadHistoryByThread } = state.threadHistoryByThread;
             const { [threadId]: _archivedGoal, ...threadGoalsByThread } = state.threadGoalsByThread;
             const { [threadId]: _archivedQueue, ...queuedPromptsByThread } = state.queuedPromptsByThread;
             const { [threadId]: _archivedHunkRevision, ...hunkRevisionByThread } = state.hunkRevisionByThread;
@@ -752,6 +868,7 @@ export const useRoderStore = create<RoderStore>()(
             return {
               threads: state.threads.filter((thread) => thread.id !== threadId),
               threadDetails,
+              threadHistoryByThread,
               threadGoalsByThread,
               queuedPromptsByThread,
               threadControlsByThread: removeThreadControls(state.threadControlsByThread, threadId),
@@ -1080,7 +1197,7 @@ export const useRoderStore = create<RoderStore>()(
       },
 
       restart: async () => {
-        set({ busy: true, error: null });
+        set({ busy: true, error: null, threadHistoryByThread: {} });
         try {
           const status = await roderIpc.restart();
           set({ status, busy: false });
@@ -1926,6 +2043,7 @@ async function createThreadForPrompt(
   options: { recordHistory?: boolean; clearBusy?: boolean } = {},
 ): Promise<string> {
   const state = get();
+  const cloudMachineId = useCloudMachinesStore.getState().selectedMachineId;
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
   const latestState = get();
   const usePromptControls = initialPrompt !== undefined;
@@ -1967,6 +2085,7 @@ async function createThreadForPrompt(
     selectedProvider,
     reasoning,
     {
+      cloudMachineId,
       ...(initialPrompt === undefined ? {} : { initialPrompt }),
       selection: configuredAutoOptionId(selectionMode)
         ? modelSelectChoice(selectionMode, selectionSource.reasoning, latestState.models)
@@ -2188,10 +2307,12 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
 
   if (notification.method === "thread/started" && isRecord(params.thread)) {
     const normalizedThread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
-    const thread = preserveOptimisticThreadTitle(normalizedThread, threadForState(state, normalizedThread.id));
+    const thread = recentThreadItems(
+      preserveOptimisticThreadTitle(normalizedThread, threadForState(state, normalizedThread.id)),
+    );
     return {
       ...waitPatch,
-      threads: upsertThread(state.threads, thread),
+      threads: upsertThread(state.threads, { ...thread, turns: undefined }),
       threadDetails: { ...state.threadDetails, [thread.id]: state.threadDetails[thread.id] ?? thread },
       threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, thread.id),
       activeThreadId: state.activeThreadId || thread.id,
@@ -2207,10 +2328,11 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     isRecord(params.thread)
   ) {
     const normalizedThread = normalizeThreadCwd(params.thread as RoderThread, state.status.cwd);
-    const thread = preserveOptimisticThreadTitle(normalizedThread, threadForState(state, normalizedThread.id));
+    const metadata = preserveOptimisticThreadTitle(normalizedThread, threadForState(state, normalizedThread.id));
+    const thread = { ...metadata, turns: state.threadDetails[metadata.id]?.turns ?? recentThreadItems(metadata).turns };
     return {
       ...waitPatch,
-      threads: upsertThread(state.threads, thread),
+      threads: upsertThread(state.threads, { ...thread, turns: undefined }),
       threadDetails: { ...state.threadDetails, [thread.id]: thread },
       selectedWorkspaceCwd: thread.id === state.activeThreadId ? thread.cwd : state.selectedWorkspaceCwd,
       selectedWorkspaceId:
@@ -2300,10 +2422,11 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     if (!itemEvent) {
       return waitPatch;
     }
-    const thread = applyThreadItemEvent(threadForState(state, itemEvent.threadId), itemEvent);
-    if (!thread) {
+    const updated = applyThreadItemEvent(threadForState(state, itemEvent.threadId), itemEvent);
+    if (!updated) {
       return waitPatch;
     }
+    const thread = itemEvent.threadId === state.activeThreadId ? updated : recentThreadItems(updated);
     return {
       ...waitPatch,
       threadDetails: { ...state.threadDetails, [itemEvent.threadId]: thread },
@@ -2508,16 +2631,20 @@ async function hydrateSubagentTracesForThread(
     return;
   }
   try {
-    const pages = await Promise.all(
-      turnIds.map(async (turnId) => {
-        try {
-          return await roderIpc.listSubagentTraces(threadId, turnId);
-        } catch {
-          // Older binaries or missing turns should not block thread selection.
-          return { traces: [] };
-        }
-      }),
-    );
+    const pages = [];
+    for (let offset = 0; offset < turnIds.length; offset += 4) {
+      const batch = await Promise.all(
+        turnIds.slice(offset, offset + 4).map(async (turnId) => {
+          try {
+            return await roderIpc.listSubagentTraces(threadId, turnId);
+          } catch {
+            // Older binaries or missing turns should not block thread selection.
+            return { traces: [] };
+          }
+        }),
+      );
+      pages.push(...batch);
+    }
     const summaries = pages.flatMap((page) => page.traces ?? []);
     if (summaries.length === 0) {
       return;

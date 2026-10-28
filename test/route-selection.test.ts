@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import {
   activeWorkspaceContextForRoute,
   activeWorkspaceCwdForPathname,
@@ -9,6 +9,7 @@ import {
   isPluginsRoutePath,
   normalizeSettingsSectionParam,
   pluginsRouteForSection,
+  stageNewThreadAfterNavigation,
   threadSelectionForRoute,
 } from "../src/lib/route-selection";
 
@@ -79,6 +80,25 @@ test("new route clears active thread selection so prompt send starts a thread", 
     pushHistory: false,
   });
   expect(threadSelectionForRoute({ route: "new", activeThreadId: "" })).toBeNull();
+});
+
+test("project plus stages its folder only after the new route has loaded", async () => {
+  let finishNavigation: (() => void) | undefined;
+  const navigateToNew = vi.fn<() => Promise<void>>(
+    () =>
+      new Promise<void>((resolve) => {
+        finishNavigation = resolve;
+      }),
+  );
+  const stageNewThread = vi.fn<(path: string) => void>();
+
+  const transition = stageNewThreadAfterNavigation(navigateToNew, stageNewThread, "/work/project-b");
+  expect(navigateToNew).toHaveBeenCalledTimes(1);
+  expect(stageNewThread).not.toHaveBeenCalled();
+
+  finishNavigation?.();
+  await transition;
+  expect(stageNewThread).toHaveBeenCalledExactlyOnceWith("/work/project-b");
 });
 
 test("settings route accepts known sections and falls back to general", () => {

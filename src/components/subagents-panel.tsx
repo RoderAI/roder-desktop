@@ -1,23 +1,14 @@
 import { useState } from "react";
-import { Bot, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { TraceEvents } from "@/components/subagent-trace-events";
 import { relativeAge } from "@/lib/relative-age";
 import { activeSubagentTraces, doneSubagentTraces, subagentTraceBlurb } from "@/lib/subagent-traces";
-import { cn } from "@/lib/utils";
+import { SubagentAvatar } from "@/components/subagent-avatar";
 import { useRoderStore } from "@/stores/roder-store";
 import type { SubagentTraceView } from "@/types/roder";
 
 const donePageSize = 10;
-
-const avatarPalette = [
-  { bg: "oklch(0.92 0.06 20)", fg: "oklch(0.45 0.14 20)" },
-  { bg: "oklch(0.93 0.07 95)", fg: "oklch(0.48 0.12 95)" },
-  { bg: "oklch(0.92 0.05 250)", fg: "oklch(0.42 0.12 250)" },
-  { bg: "oklch(0.93 0.06 150)", fg: "oklch(0.42 0.11 150)" },
-  { bg: "oklch(0.92 0.06 310)", fg: "oklch(0.45 0.12 310)" },
-  { bg: "oklch(0.93 0.05 60)", fg: "oklch(0.48 0.1 60)" },
-] as const;
 
 type SubagentsPanelProps = {
   threadId: string;
@@ -143,25 +134,4 @@ function SubagentTraceRow({ trace }: { trace: SubagentTraceView }): React.JSX.El
       {showTrace ? <TraceEvents trace={trace} /> : null}
     </li>
   );
-}
-
-export function SubagentAvatar({ seed, className }: { seed: string; className?: string }): React.JSX.Element {
-  const color = avatarPalette[hashSeed(seed) % avatarPalette.length];
-  return (
-    <span
-      className={cn("grid size-7 shrink-0 place-items-center rounded-full", className)}
-      style={{ backgroundColor: color.bg, color: color.fg }}
-      aria-hidden="true"
-    >
-      <Bot className="size-3.5" />
-    </span>
-  );
-}
-
-function hashSeed(seed: string): number {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
 }

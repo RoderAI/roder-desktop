@@ -1,6 +1,7 @@
 import type { ConversationMessage, SubagentLifecycleEvent } from "@/types/roder";
 import { reviewTurnChangeLabel, type ReviewTurnChangeSummary } from "@/lib/review-changes";
 import { groupToolMessagesForTranscript, type TranscriptMessageEntry } from "@/lib/tool-message-groups";
+import { subagentMessagesForMessage } from "@/lib/subagent-messages";
 
 export type TranscriptRow =
   | TranscriptEntryRow
@@ -164,7 +165,7 @@ export function transcriptEntryDisclosureKey(entry: TranscriptMessageEntry, key:
     entry.kind === "readFileGroup" ||
     entry.kind === "readSkillGroup" ||
     entry.kind === "searchGroup" ||
-    (entry.kind === "message" && entry.message.role === "tool")
+    (entry.kind === "message" && (entry.message.role === "tool" || subagentMessagesForMessage(entry.message)))
   ) {
     return `disclosure:${key}`;
   }
@@ -184,10 +185,14 @@ export function transcriptRowDisclosureKeys(row: TranscriptRow): string[] {
   if (row.kind !== "entry" || !row.disclosureKey) {
     return [];
   }
+  const parentDisclosureKey = row.disclosureKey;
+  if (row.entry.kind === "message") {
+    const messages = subagentMessagesForMessage(row.entry.message);
+    if (messages) return messages.map((message) => `${parentDisclosureKey}:subagent:${message.id}`);
+  }
   if (row.entry.kind !== "activityGroup") {
     return [row.disclosureKey];
   }
-  const parentDisclosureKey = row.disclosureKey;
   return [
     parentDisclosureKey,
     ...row.entry.entries.flatMap((entry) => {
@@ -299,8 +304,10 @@ function transcriptEntriesEquivalent(left: TranscriptMessageEntry, right: Transc
   if (left.kind === "activityGroup" || right.kind === "activityGroup") {
     return false;
   }
-  return left.messages.length === right.messages.length &&
-    left.messages.every((message, index) => message === right.messages[index]);
+  return (
+    left.messages.length === right.messages.length &&
+    left.messages.every((message, index) => message === right.messages[index])
+  );
 }
 
 function sameActivitySummary(

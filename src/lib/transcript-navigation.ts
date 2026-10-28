@@ -1,4 +1,5 @@
 import type { TranscriptRow } from "@/lib/transcript-rows";
+import { subagentDisplayName, subagentMessageResult, subagentMessagesForMessage } from "@/lib/subagent-messages";
 
 export type TranscriptNavigationItem = {
   id: string;
@@ -13,6 +14,19 @@ export function buildTranscriptNavigation(rows: readonly TranscriptRow[]): Trans
     if (row.kind !== "entry" || row.entry.kind !== "message") return;
     const message = row.entry.message;
     if (message.role === "tool") return;
+    const subagentMessages = subagentMessagesForMessage(message);
+    if (subagentMessages) {
+      const preview = subagentMessages
+        .map((delivery) => {
+          const agent = subagentDisplayName(delivery.kind === "NEW_TASK" ? delivery.recipient : delivery.sender);
+          return `${agent}: ${subagentMessageResult(delivery).body}`;
+        })
+        .join("\n\n")
+        .replace(/\s+/gu, " ")
+        .slice(0, 320);
+      items.push({ id: message.id, role: "system", preview, rowIndex });
+      return;
+    }
     const preview = message.text.trim().replace(/\s+/gu, " ") || (message.images?.length ? "Image attachment" : "");
     if (!preview) return;
     items.push({ id: message.id, role: message.role, preview: preview.slice(0, 320), rowIndex });

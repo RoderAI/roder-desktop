@@ -19,7 +19,7 @@ import type { PersistentAgent } from "@/types/persistent-agents";
 import { Link } from "@tanstack/react-router";
 import { useId, useReducer, useRef, useState } from "react";
 import { useRoderStore } from "@/stores/roder-store";
-import type { RoderThread } from "@/types/roder";
+import type { RoderThread, SubagentTraceView } from "@/types/roder";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -42,9 +42,20 @@ export function filterPersistentAgents<T extends Pick<PersistentAgent, "name" | 
   );
 }
 
-export function ordinarySidebarThreads<T extends { id: string }>(threads: T[], agents: { threadId: string }[]): T[] {
+export function ordinarySidebarThreads<
+  T extends { id: string; parentThreadId?: string | null; workspaceFork?: unknown },
+>(
+  threads: T[],
+  agents: { threadId: string }[],
+  tracesByThread: Record<string, readonly Pick<SubagentTraceView, "childThreadId">[]> = {},
+): T[] {
   const persistentThreadIds = new Set(agents.map((agent) => agent.threadId));
-  return threads.filter((thread) => !persistentThreadIds.has(thread.id));
+  const childThreadIds = new Set(
+    Object.values(tracesByThread).flatMap((traces) => traces.map((trace) => trace.childThreadId).filter(Boolean)),
+  );
+  return threads.filter(
+    (thread) => !persistentThreadIds.has(thread.id) && !thread.parentThreadId && !childThreadIds.has(thread.id),
+  );
 }
 
 type SidebarSearchState = { open: boolean; query: string };
@@ -142,7 +153,8 @@ export function AppSidebar({
     loading: persistentAgentsLoading,
     refresh: refreshPersistentAgents,
   } = useSidebarPersistentAgents();
-  const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents);
+  const subagentTracesByThread = useRoderStore((state) => state.subagentTracesByThread);
+  const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents, subagentTracesByThread);
   const matchingThreads = ordinaryThreads.filter((thread) =>
     `${thread.name ?? ""}\n${thread.preview}\n${thread.cwd}`
       .toLowerCase()

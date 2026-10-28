@@ -683,6 +683,12 @@ Behavior:
   model-selection intent for the new thread. When omitted, `model`,
   `modelProvider`, and `reasoning` are treated as legacy Manual overrides.
 - `rootId` is optional and defaults to the workspace default root.
+- `runner` optionally binds native coding tools to a runner for this thread:
+  `{ "providerId": "sprites", "workspace": "/workspace",
+  "config": { "sprite_name": "dev" }, "readRoots": [] }`.
+  Workspace and read roots are absolute runner paths. Configuration is persisted
+  with the thread and must not contain credentials. See
+  [Cloud Machines](cloud-machines.md) for desktop profile storage and limitations.
 - `cwd` is optional. When omitted, it defaults to the selected root path. When
   supplied, it must be the selected root or a child path of that root.
 - Stores the selected provider/model/reasoning for later `turn/start` overrides.
@@ -731,6 +737,25 @@ Behavior:
 - Applies `limit` when supplied.
 - Merges in protocol threads that are in memory but not yet persisted to disk.
 - Cursor fields are currently always null.
+
+### `thread/history/read`
+
+Desktop transcript selection uses canonical upstream `thread/history/read`
+instead of reading full `thread/read` snapshots.
+It accepts `{ threadId, before?, limit?, maxBytes? }` and returns
+`{ thread, before, hasMore }`, with items in chronological order. The initial
+page contains up to 160 items; older pages default to 120 (maximum 200).
+Serialized item data also has an approximately 2 MiB page budget, with one
+oversized item allowed so that every request can make progress. The harness
+owns stable logical item IDs and cursor validation.
+`before` is an opaque exclusive cursor scoped to the thread and a stable item.
+Pages may contain partial turns; clients merge by turn/item ID without
+overwriting newer live updates.
+
+The harness reads indexed history pages without loading full snapshots. Electron
+forwards bounded pages without caching or cloning complete transcripts. Older
+harnesses that lack this endpoint report an error; there is no unbounded fallback.
+Opening the full Review panel can still explicitly load thread-wide change history.
 
 ### `thread/read`
 

@@ -1,5 +1,6 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
+import { CloudMachinePicker, ThreadExecutionMachine } from "@/components/cloud-machine-picker";
 import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
@@ -699,6 +700,11 @@ export function Composer({
                 </Button>
               )}
               <PolicyModePicker selectedMode={selectedPolicyMode} onChange={onSelectedPolicyModeChange} />
+              {activeThreadId ? (
+                <ThreadExecutionMachine threadId={activeThreadId} />
+              ) : (
+                <CloudMachinePicker disabled={busy} />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
