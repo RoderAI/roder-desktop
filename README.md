@@ -92,7 +92,7 @@ Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` fro
 
 ### The embedded harness
 
-The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.3.17` release tag, pinned to its immutable source revision.
+The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.3.18` release tag, pinned to its immutable source revision.
 
 | Goal | Command |
 | --- | --- |
