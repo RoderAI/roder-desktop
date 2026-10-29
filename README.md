@@ -18,6 +18,8 @@ Roder runs on top of the [Roder agent harness](https://github.com/RoderAI/roder)
 
 **Threads in projects.** Pick a project folder, start an agent, and come back to recent threads from the start screen. Each thread keeps its transcript, model, and usage on disk.
 
+Hover over a sidebar project and click Archive to hide it without deleting its conversations or stopping agents. Use the archive icon beside Projects to view archived projects and restore them. Archive choices are saved on this device.
+
 **Subagents.** Spawn parallel subagents from one thread. The Subagents panel shows what is running and what has finished, and the transcript marks each subagent's lifecycle inline.
 
 ![The Subagents panel next to a thread](https://dl.roder.sh/desktop/product/desktop-subagents-panel.png)
@@ -102,14 +104,14 @@ pnpm dev
 
 `pnpm dev` builds the pinned `roder` debug binary into `resources/bin/`, then starts Electron Forge with Vite.
 
-| Command | What it does |
-| --- | --- |
-| `pnpm dev` | Build the debug harness and launch the app |
-| `pnpm typecheck` | TypeScript plus workspace package checks |
-| `pnpm test` | Vitest |
-| `pnpm lint` | oxlint |
-| `pnpm format` | oxfmt |
-| `pnpm make` | Typecheck, then build distributables with Electron Forge |
+| Command          | What it does                                             |
+| ---------------- | -------------------------------------------------------- |
+| `pnpm dev`       | Build the debug harness and launch the app               |
+| `pnpm typecheck` | TypeScript plus workspace package checks                 |
+| `pnpm test`      | Vitest                                                   |
+| `pnpm lint`      | oxlint                                                   |
+| `pnpm format`    | oxfmt                                                    |
+| `pnpm make`      | Typecheck, then build distributables with Electron Forge |
 
 Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` from asar, and ships `resources/bin` as an extra resource. Local `pnpm make` can also produce Linux deb and rpm packages, but the release CI currently publishes macOS (Apple silicon) and Windows (x64) only.
 
@@ -117,11 +119,11 @@ Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` fro
 
 The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.3.18` release tag, pinned to its immutable source revision.
 
-| Goal | Command |
-| --- | --- |
-| Compare the pin with the latest crates.io release | `pnpm roder:distro:check` |
-| Change the pinned version | `pnpm roder:distro:update <version>` |
-| Build a release binary into `resources/bin` | `pnpm roder:distro:release` |
+| Goal                                              | Command                              |
+| ------------------------------------------------- | ------------------------------------ |
+| Compare the pin with the latest crates.io release | `pnpm roder:distro:check`            |
+| Change the pinned version                         | `pnpm roder:distro:update <version>` |
+| Build a release binary into `resources/bin`       | `pnpm roder:distro:release`          |
 
 Details live in [`.agents/skills/roder-distro/SKILL.md`](.agents/skills/roder-distro/SKILL.md). Upstream harness: [RoderAI/roder](https://github.com/RoderAI/roder).
 

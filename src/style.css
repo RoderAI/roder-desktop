@@ -1262,20 +1262,6 @@ code[data-streamdown="inline-code"] {
 
 .transcript-viewport {
   overflow-anchor: none;
-  scrollbar-gutter: stable;
-}
-
-.transcript-viewport-auto-following {
-  scrollbar-color: transparent transparent;
-}
-
-.transcript-viewport-auto-following::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.transcript-viewport-auto-following::-webkit-scrollbar-thumb {
-  background: transparent;
 }
 
 .transcript-search-mirror {

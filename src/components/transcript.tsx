@@ -725,10 +725,8 @@ export function Transcript({
       />
       <ScrollArea
         className={cn("h-full", navigationItems.length > 0 && "ml-8")}
-        viewportClassName={cn(
-          "workspace-scrollbar transcript-viewport",
-          suppressAutoFollowScrollbar && "transcript-viewport-auto-following",
-        )}
+        viewportClassName="transcript-viewport"
+        hideScrollbar={suppressAutoFollowScrollbar}
         viewportProps={{
           onKeyDownCapture: handleViewportKeyDownCapture,
           onPointerDownCapture: markUserScrollIntent,

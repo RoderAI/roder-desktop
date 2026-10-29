@@ -1,5 +1,6 @@
 import {
   Archive,
+  ArchiveRestore,
   ChevronDown,
   ChevronRight,
   CirclePlus,
@@ -14,6 +15,7 @@ import {
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { PersistentAgentAvatar } from "@/components/persistent-agent-avatar";
 import { SidebarUpdateButton } from "@/components/sidebar-update-button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { PersistentAgent } from "@/types/persistent-agents";
@@ -28,6 +30,7 @@ import { isThreadRunning } from "@/lib/roder-thread";
 import { cn } from "@/lib/utils";
 import { groupThreadsByFolder, moveSidebarProject, sidebarProjectOrder } from "@/lib/sidebar-thread-groups";
 import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
+import { readArchivedSidebarProjects, setSidebarProjectArchived } from "@/lib/sidebar-project-archive";
 
 export function filterPersistentAgents<T extends Pick<PersistentAgent, "name" | "mission" | "workspaceId">>(
   agents: T[],
@@ -147,6 +150,8 @@ export function AppSidebar({
   onOpenSettings,
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
+  const [archivedProjectKeys, setArchivedProjectKeys] = useState(readArchivedSidebarProjects);
+  const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [threadSearch, dispatchThreadSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
   const {
     persistentAgents,
@@ -171,7 +176,14 @@ export function AppSidebar({
     }
   });
   const projectOrder = sidebarProjectOrder(ordinaryThreads, manualProjectOrder);
-  const threadGroups = groupThreadsByFolder(matchingThreads, projectOrder);
+  const archivedProjects = new Set(archivedProjectKeys);
+  const threadGroups = groupThreadsByFolder(matchingThreads, projectOrder).filter(
+    (group) => archivedProjects.has(group.key) === showArchivedProjects,
+  );
+
+  function handleProjectArchive(key: string, archived: boolean): void {
+    setArchivedProjectKeys(setSidebarProjectArchived(archivedProjectKeys, key, archived));
+  }
 
   function handleProjectDrop(event: React.DragEvent<HTMLElement>, target: string): void {
     event.preventDefault();
@@ -256,9 +268,10 @@ export function AppSidebar({
         ))}
       </div>
 
-      <div
-        className="sidebar-scroll no-drag mt-3 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-3"
-        onScroll={handleThreadListScroll}
+      <ScrollArea
+        className="no-drag mt-3 min-h-0 w-full flex-1"
+        viewportClassName="overflow-x-hidden px-2 pb-3"
+        onViewportScroll={handleThreadListScroll}
       >
         <div className="flex flex-col gap-4">
           <PersistentAgentLinks
@@ -272,7 +285,19 @@ export function AppSidebar({
           />
           <section aria-label="Projects" className="space-y-1">
             <div className="flex h-7 items-center gap-2 px-2.5 text-sidebar-heading">
-              <h2 className="min-w-0 flex-1 text-base font-medium">Projects</h2>
+              <h2 className="min-w-0 flex-1 text-base font-medium">
+                {showArchivedProjects ? "Archived projects" : "Projects"}
+              </h2>
+              <button
+                type="button"
+                aria-label={showArchivedProjects ? "Show active projects" : "Show archived projects"}
+                title={showArchivedProjects ? "Show active projects" : "Show archived projects"}
+                aria-pressed={showArchivedProjects}
+                className="flex size-6 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => setShowArchivedProjects(!showArchivedProjects)}
+              >
+                <Archive className="size-4" />
+              </button>
               <button
                 type="button"
                 aria-label={threadSearch.open ? "Close project search" : "Search projects"}
@@ -319,26 +344,54 @@ export function AppSidebar({
                       }}
                       onDrop={(event) => handleProjectDrop(event, group.key)}
                     >
-                      <button
-                        type="button"
-                        className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-8 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
-                        title={group.path || group.title}
-                        aria-label={`New agent in ${group.title}`}
-                        onClick={() => onNewThreadInFolder(group.path)}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{group.title}</span>
-                      </button>
-                      <Tooltip>
-                        <TooltipTrigger
+                      {showArchivedProjects ? (
+                        <span className="min-w-0 flex-1 truncate px-2.5 pr-8" title={group.path || group.title}>
+                          {group.title}
+                        </span>
+                      ) : (
+                        <button
                           type="button"
-                          className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+                          className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-14 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+                          title={group.path || group.title}
                           aria-label={`New agent in ${group.title}`}
                           onClick={() => onNewThreadInFolder(group.path)}
                         >
-                          <CirclePlus className="size-3.5" />
+                          <span className="min-w-0 flex-1 truncate">{group.title}</span>
+                        </button>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger
+                          type="button"
+                          className={cn(
+                            "absolute flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 group-focus-within:opacity-100",
+                            showArchivedProjects ? "right-1" : "right-7",
+                          )}
+                          aria-label={`${showArchivedProjects ? "Restore" : "Archive"} project ${group.title}`}
+                          onClick={() => handleProjectArchive(group.key, !showArchivedProjects)}
+                        >
+                          {showArchivedProjects ? (
+                            <ArchiveRestore className="size-3.5" />
+                          ) : (
+                            <Archive className="size-3.5" />
+                          )}
                         </TooltipTrigger>
-                        <TooltipContent side="right">New agent</TooltipContent>
+                        <TooltipContent side="right">
+                          {showArchivedProjects ? "Restore project" : "Archive project (keeps conversations)"}
+                        </TooltipContent>
                       </Tooltip>
+                      {!showArchivedProjects && (
+                        <Tooltip>
+                          <TooltipTrigger
+                            type="button"
+                            className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
+                            aria-label={`New agent in ${group.title}`}
+                            onClick={() => onNewThreadInFolder(group.path)}
+                          >
+                            <CirclePlus className="size-3.5" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right">New agent</TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="mt-1 flex flex-col gap-0.5">
                       {visibility.primaryThreads.map((thread) => (
@@ -395,7 +448,11 @@ export function AppSidebar({
               })
             ) : (
               <div className="px-3 py-2 text-sm text-sidebar-muted">
-                {threadSearch.query.trim() ? "No matching threads" : "No threads yet"}
+                {threadSearch.query.trim()
+                  ? "No matching threads"
+                  : showArchivedProjects
+                    ? "No archived projects"
+                    : "No threads yet"}
               </div>
             )}
             {hasMoreThreads || loadingMoreThreads ? (
@@ -411,7 +468,7 @@ export function AppSidebar({
             ) : null}
           </section>
         </div>
-      </div>
+      </ScrollArea>
       <div className="no-drag flex shrink-0 items-center gap-2 px-2 pb-2">
         <SidebarRowButton
           className="min-w-0 flex-1 focus-visible:ring-2 focus-visible:ring-ring"
