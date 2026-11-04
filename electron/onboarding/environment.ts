@@ -16,6 +16,7 @@ const environmentKeyTable: ReadonlyArray<{ providerId: string; label: string; en
   { providerId: "gemini", label: "Google Gemini", envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
   { providerId: "openrouter", label: "OpenRouter", envVars: ["OPENROUTER_API_KEY"] },
   { providerId: "fireworks", label: "Fireworks AI", envVars: ["FIREWORKS_API_KEY"] },
+  { providerId: "hopper", label: "Hopper", envVars: ["HOPPER_API_KEY", "RODER_HOPPER_API_KEY"] },
   { providerId: "deepseek", label: "DeepSeek", envVars: ["DEEPSEEK_API_KEY"] },
   { providerId: "opencode", label: "OpenCode Zen", envVars: ["OPENCODE_API_KEY"] },
   { providerId: "opencode-go", label: "OpenCode Go", envVars: ["OPENCODE_GO_API_KEY"] },
