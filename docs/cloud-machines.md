@@ -30,7 +30,7 @@ app-server connection.
 ## Providers
 
 Desktop discovers providers from the embedded harness's `runners/list` API rather
-than maintaining a fixed selectable catalog. The pinned Roder 0.4.1 build
+than maintaining a fixed selectable catalog. The pinned Roder 0.4.8 build
 includes Sprites, Blaxel, Docker, unix-local, Cloudflare, Daytona, E2B, Modal,
 Runloop, and Vercel.
 
