@@ -14,7 +14,7 @@ export function ThreadExecutionMachine({ threadId }: { threadId: string }): Reac
   return (
     <span
       title="Execution machine is fixed for this thread. Start a new thread to change it."
-      className="max-w-56 truncate px-2 text-sm text-muted-foreground"
+      className="min-w-0 max-w-32 truncate px-1.5 text-sm text-muted-foreground @[520px]:max-w-52 @[520px]:px-2"
     >
       {label}
     </span>
@@ -55,7 +55,7 @@ export function CloudMachinePicker({
       value={selectedMachineId}
       onChange={(event) => select(event.currentTarget.value)}
       className={cn(
-        "h-8 min-w-0 max-w-56 rounded-lg border border-input bg-background px-2 text-base font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+        "h-7 min-w-0 max-w-32 rounded-lg border border-input bg-background px-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 @[520px]:h-8 @[520px]:max-w-52 @[520px]:px-2 @[520px]:text-base",
         className,
       )}
     >

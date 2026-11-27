@@ -61,10 +61,12 @@ export function PolicyModePicker({
     <DropdownMenu>
       <DropdownMenuTrigger
         variant="pill"
-        className="max-w-40 px-2.5 text-base text-muted-foreground sm:max-w-none sm:px-3"
+        chevronClassName="size-3.5 @[520px]:size-4"
+        className="min-w-0 max-w-32 gap-1 px-2 text-sm text-muted-foreground @[520px]:max-w-48 @[520px]:gap-1.5 @[520px]:px-2.5 @[520px]:text-base"
         aria-label={`Choose permission mode: ${selected.label}`}
+        title={selected.label}
       >
-        <ShieldCheck className="size-4 shrink-0" />
+        <ShieldCheck className="size-3.5 shrink-0 @[520px]:size-4" />
         <span className="truncate">{selected.label}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-64">
@@ -295,7 +297,7 @@ export function ModelPicker({
   const showReasoningPicker = !selectedAutoItem && reasoningChoices.length > 0;
 
   return (
-    <div className="flex shrink-0 items-center gap-2 text-foreground">
+    <div className="flex min-w-0 items-center gap-1 text-foreground @[520px]:gap-1.5">
       <Combobox.Root<ModelPickerItem>
         open={open}
         onOpenChange={setOpen}
@@ -324,11 +326,18 @@ export function ModelPicker({
             });
         }}
       >
-        <Combobox.Trigger className={cn(dropdownMenuTriggerVariants({ variant: "pill" }))} aria-label="Choose model">
+        <Combobox.Trigger
+          className={cn(
+            dropdownMenuTriggerVariants({ variant: "pill" }),
+            "min-w-0 max-w-full gap-1 px-2 text-sm @[520px]:gap-1.5 @[520px]:px-2.5 @[520px]:text-base",
+          )}
+          aria-label="Choose model"
+          title={modelPickerLabel(selected)}
+        >
           <Combobox.Value>
-            {(item: ModelPickerItem | null) => <span>{modelPickerLabel(item ?? selected)}</span>}
+            {(item: ModelPickerItem | null) => <span className="truncate">{modelPickerLabel(item ?? selected)}</span>}
           </Combobox.Value>
-          <DropdownTriggerChevron />
+          <DropdownTriggerChevron className="size-3.5 @[520px]:size-4" />
         </Combobox.Trigger>
         <Combobox.Portal>
           <Combobox.Positioner align="end" side="top" sideOffset={8} className="z-50">
@@ -388,7 +397,12 @@ export function ModelPicker({
       </Combobox.Root>
       {showReasoningPicker && (
         <DropdownMenu>
-          <DropdownMenuTrigger variant="pill" aria-label={`Choose thinking effort: ${reasoningLabel(shownReasoning)}`}>
+          <DropdownMenuTrigger
+            variant="pill"
+            chevronClassName="size-3.5 @[520px]:size-4"
+            className="shrink-0 gap-1 px-2 text-sm @[520px]:gap-1.5 @[520px]:px-2.5 @[520px]:text-base"
+            aria-label={`Choose thinking effort: ${reasoningLabel(shownReasoning)}`}
+          >
             <span>{reasoningLabel(shownReasoning)}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" sideOffset={8} className={pickerMenuSurfaceClassName}>
