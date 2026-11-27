@@ -99,7 +99,7 @@ Protocol reference: [`docs/api.md`](docs/api.md). UI conventions: [`docs/design.
 
 ## Develop
 
-You need Node 24 or 25 (the packaging step checks for these), pnpm 11, and a Rust toolchain for the embedded harness build.
+You need Node 24 or 25 (the packaging step checks for these), pnpm 12, and Rust 1.100.0 for the embedded harness build.
 
 ```sh
 pnpm install
@@ -121,7 +121,7 @@ Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` fro
 
 ### The embedded harness
 
-The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.3.18` release tag, pinned to its immutable source revision.
+The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.4.11` release tag, pinned to its immutable source revision. This includes Hopper inference and image input through Chat Completions.
 
 | Goal                                              | Command                              |
 | ------------------------------------------------- | ------------------------------------ |

@@ -77,14 +77,25 @@ const config: ForgeConfig = {
 
       const prebuildSource = path.join(nodePtySource, "prebuilds", `${platform}-${arch}`);
       const prebuildTarget = path.join(nodePtyTarget, "prebuilds", `${platform}-${arch}`);
-      if (!existsSync(prebuildSource)) {
-        throw new Error(`Cannot package node-pty because ${prebuildSource} is missing`);
-      }
-      await cp(prebuildSource, prebuildTarget, { recursive: true });
+      const buildReleaseSource = path.join(nodePtySource, "build", "Release");
+      const buildReleaseTarget = path.join(nodePtyTarget, "build", "Release");
+      if (existsSync(prebuildSource)) {
+        await cp(prebuildSource, prebuildTarget, { recursive: true });
 
-      const spawnHelper = path.join(prebuildTarget, "spawn-helper");
-      if (platform === "darwin" && existsSync(spawnHelper)) {
-        await chmod(spawnHelper, 0o755);
+        const spawnHelper = path.join(prebuildTarget, "spawn-helper");
+        if (platform === "darwin" && existsSync(spawnHelper)) {
+          await chmod(spawnHelper, 0o755);
+        }
+      } else if (
+        platform === process.platform &&
+        arch === process.arch &&
+        existsSync(path.join(buildReleaseSource, "pty.node"))
+      ) {
+        await cp(buildReleaseSource, buildReleaseTarget, { recursive: true });
+      } else {
+        throw new Error(
+          `Cannot package node-pty because neither ${prebuildSource} nor ${path.join(buildReleaseSource, "pty.node")} is present`,
+        );
       }
     },
   },

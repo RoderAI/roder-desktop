@@ -15,6 +15,7 @@ export const BUILTIN_PROVIDER_IDS = new Set([
   "opencode-go",
   "openrouter",
   "fireworks",
+  "hopper",
   "roder-cloud",
   "poolside",
   "cursor",

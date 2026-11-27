@@ -57,6 +57,12 @@ export const providerCopy: Readonly<Record<string, ProviderCopy>> = {
     method: "API key",
     apiKeyUrl: "https://fireworks.ai/account/api-keys",
   },
+  hopper: {
+    title: "Hopper",
+    description: "DeepSeek models, including abliterated variants, through the Hopper API.",
+    method: "API key",
+    apiKeyUrl: "https://withhopper.com/console/keys",
+  },
   openai: {
     title: "OpenAI",
     description: "GPT models through the OpenAI API.",
