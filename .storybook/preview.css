@@ -1,0 +1,9 @@
+/* The desktop window has a native minimum width, but the Storybook iframe does not. */
+html,
+body {
+  min-width: 0;
+}
+
+body {
+  overflow: auto;
+}

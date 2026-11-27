@@ -1,0 +1,108 @@
+import { useRoderStore } from "@/stores/roder-store";
+import type { BrowserSnapshot, ChromeBridgeStatus } from "@/types/roder";
+import { models, noop, noopAsync, threads, workspace } from "./fixtures";
+
+// No fixture may fall through to real IPC, navigate, or run terminal commands.
+export function installNativeFixture(): void {
+  useRoderStore.setState({ threads, workspaces: [workspace], models, hydrated: true });
+
+  let browser: BrowserSnapshot = {
+    visible: false,
+    url: "https://example.test/",
+    cdpUrl: "Storybook fixture (no connected browser)",
+    canGoBack: false,
+    canGoForward: false,
+    annotating: false,
+  };
+  let chromeEnabled = false;
+  let bridge: ChromeBridgeStatus = {
+    state: "stopped",
+    url: null,
+    token: null,
+    tokenPreview: null,
+    pairingUrl: null,
+    pid: null,
+    clientCount: 0,
+  };
+  let mcpConfig: unknown = { mcpServers: {} };
+  const listeners = new Set<Parameters<Window["roderDesktop"]["onTerminalData"]>[0]>();
+  const fixtures = {
+    platform: "darwin",
+    homeDir: "/storybook",
+    async request(method) {
+      switch (method) {
+        case "desktop/persistent-agents/list":
+          return { persistentAgents: [] };
+        case "desktop/projects/list":
+          return { projects: [] };
+        case "desktop/issues/list":
+          return { issues: [] };
+        case "workspace/list":
+          return { workspaces: [workspace] };
+        case "model/list":
+          return { models };
+        case "subagent/traces/list":
+          return { traces: [] };
+        case "chrome/status":
+          return { enabled: chromeEnabled, connected: false, clientCount: 0 };
+        case "chrome/enable":
+        case "chrome/disable":
+          chromeEnabled = method === "chrome/enable";
+          return {};
+        default:
+          throw new Error(`No Storybook fixture for ${method}`);
+      }
+    },
+    onNotification: () => noop,
+    setMinWindowWidth: noopAsync,
+    mcpReadConfig: async () => ({ config: mcpConfig, error: null }),
+    mcpWriteConfig: async (_path, config) => {
+      mcpConfig = config;
+      return { error: null };
+    },
+    chromeBridgeStatus: async () => bridge,
+    chromeBridgeStart: async () => (bridge = { ...bridge, state: "running" }),
+    chromeBridgeRestart: async () => (bridge = { ...bridge, state: "running" }),
+    chromeBridgeStop: async () => (bridge = { ...bridge, state: "stopped" }),
+    chromeBridgeOpenExtensionOptions: noopAsync,
+    onChromeBridgeStatus: () => noop,
+    browserHide: async () => (browser = { ...browser, visible: false }),
+    browserShow: async () => (browser = { ...browser, visible: true }),
+    browserSetBounds: async () => browser,
+    browserNavigate: async (url) => (browser = { ...browser, url }),
+    browserRefresh: async () => browser,
+    browserToggleAnnotation: async () => (browser = { ...browser, annotating: !browser.annotating }),
+    openExternal: noopAsync,
+    openWorkspaceFolder: async () => workspace.roots[0].path,
+    openWorkspaceFolders: async () => [workspace.roots[0].path],
+    canvasSavePng: async (imageUrl) => ({
+      name: "sketch.png",
+      path: "/storybook/sketch.png",
+      type: "image/png",
+      size: 0,
+      imageUrl,
+      source: "canvas",
+    }),
+    onTerminalData: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    onTerminalExit: () => noop,
+    terminalStart: async ({ id = "storybook" } = {}) => {
+      for (const listener of listeners) {
+        listener({
+          id,
+          data: "\x1b[32mRoder Desktop\x1b[0m - Storybook terminal fixture\r\nNo shell is running in this preview.\r\n\r\n$ ",
+        });
+      }
+      return { id, pid: 0 };
+    },
+    terminalResize: noopAsync,
+    terminalStop: noopAsync,
+    terminalWrite: noopAsync,
+  } satisfies Partial<Window["roderDesktop"]>;
+
+  Object.defineProperty(window, "roderDesktop", { configurable: true, value: fixtures });
+}

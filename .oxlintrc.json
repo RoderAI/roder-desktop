@@ -11,7 +11,7 @@
       "version": "19.2.6"
     }
   },
-  "ignorePatterns": ["coverage/**", "out/**", "packages/*/dist/**", "resources/bin/**"],
+  "ignorePatterns": ["coverage/**", "out/**", "packages/*/dist/**", "resources/bin/**", "storybook-static/**"],
   "rules": {
     "jsx-a11y/prefer-tag-over-role": "off"
   },

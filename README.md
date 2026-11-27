@@ -108,16 +108,26 @@ pnpm dev
 
 `pnpm dev` builds the pinned `roder` debug binary into `resources/bin/`, then starts Electron Forge with Vite.
 
-| Command          | What it does                                             |
-| ---------------- | -------------------------------------------------------- |
-| `pnpm dev`       | Build the debug harness and launch the app               |
-| `pnpm typecheck` | TypeScript plus workspace package checks                 |
-| `pnpm test`      | Vitest                                                   |
-| `pnpm lint`      | oxlint                                                   |
-| `pnpm format`    | oxfmt                                                    |
-| `pnpm make`      | Typecheck, then build distributables with Electron Forge |
+| Command                | What it does                                             |
+| ---------------------- | -------------------------------------------------------- |
+| `pnpm dev`             | Build the debug harness and launch the app               |
+| `pnpm storybook`       | Open the desktop UI catalog in your browser              |
+| `pnpm build-storybook` | Build the catalog as a static site                       |
+| `pnpm typecheck`       | TypeScript plus workspace package checks                 |
+| `pnpm test`            | Vitest                                                   |
+| `pnpm lint`            | oxlint                                                   |
+| `pnpm format`          | oxfmt                                                    |
+| `pnpm make`            | Typecheck, then build distributables with Electron Forge |
 
 Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` from asar, and ships `resources/bin` as an extra resource. Local `pnpm make` can also produce Linux deb and rpm packages, but the release CI currently publishes macOS (Apple silicon) and Windows (x64) only.
+
+### Desktop UI catalog
+
+Run `pnpm storybook` to open the component catalog at `http://127.0.0.1:6006`.
+The preview uses the desktop's fonts, styles, and components without starting Electron
+or the embedded harness. Use the paintbrush toolbar to switch between light and dark.
+Stories and local fixtures live in `src/stories/`. `pnpm build-storybook` builds a
+static copy into `storybook-static/`.
 
 ### The embedded harness
 

@@ -24,6 +24,7 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
+    ".storybook",
     "electron",
     "src",
     "packages/extension-api/src",
