@@ -146,6 +146,11 @@ export function Transcript({
   const transcriptRowKeysRef = useRef<Array<string | number>>([]);
   const userScrollIntentRef = useRef(false);
   const userScrollIntentTimeoutRef = useRef<number | null>(null);
+  const indexedHistoryKey = indexedHistory
+    ? `${indexedHistory.index.threadId}:${indexedHistory.index.before ?? ""}:${indexedHistory.index.olderCount}`
+    : "";
+  const previousIndexedHistoryKeyRef = useRef(indexedHistoryKey);
+  const lastViewportAnchorRef = useRef<{ threadKey: string; anchor: HistoryScrollAnchor } | null>(null);
   const historyAnchorRef = useRef<(HistoryScrollAnchor & { threadKey: string; cursor: string | null }) | null>(null);
   const pendingNavigationRef = useRef<{ threadKey: string; id: string; controller: AbortController } | null>(null);
   const [disclosureOpenByKey, setDisclosureOpenByKey] = useState<TranscriptDisclosureState>({});
@@ -377,6 +382,16 @@ export function Transcript({
     ) {
       loadOlderHistory();
     }
+    if (!indexedHistoryKey && viewportRef.current) {
+      lastViewportAnchorRef.current = {
+        threadKey: scrollStateKey,
+        anchor: captureHistoryScrollAnchor(
+          rowVirtualizer.getVirtualItems(),
+          currentScrollTop,
+          rowVirtualizer.getTotalSize(),
+        ),
+      };
+    }
     previousScrollTopRef.current = currentScrollTop;
     syncTranscriptScrollState({
       source: rowVirtualizer,
@@ -398,6 +413,7 @@ export function Transcript({
     historyError,
     loadOlderHistory,
     historyCursor,
+    indexedHistoryKey,
     scrollStateKey,
   ]);
 
@@ -466,6 +482,25 @@ export function Transcript({
     scheduleScrollToOffset,
     setPinnedToEndState,
   ]);
+
+  // Keep the visible message anchored when background history indexing attaches
+  // older virtual slots above the live tail while the user has scrolled up.
+  useLayoutEffect(() => {
+    const previousKey = previousIndexedHistoryKeyRef.current;
+    previousIndexedHistoryKeyRef.current = indexedHistoryKey;
+    if (!indexedHistoryKey || previousKey === indexedHistoryKey) return;
+    if (pinnedToEndRef.current) return;
+    const saved = lastViewportAnchorRef.current;
+    if (!saved || saved.threadKey !== scrollStateKey) return;
+    lastViewportAnchorRef.current = null;
+    const offset = restoreHistoryScrollAnchor(
+      saved.anchor,
+      transcriptRows.map((row) => row.key),
+      (index) => rowVirtualizer.getOffsetForIndex(index, "start")?.[0],
+      rowVirtualizer.getTotalSize(),
+    );
+    scheduleScrollToOffset(offset);
+  }, [indexedHistoryKey, rowVirtualizer, scheduleScrollToOffset, scrollStateKey, transcriptRows]);
 
   const setViewportNode = useCallback((viewport: HTMLDivElement | null) => {
     viewportRef.current = viewport;

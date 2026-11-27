@@ -254,7 +254,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           messages={transcriptMessages}
           followSignal={followSignal}
           bottomInsetPx={transcriptBottomInsetPx}
-          scrollStateKey={`${activeThreadId || "new-thread"}:${history.requestId}`}
+          scrollStateKey={`${routeActiveThreadId || "new-thread"}:${history.requestId}`}
           historyCursor={history.before}
           historyLoading={history.loading}
           hasOlderHistory={history.hasMore}
