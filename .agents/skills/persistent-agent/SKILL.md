@@ -13,13 +13,23 @@ Use `persistent_agent_create` to create a persistent agent. Ask only for a
 missing agent display name or long-lived mission; reuse details already supplied
 instead of sending the user to the UI. By default the tool uses the current
 thread's workspace; pass `workspaceId` only when the user specifies a
-different existing workspace. Optionally pass both `modelProvider` and
+different existing workspace. Omit unused optional fields rather than supplying
+empty strings (empty optional strings are treated as omitted). If the user names
+a workspace, pass `workspaceName` directly instead of asking for an internal ID.
+Do not combine `workspaceId` and `workspaceName`. Use
+`persistent_agent_workspaces` to list existing workspace names and IDs if needed;
+`projects_list` lists issue projects, not workspaces. If names are duplicated, ask
+the user to choose from the returned workspaces. Never guess or create a workspace.
+Optionally pass both `modelProvider` and
 `model` (and `reasoning`) when requested.
 
 New persistent agents start paused. Do not enable proactive runs, schedule
 wakes, or start a run unless explicitly requested. Report the returned agent
 ID, workspace ID, thread ID and paused status. Do not claim success before
 the tool returns.
+
+A mission spanning multiple repositories does not configure cross-repository
+access or monitoring. Explain any access that still needs to be set up.
 
 The desktop must remain running for proactive work. If an older thread does not
 advertise the creation tool, ask the user to start a new chat; do not invent a

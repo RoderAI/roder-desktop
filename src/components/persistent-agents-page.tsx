@@ -168,18 +168,20 @@ export function PersistentAgentsPage({
   );
 }
 
-function PersistentAgentEditor({
+export function PersistentAgentEditor({
   initial,
   status,
   busy,
   observedAt,
   perform,
+  showThreadLink = true,
 }: {
   initial: PersistentAgentDetail;
   status: PersistentAgent;
   busy: boolean;
   observedAt: number;
   perform: <T>(action: () => Promise<T>) => Promise<T | undefined>;
+  showThreadLink?: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const memoryVersion = useRef(initial.memory);
@@ -187,13 +189,15 @@ function PersistentAgentEditor({
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold">{status.name}</h2>
-        <Link
-          to="/threads/$threadId"
-          params={{ threadId: status.threadId }}
-          className="rounded-md px-3 py-2 underline focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Open persistent agent thread
-        </Link>
+        {showThreadLink ? (
+          <Link
+            to="/threads/$threadId"
+            params={{ threadId: status.threadId }}
+            className="rounded-md px-3 py-2 underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Open persistent agent thread
+          </Link>
+        ) : null}
       </header>
       <p className="text-sm text-muted-foreground">
         Local device · {status.model ? `${status.model} · ${status.modelProvider}` : "Engine default model"}
@@ -201,6 +205,9 @@ function PersistentAgentEditor({
       </p>
       <PersistentAgentCharacter status={status} busy={busy} perform={perform} />
       <div className="rounded-xl border border-border p-3 space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Permissions: Bypass (all tool approvals). Always applied to persistent-agent turns.
+        </p>
         <p>
           {status.enabled ? "Proactive work is enabled" : "Proactive work is paused"}
           {status.active ? " · Run active" : ""}

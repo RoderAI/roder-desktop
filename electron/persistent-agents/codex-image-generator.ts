@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, realpath, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { delimiter } from "node:path";
+import { homedir } from "node:os";
 
 export type CodexImageClient = {
   request: (method: string, params: unknown) => Promise<unknown>;
@@ -77,6 +79,36 @@ export class CodexImageModelUnsupportedError extends Error {
   }
 }
 
+export class CodexImageCliUnavailableError extends Error {
+  constructor() {
+    super(
+      "Codex could not start. Install the Codex CLI and make sure it can run, then retry. No API-key fallback was attempted.",
+    );
+    this.name = "CodexImageCliUnavailableError";
+  }
+}
+
+export function codexImageEnvironment(env: NodeJS.ProcessEnv = process.env, home = homedir()): NodeJS.ProcessEnv {
+  const environment = { ...env };
+  delete environment.OPENAI_API_KEY;
+  // Finder launches do not inherit the interactive shell's package-manager PATH.
+  environment.PATH = [
+    ...new Set([
+      ...(env.PATH ?? "").split(delimiter).filter(Boolean),
+      join(home, ".local", "bin"),
+      join(home, ".local", "share", "mise", "shims"),
+      join(home, ".volta", "bin"),
+      join(home, ".npm-global", "bin"),
+      join(home, ".bun", "bin"),
+      "/opt/homebrew/bin",
+      "/usr/local/bin",
+      "/usr/bin",
+      "/bin",
+    ]),
+  ].join(delimiter);
+  return environment;
+}
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Invalid Codex image protocol response");
   return value as Record<string, unknown>;
@@ -90,8 +122,7 @@ function assertActive(signal: AbortSignal) {
 }
 
 export function createCodexImageClient(executable: string, directory: string): CodexImageClient {
-  const environment = { ...process.env };
-  delete environment.OPENAI_API_KEY;
+  const environment = codexImageEnvironment();
   const args = [
     "app-server",
     "--stdio",
@@ -128,10 +159,11 @@ export function createCodexImageClient(executable: string, directory: string): C
   let buffer = "";
   let total = 0;
   let closed = false;
-  function fail() {
+  function fail(error?: Error) {
     if (closed) return;
     closed = true;
-    for (const request of pending.values()) request.reject(Error("Codex image process stopped; retry explicitly"));
+    for (const request of pending.values())
+      request.reject(error ?? Error("Codex image process stopped; retry explicitly"));
     pending.clear();
     for (const listener of listeners) listener("adapter/disconnected", {});
     if (child.exitCode === null && child.signalCode === null) {
@@ -143,10 +175,10 @@ export function createCodexImageClient(executable: string, directory: string): C
       child.once("exit", () => clearTimeout(force));
     }
   }
-  child.on("error", fail);
-  child.on("exit", fail);
-  child.stdin.on("error", fail);
-  child.stdout.on("error", fail);
+  child.on("error", () => fail(new CodexImageCliUnavailableError()));
+  child.on("exit", () => fail());
+  child.stdin.on("error", () => fail());
+  child.stdout.on("error", () => fail());
   child.stderr.resume();
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", (chunk: string) => {

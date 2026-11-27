@@ -93,6 +93,67 @@ test("creates a real thread, starts paused and preserves editable memory across 
   await recovered.stop();
 });
 
+test("manual and automatic persistent agent runs always use bypass permissions", async () => {
+  const { service, persistentAgent, request } = await setup();
+  await service.handleRequest("desktop/persistent-agents/run", { id: persistentAgent.id });
+  expect(request).toHaveBeenCalledWith(
+    "turn/start",
+    expect.objectContaining({ threadId: persistentAgent.threadId, policyMode: "bypass" }),
+  );
+  await service.onNotification("turn/completed", {
+    threadId: persistentAgent.threadId,
+    turn: { id: "turn-1" },
+  });
+  await service.handleRequest("desktop/persistent-agents/update", {
+    id: persistentAgent.id,
+    enabled: true,
+  });
+  await service.handleRequest("desktop/persistent-agents/schedule", {
+    id: persistentAgent.id,
+    at: Date.now() - 1,
+    reason: "Check docs",
+  });
+  await service.tick();
+  const starts = request.mock.calls.filter(([method]) => method === "turn/start");
+  expect(starts).toHaveLength(2);
+  for (const [, params] of starts) expect(params).toMatchObject({ policyMode: "bypass" });
+  await service.stop();
+});
+
+test("persistent agent chat overrides permission mode without changing ordinary threads", async () => {
+  const { service, persistentAgent } = await setup();
+  const input = {
+    threadId: persistentAgent.threadId,
+    policyMode: "default",
+    developerContext: "Desktop context",
+    input: [{ type: "text", text: "Update docs" }],
+  };
+  expect(await service.turnStartParams(input)).toMatchObject({
+    ...input,
+    policyMode: "bypass",
+    developerContext: expect.stringContaining("Desktop context"),
+  });
+  const ordinary = { ...input, threadId: "ordinary", policyMode: "plan" };
+  expect(await service.turnStartParams(ordinary)).toBe(ordinary);
+  expect(
+    (await service.handleRequest("desktop/persistent-agents/read", {
+      id: persistentAgent.id,
+    })) as PersistentAgentDetail,
+  ).toMatchObject({ enabled: false, runs: [] });
+  await service.stop();
+});
+
+test("recovered persistent agents also default to bypass on their next chat turn", async () => {
+  const { service, persistentAgent, directory, request } = await setup();
+  await service.stop();
+  const recovered = createPersistentAgentService({ directory, request });
+  await recovered.start();
+  expect(
+    await recovered.turnStartParams({ threadId: persistentAgent.threadId, policyMode: "accept_all" }),
+  ).toMatchObject({ policyMode: "bypass" });
+  await recovered.stop();
+});
+
 test("daily run allowances must be whole counts", async () => {
   const { service, persistentAgent } = await setup();
   await expect(

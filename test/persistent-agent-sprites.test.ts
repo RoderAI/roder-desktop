@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, test, vi } from "vitest";
+import { CodexImageCliUnavailableError } from "../electron/persistent-agents/codex-image-generator";
 import {
   createPersistentAgentSpriteManager,
   createSpriteImageNormalizer,
@@ -193,6 +194,19 @@ test("an unreported or legacy model is not relabeled as GPT Image 2.5", async ()
   expect(manager.get(persona.id)).toMatchObject({
     status: "ready",
     asset: { model: "gpt-image-2", provider: "codex" },
+  });
+  expect(generateOpenAi).not.toHaveBeenCalled();
+});
+
+test("a missing Codex CLI is reported as a startup failure, not invalid transparent art", async () => {
+  const { manager, generateCodex, generateOpenAi } = await setup();
+  generateCodex.mockRejectedValue(new CodexImageCliUnavailableError());
+  await manager.enqueue(persona);
+  await manager.whenIdle();
+  expect(manager.get(persona.id)).toMatchObject({
+    status: "failed",
+    error: expect.stringContaining("Codex could not start"),
+    asset: null,
   });
   expect(generateOpenAi).not.toHaveBeenCalled();
 });

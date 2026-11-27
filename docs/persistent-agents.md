@@ -35,9 +35,13 @@ durable context, not infinite model context.
 an active run. The service retains the active lease until the engine confirms
 completion or an idle thread, so an interrupt request cannot cause overlap.
 Run time enforcement checks every 15 seconds and also requests interruption;
-it is not an instantaneous process kill. Approval and user-input waits remain
-subject to the same run time limit. The engine's normal safety policy remains
-in effect; the persistent agent does not bypass approvals.
+it is not an instantaneous process kill. User-input waits remain subject to the
+same run time limit. All persistent-agent turns use the engine's `bypass`
+permission mode: manual chat, **Run once**, and scheduled or event-triggered
+runs do not require tool approval prompts. This applies to existing agents after
+restart as well as newly created or promoted agents. Ordinary threads retain
+their selected permission mode. Bypass does not enable paused agents, remove
+run budgets, grant missing OS permissions, or override tool-specific restrictions.
 
 ## Persona characters
 

@@ -189,6 +189,7 @@ export function createPersistentAgentService(options: Options) {
       const result = object(
         await options.request("turn/start", {
           threadId: c.threadId,
+          policyMode: "bypass",
           ...(c.modelProvider ? { modelProvider: c.modelProvider } : {}),
           ...(c.model ? { model: c.model } : {}),
           ...(c.reasoning ? { reasoning: c.reasoning } : {}),
@@ -392,6 +393,19 @@ export function createPersistentAgentService(options: Options) {
   }
   return {
     contextForThread,
+    async turnStartParams(params: unknown): Promise<unknown> {
+      if (!params || typeof params !== "object" || Array.isArray(params)) return params;
+      const input = params as ObjectValue;
+      if (typeof input.threadId !== "string") return params;
+      const context = await contextForThread(input.threadId);
+      if (context === null) return params;
+      const existing = typeof input.developerContext === "string" ? input.developerContext : "";
+      return {
+        ...input,
+        policyMode: "bypass",
+        developerContext: existing ? `${context}\n\n${existing}` : context,
+      };
+    },
     handleRequest,
     tick,
     async start() {
