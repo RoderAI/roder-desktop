@@ -186,13 +186,19 @@ jobs:
             fi
           fi
 
-          pnpm exec electron-osx-sign "${app}" \
-            --identity="${APPLE_SIGNING_IDENTITY}" \
-            --keychain="${CSC_KEYCHAIN}" \
-            --platform=darwin \
-            --type=distribution \
-            --hardened-runtime \
-            --strictVerify
+          RODER_DESKTOP_APP_PATH="${app}" node --input-type=module <<'JS'
+          import { sign } from "@electron/osx-sign";
+
+          await sign({
+            app: process.env.RODER_DESKTOP_APP_PATH,
+            identity: process.env.APPLE_SIGNING_IDENTITY,
+            keychain: process.env.CSC_KEYCHAIN,
+            platform: "darwin",
+            type: "distribution",
+            optionsForFile: () => ({ hardenedRuntime: true }),
+            strictVerify: true,
+          });
+          JS
           codesign --verify --deep --strict --verbose=2 "${app}"
           echo "RODER_DESKTOP_APP_PATH=${app}" >> "${GITHUB_ENV}"
 
