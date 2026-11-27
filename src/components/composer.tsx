@@ -544,7 +544,7 @@ export function Composer({
   return (
     <div
       ref={speechLifecycleRef}
-      className="mx-auto w-full max-w-3xl px-4 pb-3 pt-0"
+      className="@container mx-auto w-full max-w-3xl px-2.5 pb-2 pt-0 @[520px]:px-4 @[520px]:pb-3"
       onDragEnter={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
           setDragActive(true);
@@ -565,7 +565,7 @@ export function Composer({
     >
       <div
         className={cn(
-          "relative mt-2 rounded-2xl bg-card/95 shadow-sm ring-1 ring-border/70 backdrop-blur-md transition-[background-color,box-shadow]",
+          "relative mt-1 rounded-xl bg-card/95 shadow-sm ring-1 ring-border/70 backdrop-blur-md transition-[background-color,box-shadow] @[520px]:mt-2 @[520px]:rounded-2xl",
           dragActive && "bg-card shadow-md ring-2 ring-ring/30",
         )}
       >
@@ -615,7 +615,7 @@ export function Composer({
           onHighlight={skillCompletion.setHighlightedSkillIndex}
           onSelect={skillCompletion.insertSkillCompletion}
         />
-        <div className="px-3 py-2">
+        <div className="px-2.5 py-1.5 @[520px]:px-3 @[520px]:py-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -655,19 +655,19 @@ export function Composer({
               ))}
             </div>
           )}
-          <div className="mt-1 flex min-h-8 items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-x-1.5 gap-y-1 @[520px]:gap-x-2">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1 @[520px]:flex-nowrap @[520px]:gap-1.5">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   variant="unstyled"
                   className={cn(
                     buttonVariants({ variant: "ghost", size: "icon" }),
-                    "shrink-0 rounded-full text-muted-foreground data-[popup-open]:bg-accent data-[popup-open]:text-foreground",
+                    "size-7 shrink-0 rounded-full text-muted-foreground data-[popup-open]:bg-accent data-[popup-open]:text-foreground @[520px]:size-8",
                   )}
                   aria-label="Add input"
                   title="Add input"
                 >
-                  <Plus className="size-4" />
+                  <Plus className="size-3.5 @[520px]:size-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-48">
                   <DropdownMenuGroup>
@@ -690,12 +690,12 @@ export function Composer({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-10 max-w-44 rounded-full bg-primary/10 px-3 text-base text-primary hover:bg-primary/15 hover:text-primary"
+                  className="h-7 min-w-0 max-w-32 rounded-full bg-primary/10 px-2 text-sm text-primary hover:bg-primary/15 hover:text-primary @[520px]:max-w-44 @[520px]:px-2.5 @[520px]:text-base"
                   aria-pressed="true"
                   title="Agent Swarm mode is on for this thread"
                   onClick={toggleAgentSwarmMode}
                 >
-                  <Network className="size-4 shrink-0" />
+                  <Network className="size-3.5 shrink-0 @[520px]:size-4" />
                   <span className="truncate">Agent Swarm</span>
                 </Button>
               )}
@@ -706,12 +706,12 @@ export function Composer({
                 <CloudMachinePicker disabled={busy} />
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex min-w-0 max-w-full items-center gap-1 @[520px]:gap-1.5">
               <Button
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "shrink-0 rounded-full",
+                  "size-7 shrink-0 rounded-full @[520px]:size-8",
                   isRecording
                     ? "bg-destructive/10 text-destructive animate-pulse hover:bg-destructive/20 hover:text-destructive"
                     : "text-muted-foreground",
@@ -720,7 +720,11 @@ export function Composer({
                 onClick={toggleRecording}
                 disabled={isTranscribing}
               >
-                {isTranscribing ? <Loader2 className="size-4 animate-spin" /> : <Mic className="size-4" />}
+                {isTranscribing ? (
+                  <Loader2 className="size-3.5 animate-spin @[520px]:size-4" />
+                ) : (
+                  <Mic className="size-3.5 @[520px]:size-4" />
+                )}
               </Button>
               <ModelPicker
                 models={models}
@@ -883,7 +887,7 @@ function SkillPromptEditor({
   return (
     <div className="relative">
       {value.length === 0 && (
-        <div className="pointer-events-none absolute left-1 top-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-muted-foreground">
+        <div className="pointer-events-none absolute left-1 top-1 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-muted-foreground @[520px]:top-2">
           {placeholder}
         </div>
       )}
@@ -899,7 +903,7 @@ function SkillPromptEditor({
         suppressContentEditableWarning
         spellCheck={false}
         tabIndex={0}
-        className="skill-prompt-editor relative min-h-12 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-2 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-foreground caret-primary outline-none [&_p]:m-0 [&_p]:min-h-[1.45em]"
+        className="skill-prompt-editor relative min-h-8 w-full whitespace-pre-wrap break-words rounded-md bg-transparent px-1 py-1 font-[var(--font-ui)] text-[var(--font-size-composer)] font-medium leading-[1.45] text-foreground caret-primary outline-none @[520px]:min-h-11 @[520px]:py-2 [&_p]:m-0 [&_p]:min-h-[1.45em]"
         onKeyDownCapture={onKeyDownCapture}
         onPaste={onPaste}
       />
@@ -935,14 +939,18 @@ function SubmitOrStopButton({
       variant="ghost"
       size="icon"
       className={cn(
-        "composer-submit-button shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+        "composer-submit-button size-7 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground @[520px]:size-8",
       )}
       aria-label={stopsActiveRun ? "Stop inference" : busy ? "Queue message" : "Send message"}
       disabled={disabled}
       data-state={stopsActiveRun ? "stop" : busy ? "queue" : "send"}
       onClick={stopsActiveRun ? onStop : onSubmit}
     >
-      {stopsActiveRun ? <Square className="size-3.5 fill-current" /> : <ArrowUp className="size-4" />}
+      {stopsActiveRun ? (
+        <Square className="size-3 fill-current @[520px]:size-3.5" />
+      ) : (
+        <ArrowUp className="size-3.5 @[520px]:size-4" />
+      )}
     </Button>
   );
 }

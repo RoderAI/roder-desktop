@@ -12,7 +12,7 @@ permissions:
 
 env:
   NODE_VERSION: "24"
-  PNPM_VERSION: "11.5.0"
+  PNPM_VERSION: "12.23.0"
   R2_ACCOUNT_ID: "769befa385792ae6e7ca7136b7010256"
   R2_BUCKET: "roder-downloads"
   R2_PUBLIC_BASE_URL: "https://dl.roder.sh"
@@ -39,7 +39,7 @@ jobs:
           run_install: false
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Cache Rust build outputs
         uses: actions/cache@v4
@@ -48,7 +48,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             roder-desktop-distro/target
-          key: roder-desktop-windows-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('roder-desktop-distro/Cargo.lock', 'roder-desktop-distro/Cargo.toml', 'roder-desktop-distro/src/**/*.rs') }}
+          key: roder-desktop-windows-rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('roder-desktop-distro/rust-toolchain.toml', 'roder-desktop-distro/Cargo.lock', 'roder-desktop-distro/Cargo.toml', 'roder-desktop-distro/src/**/*.rs') }}
           restore-keys: |
             roder-desktop-windows-rust-${{ runner.os }}-${{ runner.arch }}-
 

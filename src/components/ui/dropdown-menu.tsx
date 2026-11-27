@@ -30,6 +30,7 @@ export const dropdownMenuTriggerVariants = cva(
 
 type DropdownMenuTriggerProps = React.ComponentPropsWithoutRef<typeof Menu.Trigger> &
   VariantProps<typeof dropdownMenuTriggerVariants> & {
+    chevronClassName?: string;
     showChevron?: boolean;
   };
 
@@ -45,6 +46,7 @@ export function DropdownTriggerChevron({ className }: { className?: string }): R
 }
 
 export function DropdownMenuTrigger({
+  chevronClassName,
   children,
   className,
   ref,
@@ -57,7 +59,7 @@ export function DropdownMenuTrigger({
   return (
     <Menu.Trigger ref={ref} className={cn(dropdownMenuTriggerVariants({ variant }), className)} {...props}>
       {children}
-      {shouldShowChevron && <DropdownTriggerChevron />}
+      {shouldShowChevron && <DropdownTriggerChevron className={chevronClassName} />}
     </Menu.Trigger>
   );
 }
