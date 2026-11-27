@@ -1,4 +1,5 @@
 import {
+  effectiveRunnerProviderId,
   isRemoteRunner,
   remoteRunnerLabel,
   remoteRunnerTargetName,
@@ -76,10 +77,11 @@ export function groupThreadsByFolder(
     if (existing) {
       group = existing;
     } else if (isRemoteRunner(thread.runner)) {
+      const providerId = effectiveRunnerProviderId(thread.runner);
       const targetName = remoteRunnerTargetName(thread.runner);
       const matchingMachine = machines.find(
         (machine) =>
-          machine.providerId === thread.runner!.providerId &&
+          machine.providerId === providerId &&
           machine.workspace === thread.runner!.workspace &&
           machine.name.toLowerCase() === targetName.toLowerCase(),
       );
@@ -89,7 +91,7 @@ export function groupThreadsByFolder(
         path: thread.cwd || "",
         threads: [],
         remote: {
-          providerId: thread.runner.providerId,
+          providerId,
           workspace: thread.runner.workspace,
           targetName,
           ...(matchingMachine ? { machineId: matchingMachine.id } : {}),

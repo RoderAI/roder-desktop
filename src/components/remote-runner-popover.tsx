@@ -1,5 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import { Cloud, ExternalLink, Globe2, Pause, Play, RefreshCw } from "lucide-react";
+import { Cloud, ExternalLink, Globe2, Network, Pause, Play, RefreshCw, Server } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useMountEffect } from "@/hooks/use-mount-effect";
@@ -81,6 +81,28 @@ export function RemoteRunnerPopover({
     }
   }
 
+  async function handleSetupTailscale(): Promise<void> {
+    setActionBusy("tailscale");
+    setFeedback(null);
+    try {
+      const result = await roderIpc.setupRemoteTailscaleTunnel(remoteWorkspace.workspaceId);
+      setSnapshot(result.status);
+      setFeedback({
+        kind: "info",
+        text: result.status.tailscaleIp
+          ? `Tailscale tunnel active (${result.status.tailscaleDnsName || result.status.tailscaleIp}).`
+          : "Tailscale tunnel is active.",
+      });
+    } catch (error) {
+      setFeedback({
+        kind: "error",
+        text: error instanceof Error ? error.message : "Could not set up Tailscale tunnel.",
+      });
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   async function handleOpenPort(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const port = Number.parseInt(portInput.trim(), 10);
@@ -98,7 +120,15 @@ export function RemoteRunnerPopover({
       } else {
         await window.roderDesktop.openExternal(result.url);
       }
-      setFeedback({ kind: "info", text: `Opened port ${port} preview.` });
+      setFeedback({
+        kind: "info",
+        text:
+          result.transport === "tailscale"
+            ? `Opened port ${port} over Tailscale.`
+            : result.transport === "ssh-forward"
+              ? `Opened port ${port} via local SSH tunnel (${result.url}).`
+              : `Opened port ${port} preview.`,
+      });
     } catch (error) {
       setFeedback({
         kind: "error",
@@ -111,6 +141,10 @@ export function RemoteRunnerPopover({
 
   const reachable = snapshot ? snapshot.reachable : true;
   const statusText = snapshot?.status ? formatStatusLabel(snapshot.status) : "Remote";
+  const isTailscaleProvider = remoteWorkspace.providerId === "tailscale";
+  const isSshProvider = remoteWorkspace.providerId === "ssh";
+  const isTailscaleActive = Boolean(snapshot?.tailscaleActive || snapshot?.bridgeMode === "tailscale-tunnel");
+  const supportsPortPreview = remoteWorkspace.providerId === "blaxel" || isTailscaleProvider || isSshProvider;
 
   return (
     <Popover.Root
@@ -130,7 +164,13 @@ export function RemoteRunnerPopover({
             loading ? "bg-amber-500" : reachable ? "bg-emerald-500" : "bg-destructive",
           )}
         />
-        <Cloud className="size-3.5 shrink-0" />
+        {isTailscaleProvider || isTailscaleActive ? (
+          <Network className="size-3.5 shrink-0" />
+        ) : isSshProvider ? (
+          <Server className="size-3.5 shrink-0" />
+        ) : (
+          <Cloud className="size-3.5 shrink-0" />
+        )}
         <span className="max-w-28 truncate">{remoteWorkspace.label}</span>
       </Popover.Trigger>
       <Popover.Portal>
@@ -143,7 +183,13 @@ export function RemoteRunnerPopover({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-base font-semibold text-foreground">
-                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                    {isTailscaleProvider || isTailscaleActive ? (
+                      <Network className="size-4 shrink-0 text-muted-foreground" />
+                    ) : isSshProvider ? (
+                      <Server className="size-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                    )}
                     <span className="truncate">{remoteWorkspace.label}</span>
                   </div>
                   <p className="mt-0.5 truncate font-mono text-sm font-normal text-muted-foreground">
@@ -166,7 +212,11 @@ export function RemoteRunnerPopover({
               <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-lg bg-muted/30 p-3 text-sm">
                 <div>
                   <dt className="font-normal text-muted-foreground">Provider</dt>
-                  <dd className="capitalize text-foreground">{remoteWorkspace.providerId}</dd>
+                  <dd className="text-foreground">
+                    {remoteWorkspace.providerId === "ssh"
+                      ? "SSH"
+                      : remoteWorkspace.providerId.charAt(0).toUpperCase() + remoteWorkspace.providerId.slice(1)}
+                  </dd>
                 </div>
                 <div>
                   <dt className="font-normal text-muted-foreground">Status</dt>
@@ -184,19 +234,30 @@ export function RemoteRunnerPopover({
                     <dd className="truncate font-mono text-foreground">{snapshot.blaxelWorkspace}</dd>
                   </div>
                 )}
+                {(snapshot?.tailscaleDnsName || snapshot?.tailscaleIp) && (
+                  <div className="col-span-2">
+                    <dt className="font-normal text-muted-foreground">Tailscale node</dt>
+                    <dd className="truncate font-mono text-foreground">
+                      {snapshot.tailscaleDnsName || snapshot.tailscaleIp}
+                      {snapshot.tailscaleDnsName && snapshot.tailscaleIp ? ` (${snapshot.tailscaleIp})` : ""}
+                    </dd>
+                  </div>
+                )}
                 {snapshot?.bridgeMode && (
                   <div className="col-span-2">
                     <dt className="font-normal text-muted-foreground">App-server bridge</dt>
                     <dd className="truncate font-mono text-foreground" title={snapshot.bridgeDetail}>
-                      {snapshot.bridgeMode === "remote-roder-tunnel"
-                        ? "remote-roder (WSS tunnel)"
-                        : snapshot.bridgeMode === "blaxel-api"
-                          ? "Blaxel API fallback"
-                          : "Ready to connect"}
+                      {formatBridgeModeLabel(snapshot.bridgeMode)}
                     </dd>
                   </div>
                 )}
               </dl>
+
+              {snapshot?.tailscaleError && !isTailscaleActive && (
+                <p className="text-sm font-normal text-muted-foreground">
+                  Tailscale fallback: {snapshot.tailscaleError}
+                </p>
+              )}
 
               {snapshot?.message && !snapshot.reachable && (
                 <p role="alert" className="text-sm font-normal text-destructive">
@@ -217,7 +278,7 @@ export function RemoteRunnerPopover({
               )}
 
               <div className="flex flex-wrap items-center gap-2">
-                {remoteWorkspace.providerId === "blaxel" && (
+                {(remoteWorkspace.providerId === "blaxel" || isSshProvider) && (
                   <Button
                     type="button"
                     size="sm"
@@ -227,10 +288,36 @@ export function RemoteRunnerPopover({
                     onClick={() => void handleWake()}
                   >
                     <Play className="size-3.5" />
-                    {actionBusy === "wake" ? "Waking…" : "Wake"}
+                    {actionBusy === "wake"
+                      ? isSshProvider
+                        ? "Connecting…"
+                        : "Waking…"
+                      : isSshProvider
+                        ? "Connect tunnel"
+                        : "Wake"}
                   </Button>
                 )}
-                {remoteWorkspace.threadId && (
+                {(((remoteWorkspace.providerId === "blaxel" || isSshProvider) &&
+                  snapshot?.tailscaleConfigured &&
+                  !isTailscaleActive) ||
+                  isTailscaleProvider) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-md"
+                    disabled={actionBusy !== null}
+                    onClick={() => void handleSetupTailscale()}
+                  >
+                    <Network className="size-3.5" />
+                    {actionBusy === "tailscale"
+                      ? "Tunneling…"
+                      : isTailscaleProvider
+                        ? "Reconnect tunnel"
+                        : "Inject Tailscale"}
+                  </Button>
+                )}
+                {remoteWorkspace.threadId && !isTailscaleProvider && !isSshProvider && (
                   <>
                     <Button
                       type="button"
@@ -258,14 +345,21 @@ export function RemoteRunnerPopover({
                 )}
               </div>
 
-              {remoteWorkspace.providerId === "blaxel" && (
+              {supportsPortPreview && (
                 <form
                   onSubmit={(event) => void handleOpenPort(event)}
                   className="space-y-2 border-t border-border/70 pt-3"
                 >
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <Globe2 className="size-3.5" />
-                    <span>Preview remote port</span>
+                    <span>
+                      Preview remote port
+                      {isTailscaleProvider || isTailscaleActive
+                        ? " (via Tailscale)"
+                        : isSshProvider
+                          ? " (via SSH tunnel)"
+                          : ""}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -305,6 +399,16 @@ export function RemoteRunnerPopover({
       </Popover.Portal>
     </Popover.Root>
   );
+}
+
+function formatBridgeModeLabel(mode: NonNullable<RemoteRunnerStatusSnapshot["bridgeMode"]>): string {
+  if (mode === "tailscale-tunnel") return "Tailscale WireGuard tunnel";
+  if (mode === "ssh-tunnel") return "remote-roder (SSH tunnel)";
+  if (mode === "remote-roder-tunnel") return "remote-roder (WSS tunnel)";
+  if (mode === "tailscale-ssh") return "Tailscale SSH bridge";
+  if (mode === "ssh-direct") return "SSH bridge";
+  if (mode === "blaxel-api") return "Blaxel API fallback";
+  return "Ready to connect";
 }
 
 function formatStatusLabel(raw: string): string {

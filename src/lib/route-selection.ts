@@ -1,4 +1,5 @@
 import {
+  effectiveRunnerProviderId,
   isRemoteRunner,
   REMOTE_WORKSPACE_ROOT_ID,
   remoteRunnerLabel,
@@ -133,7 +134,7 @@ export function activeWorkspaceContextForRoute({
       roots: [{ id: REMOTE_WORKSPACE_ROOT_ID, name: label, path: workspacePath }],
       remote: {
         workspaceId,
-        providerId: routeThread.runner.providerId,
+        providerId: effectiveRunnerProviderId(routeThread.runner),
         label,
         workspacePath,
         targetName,

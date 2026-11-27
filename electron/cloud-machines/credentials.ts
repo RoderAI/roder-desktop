@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { normalizeTailscaleTags, TAILSCALE_DEFAULT_TAG, validateTailscaleAuthKey } from "./tailscale";
 
 export type BlaxelCredentialRecord = {
   apiKey: string;
@@ -8,8 +9,45 @@ export type BlaxelCredentialRecord = {
   source?: "manual" | "blaxel-cli";
 };
 
+export type TailscaleCredentialRecord = {
+  mode: "oauth" | "auth-key";
+  authKey?: string;
+  oauthClientId?: string;
+  oauthClientSecret?: string;
+  tags?: string[];
+  tailnet?: string;
+  preferForSandboxes?: boolean;
+};
+
+export type TailscaleCredentialStatus = {
+  configured: boolean;
+  mode: "oauth" | "auth-key" | "none";
+  source: "saved" | "env" | "none";
+  preview: string | null;
+  oauthClientId: string | null;
+  tags: string[];
+  tailnet: string | null;
+  preferForSandboxes: boolean;
+};
+
+export type ResolvedTailscaleAuth =
+  | {
+      mode: "oauth";
+      oauthClientId: string;
+      oauthClientSecret: string;
+      tags: string[];
+      tailnet: string;
+      preferForSandboxes: boolean;
+    }
+  | {
+      mode: "auth-key";
+      authKey: string;
+      preferForSandboxes: boolean;
+    };
+
 export type StoredCloudCredentials = {
   blaxel?: BlaxelCredentialRecord;
+  tailscale?: TailscaleCredentialRecord;
   tokens?: Record<string, string>;
 };
 
@@ -45,6 +83,7 @@ const providerTokenEnvMap: Record<string, string[]> = {
 };
 
 const blaxelKeyEnvVars = ["BLAXEL_API_KEY", "RODER_BLAXEL_API_KEY", "BL_API_KEY"] as const;
+const tailscaleAuthKeyEnvVars = ["RODER_TAILSCALE_AUTH_KEY", "TAILSCALE_AUTH_KEY", "TS_AUTHKEY"] as const;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return (
@@ -83,6 +122,37 @@ function normalizeStored(data: unknown): StoredCloudCredentials {
         : undefined;
     const source = data.blaxel.source === "blaxel-cli" ? "blaxel-cli" : "manual";
     result.blaxel = { apiKey, ...(workspace ? { workspace } : {}), source };
+  }
+  if (data.tailscale !== undefined) {
+    if (!isPlainRecord(data.tailscale)) throw new Error("Invalid Tailscale credential");
+    const mode = data.tailscale.mode === "oauth" ? "oauth" : "auth-key";
+    const preferForSandboxes = data.tailscale.preferForSandboxes !== false;
+    if (mode === "oauth") {
+      const oauthClientId = nonEmptyString(data.tailscale.oauthClientId, "Tailscale OAuth client ID");
+      const oauthClientSecret = nonEmptyString(data.tailscale.oauthClientSecret, "Tailscale OAuth client secret");
+      const tags = Array.isArray(data.tailscale.tags)
+        ? normalizeTailscaleTags(data.tailscale.tags.filter((item): item is string => typeof item === "string"))
+        : [TAILSCALE_DEFAULT_TAG];
+      const tailnet =
+        typeof data.tailscale.tailnet === "string" && data.tailscale.tailnet.trim()
+          ? data.tailscale.tailnet.trim()
+          : undefined;
+      result.tailscale = {
+        mode: "oauth",
+        oauthClientId,
+        oauthClientSecret,
+        tags: tags.length > 0 ? tags : [TAILSCALE_DEFAULT_TAG],
+        ...(tailnet ? { tailnet } : {}),
+        preferForSandboxes,
+      };
+    } else {
+      const authKey = validateTailscaleAuthKey(nonEmptyString(data.tailscale.authKey, "Tailscale auth key"));
+      result.tailscale = {
+        mode: "auth-key",
+        authKey,
+        preferForSandboxes,
+      };
+    }
   }
   if (data.tokens !== undefined) {
     if (!isPlainRecord(data.tokens)) throw new Error("Invalid provider tokens");
@@ -198,6 +268,79 @@ export class CloudCredentialsService {
     });
   }
 
+  saveTailscaleAuthKey(input: { authKey: string; preferForSandboxes?: boolean }): Promise<TailscaleCredentialStatus> {
+    const authKey = validateTailscaleAuthKey(input.authKey);
+    const preferForSandboxes = input.preferForSandboxes !== false;
+    return this.serialized(async () => {
+      this.requireEncryption();
+      const current = await this.read();
+      const next: StoredCloudCredentials = {
+        ...current,
+        tailscale: {
+          mode: "auth-key",
+          authKey,
+          preferForSandboxes,
+        },
+      };
+      await this.write(next);
+      this.cachedStored = next;
+      return statusForTailscale(next.tailscale, process.env);
+    });
+  }
+
+  saveTailscaleOAuth(input: {
+    oauthClientId: string;
+    oauthClientSecret: string;
+    tags?: readonly string[] | string;
+    tailnet?: string;
+    preferForSandboxes?: boolean;
+  }): Promise<TailscaleCredentialStatus> {
+    const oauthClientId = nonEmptyString(input.oauthClientId, "Tailscale OAuth client ID");
+    const oauthClientSecret = nonEmptyString(input.oauthClientSecret, "Tailscale OAuth client secret");
+    const parsedTags = normalizeTailscaleTags(input.tags);
+    const tags = parsedTags.length > 0 ? parsedTags : [TAILSCALE_DEFAULT_TAG];
+    const tailnet = typeof input.tailnet === "string" && input.tailnet.trim() ? input.tailnet.trim() : undefined;
+    const preferForSandboxes = input.preferForSandboxes !== false;
+    return this.serialized(async () => {
+      this.requireEncryption();
+      const current = await this.read();
+      const next: StoredCloudCredentials = {
+        ...current,
+        tailscale: {
+          mode: "oauth",
+          oauthClientId,
+          oauthClientSecret,
+          tags,
+          ...(tailnet ? { tailnet } : {}),
+          preferForSandboxes,
+        },
+      };
+      await this.write(next);
+      this.cachedStored = next;
+      return statusForTailscale(next.tailscale, process.env);
+    });
+  }
+
+  setTailscalePreferForSandboxes(preferForSandboxes: boolean): Promise<TailscaleCredentialStatus> {
+    return this.serialized(async () => {
+      this.requireEncryption();
+      const current = await this.read();
+      if (!current.tailscale) {
+        throw new Error("Configure Tailscale credentials before changing sandbox tunneling preference.");
+      }
+      const next: StoredCloudCredentials = {
+        ...current,
+        tailscale: {
+          ...current.tailscale,
+          preferForSandboxes,
+        },
+      };
+      await this.write(next);
+      this.cachedStored = next;
+      return statusForTailscale(next.tailscale, process.env);
+    });
+  }
+
   clearProvider(providerId: string): Promise<{ cleared: true }> {
     return this.serialized(async () => {
       this.requireEncryption();
@@ -208,16 +351,93 @@ export class CloudCredentialsService {
         this.cachedStored = rest;
         return { cleared: true };
       }
+      if (providerId === "tailscale") {
+        const { tailscale: _, ...rest } = current;
+        await this.write(rest);
+        this.cachedStored = rest;
+        return { cleared: true };
+      }
       if (providerId in providerTokenEnvMap) {
         const tokens = { ...current.tokens };
         delete tokens[providerId];
-        const next: StoredCloudCredentials =
-          Object.keys(tokens).length > 0 ? { ...current, tokens } : current.blaxel ? { blaxel: current.blaxel } : {};
+        const { tokens: _oldTokens, ...rest } = current;
+        const next: StoredCloudCredentials = Object.keys(tokens).length > 0 ? { ...rest, tokens } : rest;
         await this.write(next);
         this.cachedStored = next;
         return { cleared: true };
       }
       throw new Error(`Unsupported credential provider: ${providerId}`);
+    });
+  }
+
+  getTailscaleStatus(baseEnv: NodeJS.ProcessEnv = process.env): Promise<TailscaleCredentialStatus> {
+    return this.serialized(async () => {
+      let stored: StoredCloudCredentials = {};
+      try {
+        stored = await this.read();
+      } catch {
+        stored = {};
+      }
+      return statusForTailscale(stored.tailscale, baseEnv);
+    });
+  }
+
+  resolveTailscaleAuth(baseEnv: NodeJS.ProcessEnv = process.env): Promise<ResolvedTailscaleAuth | null> {
+    return this.serialized(async () => {
+      let stored: StoredCloudCredentials = {};
+      try {
+        stored = await this.read();
+      } catch {
+        stored = {};
+      }
+      const saved = stored.tailscale;
+      if (saved) {
+        if (saved.mode === "oauth" && saved.oauthClientId && saved.oauthClientSecret) {
+          return {
+            mode: "oauth",
+            oauthClientId: saved.oauthClientId,
+            oauthClientSecret: saved.oauthClientSecret,
+            tags: saved.tags && saved.tags.length > 0 ? saved.tags : [TAILSCALE_DEFAULT_TAG],
+            tailnet: saved.tailnet?.trim() || "-",
+            preferForSandboxes: saved.preferForSandboxes !== false,
+          };
+        }
+        if (saved.mode === "auth-key" && saved.authKey) {
+          return {
+            mode: "auth-key",
+            authKey: saved.authKey,
+            preferForSandboxes: saved.preferForSandboxes !== false,
+          };
+        }
+      }
+      const envOAuthId = baseEnv.TAILSCALE_OAUTH_CLIENT_ID?.trim();
+      const envOAuthSecret = baseEnv.TAILSCALE_OAUTH_CLIENT_SECRET?.trim();
+      if (envOAuthId && envOAuthSecret) {
+        let tags = [TAILSCALE_DEFAULT_TAG];
+        try {
+          const parsed = normalizeTailscaleTags(baseEnv.TAILSCALE_TAGS);
+          if (parsed.length > 0) tags = parsed;
+        } catch {
+          tags = [TAILSCALE_DEFAULT_TAG];
+        }
+        return {
+          mode: "oauth",
+          oauthClientId: envOAuthId,
+          oauthClientSecret: envOAuthSecret,
+          tags,
+          tailnet: baseEnv.TAILSCALE_TAILNET?.trim() || "-",
+          preferForSandboxes: true,
+        };
+      }
+      const envAuthKey = tailscaleAuthKeyEnvVars.map((envVar) => baseEnv[envVar]?.trim()).find(Boolean);
+      if (envAuthKey) {
+        return {
+          mode: "auth-key",
+          authKey: envAuthKey,
+          preferForSandboxes: true,
+        };
+      }
+      return null;
     });
   }
 
@@ -335,6 +555,82 @@ function statusForBlaxel(
     workspace: null,
     preview: null,
     envVars: ["BLAXEL_API_KEY", "BL_WORKSPACE"],
+  };
+}
+
+function statusForTailscale(
+  saved: TailscaleCredentialRecord | undefined,
+  baseEnv: NodeJS.ProcessEnv,
+): TailscaleCredentialStatus {
+  if (saved) {
+    if (saved.mode === "oauth" && saved.oauthClientId && saved.oauthClientSecret) {
+      return {
+        configured: true,
+        mode: "oauth",
+        source: "saved",
+        preview: maskCredentialPreview(saved.oauthClientSecret),
+        oauthClientId: saved.oauthClientId,
+        tags: saved.tags && saved.tags.length > 0 ? saved.tags : [TAILSCALE_DEFAULT_TAG],
+        tailnet: saved.tailnet ?? null,
+        preferForSandboxes: saved.preferForSandboxes !== false,
+      };
+    }
+    if (saved.mode === "auth-key" && saved.authKey) {
+      return {
+        configured: true,
+        mode: "auth-key",
+        source: "saved",
+        preview: maskCredentialPreview(saved.authKey),
+        oauthClientId: null,
+        tags: [],
+        tailnet: null,
+        preferForSandboxes: saved.preferForSandboxes !== false,
+      };
+    }
+  }
+  const envOAuthId = baseEnv.TAILSCALE_OAUTH_CLIENT_ID?.trim();
+  const envOAuthSecret = baseEnv.TAILSCALE_OAUTH_CLIENT_SECRET?.trim();
+  if (envOAuthId && envOAuthSecret) {
+    let tags = [TAILSCALE_DEFAULT_TAG];
+    try {
+      const parsed = normalizeTailscaleTags(baseEnv.TAILSCALE_TAGS);
+      if (parsed.length > 0) tags = parsed;
+    } catch {
+      tags = [TAILSCALE_DEFAULT_TAG];
+    }
+    return {
+      configured: true,
+      mode: "oauth",
+      source: "env",
+      preview: maskCredentialPreview(envOAuthSecret),
+      oauthClientId: envOAuthId,
+      tags,
+      tailnet: baseEnv.TAILSCALE_TAILNET?.trim() || null,
+      preferForSandboxes: true,
+    };
+  }
+  const envAuthKey = tailscaleAuthKeyEnvVars.map((envVar) => baseEnv[envVar]?.trim()).find(Boolean);
+  if (envAuthKey) {
+    return {
+      configured: true,
+      mode: "auth-key",
+      source: "env",
+      preview: maskCredentialPreview(envAuthKey),
+      oauthClientId: null,
+      tags: [],
+      tailnet: null,
+      preferForSandboxes: true,
+    };
+  }
+  return {
+    configured: false,
+    mode: "none",
+    source: "none",
+    preview: null,
+    oauthClientId: null,
+    tags: [TAILSCALE_DEFAULT_TAG],
+    tailnet: null,
+    preferForSandboxes: true,
   };
 }
 

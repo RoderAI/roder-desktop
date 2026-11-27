@@ -8,6 +8,9 @@ import type {
   CloudMachineInput,
   CloudProviderCredentialStatus,
   CloudRunnerProvider,
+  LocalSshEnvironment,
+  LocalTailscaleStatus,
+  TailscaleCredentialStatus,
 } from "@/lib/cloud-machines";
 import { roderIpc } from "@/lib/roder-ipc";
 
@@ -25,6 +28,9 @@ type CloudMachinesState = {
   blaxelWorkspaces: BlaxelWorkspaceInfo[];
   blaxelSandboxes: BlaxelSandboxSummary[];
   blaxelActiveWorkspace: string | null;
+  localTailscale: LocalTailscaleStatus | null;
+  tailscaleCredentials: TailscaleCredentialStatus | null;
+  localSsh: LocalSshEnvironment | null;
   loadingSandboxes: boolean;
   savingCredentials: boolean;
   selectedMachineId: string;
@@ -32,9 +38,20 @@ type CloudMachinesState = {
   busy: boolean;
   refresh: () => Promise<void>;
   refreshCredentials: () => Promise<void>;
+  refreshTailscale: () => Promise<void>;
+  refreshSsh: () => Promise<void>;
   refreshBlaxelSandboxes: (workspace?: string) => Promise<void>;
   importBlaxelCli: (workspace?: string) => Promise<void>;
   saveBlaxelCredentials: (params: { apiKey: string; workspace?: string }) => Promise<void>;
+  saveTailscaleAuthKey: (params: { authKey: string; preferForSandboxes?: boolean }) => Promise<void>;
+  saveTailscaleOAuth: (params: {
+    oauthClientId: string;
+    oauthClientSecret: string;
+    tags?: string[] | string;
+    tailnet?: string;
+    preferForSandboxes?: boolean;
+  }) => Promise<void>;
+  setTailscaleSandboxPreference: (preferForSandboxes: boolean) => Promise<void>;
   saveProviderToken: (providerId: string, token: string) => Promise<void>;
   clearProviderCredentials: (providerId: string) => Promise<void>;
   createBlaxelSandbox: (params: {
@@ -60,6 +77,9 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
       blaxelWorkspaces: [],
       blaxelSandboxes: [],
       blaxelActiveWorkspace: null,
+      localTailscale: null,
+      tailscaleCredentials: null,
+      localSsh: null,
       loadingSandboxes: false,
       savingCredentials: false,
       selectedMachineId: "",
@@ -88,6 +108,9 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
             credentialStatuses: creds.statuses,
             blaxelCli: creds.blaxelCli ?? null,
             blaxelActiveWorkspace: blaxelStatus?.workspace ?? creds.blaxelCli?.workspace ?? null,
+            ...(creds.localTailscale !== undefined ? { localTailscale: creds.localTailscale } : {}),
+            ...(creds.tailscaleCredentials !== undefined ? { tailscaleCredentials: creds.tailscaleCredentials } : {}),
+            ...(creds.localSsh !== undefined ? { localSsh: creds.localSsh } : {}),
           });
           if (blaxelStatus?.configured) {
             void get()
@@ -96,6 +119,27 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
           }
         } catch {
           // Optional enhancement when mocked or before engine is ready.
+        }
+      },
+      refreshTailscale: async () => {
+        try {
+          const status = await roderIpc.tailscaleStatus();
+          if (!status) return;
+          set({
+            localTailscale: status.local ?? null,
+            tailscaleCredentials: status.credentials ?? null,
+          });
+        } catch {
+          // Optional when mocked or before engine is ready.
+        }
+      },
+      refreshSsh: async () => {
+        try {
+          const status = await roderIpc.sshStatus();
+          if (!status) return;
+          set({ localSsh: status.local ?? null });
+        } catch {
+          // Optional when mocked or before engine is ready.
         }
       },
       refreshBlaxelSandboxes: async (workspace) => {
@@ -158,6 +202,56 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
           throw error;
         }
       },
+      saveTailscaleAuthKey: async (params) => {
+        set({ savingCredentials: true, error: "" });
+        try {
+          const result = await roderIpc.saveTailscaleAuthKey(params);
+          set({
+            savingCredentials: false,
+            tailscaleCredentials: result.status,
+          });
+          await get().refreshTailscale();
+        } catch (error) {
+          set({
+            savingCredentials: false,
+            error: cleanErrorMessage(error, "Could not save Tailscale auth key."),
+          });
+          throw error;
+        }
+      },
+      saveTailscaleOAuth: async (params) => {
+        set({ savingCredentials: true, error: "" });
+        try {
+          const result = await roderIpc.saveTailscaleOAuth(params);
+          set({
+            savingCredentials: false,
+            tailscaleCredentials: result.status,
+          });
+          await get().refreshTailscale();
+        } catch (error) {
+          set({
+            savingCredentials: false,
+            error: cleanErrorMessage(error, "Could not verify or save Tailscale OAuth credentials."),
+          });
+          throw error;
+        }
+      },
+      setTailscaleSandboxPreference: async (preferForSandboxes) => {
+        set({ savingCredentials: true, error: "" });
+        try {
+          const result = await roderIpc.setTailscaleSandboxPreference(preferForSandboxes);
+          set({
+            savingCredentials: false,
+            tailscaleCredentials: result.status,
+          });
+        } catch (error) {
+          set({
+            savingCredentials: false,
+            error: cleanErrorMessage(error, "Could not update Tailscale sandbox preference."),
+          });
+          throw error;
+        }
+      },
       saveProviderToken: async (providerId, token) => {
         set({ savingCredentials: true, error: "" });
         try {
@@ -179,6 +273,20 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
           set((state) => ({
             savingCredentials: false,
             ...(providerId === "blaxel" ? { blaxelSandboxes: [], blaxelWorkspaces: [] } : {}),
+            ...(providerId === "tailscale"
+              ? {
+                  tailscaleCredentials: {
+                    configured: false,
+                    mode: "none",
+                    source: "none",
+                    preview: null,
+                    oauthClientId: null,
+                    tags: ["tag:roder"],
+                    tailnet: null,
+                    preferForSandboxes: true,
+                  },
+                }
+              : {}),
             credentialStatuses: state.credentialStatuses.map((item) =>
               item.providerId === providerId ? { ...item, configured: false, source: "none", preview: null } : item,
             ),

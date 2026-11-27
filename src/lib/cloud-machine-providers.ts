@@ -14,6 +14,22 @@ const gatewayEnvironment: Record<string, string> = {
 };
 
 export function machineProviderHelp(providerId: string): CloudMachineProviderHelp {
+  if (providerId === "ssh") {
+    return {
+      description:
+        "Connect to any Linux or macOS server over SSH using your ~/.ssh/config or SSH keys, with automatic remote-roder tunneling and optional Tailscale WireGuard injection.",
+      environment: [],
+      config: { ssh_host: "dev.example.com", ssh_user: "ubuntu", ssh_port: 22 },
+    };
+  }
+  if (providerId === "tailscale") {
+    return {
+      description:
+        "Connect directly to one of your own Tailscale machines over your private tailnet (via Tailscale SSH or SSH keys) with automatic remote-roder tunneling.",
+      environment: [],
+      config: { tailscale_host: "devbox.tailnet.ts.net", ssh_user: "ubuntu", ssh_port: 22 },
+    };
+  }
   if (providerId === "sprites") {
     return {
       description: "Connect to a named Sprite. Set either token environment variable on the app-server.",

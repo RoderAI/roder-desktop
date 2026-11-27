@@ -21,6 +21,7 @@ import {
   RemoteWorkspaceService,
 } from "../electron/cloud-machines/remote-workspace";
 import { CloudMachinesService } from "../electron/cloud-machines/service";
+import type { TailscaleSshClient } from "../electron/cloud-machines/tailscale-ssh";
 
 const tempDirs: string[] = [];
 afterEach(async () => {
@@ -583,4 +584,281 @@ test("BlaxelClient.createPreview reuses an existing matching preview without hit
   });
   expect(preview).toEqual({ url: "https://existing.preview.bl.run", name: "roder-app-server" });
   expect(calls).toEqual(["GET https://api.blaxel.ai/v0/sandboxes/demo-sbx/previews/roder-app-server"]);
+});
+
+test("Blaxel sandbox injects userspace Tailscale tunnel when configured and uses direct Tailscale WebSocket + port preview", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "roder-ts-blaxel-"));
+  tempDirs.push(dir);
+  const credentials = new CloudCredentialsService(createCryptoOptions(join(dir, "creds.enc")));
+  await credentials.saveBlaxel({ apiKey: "bl_ts_key_123456", workspace: "vexscm" });
+  await credentials.saveTailscaleAuthKey({ authKey: "tskey-auth-kEphemeral123", preferForSandboxes: true });
+
+  const machines = new CloudMachinesService(createCryptoOptions(join(dir, "machines.enc")));
+  const { machine } = await machines.save({
+    name: "ts-sbx",
+    providerId: "blaxel",
+    workspace: "/workspace",
+    config: { sandbox_name: "ts-sbx", workspace: "vexscm", tailscale_tunnel: true },
+  });
+
+  const processNames: string[] = [];
+  let previewCalled = false;
+  const blaxelClient = new BlaxelClient({
+    fetchImpl: async (input, init) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = init?.method ?? "GET";
+      if (url.endsWith("/sandboxes/ts-sbx")) {
+        return new Response(
+          JSON.stringify({
+            metadata: { name: "ts-sbx", workspace: "vexscm", url: "https://sbx-ts.bl.run" },
+            spec: { region: "us-pdx-1" },
+            status: "DEPLOYED",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.endsWith("/health") || (url.includes("/filesystem/") && method === "PUT")) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.includes("/previews")) {
+        previewCalled = true;
+        return new Response(JSON.stringify({ error: "preview should not be needed" }), { status: 500 });
+      }
+      if (url.endsWith("/process") && method === "POST") {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { name?: string };
+        processNames.push(body.name ?? "");
+        if (body.name === "roder-bridge-probe") {
+          return new Response(JSON.stringify({ exitCode: 0, stdout: "REUSE:existing_token_0123456789abcdef" }), {
+            status: 200,
+          });
+        }
+        if (body.name === "roder-ts-probe") {
+          return new Response(JSON.stringify({ exitCode: 0, stdout: '{"BackendState":"NotRunning"}' }), {
+            status: 200,
+          });
+        }
+        if (body.name === "roder-ts-up") {
+          return new Response(
+            JSON.stringify({
+              exitCode: 0,
+              stdout: JSON.stringify({
+                BackendState: "Running",
+                Self: { TailscaleIPs: ["100.101.202.33"], DNSName: "roder-ts-sbx.drum-sunfish.ts.net." },
+              }),
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ exitCode: 0, stdout: "OK" }), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  });
+
+  let capturedWsUrl = "";
+  const tunnelManager = new RemoteRoderTunnelManager({
+    blaxelClient,
+    createWebSocket: (url) => {
+      capturedWsUrl = url;
+      const emitter = new EventEmitter();
+      const ws = {
+        readyState: 1,
+        addEventListener: (event: string, listener: (arg?: unknown) => void) => emitter.on(event, listener),
+        send: (raw: string) => {
+          const msg = JSON.parse(raw) as { id: number; method: string };
+          queueMicrotask(() => {
+            if (msg.method === "initialize") {
+              emitter.emit("message", { data: JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { ok: true } }) });
+            } else if (msg.method === "workspace/list") {
+              emitter.emit("message", {
+                data: JSON.stringify({
+                  jsonrpc: "2.0",
+                  id: msg.id,
+                  result: { workspaces: [{ id: "ws_ts_1", roots: [{ id: "r_ts_1", path: "/workspace" }] }] },
+                }),
+              });
+            } else if (msg.method === "workspace/files/children") {
+              emitter.emit("message", {
+                data: JSON.stringify({
+                  jsonrpc: "2.0",
+                  id: msg.id,
+                  result: { status: { workspaceId: "ws_ts_1", state: "ready", roots: [] }, entries: [] },
+                }),
+              });
+            }
+          });
+        },
+        close: () => {
+          ws.readyState = 3;
+          emitter.emit("close", { code: 1000 });
+        },
+      };
+      queueMicrotask(() => emitter.emit("open"));
+      return ws as unknown as WebSocket;
+    },
+  });
+
+  const service = new RemoteWorkspaceService({
+    blaxelClient,
+    credentialsService: credentials,
+    machinesService: machines,
+    readThreadRunner: async () => null,
+    tunnelManager,
+    detectLocalTailscale: async () => ({
+      installed: true,
+      running: true,
+      backendState: "Running",
+      version: "1.104.2",
+      binaryPath: "/usr/bin/tailscale",
+      self: {
+        hostName: "iusearchbtw",
+        dnsName: "iusearchbtw.drum-sunfish.ts.net",
+        tailscaleIp: "100.76.53.91",
+        os: "linux",
+        sshCapable: true,
+        httpsEnabled: true,
+      },
+      tailnetName: "user@example.com",
+      magicDnsSuffix: "drum-sunfish.ts.net",
+      peers: [],
+    }),
+  });
+
+  const wsId = remoteWorkspaceIdForMachine(machine.id);
+  await service.proxyRequest("workspace/files/children", { workspaceId: wsId, rootId: "remote-root" });
+
+  expect(previewCalled).toBe(false);
+  expect(processNames).toContain("roder-ts-install");
+  expect(processNames).toContain("roder-tailscaled");
+  expect(processNames).toContain("roder-ts-up");
+  expect(capturedWsUrl).toBe("ws://100.101.202.33:17373");
+
+  const status = await service.getStatus(wsId);
+  expect(status).toMatchObject({
+    bridgeMode: "tailscale-tunnel",
+    tailscaleActive: true,
+    tailscaleIp: "100.101.202.33",
+    tailscaleDnsName: "roder-ts-sbx.drum-sunfish.ts.net",
+  });
+
+  const preview = await service.openPreviewPort(wsId, 5173);
+  expect(preview).toEqual({ url: "http://100.101.202.33:5173", port: 5173, transport: "tailscale" });
+  service.closeAll();
+});
+
+test("own Tailscale peer supports testProfile, remote-roder tunnel, SSH fallback, and direct tailnet port preview", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "roder-ts-peer-"));
+  tempDirs.push(dir);
+  const credentials = new CloudCredentialsService(createCryptoOptions(join(dir, "creds.enc")));
+  const machines = new CloudMachinesService(createCryptoOptions(join(dir, "machines.enc")));
+  const { machine } = await machines.save({
+    name: "macbook",
+    providerId: "tailscale",
+    workspace: "/Users/pz/repo",
+    config: { tailscale_host: "macbook.drum-sunfish.ts.net", tailscale_ip: "100.125.70.56", ssh_user: "pz" },
+  });
+
+  const sshStub = {
+    execCommand: vi.fn<TailscaleSshClient["execCommand"]>(async (_peer, cmd: string) => {
+      if (cmd.includes("RODER:YES")) {
+        return { exitCode: 0, stdout: "OS:Darwin\nDIR:YES\nRODER:NO\n", stderr: "", timedOut: false, cancelled: false };
+      }
+      if (cmd.includes("RODER_UNSUPPORTED_PEER_OS")) {
+        return {
+          exitCode: 42,
+          stdout: "",
+          stderr: "RODER_UNSUPPORTED_PEER_OS:Darwin",
+          timedOut: false,
+          cancelled: false,
+        };
+      }
+      if (cmd.includes('printf "D\\t')) {
+        return { exitCode: 0, stdout: "D\tsrc\nF\tREADME.md\n", stderr: "", timedOut: false, cancelled: false };
+      }
+      if (cmd.includes("===RODER_STATUS===")) {
+        return {
+          exitCode: 0,
+          stdout: [
+            "===RODER_ROOT===",
+            "/Users/pz/repo",
+            "===RODER_BRANCH===",
+            "main",
+            "===RODER_BASE===",
+            "",
+            "===RODER_STATUS===",
+            " M README.md",
+            "===RODER_STAGED_NUMSTAT===",
+            "",
+            "===RODER_UNSTAGED_NUMSTAT===",
+            "2\t1\tREADME.md",
+            "===RODER_UNTRACKED_COUNTS===",
+            "",
+          ].join("\n"),
+          stderr: "",
+          timedOut: false,
+          cancelled: false,
+        };
+      }
+      return { exitCode: 0, stdout: "", stderr: "", timedOut: false, cancelled: false };
+    }),
+    readFile: vi.fn<TailscaleSshClient["readFile"]>(async () => Buffer.from("# MacBook Repo\n", "utf8")),
+    writeFile: vi.fn<TailscaleSshClient["writeFile"]>(async () => undefined),
+    cancelCommand: vi.fn<TailscaleSshClient["cancelCommand"]>(() => false),
+    closeAll: vi.fn<TailscaleSshClient["closeAll"]>(),
+  } as unknown as TailscaleSshClient;
+
+  const service = new RemoteWorkspaceService({
+    blaxelClient: new BlaxelClient(),
+    credentialsService: credentials,
+    machinesService: machines,
+    readThreadRunner: async () => null,
+    sshClient: sshStub,
+  });
+
+  const tested = await service.testProfile({
+    providerId: "tailscale",
+    workspace: "/Users/pz/repo",
+    config: { tailscale_host: "macbook.drum-sunfish.ts.net", tailscale_ip: "100.125.70.56", ssh_user: "pz" },
+  });
+  expect(tested).toMatchObject({
+    ok: true,
+    status: "CONNECTED",
+    tailscaleIp: "100.125.70.56",
+    directoryExists: true,
+  });
+  expect(tested.message).toContain("Darwin");
+
+  const wsId = remoteWorkspaceIdForMachine(machine.id);
+  const children = (await service.proxyRequest("workspace/files/children", {
+    workspaceId: wsId,
+    rootId: "remote-root",
+  })) as { entries: Array<{ name: string; kind: string }> };
+  expect(children.entries.map((e) => `${e.kind}:${e.name}`)).toEqual(["directory:src", "file:README.md"]);
+
+  const file = (await service.proxyRequest("workspace/files/read", {
+    workspaceId: wsId,
+    rootId: "remote-root",
+    path: "README.md",
+  })) as { text: string };
+  expect(file.text).toBe("# MacBook Repo\n");
+
+  const vcs = (await service.proxyRequest("vcs/changes/list", { workspaceId: wsId })) as {
+    files: Array<{ path: string; additions: number; deletions: number }>;
+  };
+  expect(vcs.files[0]).toMatchObject({ path: "README.md", additions: 2, deletions: 1 });
+
+  const status = await service.getStatus(wsId);
+  expect(status).toMatchObject({
+    providerId: "tailscale",
+    bridgeMode: "tailscale-ssh",
+    tailscaleIp: "100.125.70.56",
+    tailscaleDnsName: "macbook.drum-sunfish.ts.net",
+  });
+
+  const preview = await service.openPreviewPort(wsId, 3000);
+  expect(preview).toEqual({ url: "http://100.125.70.56:3000", port: 3000, transport: "tailscale" });
+  service.closeAll();
 });

@@ -50,7 +50,17 @@ import {
   RemoteWorkspaceService,
 } from "../cloud-machines/remote-workspace";
 import { CloudMachinesService } from "../cloud-machines/service";
+import { detectLocalSshEnvironment, parseSshMachineConfig } from "../cloud-machines/ssh-config";
+import {
+  detectLocalTailscale,
+  parseTailscalePeerConfig,
+  requestTailscaleOAuthToken,
+} from "../cloud-machines/tailscale";
+import { TailscaleRunnerGateway } from "../cloud-machines/tailscale-runner-gateway";
+import { TailscaleSshClient } from "../cloud-machines/tailscale-ssh";
+import { TailscaleSshTerminalSession } from "../cloud-machines/tailscale-terminal";
 import { cloudMachineThreadParams } from "../cloud-machines/thread-routing";
+import { effectiveRunnerProviderId } from "../../src/lib/cloud-machines";
 import { findClaudeCli } from "../onboarding/claude-cli";
 import { detectEnvironmentProviders } from "../onboarding/environment";
 import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } from "../onboarding/record";
@@ -93,7 +103,11 @@ import { rendererZoomFactor, scaleRendererBounds } from "./renderer-scale";
 import { mainPanelMinWidth, mainWindowMinHeight, mainWindowMinWidth } from "./window-options";
 
 const roder = new RoderAppServerClient({
-  getExtraEnv: () => getCloudCredentialsService().getCachedRunnerEnv(process.env),
+  getExtraEnv: () => {
+    const cloudEnv = getCloudCredentialsService().getCachedRunnerEnv(process.env);
+    const gatewayEnv = tailscaleRunnerGateway?.getRunnerEnv({ ...process.env, ...cloudEnv }) ?? {};
+    return { ...cloudEnv, ...gatewayEnv };
+  },
 });
 const threadHistory = createThreadHistoryService({
   request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
@@ -106,6 +120,16 @@ const terminal = new TerminalManager({
   startRemoteTerminal: async ({ id, remoteWorkspaceId, cols, rows }) => {
     const remoteService = getRemoteWorkspaceService();
     const target = await remoteService.resolveTarget(remoteWorkspaceId);
+    const provider = effectiveRunnerProviderId(target);
+    if (provider === "tailscale" || provider === "ssh") {
+      const peer = await remoteService.resolveSshConnectionTarget(target);
+      return new TailscaleSshTerminalSession({
+        peer,
+        workingDir: target.workspace,
+        cols,
+        rows,
+      });
+    }
     const endpoint = await remoteService.resolveBlaxelEndpoint(target);
     await getBlaxelClient().wakeSandbox(endpoint.auth, endpoint.sandboxUrl);
     const stableSessionId = `roder-${id.replace(/[^a-zA-Z0-9_-]/gu, "_").slice(0, 48)}`;
@@ -643,6 +667,11 @@ app.whenReady().then(async () => {
   }, 4_000);
   try {
     await getCloudCredentialsService().hydrate();
+    if (process.platform !== "win32") {
+      await getTailscaleRunnerGateway()
+        .start()
+        .catch(() => undefined);
+    }
     await roder.start();
     await startPersistentAgents().catch(reportPersistentAgentStartupError);
   } catch (error) {
@@ -672,7 +701,13 @@ app.on("before-quit", (event) => {
     try {
       await persistentAgentService?.stop();
     } finally {
-      await Promise.allSettled([extensionHost?.stopAll(), roder.stop(), chromeBridge.stop()]);
+      tailscaleSshClient?.closeAll();
+      await Promise.allSettled([
+        tailscaleRunnerGateway?.stop(),
+        extensionHost?.stopAll(),
+        roder.stop(),
+        chromeBridge.stop(),
+      ]);
       app.quit();
     }
   })().catch(() => app.quit());
@@ -846,6 +881,29 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
         const result = (await roder.request("runners/list", {})) as { active?: unknown };
         return result.active;
       },
+      process.platform,
+      async (machineId, runner) => {
+        const gateway = getTailscaleRunnerGateway();
+        const { baseUrl } = await gateway.start();
+        const profile = await getCloudMachinesService().getProfile(machineId);
+        const transport = runner.providerId === "ssh" ? "ssh" : "tailscale";
+        if (transport === "ssh") {
+          parseSshMachineConfig(runner.config);
+        } else {
+          parseTailscalePeerConfig(runner.config);
+        }
+        return {
+          providerId: gateway.backingProviderId,
+          workspace: runner.workspace,
+          config: {
+            ...runner.config,
+            base_url: baseUrl,
+            roder_transport: transport,
+            machine_name: profile.name,
+          },
+          ...(runner.readRoots ? { readRoots: runner.readRoots } : {}),
+        };
+      },
     );
     return roder.request(method, getDesktopAgentTools().threadStartParams(input));
   }
@@ -864,6 +922,8 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
 let cloudMachinesService: CloudMachinesService | undefined;
 let cloudCredentialsService: CloudCredentialsService | undefined;
 let blaxelClient: BlaxelClient | undefined;
+let tailscaleSshClient: TailscaleSshClient | undefined;
+let tailscaleRunnerGateway: TailscaleRunnerGateway | undefined;
 let remoteWorkspaceService: RemoteWorkspaceService | undefined;
 
 function cloudEncryptionAvailable(): boolean {
@@ -895,12 +955,23 @@ function getBlaxelClient(): BlaxelClient {
   return (blaxelClient ??= new BlaxelClient());
 }
 
+function getTailscaleSshClient(): TailscaleSshClient {
+  return (tailscaleSshClient ??= new TailscaleSshClient());
+}
+
+function getTailscaleRunnerGateway(): TailscaleRunnerGateway {
+  return (tailscaleRunnerGateway ??= new TailscaleRunnerGateway({
+    sshClient: getTailscaleSshClient(),
+  }));
+}
+
 function getRemoteWorkspaceService(): RemoteWorkspaceService {
   if (!remoteWorkspaceService) {
     const service = new RemoteWorkspaceService({
       blaxelClient: getBlaxelClient(),
       credentialsService: getCloudCredentialsService(),
       machinesService: getCloudMachinesService(),
+      sshClient: getTailscaleSshClient(),
       readThreadRunner: async (threadId) => {
         const result = (await roder.request("thread/read", { threadId, includeTurns: false })) as {
           thread?: { runner?: unknown };
@@ -991,7 +1062,9 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
   }
   // Config and credentials may contain secrets even when validation later rejects them.
   const redactRequestPayload =
-    method === "desktop/cloud-machines/save" || method.startsWith("desktop/cloud-machines/credentials/");
+    method === "desktop/cloud-machines/save" ||
+    method.startsWith("desktop/cloud-machines/credentials/") ||
+    method.startsWith("desktop/cloud-machines/tailscale/");
   recordAppServerEvent("request", method, redactRequestPayload ? "[redacted]" : redactSecrets(params ?? {}));
 
   // Route remote workspace requests through the tunneled remote-roder app-server inside the sandbox.
@@ -1025,6 +1098,20 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       return { machine: await service.getProfile(input.id) };
     }
     if (method === "desktop/cloud-machines/save") {
+      if (input.providerId === "tailscale" || input.providerId === "ssh") {
+        if (process.platform === "win32") {
+          throw new Error("Remote SSH and Tailscale machines are not supported on Windows yet.");
+        }
+        if (!isRecord(input.config)) {
+          throw new Error("Machine configuration must be a JSON object.");
+        }
+        if (input.providerId === "ssh") {
+          parseSshMachineConfig(input.config);
+        } else {
+          parseTailscalePeerConfig(input.config);
+        }
+        return service.save(input);
+      }
       const runners = (await roder.request("runners/list", {})) as { providers: { provider_id: string }[] };
       if (!runners.providers.some((provider) => provider.provider_id === input.providerId)) {
         throw new Error("This runner provider is not installed in the embedded Roder harness.");
@@ -1047,11 +1134,58 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       throw new Error("Invalid cloud machine test request.");
     }
     if (method === "desktop/cloud-machines/credentials/status") {
-      const [{ statuses }, blaxelCli] = await Promise.all([
+      const [{ statuses }, blaxelCli, tailscaleCredentials, localTailscale, localSsh] = await Promise.all([
         credentials.listStatuses(process.env),
         detectBlaxelCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
+        credentials.getTailscaleStatus(process.env),
+        detectLocalTailscale({ env: process.env, platform: process.platform }),
+        detectLocalSshEnvironment({ env: process.env, platform: process.platform, homeDir: homedir() }),
       ]);
-      return { statuses, blaxelCli };
+      return { statuses, blaxelCli, tailscaleCredentials, localTailscale, localSsh };
+    }
+    if (method === "desktop/cloud-machines/ssh/status") {
+      const local = await detectLocalSshEnvironment({
+        env: process.env,
+        platform: process.platform,
+        homeDir: homedir(),
+      });
+      return { local };
+    }
+    if (method === "desktop/cloud-machines/tailscale/status") {
+      const [local, tailscaleCredentials] = await Promise.all([
+        detectLocalTailscale({ env: process.env, platform: process.platform }),
+        credentials.getTailscaleStatus(process.env),
+      ]);
+      return { local, credentials: tailscaleCredentials };
+    }
+    if (method === "desktop/cloud-machines/credentials/saveTailscaleAuthKey") {
+      const authKey = typeof input.authKey === "string" ? input.authKey.trim() : "";
+      const preferForSandboxes = input.preferForSandboxes !== false;
+      const status = await credentials.saveTailscaleAuthKey({ authKey, preferForSandboxes });
+      return { status };
+    }
+    if (method === "desktop/cloud-machines/credentials/saveTailscaleOAuth") {
+      const oauthClientId = typeof input.oauthClientId === "string" ? input.oauthClientId.trim() : "";
+      const oauthClientSecret = typeof input.oauthClientSecret === "string" ? input.oauthClientSecret.trim() : "";
+      const tags =
+        Array.isArray(input.tags) || typeof input.tags === "string" ? (input.tags as string[] | string) : undefined;
+      const tailnet = typeof input.tailnet === "string" ? input.tailnet.trim() : undefined;
+      const preferForSandboxes = input.preferForSandboxes !== false;
+      // Verify OAuth client credentials with Tailscale before saving.
+      await requestTailscaleOAuthToken({ oauthClientId, oauthClientSecret });
+      const status = await credentials.saveTailscaleOAuth({
+        oauthClientId,
+        oauthClientSecret,
+        tags,
+        tailnet,
+        preferForSandboxes,
+      });
+      return { status };
+    }
+    if (method === "desktop/cloud-machines/credentials/setTailscaleSandboxPreference") {
+      const preferForSandboxes = Boolean(input.preferForSandboxes);
+      const status = await credentials.setTailscalePreferForSandboxes(preferForSandboxes);
+      return { status };
     }
     if (method === "desktop/cloud-machines/credentials/saveBlaxel") {
       const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
@@ -1094,7 +1228,11 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     }
     if (method === "desktop/cloud-machines/credentials/clear" && typeof input.providerId === "string") {
       const result = await credentials.clearProvider(input.providerId);
-      await restartRoderEngine();
+      if (input.providerId === "tailscale") {
+        remoteWorkspaceService?.closeAll();
+      } else {
+        await restartRoderEngine();
+      }
       return result;
     }
     if (method === "desktop/cloud-machines/blaxel/workspaces") {
@@ -1130,6 +1268,9 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     }
     if (method === "desktop/cloud-machines/remote/wake" && typeof input.workspaceId === "string") {
       return { status: await remoteService.wake(input.workspaceId) };
+    }
+    if (method === "desktop/cloud-machines/remote/setupTailscale" && typeof input.workspaceId === "string") {
+      return { status: await remoteService.setupTailscaleTunnel(input.workspaceId) };
     }
     if (
       method === "desktop/cloud-machines/remote/previewPort" &&
@@ -1210,6 +1351,55 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     try {
       const baseSkills = await roder.request(method, params);
       const result = mergePersistentAgentSkill(mergeDesktopBrowserSkill(baseSkills));
+      recordAppServerEvent("response", method, result);
+      return result;
+    } catch (error) {
+      recordAppServerEvent("error", method, (error as Error).message);
+      throw error;
+    }
+  }
+  if (method === "runners/list") {
+    try {
+      const base = (await requestEngine(method, params)) as {
+        providers?: Array<{ provider_id: string; capabilities: Record<string, unknown>; setup_hint?: string | null }>;
+        [key: string]: unknown;
+      };
+      const existingProviders = Array.isArray(base?.providers) ? base.providers : [];
+      const extraProviders: Array<{
+        provider_id: string;
+        capabilities: Record<string, unknown>;
+        setup_hint?: string | null;
+      }> = [];
+      if (process.platform !== "win32") {
+        if (!existingProviders.some((provider) => provider.provider_id === "ssh")) {
+          extraProviders.push({
+            provider_id: "ssh",
+            capabilities: {
+              command_exec: true,
+              file_read: true,
+              file_write: true,
+              port_preview: true,
+              cancellation: true,
+            },
+            setup_hint: null,
+          });
+        }
+        if (!existingProviders.some((provider) => provider.provider_id === "tailscale")) {
+          extraProviders.push({
+            provider_id: "tailscale",
+            capabilities: {
+              command_exec: true,
+              file_read: true,
+              file_write: true,
+              port_preview: true,
+              cancellation: true,
+            },
+            setup_hint: null,
+          });
+        }
+      }
+      const providers = [...existingProviders, ...extraProviders];
+      const result = { ...base, providers };
       recordAppServerEvent("response", method, result);
       return result;
     } catch (error) {

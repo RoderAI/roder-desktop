@@ -1,10 +1,13 @@
 import { WINDOWS_CLOUD_MACHINES_NOTICE, type ThreadRunner } from "../../src/lib/cloud-machines";
 
+export type TailscaleRunnerResolver = (machineId: string, runner: ThreadRunner) => Promise<ThreadRunner>;
+
 export async function cloudMachineThreadParams(
   params: unknown,
   runnerFor: (id: string) => Promise<ThreadRunner>,
   activeRunnerFor?: () => Promise<unknown>,
   platform: NodeJS.Platform = process.platform,
+  resolveTailscaleRunner?: TailscaleRunnerResolver,
 ): Promise<Record<string, unknown>> {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
     throw new Error("Thread parameters must be an object.");
@@ -25,5 +28,16 @@ export async function cloudMachineThreadParams(
     return input;
   }
   if (platform === "win32") throw new Error(WINDOWS_CLOUD_MACHINES_NOTICE);
-  return { ...input, runner: await runnerFor(desktopCloudMachineId) };
+  const runner = await runnerFor(desktopCloudMachineId);
+  if (runner.providerId === "tailscale" || runner.providerId === "ssh") {
+    if (!resolveTailscaleRunner) {
+      throw new Error(
+        runner.providerId === "ssh"
+          ? "SSH runner gateway is unavailable. Restart Roder Desktop and try again."
+          : "Tailscale runner gateway is unavailable. Restart Roder Desktop and try again.",
+      );
+    }
+    return { ...input, runner: await resolveTailscaleRunner(desktopCloudMachineId, runner) };
+  }
+  return { ...input, runner };
 }
