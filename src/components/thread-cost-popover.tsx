@@ -324,12 +324,14 @@ export function ThreadCostPopover({ threadId }: { threadId: string }): React.JSX
   const refreshAgain = useRef(false);
   const mounted = useRef(false);
   const trackedIds = useRef<Set<string> | null>(null);
-  const scanBudget = useRef({ maxTracePages: 256, maxThreads: 200 });
+  // Render reads the state; async refreshes read the ref copy.
+  const [scanLimits, setScanLimits] = useState({ maxTracePages: 256, maxThreads: 200 });
+  const scanBudget = useRef(scanLimits);
   const [tab, setTab] = useState("thread");
   const estimate = estimateThreadTreeCost(tree);
   const partial = estimate.partial;
-  const scanLimited = estimate.skippedTurns > 0 || estimate.threads.length >= scanBudget.current.maxThreads;
-  const scanAtMaximum = scanBudget.current.maxTracePages >= 8192 && scanBudget.current.maxThreads >= 2000;
+  const scanLimited = estimate.skippedTurns > 0 || estimate.threads.length >= scanLimits.maxThreads;
+  const scanAtMaximum = scanLimits.maxTracePages >= 8192 && scanLimits.maxThreads >= 2000;
   const totalLabel =
     status === "loading" ? "Loading..." : status === "error" ? "Unavailable" : formatEstimatedCost(estimate.total);
 
@@ -415,6 +417,7 @@ export function ThreadCostPopover({ threadId }: { threadId: string }): React.JSX
                   maxTracePages: Math.min(scanBudget.current.maxTracePages * 4, 8192),
                   maxThreads: Math.min(scanBudget.current.maxThreads * 4, 2000),
                 };
+                setScanLimits(scanBudget.current);
                 void refresh();
               }}
               refreshing={isRefreshing}

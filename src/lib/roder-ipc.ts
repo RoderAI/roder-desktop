@@ -92,6 +92,7 @@ export type ThreadStartOptions = {
   initialPrompt?: string;
   selection?: ModelSelectChoice;
   cloudMachineId?: string;
+  worktreePath?: string;
 };
 
 export type ThreadStartWorkspace = {
@@ -115,6 +116,7 @@ export type ThreadStartResult = {
   workspaceId: string;
   rootId: string;
   cwd: string;
+  desktopWorktreeWorkspace?: Workspace;
 };
 
 export type WorkspaceListResult = {
@@ -621,6 +623,7 @@ export const roderIpc = {
         ephemeral: false,
         initialPrompt: options.initialPrompt || undefined,
         ...(options.cloudMachineId === undefined ? {} : { desktopCloudMachineId: options.cloudMachineId }),
+        ...(options.worktreePath === undefined ? {} : { desktopWorktreePath: options.worktreePath }),
       })
       .then((result) => threadStartResultFromWire(result as WireThreadStartResult)) as Promise<ThreadStartResult>,
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>

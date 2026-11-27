@@ -180,9 +180,7 @@ function DesignCanvasBodyImpl({
 }): React.JSX.Element {
   const [creation, setCreation] = useState<CreationInteraction | null>(null);
   // Transient pointer state lives in refs so pointer moves never re-render the tree.
-  const cursorPointStoreRef = useRef<CursorPointStore | null>(null);
-  cursorPointStoreRef.current ??= createCursorPointStore();
-  const cursorPointStore = cursorPointStoreRef.current;
+  const [cursorPointStore] = useState<CursorPointStore>(createCursorPointStore);
   const panRef = useRef<PanGesture | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const designDocument = state.status === "ready" ? state.result.document : null;

@@ -6,7 +6,7 @@ test("desktop config saves an existing Blaxel sandbox as a retained machine prof
   const method = "desktop/cloud-machines/save";
   const machine = { id: "m1", name: "Dev", providerId: "blaxel", workspace: "/workspace" };
   const request = vi
-    .fn()
+    .fn<(method: string, params: unknown) => Promise<unknown>>()
     .mockResolvedValueOnce({ workspace: "my-team", sandboxes: [{ name: "dev-box" }] })
     .mockResolvedValueOnce({ machine: { ...machine, config: { private: "omit" } } });
   await expect(
@@ -24,7 +24,7 @@ test("desktop config saves an existing Blaxel sandbox as a retained machine prof
 });
 
 test("a missing Blaxel sandbox is not saved or provisioned", async () => {
-  const request = vi.fn().mockResolvedValue({ workspace: "my-team", sandboxes: [{ name: "other-box" }] });
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>().mockResolvedValue({ workspace: "my-team", sandboxes: [{ name: "other-box" }] });
   await expect(
     configureDesktopFromTool(
       {
@@ -38,7 +38,7 @@ test("a missing Blaxel sandbox is not saved or provisioned", async () => {
 });
 
 test("machine credential status only exposes connection metadata", async () => {
-  const request = vi.fn().mockResolvedValue({
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>().mockResolvedValue({
     statuses: [{ providerId: "blaxel", configured: true, preview: "sensitive", apiKey: "secret" }],
     localSsh: { identityFiles: ["/private/.ssh/id"] },
   });
@@ -54,7 +54,7 @@ test.each([
   { sandboxName: "https://example.com/?token=do-not-pass" },
   { sandboxName: "dev-box", workspace: "relative/path" },
 ])("machine tool rejects arbitrary configuration, unsafe identifiers and invalid paths", async (params) => {
-  const request = vi.fn();
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>();
   await expect(
     configureDesktopFromTool(
       {
@@ -63,12 +63,12 @@ test.each([
       },
       request,
     ),
-  ).rejects.toThrow();
+  ).rejects.toThrow(Error);
   expect(request).not.toHaveBeenCalled();
 });
 
 test("config skill documents Desktop machine configuration", async () => {
-  const request = vi.fn().mockResolvedValue({
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>().mockResolvedValue({
     skill: { descriptor: { name: "roder-config", source: "builtIn" }, body: "Base skill" },
   });
   const result = await configureDesktopFromTool(

@@ -1,5 +1,6 @@
 import { Check, ChevronDown, ChevronRight, Plus, RefreshCcw, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useMountEffect } from "@/hooks/use-mount-effect";
 import { Button } from "@/components/ui/button";
 import { useRoderStore } from "@/stores/roder-store";
 import { cn } from "@/lib/utils";
@@ -56,9 +57,7 @@ function McpScopeSection({ scope }: { scope: ConfigScope }): React.JSX.Element {
   const [saving, setSaving] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchConfig = useCallback(async () => {
     const result = await window.roderDesktop.mcpReadConfig(scope.path);
     if (result.error) {
       setError(result.error);
@@ -68,9 +67,16 @@ function McpScopeSection({ scope }: { scope: ConfigScope }): React.JSX.Element {
     setLoading(false);
   }, [scope.path]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  async function load(): Promise<void> {
+    setLoading(true);
+    setError(null);
+    await fetchConfig();
+  }
+
+  // Fetch once per mount; the parent keys this section by scope.path.
+  useMountEffect(() => {
+    void fetchConfig();
+  });
 
   async function save(nextConfig: McpConfig): Promise<void> {
     setSaving(true);
@@ -332,7 +338,7 @@ function AddServerForm({
       <div className="space-y-3">
         <FieldRow label="Name" hint="e.g. honeycomb">
           <input
-            autoFocus
+            ref={focusOnMount}
             type="text"
             placeholder="server-name"
             value={name}
@@ -475,4 +481,9 @@ function nameToHue(name: string): number {
     hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
   }
   return hash % 360;
+}
+
+// Stable callback ref: focuses the field once when it mounts.
+function focusOnMount(element: HTMLInputElement | null): void {
+  element?.focus();
 }

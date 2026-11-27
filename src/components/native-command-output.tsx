@@ -6,7 +6,6 @@ export function NativeCommandOutput({ output }: { output: NativeCommandOutputMod
   if (!output) {
     return null;
   }
-  const Icon = toneIcon(output.tone);
   return (
     <section
       className={cn(
@@ -18,7 +17,7 @@ export function NativeCommandOutput({ output }: { output: NativeCommandOutputMod
     >
       <div className="rounded-xl bg-card/95 px-3.5 py-3 text-base shadow-sm ring-1 ring-border/70">
         <div className="flex min-w-0 items-start gap-2.5">
-          <Icon className="mt-0.5 size-4 shrink-0" />
+          <ToneIcon tone={output.tone} className="mt-0.5 size-4 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="font-medium text-foreground">{output.title}</div>
             {output.body && <div className="mt-1 text-muted-foreground">{output.body}</div>}
@@ -42,15 +41,9 @@ export function NativeCommandOutput({ output }: { output: NativeCommandOutputMod
   );
 }
 
-function toneIcon(tone: NativeCommandOutputModel["tone"]) {
-  if (tone === "success") {
-    return CheckCircle2;
-  }
-  if (tone === "warning") {
-    return TriangleAlert;
-  }
-  if (tone === "error") {
-    return AlertCircle;
-  }
-  return Info;
+function ToneIcon({ tone, className }: { tone: NativeCommandOutputModel["tone"]; className: string }) {
+  if (tone === "success") return <CheckCircle2 className={className} />;
+  if (tone === "warning") return <TriangleAlert className={className} />;
+  if (tone === "error") return <AlertCircle className={className} />;
+  return <Info className={className} />;
 }

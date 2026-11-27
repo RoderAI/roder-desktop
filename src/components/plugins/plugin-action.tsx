@@ -94,12 +94,9 @@ export function immediatePluginActionState({
 }
 
 function useValueChanged(value: string): boolean {
-  const previousValue = React.useRef(value);
-  const changed = previousValue.current !== value;
-
-  React.useEffect(() => {
-    previousValue.current = value;
-  }, [value]);
-
+  // Once the value has changed, keep animating: each change remounts the keyed spans anyway.
+  const [initialValue] = React.useState(value);
+  const [changed, setChanged] = React.useState(false);
+  if (!changed && value !== initialValue) setChanged(true);
   return changed;
 }

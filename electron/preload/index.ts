@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppUpdateStatus } from "../../src/lib/app-update";
+import type { LocalWorktree, LocalWorktreeContext, LocalWorktreeList } from "../../src/lib/local-worktrees";
+import type { Workspace } from "../../src/types/roder";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
 import type { ClaudeCliStatus } from "../onboarding/claude-cli";
@@ -116,6 +118,12 @@ const api = {
   status: () => ipcRenderer.invoke("roder:status") as Promise<RoderStatus>,
   appearance: () => ipcRenderer.invoke("roder:appearance") as Promise<SystemAppearance>,
   openExternal: (url: string) => ipcRenderer.invoke("openExternal", url) as Promise<void>,
+  listWorktrees: (context: LocalWorktreeContext) =>
+    ipcRenderer.invoke("worktrees:list", context) as Promise<LocalWorktreeList>,
+  createWorktree: (context: LocalWorktreeContext, branch: string) =>
+    ipcRenderer.invoke("worktrees:create", context, branch) as Promise<LocalWorktree>,
+  removeWorktree: (context: LocalWorktreeContext, path: string) =>
+    ipcRenderer.invoke("worktrees:remove", context, path) as Promise<Workspace[]>,
   openWorkspaceFolder: (defaultPath?: string) =>
     ipcRenderer.invoke("workspace:openFolder", defaultPath) as Promise<string | null>,
   openWorkspaceFolders: (defaultPath?: string) =>

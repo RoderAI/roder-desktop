@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Camera, ExternalLink, Highlighter, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useLayoutEffect} from "react";
 import type { DesktopAttachment, BrowserSnapshot } from "@/types/roder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,9 @@ export function BrowserPanel({
   const [snapshot, setSnapshot] = useState<BrowserSnapshot | null>(null);
   const [capturing, setCapturing] = useState(false);
 
-  nativeOverlayOcclusionRef.current = nativeOverlayOcclusion;
+  useLayoutEffect(() => {
+    nativeOverlayOcclusionRef.current = nativeOverlayOcclusion;
+  });
 
   const syncBrowserBounds = useCallback(async (mode: "show" | "set"): Promise<BrowserSnapshot | null> => {
     const viewport = viewportRef.current;

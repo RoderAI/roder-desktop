@@ -69,7 +69,8 @@ test("failed updates stay actionable and explain the retry", () => {
 test("pill calls its update action", () => {
   const onClick = vi.fn<() => void>();
   const pill = SidebarUpdatePill({ status: available, onClick });
-  const [button] = (pill?.props as { children: Array<ReturnType<typeof createElement>> }).children;
+  expect(pill).toBeTruthy();
+  const [button] = (pill!.props as { children: Array<ReturnType<typeof createElement>> }).children;
   const props = button.props as ComponentProps<"button">;
   expect(props.onClick).toBe(onClick);
 });

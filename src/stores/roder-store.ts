@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 import { roderIpc } from "@/lib/roder-ipc";
+import type { LocalWorktreeContext } from "@/lib/local-worktrees";
 import { commandInvocationText, type CommandInvocation } from "@/lib/roder-commands";
 import {
   applyThreadItemEvent,
@@ -119,6 +120,9 @@ type RoderStore = {
   selectedWorkspaceId: string;
   selectedRootId: string;
   selectedWorkspaceCwd: string;
+  draftWorktree: (LocalWorktreeContext & { path: string }) | null;
+  setDraftWorktree: (selection: RoderStore["draftWorktree"]) => void;
+  syncWorktreeWorkspaces: (workspaces: Workspace[]) => void;
   workspaceRecents: WorkspaceFolder[];
   pendingWaitRequestsByThread: PendingWaitRequestsByThread;
   pendingMcpAuthRequests: McpAuthWaitRequest[];
@@ -461,6 +465,22 @@ export const useRoderStore = create<RoderStore>()(
       selectedWorkspaceId: "",
       selectedRootId: "",
       selectedWorkspaceCwd: "",
+      draftWorktree: null,
+      setDraftWorktree: (draftWorktree) => set({ draftWorktree }),
+      syncWorktreeWorkspaces: (workspaces) =>
+        set((state) => {
+          const current = workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId);
+          const fallback =
+            current && !current.roots.some((root) => root.id === state.selectedRootId)
+              ? selectedRootForWorkspace(current)
+              : null;
+          return {
+            workspaces: workspaces.reduce(upsertWorkspace, state.workspaces),
+            ...(fallback
+              ? { selectedRootId: fallback.id, selectedWorkspaceCwd: fallback.path, draftWorktree: null }
+              : {}),
+          };
+        }),
       workspaceRecents: [],
       pendingWaitRequestsByThread: {},
       pendingMcpAuthRequests: [],
@@ -2132,6 +2152,13 @@ async function createThreadForPrompt(
   const state = get();
   const cloudMachineId = useCloudMachinesStore.getState().selectedMachineId;
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
+  const draftWorktree = state.draftWorktree;
+  const worktreePath =
+    !cloudMachineId &&
+    draftWorktree?.workspaceId === workspaceSelection.workspace.id &&
+    draftWorktree.rootId === workspaceSelection.root.id
+      ? draftWorktree.path
+      : undefined;
   const latestState = get();
   const usePromptControls = initialPrompt !== undefined;
   const selectionSource = usePromptControls
@@ -2173,6 +2200,7 @@ async function createThreadForPrompt(
     reasoning,
     {
       cloudMachineId,
+      worktreePath,
       ...(initialPrompt === undefined ? {} : { initialPrompt }),
       selection: configuredAutoOptionId(selectionMode)
         ? modelSelectChoice(selectionMode, selectionSource.reasoning, latestState.models)
@@ -2198,6 +2226,10 @@ async function createThreadForPrompt(
       result.reasoning || reasoning,
     );
   set((state) => ({
+    draftWorktree: null,
+    workspaces: result.desktopWorktreeWorkspace
+      ? upsertWorkspace(state.workspaces, result.desktopWorktreeWorkspace)
+      : state.workspaces,
     threads: upsertThread(state.threads, threadWithPreview),
     threadDetails: { ...state.threadDetails, [threadWithPreview.id]: threadWithPreview },
     threadGoalsByThread: removeThreadGoal(state.threadGoalsByThread, threadWithPreview.id),

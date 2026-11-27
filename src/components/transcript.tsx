@@ -319,6 +319,8 @@ export function Transcript({
     cancelAnimationFrame(pendingScrollFrameRef.current);
     pendingScrollFrameRef.current = null;
   }, []);
+  // TanStack Virtual returns mutable objects the React Compiler cannot memoize; this component is not compiled.
+  // oxlint-disable-next-line react/incompatible-library
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     anchorTo: "end",
     count: transcriptRows.length,

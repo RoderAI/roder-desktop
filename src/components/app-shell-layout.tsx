@@ -219,7 +219,8 @@ export function AppShellLayout({
   const shellLayoutAnimating = shellAnimationState.animating;
   const measuredWorkspacePanelWidth = measuredWorkspacePanelWidthOverride ?? initialWorkspacePanelWidth;
   const [appChromeGroupElement, setAppChromeGroupElement] = useState<HTMLDivElement | null>(null);
-  const [appChromeGroupWidth, setAppChromeGroupWidth] = useState<number | null>(() => Math.round(window.innerWidth));
+  const [measuredAppChromeGroupWidth, setAppChromeGroupWidth] = useState<number>(() => Math.round(window.innerWidth));
+  const appChromeGroupWidth = appChromeGroupElement ? measuredAppChromeGroupWidth : null;
   // The workspace panel shares the group with the main column; the sidebar does not (it is a fixed
   // flex item beside the group), so this only depends on the measured group width.
   const canShowWorkspacePanel =
@@ -239,7 +240,6 @@ export function AppShellLayout({
 
   useLayoutEffect(() => {
     if (!appChromeGroupElement) {
-      setAppChromeGroupWidth(null);
       return;
     }
 

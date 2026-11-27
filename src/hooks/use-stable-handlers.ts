@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 type AnyHandler = (...args: never[]) => unknown;
 
@@ -15,12 +15,14 @@ export function useStableHandlers<T extends Record<string, AnyHandler>>(handlers
     latestRef.current = handlers;
   });
 
-  const stableRef = useRef<T | null>(null);
-  stableRef.current ??= Object.fromEntries(
-    Object.keys(handlers).map((key) => [
-      key,
-      (...args: never[]) => (latestRef.current[key] as (...callArgs: never[]) => unknown)(...args),
-    ]),
-  ) as T;
-  return stableRef.current;
+  const [stable] = useState(
+    () =>
+      Object.fromEntries(
+        Object.keys(handlers).map((key) => [
+          key,
+          (...args: never[]) => (latestRef.current[key] as (...callArgs: never[]) => unknown)(...args),
+        ]),
+      ) as T,
+  );
+  return stable;
 }

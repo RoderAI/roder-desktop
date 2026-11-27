@@ -8,6 +8,9 @@ import {
   runStaleEmptyThreadCleanup,
 } from "../src/lib/thread-cleanup";
 
+// oxlint-disable-next-line typescript/no-explicit-any -- loose signature for test doubles
+type AnyFn = (...args: any[]) => any;
+
 const NOW = 1_774_000_000;
 const STALE_AT = NOW - DEFAULT_STALE_EMPTY_THREAD_MIN_AGE_SECONDS - 60;
 const FRESH_AT = NOW - 5 * 60;
@@ -107,7 +110,7 @@ test("collectStaleEmptyThreadIds pages through list results and excludes protect
       nextCursor: null,
     },
   ];
-  const listThreads = vi.fn(async (_limit: number, cursor?: string | null) => {
+  const listThreads = vi.fn<AnyFn>(async (_limit: number, cursor?: string | null) => {
     if (!cursor) {
       return pages[0];
     }
@@ -133,7 +136,7 @@ test("collectStaleEmptyThreadIds pages through list results and excludes protect
 });
 
 test("collectStaleEmptyThreadIds stops at maxPages", async () => {
-  const listThreads = vi.fn(async () => ({
+  const listThreads = vi.fn<AnyFn>(async () => ({
     data: [thread({ id: `page-${listThreads.mock.calls.length}` })],
     nextCursor: `cursor-${listThreads.mock.calls.length}`,
   }));
@@ -152,7 +155,7 @@ test("collectStaleEmptyThreadIds stops at maxPages", async () => {
 test("runStaleEmptyThreadCleanup archives matches, refreshes, and runs once per session", async () => {
   resetStaleEmptyThreadCleanupForTests();
 
-  const listThreads = vi.fn(async () => ({
+  const listThreads = vi.fn<AnyFn>(async () => ({
     data: [
       thread({ id: "stale-a" }),
       thread({ id: "active" }),
@@ -160,8 +163,8 @@ test("runStaleEmptyThreadCleanup archives matches, refreshes, and runs once per 
     ],
     nextCursor: null,
   }));
-  const archiveThread = vi.fn(async () => ({}));
-  const refreshThreads = vi.fn(async () => undefined);
+  const archiveThread = vi.fn<AnyFn>(async () => ({}));
+  const refreshThreads = vi.fn<AnyFn>(async () => undefined);
   let activeThreadId = "active";
 
   const first = await runStaleEmptyThreadCleanup({
@@ -199,12 +202,12 @@ test("runStaleEmptyThreadCleanup archives matches, refreshes, and runs once per 
 test("runStaleEmptyThreadCleanup skips archive when the active thread changes mid-sweep", async () => {
   resetStaleEmptyThreadCleanupForTests();
 
-  const listThreads = vi.fn(async () => ({
+  const listThreads = vi.fn<AnyFn>(async () => ({
     data: [thread({ id: "stale-a" }), thread({ id: "becomes-active" })],
     nextCursor: null,
   }));
-  const archiveThread = vi.fn(async () => ({}));
-  const refreshThreads = vi.fn(async () => undefined);
+  const archiveThread = vi.fn<AnyFn>(async () => ({}));
+  const refreshThreads = vi.fn<AnyFn>(async () => undefined);
   let activeThreadId = "";
 
   archiveThread.mockImplementation(async (threadId: string) => {
@@ -231,12 +234,12 @@ test("runStaleEmptyThreadCleanup skips archive when the active thread changes mi
 test("runStaleEmptyThreadCleanup does not refresh when nothing was archived", async () => {
   resetStaleEmptyThreadCleanupForTests();
 
-  const listThreads = vi.fn(async () => ({
+  const listThreads = vi.fn<AnyFn>(async () => ({
     data: [thread({ id: "fresh", createdAt: FRESH_AT, updatedAt: FRESH_AT })],
     nextCursor: null,
   }));
-  const archiveThread = vi.fn(async () => ({}));
-  const refreshThreads = vi.fn(async () => undefined);
+  const archiveThread = vi.fn<AnyFn>(async () => ({}));
+  const refreshThreads = vi.fn<AnyFn>(async () => undefined);
 
   const result = await runStaleEmptyThreadCleanup({
     listThreads,

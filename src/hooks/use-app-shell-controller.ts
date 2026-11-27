@@ -311,10 +311,13 @@ export function useAppShellController(): AppShellController {
     },
     [followBottom],
   );
-  useEffect(() => {
+  // Reset per-thread command UI when the thread changes (adjusted during render, not in an effect).
+  const [commandUiThreadId, setCommandUiThreadId] = useState(routeActiveThreadId);
+  if (commandUiThreadId !== routeActiveThreadId) {
+    setCommandUiThreadId(routeActiveThreadId);
     setNativeCommandOutput(null);
     setNativeModelPickerOpen(false);
-  }, [routeActiveThreadId]);
+  }
 
   const hideNativeModelPicker = useCallback(() => {
     setNativeModelPickerOpen(false);

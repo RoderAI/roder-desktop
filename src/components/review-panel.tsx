@@ -24,6 +24,7 @@ import {
   useState,
   type ComponentProps,
   type CSSProperties,
+  useLayoutEffect,
 } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,22 +122,14 @@ export function ReviewPanel({
   const [nearbyDiffPaths, setNearbyDiffPaths] = useState<Set<string>>(() => new Set());
   const fileTreeId = useId();
   const diffScrollRef = useRef<HTMLElement | null>(null);
-  const diffSectionRefs = useRef<Map<string, HTMLElement> | null>(null);
-  if (!diffSectionRefs.current) {
-    diffSectionRefs.current = new Map<string, HTMLElement>();
-  }
-  const diffSections = diffSectionRefs.current;
+  const [diffSections] = useState(() => new Map<string, HTMLElement>());
   const selectionSourceRef = useRef<"navigation" | "scroll" | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   // Section bounds in scroll-content coordinates, measured lazily and reused
   // across scroll frames so scrolling never forces per-section layout reads.
   const sectionBoundsRef = useRef<Map<string, { top: number; bottom: number }> | null>(null);
+  // Created on first use in the section ref callback, never during render.
   const sectionResizeObserverRef = useRef<ResizeObserver | null>(null);
-  if (!sectionResizeObserverRef.current && typeof ResizeObserver !== "undefined") {
-    sectionResizeObserverRef.current = new ResizeObserver(() => {
-      sectionBoundsRef.current = null;
-    });
-  }
   const fileTreeToggleLabel = reviewFileTreeToggleLabel(fileTreeVisible);
   const effectiveFileTreeWidth = reviewFileTreeWidth(fileTreeWidth, width);
   const reviewPanelStyle = { "--review-file-tree-width": `${effectiveFileTreeWidth}px` } as ReviewPanelStyle;
@@ -205,13 +198,19 @@ export function ReviewPanel({
   const setDiffSectionRef = useCallback(
     (path: string, section: HTMLElement | null) => {
       sectionBoundsRef.current = null;
+      if (!sectionResizeObserverRef.current && typeof ResizeObserver !== "undefined") {
+        sectionResizeObserverRef.current = new ResizeObserver(() => {
+          sectionBoundsRef.current = null;
+        });
+      }
+      const sectionResizeObserver = sectionResizeObserverRef.current;
       const previous = diffSections.get(path);
       if (previous) {
-        sectionResizeObserverRef.current?.unobserve(previous);
+        sectionResizeObserver?.unobserve(previous);
       }
       if (section) {
         diffSections.set(path, section);
-        sectionResizeObserverRef.current?.observe(section);
+        sectionResizeObserver?.observe(section);
         return;
       }
       diffSections.delete(path);
@@ -623,9 +622,11 @@ function ReviewFileTree({
   const normalizingSelectionRef = useRef(false);
   const selectRef = useRef(onSelectedPathChange);
   const selectedPathRef = useRef(selectedPath);
-  fileMapRef.current = fileMap;
-  selectRef.current = onSelectedPathChange;
-  selectedPathRef.current = selectedPath;
+  useLayoutEffect(() => {
+    fileMapRef.current = fileMap;
+    selectRef.current = onSelectedPathChange;
+    selectedPathRef.current = selectedPath;
+  });
 
   const { model } = useFileTree({
     paths: [],
@@ -667,7 +668,9 @@ function ReviewFileTree({
     },
     unsafeCSS: reviewFileTreeUnsafeCSS,
   });
-  modelRef.current = model;
+  useLayoutEffect(() => {
+    modelRef.current = model;
+  });
 
   const paths = useMemo(() => files.map((file) => file.path), [files]);
   const gitStatus = useMemo<GitStatusEntry[]>(

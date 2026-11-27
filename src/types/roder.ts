@@ -1291,6 +1291,17 @@ declare global {
       status: () => Promise<RoderStatus>;
       appearance: () => Promise<SystemAppearance>;
       openExternal: (url: string) => Promise<void>;
+      listWorktrees: (
+        context: import("../lib/local-worktrees").LocalWorktreeContext,
+      ) => Promise<import("../lib/local-worktrees").LocalWorktreeList>;
+      createWorktree: (
+        context: import("../lib/local-worktrees").LocalWorktreeContext,
+        branch: string,
+      ) => Promise<import("../lib/local-worktrees").LocalWorktree>;
+      removeWorktree: (
+        context: import("../lib/local-worktrees").LocalWorktreeContext,
+        path: string,
+      ) => Promise<Workspace[]>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       openWorkspaceFolders: (defaultPath?: string) => Promise<string[] | null>;
       terminalStart: (options?: {

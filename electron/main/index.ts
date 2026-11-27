@@ -90,6 +90,9 @@ import { createOpenAiImageGenerator } from "../persistent-agents/openai-image-ge
 import type { Issue, IssueProject } from "../../src/types/issues";
 import type { PersistentAgentDetail } from "../../src/types/persistent-agents";
 import type { Workspace } from "../../src/types/roder";
+import type { LocalWorktreeContext } from "../../src/lib/local-worktrees";
+import { DesktopWorktrees } from "../worktrees/desktop-worktrees";
+import { GitWorktrees } from "../worktrees/git-worktrees";
 import { TerminalManager, type TerminalStartOptions } from "../terminal/pty-manager";
 import { createAutoUpdateController } from "./auto-update";
 import {
@@ -361,6 +364,13 @@ ipcMain.handle("openExternal", (_event, url: string) => openExternalTarget(url))
 ipcMain.handle("roder:request", async (_event, method: string, params: unknown) => {
   return handleRoderRequest(method, params);
 });
+ipcMain.handle("worktrees:list", (_event, context: LocalWorktreeContext) => getDesktopWorktrees().list(context));
+ipcMain.handle("worktrees:create", (_event, context: LocalWorktreeContext, branch: string) =>
+  getDesktopWorktrees().create(context, branch),
+);
+ipcMain.handle("worktrees:remove", (_event, context: LocalWorktreeContext, path: string) =>
+  getDesktopWorktrees().remove(context, path),
+);
 ipcMain.handle("window:setMinWidth", (_event, width: number) => {
   if (!mainWindow || !Number.isFinite(width)) {
     return;
@@ -882,6 +892,16 @@ function getDesktopAgentTools(): DesktopAgentTools {
   return desktopAgentTools;
 }
 
+let desktopWorktrees: DesktopWorktrees | undefined;
+
+function getDesktopWorktrees(): DesktopWorktrees {
+  desktopWorktrees ??= new DesktopWorktrees(
+    new GitWorktrees(join(app.getPath("userData"), "worktrees")),
+    (method, params) => roder.request(method, params),
+  );
+  return desktopWorktrees;
+}
+
 async function requestEngine(method: string, params: unknown, enrichPersistentAgentContext = true): Promise<unknown> {
   if (method === "turn/start") params = getDesktopAgentTools().turnStartParams(params);
   if (method === "thread/start") {
@@ -916,7 +936,32 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
         };
       },
     );
-    return roder.request(method, getDesktopAgentTools().threadStartParams(input));
+    const { desktopWorktreePath, ...threadParams } = input;
+    if (desktopWorktreePath !== undefined) {
+      if (
+        input.runner !== undefined ||
+        typeof desktopWorktreePath !== "string" ||
+        typeof input.workspaceId !== "string" ||
+        typeof input.rootId !== "string"
+      ) {
+        throw new Error("A worktree checkout requires a local workspace folder.");
+      }
+      return getDesktopWorktrees().startThread(
+        { workspaceId: input.workspaceId, rootId: input.rootId },
+        desktopWorktreePath,
+        (root) =>
+          roder.request(
+            method,
+            getDesktopAgentTools().threadStartParams({
+              ...threadParams,
+              rootId: root.id,
+              cwd: root.path,
+            }),
+          ),
+      );
+    }
+    const start = () => roder.request(method, getDesktopAgentTools().threadStartParams(threadParams));
+    return input.runner === undefined ? getDesktopWorktrees().startInCurrentFolder(start) : start();
   }
   if (
     method === "turn/start" &&

@@ -32,6 +32,8 @@ Hover over a sidebar project and click Archive to hide it without deleting its c
 
 **A composer for real work.** Type `$` to complete skills and `@` to target MCP servers. Plan mode and agent swarm mode sit next to the model picker, and voice input, sketches, and file attachments work on any turn.
 
+**Local Git worktrees.** In a new thread, use **Checkout** beside **Local machine** to select an existing checkout or open **Manage worktrees** to create a new branch and checkout. The choice applies to the new thread; it doesn't move existing threads or switch the primary checkout's branch. To remove a Roder-created worktree, archive its threads, clear its local files and changes (including ignored files), and merge its commits into the primary checkout. Removal keeps the branch and archived conversations.
+
 **Panels beside the chat.** Terminal, Browser, Canvas, Design, Review (changed files), Files, Extensions, and Subagents. They are scoped to the project you opened, so the agent and the evidence stay in one place.
 
 **Settings you can live with.** Appearance includes several built-in themes, including Roder, Plain, and Black. You can also manage providers, models, skills, MCP servers, Git, and usage.

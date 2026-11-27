@@ -1,6 +1,7 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
 import { CloudMachinePicker, ThreadExecutionMachine } from "@/components/cloud-machine-picker";
+import { WorktreePicker } from "@/components/worktree-picker";
 import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
 import {
   use,
@@ -174,7 +175,8 @@ export function Composer({
   const persistentAgentThread = use(PersistentAgentThreadContext);
   const selectedPolicyMode = persistentAgentThread ? "bypass" : requestedPolicyMode;
   const [prompt, setPrompt] = useState("");
-  const [drainingQueuedPromptId, setDrainingQueuedPromptId] = useState<string | null>(null);
+  // Guard only, never rendered: a ref avoids a synchronous setState inside the drain effect.
+  const drainingQueuedPromptIdRef = useRef<string | null>(null);
   const [blockedQueuedPromptId, setBlockedQueuedPromptId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [sketchOpen, setSketchOpen] = useState(false);
@@ -278,7 +280,7 @@ export function Composer({
       queueBusy ||
       attachmentPreparation.pending > 0 ||
       preparingAttachments > 0 ||
-      drainingQueuedPromptId ||
+      drainingQueuedPromptIdRef.current ||
       queuedPrompts.length === 0
     ) {
       return;
@@ -287,7 +289,7 @@ export function Composer({
     if (blockedQueuedPromptId === nextQueuedPrompt.id) {
       return;
     }
-    setDrainingQueuedPromptId(nextQueuedPrompt.id);
+    drainingQueuedPromptIdRef.current = nextQueuedPrompt.id;
     void (async () => {
       try {
         await onSend(nextQueuedPrompt.prompt, nextQueuedPrompt.attachments);
@@ -296,13 +298,12 @@ export function Composer({
       } catch {
         setBlockedQueuedPromptId(nextQueuedPrompt.id);
       } finally {
-        setDrainingQueuedPromptId(null);
+        drainingQueuedPromptIdRef.current = null;
       }
     })();
   }, [
     activeQueueKey,
     blockedQueuedPromptId,
-    drainingQueuedPromptId,
     onRemoveQueuedPrompt,
     onSend,
     queueBusy,
@@ -723,7 +724,10 @@ export function Composer({
               {activeThreadId ? (
                 <ThreadExecutionMachine threadId={activeThreadId} />
               ) : (
-                <CloudMachinePicker disabled={busy} />
+                <>
+                  <CloudMachinePicker disabled={busy} />
+                  <WorktreePicker disabled={busy || queueBusy} />
+                </>
               )}
             </div>
             <div className="ml-auto flex min-w-0 max-w-full items-center gap-1 @[520px]:gap-1.5">
@@ -876,8 +880,10 @@ function SkillPromptEditor({
   const skillsRef = useRef(skills);
   const onSubmitKeyRef = useRef(onSubmitKey);
   // Registered Lexical commands read the latest skills without re-registering on every store update.
-  skillsRef.current = skills;
-  onSubmitKeyRef.current = onSubmitKey;
+  useLayoutEffect(() => {
+    skillsRef.current = skills;
+    onSubmitKeyRef.current = onSubmitKey;
+  });
 
   useEffect(() => {
     const rootElement = editorRootRef.current;

@@ -1,9 +1,12 @@
 import { afterEach, expect, test, vi } from "vitest";
 
-const setFeedURL = vi.fn();
-const checkForUpdates = vi.fn();
-const on = vi.fn();
-const quitAndInstall = vi.fn();
+// oxlint-disable-next-line typescript/no-explicit-any -- loose signature for test doubles
+type AnyFn = (...args: any[]) => any;
+
+const setFeedURL = vi.fn<AnyFn>();
+const checkForUpdates = vi.fn<AnyFn>();
+const on = vi.fn<AnyFn>();
+const quitAndInstall = vi.fn<AnyFn>();
 
 vi.mock("electron", () => ({
   app: {
@@ -16,10 +19,10 @@ vi.mock("electron", () => ({
     quitAndInstall,
   },
   dialog: {
-    showMessageBox: vi.fn(async () => ({ response: 1 })),
+    showMessageBox: vi.fn<AnyFn>(async () => ({ response: 1 })),
   },
   shell: {
-    openExternal: vi.fn(async () => undefined),
+    openExternal: vi.fn<AnyFn>(async () => undefined),
   },
 }));
 
@@ -33,7 +36,7 @@ afterEach(() => {
 
 test("feed check marks update available without starting native download", async () => {
   const { createAutoUpdateController, MACOS_UPDATE_FEED_URL } = await import("../electron/main/auto-update");
-  const fetchImpl = vi.fn(async () => ({
+  const fetchImpl = vi.fn<AnyFn>(async () => ({
     ok: true,
     json: async () => ({
       url: "https://dl.roder.sh/desktop/latest/Roder-macos-arm64.zip",
@@ -67,7 +70,7 @@ test("feed check marks update available without starting native download", async
 
 test("installUpdate starts native updater when packaged on macOS", async () => {
   const { createAutoUpdateController } = await import("../electron/main/auto-update");
-  const fetchImpl = vi.fn(async () => ({
+  const fetchImpl = vi.fn<AnyFn>(async () => ({
     ok: true,
     json: async () => ({
       url: "https://dl.roder.sh/desktop/latest/Roder-macos-arm64.zip",
@@ -93,9 +96,9 @@ test("installUpdate starts native updater when packaged on macOS", async () => {
 });
 
 test("dev builds open the download URL instead of native updater", async () => {
-  const openExternal = vi.fn(async () => undefined);
+  const openExternal = vi.fn<AnyFn>(async () => undefined);
   const { createAutoUpdateController } = await import("../electron/main/auto-update");
-  const fetchImpl = vi.fn(async () => ({
+  const fetchImpl = vi.fn<AnyFn>(async () => ({
     ok: true,
     json: async () => ({
       url: "https://dl.roder.sh/desktop/latest/Roder-macos-arm64.zip",
@@ -122,7 +125,7 @@ test("dev builds open the download URL instead of native updater", async () => {
 
 test("native and background checks keep a download visible until restart is ready", async () => {
   const { createAutoUpdateController } = await import("../electron/main/auto-update");
-  const fetchFeed = vi.fn(async () => ({
+  const fetchFeed = vi.fn<AnyFn>(async () => ({
     ok: true,
     json: async () => ({ url: "https://example.com/roder.zip", name: "0.1.2" }),
   }));
@@ -155,7 +158,7 @@ test("native and background checks keep a download visible until restart is read
 
 test("a failed native download can retry without losing the available release", async () => {
   const { createAutoUpdateController } = await import("../electron/main/auto-update");
-  const fetchFeed = vi.fn(async () => ({
+  const fetchFeed = vi.fn<AnyFn>(async () => ({
     ok: true,
     json: async () => ({ url: "https://example.com/roder.zip", name: "0.1.2" }),
   }));
