@@ -2,10 +2,13 @@ import {
   CheckCircle2,
   Cloud,
   KeyRound,
+  Network,
   Pencil,
   PlugZap,
   Plus,
   RefreshCw,
+  Server,
+  ShieldCheck,
   Terminal,
   Trash2,
   Unplug,
@@ -14,9 +17,11 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import {
+  parseQuickSshInput,
   validateMachineConfig,
   WINDOWS_CLOUD_MACHINES_NOTICE,
   type CloudMachineTestResult,
+  type SshConfigHostEntry,
 } from "@/lib/cloud-machines";
 import { machineProviderHelp } from "@/lib/cloud-machine-providers";
 import { roderIpc } from "@/lib/roder-ipc";
@@ -34,14 +39,22 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const blaxelWorkspaces = useCloudMachinesStore((state) => state.blaxelWorkspaces) ?? [];
   const blaxelSandboxes = useCloudMachinesStore((state) => state.blaxelSandboxes) ?? [];
   const blaxelActiveWorkspace = useCloudMachinesStore((state) => state.blaxelActiveWorkspace) ?? null;
+  const localTailscale = useCloudMachinesStore((state) => state.localTailscale) ?? null;
+  const tailscaleCredentials = useCloudMachinesStore((state) => state.tailscaleCredentials) ?? null;
+  const localSsh = useCloudMachinesStore((state) => state.localSsh) ?? null;
   const loadingSandboxes = useCloudMachinesStore((state) => state.loadingSandboxes) ?? false;
   const savingCredentials = useCloudMachinesStore((state) => state.savingCredentials) ?? false;
   const busy = useCloudMachinesStore((state) => state.busy);
   const error = useCloudMachinesStore((state) => state.error);
   const refresh = useCloudMachinesStore((state) => state.refresh);
+  const refreshTailscale = useCloudMachinesStore((state) => state.refreshTailscale);
+  const refreshSsh = useCloudMachinesStore((state) => state.refreshSsh);
   const refreshBlaxelSandboxes = useCloudMachinesStore((state) => state.refreshBlaxelSandboxes);
   const importBlaxelCli = useCloudMachinesStore((state) => state.importBlaxelCli);
   const saveBlaxelCredentials = useCloudMachinesStore((state) => state.saveBlaxelCredentials);
+  const saveTailscaleAuthKey = useCloudMachinesStore((state) => state.saveTailscaleAuthKey);
+  const saveTailscaleOAuth = useCloudMachinesStore((state) => state.saveTailscaleOAuth);
+  const setTailscaleSandboxPreference = useCloudMachinesStore((state) => state.setTailscaleSandboxPreference);
   const saveProviderToken = useCloudMachinesStore((state) => state.saveProviderToken);
   const clearProviderCredentials = useCloudMachinesStore((state) => state.clearProviderCredentials);
   const createBlaxelSandbox = useCloudMachinesStore((state) => state.createBlaxelSandbox);
@@ -64,16 +77,42 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const [blaxelWorkspaceInput, setBlaxelWorkspaceInput] = useState("");
   const [credentialFeedback, setCredentialFeedback] = useState<{ kind: "info" | "error"; text: string } | null>(null);
 
+  // Tailscale sandbox-tunnel credentials form state
+  const [showTailscaleForm, setShowTailscaleForm] = useState(false);
+  const [tailscaleAuthMode, setTailscaleAuthMode] = useState<"oauth" | "auth-key">("oauth");
+  const [tailscaleAuthKeyInput, setTailscaleAuthKeyInput] = useState("");
+  const [tailscaleOAuthClientId, setTailscaleOAuthClientId] = useState("");
+  const [tailscaleOAuthClientSecret, setTailscaleOAuthClientSecret] = useState("");
+  const [tailscaleTagsInput, setTailscaleTagsInput] = useState("tag:roder");
+  const [tailscaleTailnetInput, setTailscaleTailnetInput] = useState("");
+  const [tailscaleFeedback, setTailscaleFeedback] = useState<{ kind: "info" | "error"; text: string } | null>(null);
+
   // Generic provider token input (for Sprites / gateway providers)
   const [providerTokenInput, setProviderTokenInput] = useState("");
 
   // Guided Blaxel sandbox picker / creation state
   const [blaxelMode, setBlaxelMode] = useState<"existing" | "create">("existing");
   const [selectedSandboxName, setSelectedSandboxName] = useState("");
+  const [blaxelTailscaleEnabled, setBlaxelTailscaleEnabled] = useState(true);
   const [newSandboxName, setNewSandboxName] = useState("");
   const [newSandboxImage, setNewSandboxImage] = useState("blaxel/py-app:latest");
   const [newSandboxMemory, setNewSandboxMemory] = useState("4096");
   const [creatingSandbox, setCreatingSandbox] = useState(false);
+
+  // Guided Tailscale peer machine state
+  const [tailscalePeerHost, setTailscalePeerHost] = useState("");
+  const [tailscalePeerIp, setTailscalePeerIp] = useState("");
+  const [tailscaleSshUser, setTailscaleSshUser] = useState("");
+  const [tailscaleSshPort, setTailscaleSshPort] = useState("22");
+
+  // Guided SSH server state
+  const [sshQuickTarget, setSshQuickTarget] = useState("");
+  const [sshHost, setSshHost] = useState("");
+  const [sshUser, setSshUser] = useState("");
+  const [sshPort, setSshPort] = useState("22");
+  const [sshIdentityFile, setSshIdentityFile] = useState("");
+  const [sshProxyJump, setSshProxyJump] = useState("");
+  const [sshTailscaleEnabled, setSshTailscaleEnabled] = useState(false);
 
   // Connection test results keyed by machine ID
   const [testingMachineId, setTestingMachineId] = useState<string | null>(null);
@@ -81,8 +120,15 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
 
   const formId = useId();
   const blaxelProviderAvailable = providers.some((provider) => provider.provider_id === "blaxel");
+  const tailscaleProviderAvailable = providers.some((provider) => provider.provider_id === "tailscale");
+  const sshProviderAvailable = providers.some((provider) => provider.provider_id === "ssh");
   const blaxelCredential = credentialStatuses.find((entry) => entry.providerId === "blaxel") ?? null;
   const blaxelConnected = Boolean(blaxelCredential?.configured);
+  const tailscaleConfigured = Boolean(tailscaleCredentials?.configured);
+  const tailscalePeers = localTailscale?.peers ?? [];
+  const sshConfigHosts = localSsh?.hosts ?? [];
+  const sshIdentityFiles = localSsh?.identityFiles ?? [];
+  const onlineTailscalePeerCount = tailscalePeers.filter((peer) => peer.online).length;
   const defaultProvider =
     providers.find((provider) => provider.provider_id === providerId) ??
     (blaxelProviderAvailable ? providers.find((provider) => provider.provider_id === "blaxel") : undefined) ??
@@ -90,6 +136,8 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     providers[0];
   const selectedProvider = defaultProvider;
   const isBlaxelSelected = selectedProvider?.provider_id === "blaxel";
+  const isTailscaleSelected = selectedProvider?.provider_id === "tailscale";
+  const isSshSelected = selectedProvider?.provider_id === "ssh";
   const providerHelp = machineProviderHelp(selectedProvider?.provider_id ?? "");
   const selectedProviderCredential = selectedProvider
     ? (credentialStatuses.find((entry) => entry.providerId === selectedProvider.provider_id) ?? null)
@@ -110,8 +158,96 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     setReadRoots("");
     setConfigText("{}");
     setSelectedSandboxName("");
+    setBlaxelTailscaleEnabled(true);
     setNewSandboxName("");
+    setTailscalePeerHost("");
+    setTailscalePeerIp("");
+    setTailscaleSshUser("");
+    setTailscaleSshPort("22");
+    setSshQuickTarget("");
+    setSshHost("");
+    setSshUser("");
+    setSshPort("22");
+    setSshIdentityFile("");
+    setSshProxyJump("");
+    setSshTailscaleEnabled(false);
     setFormError("");
+  }
+
+  function syncSshGuidedConfig(next: {
+    host: string;
+    user: string;
+    port: string;
+    identityFile: string;
+    proxyJump: string;
+    tailscaleTunnel: boolean;
+  }): void {
+    const cleanHost = next.host.trim();
+    const cleanUser = next.user.trim();
+    const parsedPort = Number.parseInt(next.port.trim(), 10);
+    const cleanKey = next.identityFile.trim();
+    const cleanJump = next.proxyJump.trim();
+    const config: Record<string, unknown> = {
+      ...(cleanHost ? { ssh_host: cleanHost } : {}),
+      ...(cleanUser ? { ssh_user: cleanUser } : {}),
+      ssh_port: Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 22,
+      ...(cleanKey ? { identity_file: cleanKey } : {}),
+      ...(cleanJump ? { proxy_jump: cleanJump } : {}),
+      ...(tailscaleConfigured ? { tailscale_tunnel: next.tailscaleTunnel } : {}),
+    };
+    setConfigText(JSON.stringify(config, null, 2));
+  }
+
+  function importSshConfigHost(entry: SshConfigHostEntry): void {
+    const nextPort = String(entry.port || 22);
+    const nextUser = entry.user ?? "";
+    const nextKey = entry.identityFile ?? "";
+    const nextJump = entry.proxyJump ?? "";
+    const defaultTs = Boolean(tailscaleCredentials?.configured && tailscaleCredentials.preferForSandboxes);
+    setEditingId(null);
+    setProviderId("ssh");
+    setName(entry.alias);
+    setSshQuickTarget("");
+    setSshHost(entry.alias);
+    setSshUser(nextUser);
+    setSshPort(nextPort);
+    setSshIdentityFile(nextKey);
+    setSshProxyJump(nextJump);
+    setSshTailscaleEnabled(defaultTs);
+    if (!workspace.trim()) {
+      setWorkspace(nextUser === "root" ? "/root" : nextUser ? `/home/${nextUser}` : "/workspace");
+    }
+    setFormError("");
+    setFormNotice(
+      `Loaded "${entry.alias}" from ~/.ssh/config. Confirm the remote workspace path and click Add machine.`,
+    );
+    syncSshGuidedConfig({
+      host: entry.alias,
+      user: nextUser,
+      port: nextPort,
+      identityFile: nextKey,
+      proxyJump: nextJump,
+      tailscaleTunnel: defaultTs,
+    });
+    requestAnimationFrame(() => {
+      const target = document.getElementById(`${formId}-workspace`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.focus();
+    });
+  }
+
+  function syncTailscaleGuidedConfig(nextHost: string, nextIp: string, nextUser: string, nextPort: string): void {
+    const cleanHost = nextHost.trim();
+    const cleanIp = nextIp.trim();
+    const cleanUser = nextUser.trim();
+    const parsedPort = Number.parseInt(nextPort.trim(), 10);
+    const config: Record<string, unknown> = {
+      ...(cleanHost ? { tailscale_host: cleanHost } : {}),
+      ...(cleanIp ? { tailscale_ip: cleanIp } : {}),
+      ...(cleanUser ? { ssh_user: cleanUser } : {}),
+      ssh_port: Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 22,
+    };
+    setConfigText(JSON.stringify(config, null, 2));
   }
 
   function applyProviderSelection(nextProviderId: string): void {
@@ -127,22 +263,41 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
             working_dir: workspace.trim() || "/workspace",
             ...(effectiveBlaxelWorkspace ? { workspace: effectiveBlaxelWorkspace } : {}),
             cleanup: "keep",
+            ...(tailscaleConfigured && !blaxelTailscaleEnabled ? { tailscale_tunnel: false } : {}),
           },
           null,
           2,
         ),
       );
+    } else if (nextProviderId === "ssh") {
+      const defaultTs = Boolean(tailscaleCredentials?.configured && tailscaleCredentials.preferForSandboxes);
+      setSshTailscaleEnabled(defaultTs);
+      syncSshGuidedConfig({
+        host: sshHost,
+        user: sshUser,
+        port: sshPort,
+        identityFile: sshIdentityFile,
+        proxyJump: sshProxyJump,
+        tailscaleTunnel: defaultTs,
+      });
+    } else if (nextProviderId === "tailscale") {
+      syncTailscaleGuidedConfig(tailscalePeerHost, tailscalePeerIp, tailscaleSshUser, tailscaleSshPort);
     } else {
       setConfigText("{}");
     }
   }
 
-  function syncBlaxelGuidedConfig(sandboxName: string, nextWorkspace: string): void {
+  function syncBlaxelGuidedConfig(
+    sandboxName: string,
+    nextWorkspace: string,
+    nextTailscale = blaxelTailscaleEnabled,
+  ): void {
     const cleanWorkspace = nextWorkspace.trim() || "/workspace";
     const config: Record<string, unknown> = {
       sandbox_name: sandboxName,
       working_dir: cleanWorkspace,
       cleanup: "keep",
+      ...(tailscaleConfigured ? { tailscale_tunnel: nextTailscale } : {}),
     };
     if (effectiveBlaxelWorkspace) {
       config.workspace = effectiveBlaxelWorkspace;
@@ -187,6 +342,82 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       setCredentialFeedback({
         kind: "error",
         text: cause instanceof Error ? cause.message : "Could not save Blaxel credentials.",
+      });
+    }
+  }
+
+  async function handleSaveTailscaleCredentials(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setTailscaleFeedback(null);
+    try {
+      if (tailscaleAuthMode === "oauth") {
+        if (!saveTailscaleOAuth) return;
+        await saveTailscaleOAuth({
+          oauthClientId: tailscaleOAuthClientId.trim(),
+          oauthClientSecret: tailscaleOAuthClientSecret.trim(),
+          tags: tailscaleTagsInput.trim() || "tag:roder",
+          tailnet: tailscaleTailnetInput.trim() || undefined,
+          preferForSandboxes: true,
+        });
+        setTailscaleOAuthClientSecret("");
+        setShowTailscaleForm(false);
+        setTailscaleFeedback({
+          kind: "info",
+          text: "Verified and saved encrypted Tailscale OAuth client. Ephemeral keys will be auto-minted per sandbox.",
+        });
+      } else {
+        if (!saveTailscaleAuthKey) return;
+        await saveTailscaleAuthKey({
+          authKey: tailscaleAuthKeyInput.trim(),
+          preferForSandboxes: true,
+        });
+        setTailscaleAuthKeyInput("");
+        setShowTailscaleForm(false);
+        setTailscaleFeedback({
+          kind: "info",
+          text: "Saved encrypted Tailscale auth key for automatic sandbox tunneling.",
+        });
+      }
+    } catch (cause) {
+      setTailscaleFeedback({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : "Could not save Tailscale credentials.",
+      });
+    }
+  }
+
+  async function handleToggleTailscaleSandboxes(enabled: boolean): Promise<void> {
+    if (!setTailscaleSandboxPreference) return;
+    setTailscaleFeedback(null);
+    try {
+      await setTailscaleSandboxPreference(enabled);
+      setTailscaleFeedback({
+        kind: "info",
+        text: enabled
+          ? "Cloud sandboxes will automatically inject and tunnel over Tailscale."
+          : "Cloud sandboxes will use provider preview tunnels unless opted in per machine.",
+      });
+    } catch (cause) {
+      setTailscaleFeedback({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : "Could not update Tailscale preference.",
+      });
+    }
+  }
+
+  async function handleClearTailscaleCredentials(): Promise<void> {
+    if (!clearProviderCredentials) return;
+    setTailscaleFeedback(null);
+    try {
+      await clearProviderCredentials("tailscale");
+      setTailscaleFeedback({
+        kind: "info",
+        text: "Cleared saved Tailscale sandbox credentials.",
+      });
+    } catch (cause) {
+      setTailscaleFeedback({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : "Could not clear Tailscale credentials.",
       });
     }
   }
@@ -316,6 +547,80 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
           working_dir: resolvedWorkspace,
           ...(effectiveBlaxelWorkspace && !baseConfig.workspace ? { workspace: effectiveBlaxelWorkspace } : {}),
           cleanup: typeof baseConfig.cleanup === "string" ? baseConfig.cleanup : "keep",
+          ...(tailscaleConfigured ? { tailscale_tunnel: blaxelTailscaleEnabled } : {}),
+        });
+      } catch {
+        setFormError(
+          "Enter a valid JSON object without credentials. Supply secrets through the app-server environment.",
+        );
+        return;
+      }
+    } else if (isSshSelected) {
+      const host = sshHost.trim();
+      if (!host) {
+        setFormError("Enter an SSH hostname, IP address, or ~/.ssh/config alias.");
+        return;
+      }
+      if (!resolvedWorkspace) {
+        setFormError("Enter the remote workspace path on that SSH server (e.g. /home/ubuntu/project).");
+        return;
+      }
+      if (!resolvedName) {
+        resolvedName = host.split(".")[0] || host;
+      }
+      const parsedPort = Number.parseInt(sshPort.trim(), 10);
+      if (sshPort.trim() && (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535)) {
+        setFormError("SSH port must be a number between 1 and 65535.");
+        return;
+      }
+      try {
+        const parsed: unknown = configText.trim() ? JSON.parse(configText) : {};
+        const baseConfig =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+        config = validateMachineConfig({
+          ...baseConfig,
+          ssh_host: host,
+          ...(sshUser.trim() ? { ssh_user: sshUser.trim() } : {}),
+          ssh_port: Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 22,
+          ...(sshIdentityFile.trim() ? { identity_file: sshIdentityFile.trim() } : {}),
+          ...(sshProxyJump.trim() ? { proxy_jump: sshProxyJump.trim() } : {}),
+          ...(tailscaleConfigured ? { tailscale_tunnel: sshTailscaleEnabled } : {}),
+        });
+      } catch {
+        setFormError(
+          "Enter a valid JSON object without credentials. Keep private keys on disk and reference their path only.",
+        );
+        return;
+      }
+    } else if (isTailscaleSelected) {
+      const host = tailscalePeerHost.trim();
+      const ip = tailscalePeerIp.trim();
+      if (!host && !ip) {
+        setFormError("Select a Tailscale peer or enter a Tailscale hostname / 100.x IP address.");
+        return;
+      }
+      if (!resolvedWorkspace) {
+        setFormError("Enter the remote workspace path on that Tailscale machine (e.g. /home/user/project).");
+        return;
+      }
+      if (!resolvedName) {
+        resolvedName = host.split(".")[0] || ip;
+      }
+      const parsedPort = Number.parseInt(tailscaleSshPort.trim(), 10);
+      if (tailscaleSshPort.trim() && (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535)) {
+        setFormError("SSH port must be a number between 1 and 65535.");
+        return;
+      }
+      try {
+        const parsed: unknown = configText.trim() ? JSON.parse(configText) : {};
+        const baseConfig =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+        config = validateMachineConfig({
+          ...baseConfig,
+          ...(host ? { tailscale_host: host } : {}),
+          ...(ip ? { tailscale_ip: ip } : {}),
+          ...(tailscaleSshUser.trim() ? { ssh_user: tailscaleSshUser.trim() } : {}),
+          ssh_port: Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 22,
         });
       } catch {
         setFormError(
@@ -377,7 +682,20 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       if (machine.providerId === "blaxel") {
         const sbx = typeof machine.config.sandbox_name === "string" ? machine.config.sandbox_name : "";
         setSelectedSandboxName(sbx);
+        setBlaxelTailscaleEnabled(machine.config.tailscale_tunnel !== false);
         setBlaxelMode("existing");
+      } else if (machine.providerId === "ssh") {
+        setSshHost(typeof machine.config.ssh_host === "string" ? machine.config.ssh_host : "");
+        setSshUser(typeof machine.config.ssh_user === "string" ? machine.config.ssh_user : "");
+        setSshPort(typeof machine.config.ssh_port === "number" ? String(machine.config.ssh_port) : "22");
+        setSshIdentityFile(typeof machine.config.identity_file === "string" ? machine.config.identity_file : "");
+        setSshProxyJump(typeof machine.config.proxy_jump === "string" ? machine.config.proxy_jump : "");
+        setSshTailscaleEnabled(machine.config.tailscale_tunnel === true);
+      } else if (machine.providerId === "tailscale") {
+        setTailscalePeerHost(typeof machine.config.tailscale_host === "string" ? machine.config.tailscale_host : "");
+        setTailscalePeerIp(typeof machine.config.tailscale_ip === "string" ? machine.config.tailscale_ip : "");
+        setTailscaleSshUser(typeof machine.config.ssh_user === "string" ? machine.config.ssh_user : "");
+        setTailscaleSshPort(typeof machine.config.ssh_port === "number" ? String(machine.config.ssh_port) : "22");
       }
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : "Could not load machine profile.");
@@ -420,7 +738,11 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         selectedProvider &&
         (blaxelMode === "create" ? newSandboxName.trim() : selectedSandboxName.trim() || name.trim()),
       )
-    : Boolean(name.trim() && workspace.trim() && selectedProvider);
+    : isSshSelected
+      ? Boolean(selectedProvider && sshHost.trim() && workspace.trim())
+      : isTailscaleSelected
+        ? Boolean(selectedProvider && (tailscalePeerHost.trim() || tailscalePeerIp.trim()) && workspace.trim())
+        : Boolean(name.trim() && workspace.trim() && selectedProvider);
 
   return (
     <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
@@ -589,6 +911,357 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         </div>
       )}
 
+      {cloudSupported && (tailscaleProviderAvailable || localTailscale?.installed || tailscaleConfigured) && (
+        <div className="space-y-3 border-b border-border px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-medium">
+                <Network className="size-4 text-muted-foreground" />
+                Tailscale tunnel
+              </h2>
+              <p className="mt-1 text-sm font-normal text-muted-foreground">
+                Inject ephemeral Tailscale tunnels into cloud sandboxes and connect directly to your own tailnet
+                machines over WireGuard.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {localTailscale?.running ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-3.5" />
+                  Tailnet{localTailscale.magicDnsSuffix ? ` · ${localTailscale.magicDnsSuffix}` : " active"}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-sm font-medium text-muted-foreground">
+                  {localTailscale?.installed ? "Tailscale stopped" : "Tailscale not detected"}
+                </span>
+              )}
+              {refreshTailscale && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={savingCredentials}
+                  onClick={() => void refreshTailscale()}
+                >
+                  <RefreshCw className="size-3.5" />
+                  Scan peers
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant={tailscaleConfigured ? "outline" : "default"}
+                disabled={savingCredentials}
+                onClick={() => setShowTailscaleForm((open) => !open)}
+              >
+                <ShieldCheck className="size-3.5" />
+                {showTailscaleForm
+                  ? "Hide setup"
+                  : tailscaleConfigured
+                    ? "Update tunnel auth"
+                    : "Configure sandbox tunnel"}
+              </Button>
+              {tailscaleConfigured && tailscaleCredentials?.source !== "env" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={savingCredentials}
+                  onClick={() => void handleClearTailscaleCredentials()}
+                >
+                  <Unplug className="size-3.5" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {localTailscale?.running && localTailscale.self && (
+            <p className="text-sm font-normal text-muted-foreground">
+              This device:{" "}
+              <span className="font-mono text-foreground">
+                {localTailscale.self.dnsName || localTailscale.self.hostName}
+              </span>{" "}
+              (<span className="font-mono">{localTailscale.self.tailscaleIp}</span>){" · "}
+              {onlineTailscalePeerCount}/{tailscalePeers.length} tailnet peers online
+            </p>
+          )}
+
+          {tailscaleConfigured && tailscaleCredentials && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5 text-sm">
+              <div className="space-y-0.5">
+                <p className="text-foreground">
+                  Sandbox auto-injection:{" "}
+                  <span className="font-medium">
+                    {tailscaleCredentials.mode === "oauth"
+                      ? `OAuth auto-minting (${tailscaleCredentials.tags.join(", ") || "tag:roder"})`
+                      : `Ephemeral auth key (${tailscaleCredentials.preview ?? "saved"})`}
+                  </span>
+                </p>
+                <p className="font-normal text-muted-foreground">
+                  {tailscaleCredentials.source === "env"
+                    ? "Loaded from process environment"
+                    : "Stored encrypted in OS secure storage"}
+                </p>
+              </div>
+              {tailscaleCredentials.source !== "env" && typeof setTailscaleSandboxPreference === "function" && (
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={tailscaleCredentials.preferForSandboxes}
+                    disabled={savingCredentials}
+                    onChange={(event) => void handleToggleTailscaleSandboxes(event.currentTarget.checked)}
+                    className="size-4 rounded border-input accent-primary"
+                  />
+                  <span>Prefer Tailscale for cloud sandboxes</span>
+                </label>
+              )}
+            </div>
+          )}
+
+          {tailscaleFeedback && (
+            <p
+              role={tailscaleFeedback.kind === "error" ? "alert" : "status"}
+              className={cn(
+                "text-sm font-normal",
+                tailscaleFeedback.kind === "error" ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {tailscaleFeedback.text}
+            </p>
+          )}
+
+          {showTailscaleForm && (
+            <form
+              onSubmit={(event) => void handleSaveTailscaleCredentials(event)}
+              className="space-y-3 rounded-lg bg-muted/30 p-3.5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex rounded-lg bg-background p-0.5 ring-1 ring-border/70">
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
+                      tailscaleAuthMode === "oauth"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setTailscaleAuthMode("oauth")}
+                  >
+                    OAuth client (recommended)
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
+                      tailscaleAuthMode === "auth-key"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setTailscaleAuthMode("auth-key")}
+                  >
+                    Auth key
+                  </button>
+                </div>
+                <span className="text-sm font-normal text-muted-foreground">
+                  Encrypted in OS keyring · never stored in thread config
+                </span>
+              </div>
+
+              {tailscaleAuthMode === "oauth" ? (
+                <div className="space-y-3">
+                  <p className="text-sm font-normal text-muted-foreground">
+                    Create an OAuth client in Tailscale Admin → Settings → OAuth clients with{" "}
+                    <span className="font-mono">auth_keys</span> write scope and a tag (e.g.{" "}
+                    <span className="font-mono">tag:roder</span>). Roder Desktop auto-mints single-use ephemeral keys
+                    for each sandbox.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label htmlFor={`${formId}-ts-oauth-id`} className="space-y-1 text-sm">
+                      <span className="text-muted-foreground">OAuth client ID</span>
+                      <input
+                        id={`${formId}-ts-oauth-id`}
+                        className={cn(fieldClass, "font-mono")}
+                        value={tailscaleOAuthClientId}
+                        onChange={(event) => setTailscaleOAuthClientId(event.currentTarget.value)}
+                        placeholder={tailscaleCredentials?.oauthClientId || "k123456CNTRL"}
+                        autoComplete="off"
+                        required
+                      />
+                    </label>
+                    <label htmlFor={`${formId}-ts-oauth-secret`} className="space-y-1 text-sm">
+                      <span className="text-muted-foreground">OAuth client secret</span>
+                      <input
+                        id={`${formId}-ts-oauth-secret`}
+                        type="password"
+                        className={cn(fieldClass, "font-mono")}
+                        value={tailscaleOAuthClientSecret}
+                        onChange={(event) => setTailscaleOAuthClientSecret(event.currentTarget.value)}
+                        placeholder="tskey-client-..."
+                        autoComplete="off"
+                        required
+                      />
+                    </label>
+                    <label htmlFor={`${formId}-ts-tags`} className="space-y-1 text-sm">
+                      <span className="text-muted-foreground">Node tag(s)</span>
+                      <input
+                        id={`${formId}-ts-tags`}
+                        className={cn(fieldClass, "font-mono")}
+                        value={tailscaleTagsInput}
+                        onChange={(event) => setTailscaleTagsInput(event.currentTarget.value)}
+                        placeholder="tag:roder"
+                        required
+                      />
+                    </label>
+                    <label htmlFor={`${formId}-ts-tailnet`} className="space-y-1 text-sm">
+                      <span className="text-muted-foreground">Tailnet (optional)</span>
+                      <input
+                        id={`${formId}-ts-tailnet`}
+                        className={cn(fieldClass, "font-mono")}
+                        value={tailscaleTailnetInput}
+                        onChange={(event) => setTailscaleTailnetInput(event.currentTarget.value)}
+                        placeholder={localTailscale?.tailnetName || "- (default)"}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-normal text-muted-foreground">
+                    Paste a reusable, ephemeral, pre-authorized key from Tailscale Admin → Settings → Keys.
+                  </p>
+                  <label htmlFor={`${formId}-ts-authkey`} className="block space-y-1 text-sm">
+                    <span className="text-muted-foreground">Tailscale auth key</span>
+                    <input
+                      id={`${formId}-ts-authkey`}
+                      type="password"
+                      className={cn(fieldClass, "font-mono")}
+                      value={tailscaleAuthKeyInput}
+                      onChange={(event) => setTailscaleAuthKeyInput(event.currentTarget.value)}
+                      placeholder="tskey-auth-..."
+                      autoComplete="off"
+                      required
+                    />
+                  </label>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={
+                    savingCredentials ||
+                    (tailscaleAuthMode === "oauth"
+                      ? !tailscaleOAuthClientId.trim() || !tailscaleOAuthClientSecret.trim()
+                      : !tailscaleAuthKeyInput.trim())
+                  }
+                >
+                  {savingCredentials
+                    ? "Verifying…"
+                    : tailscaleAuthMode === "oauth"
+                      ? "Verify & save OAuth client"
+                      : "Save auth key"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {cloudSupported && (sshProviderAvailable || localSsh?.installed) && (
+        <div className="space-y-3 border-b border-border px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-medium">
+                <Server className="size-4 text-muted-foreground" />
+                SSH servers
+              </h2>
+              <p className="mt-1 text-sm font-normal text-muted-foreground">
+                Connect to any macOS or Linux machine over SSH using your local{" "}
+                <span className="font-mono">~/.ssh/config</span> or SSH keys, with automatic{" "}
+                <span className="font-mono">remote-roder</span> tunneling and optional Tailscale injection.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {localSsh?.installed ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="size-3.5" />
+                  OpenSSH ready
+                  {sshConfigHosts.length > 0
+                    ? ` · ${sshConfigHosts.length} ${sshConfigHosts.length === 1 ? "host" : "hosts"}`
+                    : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/50 px-2.5 py-1 text-sm font-medium text-muted-foreground">
+                  SSH client ready on macOS/Linux
+                </span>
+              )}
+              {typeof refreshSsh === "function" && (
+                <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => void refreshSsh()}>
+                  <RefreshCw className="size-3.5" />
+                  Scan ~/.ssh
+                </Button>
+              )}
+              {sshProviderAvailable && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    applyProviderSelection("ssh");
+                    requestAnimationFrame(() => {
+                      const target = document.getElementById(`${formId}-ssh-quick`);
+                      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      target?.focus();
+                    });
+                  }}
+                >
+                  <Plus className="size-3.5" />
+                  Add SSH server
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {(sshConfigHosts.length > 0 || sshIdentityFiles.length > 0) && (
+            <div className="space-y-2 rounded-lg bg-muted/30 p-3 text-sm">
+              {sshIdentityFiles.length > 0 && (
+                <p className="font-normal text-muted-foreground">
+                  Detected SSH keys ({sshIdentityFiles.length}):{" "}
+                  <span className="font-mono text-foreground">{sshIdentityFiles.slice(0, 4).join(", ")}</span>
+                  {sshIdentityFiles.length > 4 ? ` +${sshIdentityFiles.length - 4} more` : ""}
+                </p>
+              )}
+              {sshConfigHosts.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="font-normal text-muted-foreground">Hosts in ~/.ssh/config (click to configure):</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sshConfigHosts.map((hostEntry) => (
+                      <Button
+                        key={hostEntry.alias}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 rounded-md font-mono text-sm"
+                        onClick={() => importSshConfigHost(hostEntry)}
+                      >
+                        <Server className="size-3" />
+                        <span>{hostEntry.alias}</span>
+                        {hostEntry.hostName !== hostEntry.alias && (
+                          <span className="text-muted-foreground">({hostEntry.hostName})</span>
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="border-b border-border px-5 py-4">
         <details className="rounded-lg border border-border">
           <summary className="cursor-pointer px-3 py-3 text-base font-medium">Manage runner providers</summary>
@@ -666,7 +1339,13 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
               return (
                 <li key={machine.id} className="space-y-2 p-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                    {machine.providerId === "tailscale" ? (
+                      <Network className="size-4 shrink-0 text-muted-foreground" />
+                    ) : machine.providerId === "ssh" ? (
+                      <Server className="size-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="break-words text-base font-medium">{machine.name}</div>
                       <div className="break-all font-mono text-sm text-muted-foreground">
@@ -695,18 +1374,21 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1">
-                        {machine.providerId === "blaxel" && cloudSupported && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy || testingMachineId === machine.id}
-                            onClick={() => void testMachineConnection(machine.id)}
-                          >
-                            <PlugZap className="size-3.5" />
-                            {testingMachineId === machine.id ? "Testing…" : "Test"}
-                          </Button>
-                        )}
+                        {(machine.providerId === "blaxel" ||
+                          machine.providerId === "tailscale" ||
+                          machine.providerId === "ssh") &&
+                          cloudSupported && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy || testingMachineId === machine.id}
+                              onClick={() => void testMachineConnection(machine.id)}
+                            >
+                              <PlugZap className="size-3.5" />
+                              {testingMachineId === machine.id ? "Testing…" : "Test"}
+                            </Button>
+                          )}
                         {cloudSupported && (
                           <Button
                             type="button"
@@ -784,8 +1466,16 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                 className={fieldClass}
                 value={name}
                 onChange={(event) => setName(event.currentTarget.value)}
-                placeholder={isBlaxelSelected ? "roder-remote-dev" : "Development sandbox"}
-                required={!isBlaxelSelected}
+                placeholder={
+                  isBlaxelSelected
+                    ? "roder-remote-dev"
+                    : isSshSelected
+                      ? "hetzner-prod"
+                      : isTailscaleSelected
+                        ? "devbox"
+                        : "Development sandbox"
+                }
+                required={!isBlaxelSelected && !isTailscaleSelected && !isSshSelected}
               />
             </label>
             <label htmlFor={`${formId}-provider`} className="space-y-1.5 text-base">
@@ -949,6 +1639,364 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                   Active Blaxel workspace: <span className="font-mono">{effectiveBlaxelWorkspace}</span>
                 </p>
               )}
+
+              {tailscaleConfigured && (
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={blaxelTailscaleEnabled}
+                    onChange={(event) => {
+                      const nextEnabled = event.currentTarget.checked;
+                      setBlaxelTailscaleEnabled(nextEnabled);
+                      if (selectedSandboxName) {
+                        syncBlaxelGuidedConfig(selectedSandboxName, workspace, nextEnabled);
+                      }
+                    }}
+                    className="size-4 rounded border-input accent-primary"
+                  />
+                  <span>Inject ephemeral Tailscale WireGuard tunnel into this sandbox</span>
+                </label>
+              )}
+            </div>
+          ) : isSshSelected ? (
+            <div className="space-y-3 rounded-xl bg-muted/30 p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-normal text-muted-foreground">
+                  Paste an SSH target (<span className="font-mono">user@host:port</span> or{" "}
+                  <span className="font-mono">ssh -i ~/.ssh/key user@host</span>) or pick from{" "}
+                  <span className="font-mono">~/.ssh/config</span>. Works on macOS and Linux.
+                </p>
+                {typeof refreshSsh === "function" && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => void refreshSsh()}>
+                    <RefreshCw className="size-3.5" />
+                    Reload ~/.ssh
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label htmlFor={`${formId}-ssh-quick`} className="space-y-1.5 text-base">
+                  <span>Quick paste (optional)</span>
+                  <input
+                    id={`${formId}-ssh-quick`}
+                    className={cn(fieldClass, "font-mono")}
+                    spellCheck={false}
+                    value={sshQuickTarget}
+                    onChange={(event) => {
+                      const raw = event.currentTarget.value;
+                      const prevDerivedName = sshHost.split(".")[0] || sshHost;
+                      setSshQuickTarget(raw);
+                      const trimmedRaw = raw.trim();
+                      if (trimmedRaw === "s" || trimmedRaw === "ss" || trimmedRaw === "ssh") {
+                        return;
+                      }
+                      const parsed = parseQuickSshInput(raw);
+                      if (parsed.host) {
+                        const nextUser = parsed.user ?? sshUser;
+                        const nextPort = parsed.port ? String(parsed.port) : sshPort;
+                        const nextKey = parsed.identityFile ?? sshIdentityFile;
+                        const nextJump = parsed.proxyJump ?? sshProxyJump;
+                        const nextDerivedName = parsed.host.split(".")[0] || parsed.host;
+                        setSshHost(parsed.host);
+                        if (parsed.user !== undefined) setSshUser(parsed.user);
+                        if (parsed.port !== undefined) setSshPort(String(parsed.port));
+                        if (parsed.identityFile !== undefined) setSshIdentityFile(parsed.identityFile);
+                        if (parsed.proxyJump !== undefined) setSshProxyJump(parsed.proxyJump);
+                        if (!name.trim() || name === prevDerivedName) {
+                          setName(nextDerivedName);
+                        }
+                        syncSshGuidedConfig({
+                          host: parsed.host,
+                          user: nextUser,
+                          port: nextPort,
+                          identityFile: nextKey,
+                          proxyJump: nextJump,
+                          tailscaleTunnel: sshTailscaleEnabled,
+                        });
+                      }
+                    }}
+                    placeholder="ssh -p 22 ubuntu@dev.example.com"
+                  />
+                </label>
+
+                {sshConfigHosts.length > 0 && (
+                  <label htmlFor={`${formId}-ssh-config-select`} className="space-y-1.5 text-base">
+                    <span>From ~/.ssh/config</span>
+                    <select
+                      id={`${formId}-ssh-config-select`}
+                      className={cn(fieldClass, "font-mono")}
+                      value={sshConfigHosts.some((entry) => entry.alias === sshHost) ? sshHost : ""}
+                      onChange={(event) => {
+                        const selected = sshConfigHosts.find((entry) => entry.alias === event.currentTarget.value);
+                        if (selected) importSshConfigHost(selected);
+                      }}
+                    >
+                      <option value="">Choose a host alias…</option>
+                      {sshConfigHosts.map((entry) => (
+                        <option key={entry.alias} value={entry.alias}>
+                          {entry.alias}
+                          {entry.hostName !== entry.alias ? ` (${entry.hostName})` : ""}
+                          {entry.user ? ` · ${entry.user}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label htmlFor={`${formId}-ssh-host`} className="space-y-1.5 text-base sm:col-span-1">
+                  <span>Host or alias</span>
+                  <input
+                    id={`${formId}-ssh-host`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={sshHost}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setSshHost(next);
+                      syncSshGuidedConfig({
+                        host: next,
+                        user: sshUser,
+                        port: sshPort,
+                        identityFile: sshIdentityFile,
+                        proxyJump: sshProxyJump,
+                        tailscaleTunnel: sshTailscaleEnabled,
+                      });
+                    }}
+                    placeholder="dev.example.com"
+                  />
+                </label>
+                <label htmlFor={`${formId}-ssh-user`} className="space-y-1.5 text-base">
+                  <span>Username (optional)</span>
+                  <input
+                    id={`${formId}-ssh-user`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={sshUser}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setSshUser(next);
+                      syncSshGuidedConfig({
+                        host: sshHost,
+                        user: next,
+                        port: sshPort,
+                        identityFile: sshIdentityFile,
+                        proxyJump: sshProxyJump,
+                        tailscaleTunnel: sshTailscaleEnabled,
+                      });
+                    }}
+                    placeholder="ubuntu"
+                  />
+                </label>
+                <label htmlFor={`${formId}-ssh-port`} className="space-y-1.5 text-base">
+                  <span>Port</span>
+                  <input
+                    id={`${formId}-ssh-port`}
+                    type="number"
+                    min={1}
+                    max={65535}
+                    className={cn(fieldClass, "font-mono")}
+                    value={sshPort}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setSshPort(next);
+                      syncSshGuidedConfig({
+                        host: sshHost,
+                        user: sshUser,
+                        port: next,
+                        identityFile: sshIdentityFile,
+                        proxyJump: sshProxyJump,
+                        tailscaleTunnel: sshTailscaleEnabled,
+                      });
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label htmlFor={`${formId}-ssh-key`} className="space-y-1.5 text-base">
+                  <span>Identity key path (optional)</span>
+                  <input
+                    id={`${formId}-ssh-key`}
+                    list={sshIdentityFiles.length > 0 ? `${formId}-ssh-keys-list` : undefined}
+                    className={cn(fieldClass, "font-mono")}
+                    value={sshIdentityFile}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setSshIdentityFile(next);
+                      syncSshGuidedConfig({
+                        host: sshHost,
+                        user: sshUser,
+                        port: sshPort,
+                        identityFile: next,
+                        proxyJump: sshProxyJump,
+                        tailscaleTunnel: sshTailscaleEnabled,
+                      });
+                    }}
+                    placeholder="~/.ssh/id_ed25519 (default agent/config)"
+                  />
+                  {sshIdentityFiles.length > 0 && (
+                    <datalist id={`${formId}-ssh-keys-list`}>
+                      {sshIdentityFiles.map((keyPath) => (
+                        <option key={keyPath} value={keyPath}>
+                          {keyPath}
+                        </option>
+                      ))}
+                    </datalist>
+                  )}
+                </label>
+                <label htmlFor={`${formId}-ssh-jump`} className="space-y-1.5 text-base">
+                  <span>ProxyJump / bastion (optional)</span>
+                  <input
+                    id={`${formId}-ssh-jump`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={sshProxyJump}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setSshProxyJump(next);
+                      syncSshGuidedConfig({
+                        host: sshHost,
+                        user: sshUser,
+                        port: sshPort,
+                        identityFile: sshIdentityFile,
+                        proxyJump: next,
+                        tailscaleTunnel: sshTailscaleEnabled,
+                      });
+                    }}
+                    placeholder="bastion@jump.example.com"
+                  />
+                </label>
+              </div>
+
+              {tailscaleConfigured && (
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={sshTailscaleEnabled}
+                    onChange={(event) => {
+                      const nextEnabled = event.currentTarget.checked;
+                      setSshTailscaleEnabled(nextEnabled);
+                      syncSshGuidedConfig({
+                        host: sshHost,
+                        user: sshUser,
+                        port: sshPort,
+                        identityFile: sshIdentityFile,
+                        proxyJump: sshProxyJump,
+                        tailscaleTunnel: nextEnabled,
+                      });
+                    }}
+                    className="size-4 rounded border-input accent-primary"
+                  />
+                  <span>Inject ephemeral Tailscale WireGuard tunnel on this SSH server</span>
+                </label>
+              )}
+            </div>
+          ) : isTailscaleSelected ? (
+            <div className="space-y-3 rounded-xl bg-muted/30 p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-normal text-muted-foreground">
+                  Pick any machine on your tailnet to run agents, files, review, and interactive terminal directly over
+                  Tailscale SSH / <span className="font-mono">remote-roder</span>.
+                </p>
+                {refreshTailscale && (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => void refreshTailscale()}>
+                    <RefreshCw className="size-3.5" />
+                    Reload peers
+                  </Button>
+                )}
+              </div>
+
+              {tailscalePeers.length > 0 && (
+                <label htmlFor={`${formId}-tailscale-peer-select`} className="block space-y-1.5 text-base">
+                  <span>Tailscale peer</span>
+                  <select
+                    id={`${formId}-tailscale-peer-select`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={tailscalePeerIp || tailscalePeerHost}
+                    onChange={(event) => {
+                      const selectedIp = event.currentTarget.value;
+                      const peer = tailscalePeers.find(
+                        (entry) => entry.tailscaleIp === selectedIp || entry.dnsName === selectedIp,
+                      );
+                      if (!peer) return;
+                      const nextHost = peer.dnsName || peer.hostName;
+                      setTailscalePeerHost(nextHost);
+                      setTailscalePeerIp(peer.tailscaleIp);
+                      if (!name.trim()) setName(peer.hostName);
+                      syncTailscaleGuidedConfig(nextHost, peer.tailscaleIp, tailscaleSshUser, tailscaleSshPort);
+                    }}
+                  >
+                    <option value="">Choose a peer on your tailnet…</option>
+                    {tailscalePeers.map((peer) => (
+                      <option key={peer.id} value={peer.tailscaleIp}>
+                        {peer.online ? "● " : "○ "}
+                        {peer.hostName} ({peer.os}) · {peer.tailscaleIp}
+                        {peer.online ? " · online" : " · offline"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label htmlFor={`${formId}-ts-peer-host`} className="space-y-1.5 text-base">
+                  <span>Tailscale hostname</span>
+                  <input
+                    id={`${formId}-ts-peer-host`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={tailscalePeerHost}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setTailscalePeerHost(next);
+                      syncTailscaleGuidedConfig(next, tailscalePeerIp, tailscaleSshUser, tailscaleSshPort);
+                    }}
+                    placeholder="devbox.tailnet.ts.net"
+                  />
+                </label>
+                <label htmlFor={`${formId}-ts-peer-ip`} className="space-y-1.5 text-base">
+                  <span>Tailscale IP (optional)</span>
+                  <input
+                    id={`${formId}-ts-peer-ip`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={tailscalePeerIp}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setTailscalePeerIp(next);
+                      syncTailscaleGuidedConfig(tailscalePeerHost, next, tailscaleSshUser, tailscaleSshPort);
+                    }}
+                    placeholder="100.x.y.z"
+                  />
+                </label>
+                <label htmlFor={`${formId}-ts-ssh-user`} className="space-y-1.5 text-base">
+                  <span>SSH user (optional)</span>
+                  <input
+                    id={`${formId}-ts-ssh-user`}
+                    className={cn(fieldClass, "font-mono")}
+                    value={tailscaleSshUser}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setTailscaleSshUser(next);
+                      syncTailscaleGuidedConfig(tailscalePeerHost, tailscalePeerIp, next, tailscaleSshPort);
+                    }}
+                    placeholder="auto / Tailscale SSH"
+                  />
+                </label>
+                <label htmlFor={`${formId}-ts-ssh-port`} className="space-y-1.5 text-base">
+                  <span>SSH port</span>
+                  <input
+                    id={`${formId}-ts-ssh-port`}
+                    type="number"
+                    min={1}
+                    max={65535}
+                    className={cn(fieldClass, "font-mono")}
+                    value={tailscaleSshPort}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value;
+                      setTailscaleSshPort(next);
+                      syncTailscaleGuidedConfig(tailscalePeerHost, tailscalePeerIp, tailscaleSshUser, next);
+                    }}
+                  />
+                </label>
+              </div>
             </div>
           ) : (
             <>
@@ -1038,7 +2086,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
             </span>
           </label>
 
-          {isBlaxelSelected ? (
+          {isBlaxelSelected || isTailscaleSelected || isSshSelected ? (
             <details className="rounded-lg border border-border p-3">
               <summary className="cursor-pointer text-base">Advanced provider configuration (JSON)</summary>
               <div className="mt-3 space-y-2">

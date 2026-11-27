@@ -1,4 +1,5 @@
-const secretKeyPattern = /(api[_-]?key|secret|password|authorization|(access|refresh|id)[_-]?token)/i;
+const secretKeyPattern =
+  /(api[_-]?key|auth[_-]?key|client[_-]?secret|secret|password|authorization|(access|refresh|id)[_-]?token)/i;
 
 /**
  * Returns a copy of `value` with every secret-looking field replaced. Used before app-server request

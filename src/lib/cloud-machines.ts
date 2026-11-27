@@ -68,10 +68,71 @@ export type BlaxelSandboxSummary = {
   updatedAt: string | null;
 };
 
+export type TailscalePeerSummary = {
+  id: string;
+  hostName: string;
+  dnsName: string;
+  tailscaleIp: string;
+  os: string;
+  online: boolean;
+  active: boolean;
+  lastSeen: string | null;
+  tags: string[];
+};
+
+export type LocalTailscaleStatus = {
+  installed: boolean;
+  running: boolean;
+  backendState: string;
+  version: string | null;
+  binaryPath: string | null;
+  self: {
+    hostName: string;
+    dnsName: string;
+    tailscaleIp: string;
+    os: string;
+    sshCapable: boolean;
+    httpsEnabled: boolean;
+  } | null;
+  tailnetName: string | null;
+  magicDnsSuffix: string | null;
+  peers: TailscalePeerSummary[];
+  error?: string;
+};
+
+export type SshConfigHostEntry = {
+  alias: string;
+  hostName: string;
+  user: string | null;
+  port: number;
+  identityFile: string | null;
+  proxyJump: string | null;
+};
+
+export type LocalSshEnvironment = {
+  installed: boolean;
+  binaryPath: string | null;
+  configPath: string;
+  hosts: SshConfigHostEntry[];
+  identityFiles: string[];
+};
+
+export type TailscaleCredentialStatus = {
+  configured: boolean;
+  mode: "oauth" | "auth-key" | "none";
+  source: "saved" | "env" | "none";
+  preview: string | null;
+  oauthClientId: string | null;
+  tags: string[];
+  tailnet: string | null;
+  preferForSandboxes: boolean;
+};
+
 export type CloudMachineTestResult = {
   ok: boolean;
   status: string;
   sandboxUrl?: string;
+  tailscaleIp?: string | null;
   directoryExists?: boolean;
   message: string;
 };
@@ -86,8 +147,20 @@ export type RemoteRunnerStatusSnapshot = {
   region?: string | null;
   url?: string | null;
   reachable: boolean;
-  bridgeMode?: "remote-roder-tunnel" | "blaxel-api" | "pending";
+  bridgeMode?:
+    | "tailscale-tunnel"
+    | "ssh-tunnel"
+    | "remote-roder-tunnel"
+    | "tailscale-ssh"
+    | "ssh-direct"
+    | "blaxel-api"
+    | "pending";
   bridgeDetail?: string;
+  tailscaleActive?: boolean;
+  tailscaleIp?: string | null;
+  tailscaleDnsName?: string | null;
+  tailscaleConfigured?: boolean;
+  tailscaleError?: string | null;
   message?: string;
 };
 
@@ -101,8 +174,22 @@ export type ActiveRemoteWorkspace = {
   machineId?: string;
 };
 
+export function effectiveRunnerProviderId(
+  runner: Pick<ThreadRunner, "providerId" | "config"> | null | undefined,
+): string {
+  if (!runner) return "";
+  if (runner.providerId === "ssh" || runner.config?.roder_transport === "ssh") {
+    return "ssh";
+  }
+  if (runner.providerId === "tailscale" || runner.config?.roder_transport === "tailscale") {
+    return "tailscale";
+  }
+  return runner.providerId;
+}
+
 export function isRemoteRunner(runner: ThreadRunner | null | undefined): runner is ThreadRunner {
-  return Boolean(runner && runner.providerId && runner.providerId !== "unix-local");
+  const providerId = effectiveRunnerProviderId(runner);
+  return Boolean(providerId && providerId !== "unix-local");
 }
 
 export function isRemoteWorkspaceId(workspaceId: string | null | undefined): boolean {
@@ -119,30 +206,44 @@ export function remoteWorkspaceIdForMachine(machineId: string): string {
 
 export function remoteRunnerTargetName(runner: Pick<ThreadRunner, "providerId" | "workspace" | "config">): string {
   const config = runner.config ?? {};
-  if (runner.providerId === "blaxel") {
+  const providerId = effectiveRunnerProviderId(runner);
+  if (providerId === "ssh") {
+    const label = config.machine_name ?? config.ssh_host ?? config.host;
+    if (typeof label === "string" && label.trim()) {
+      return label.trim();
+    }
+  }
+  if (providerId === "tailscale") {
+    const label = config.machine_name ?? config.tailscale_host ?? config.dns_name ?? config.tailscale_ip ?? config.host;
+    if (typeof label === "string" && label.trim()) {
+      return label.trim().replace(/\.+$/u, "");
+    }
+  }
+  if (providerId === "blaxel") {
     const sandbox = config.sandbox_name ?? config.sandboxName ?? config.name;
     if (typeof sandbox === "string" && sandbox.trim()) {
       return sandbox.trim();
     }
   }
-  if (runner.providerId === "sprites") {
+  if (providerId === "sprites") {
     const sprite = config.sprite_name;
     if (typeof sprite === "string" && sprite.trim()) {
       return sprite.trim();
     }
   }
   const folder = runner.workspace.split("/").filter(Boolean).pop();
-  return folder || runner.providerId;
+  return folder || providerId;
 }
 
 export function remoteRunnerLabel(
   runner: Pick<ThreadRunner, "providerId" | "workspace" | "config">,
   machines: readonly CloudMachine[] = [],
 ): string {
+  const providerId = effectiveRunnerProviderId(runner);
   const target = remoteRunnerTargetName(runner);
   const matching = machines.find(
     (machine) =>
-      machine.providerId === runner.providerId &&
+      machine.providerId === providerId &&
       machine.workspace === runner.workspace &&
       machine.name.toLowerCase() === target.toLowerCase(),
   );
@@ -150,7 +251,70 @@ export function remoteRunnerLabel(
 }
 
 export function remoteWorkspaceGroupKey(runner: Pick<ThreadRunner, "providerId" | "workspace" | "config">): string {
-  return `remote:${runner.providerId}:${remoteRunnerTargetName(runner)}:${runner.workspace}`;
+  return `remote:${effectiveRunnerProviderId(runner)}:${remoteRunnerTargetName(runner)}:${runner.workspace}`;
+}
+
+export function parseQuickSshInput(raw: string): {
+  host: string;
+  user?: string;
+  port?: number;
+  identityFile?: string;
+  proxyJump?: string;
+} {
+  const trimmed = raw.trim();
+  if (!trimmed) return { host: "" };
+  const tokens = trimmed.split(/\s+/u).filter(Boolean);
+  let start = 0;
+  if (tokens[0] === "ssh") start = 1;
+
+  let port: number | undefined;
+  let identityFile: string | undefined;
+  let proxyJump: string | undefined;
+  let destination = "";
+
+  for (let i = start; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token === "-p" && i + 1 < tokens.length) {
+      const parsed = Number.parseInt(tokens[++i], 10);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) port = parsed;
+      continue;
+    }
+    if (token === "-i" && i + 1 < tokens.length) {
+      identityFile = tokens[++i];
+      continue;
+    }
+    if (token === "-J" && i + 1 < tokens.length) {
+      proxyJump = tokens[++i];
+      continue;
+    }
+    if (token.startsWith("-")) continue;
+    destination = token;
+    break;
+  }
+
+  let user: string | undefined;
+  let hostPart = destination;
+  const atIndex = hostPart.indexOf("@");
+  if (atIndex > 0) {
+    user = hostPart.slice(0, atIndex);
+    hostPart = hostPart.slice(atIndex + 1);
+  }
+  const colonIndex = hostPart.lastIndexOf(":");
+  if (colonIndex > 0 && !hostPart.includes("]")) {
+    const maybePort = Number.parseInt(hostPart.slice(colonIndex + 1), 10);
+    if (Number.isInteger(maybePort) && maybePort >= 1 && maybePort <= 65535) {
+      port = port ?? maybePort;
+      hostPart = hostPart.slice(0, colonIndex);
+    }
+  }
+
+  return {
+    host: hostPart.trim(),
+    ...(user ? { user: user.trim() } : {}),
+    ...(port ? { port } : {}),
+    ...(identityFile ? { identityFile } : {}),
+    ...(proxyJump ? { proxyJump } : {}),
+  };
 }
 
 const credentialKey = /token|secret|password|authorization|credential|api[_-]?key|private[_-]?key/i;

@@ -102,3 +102,40 @@ test("Windows local execution remains native and checks global runner state", as
   expect(runnerFor).not.toHaveBeenCalled();
   expect(activeRunnerFor).toHaveBeenCalledOnce();
 });
+
+test("routes Tailscale machines through the loopback Tailscale runner resolver", async () => {
+  const tsProfile: ThreadRunner = {
+    providerId: "tailscale",
+    workspace: "/home/pz/app",
+    config: { tailscale_host: "devbox.drum-sunfish.ts.net", tailscale_ip: "100.90.10.20", ssh_user: "pz" },
+  };
+  const resolved: ThreadRunner = {
+    providerId: "runloop",
+    workspace: "/home/pz/app",
+    config: {
+      ...tsProfile.config,
+      base_url: "http://127.0.0.1:17379",
+      roder_transport: "tailscale",
+      machine_name: "Devbox",
+    },
+  };
+  const runnerFor = vi.fn<(id: string) => Promise<ThreadRunner>>().mockResolvedValue(tsProfile);
+  const resolveTailscale = vi
+    .fn<(machineId: string, runner: ThreadRunner) => Promise<ThreadRunner>>()
+    .mockResolvedValue(resolved);
+
+  const params = await cloudMachineThreadParams(
+    { workspaceId: "ws", desktopCloudMachineId: "ts-1" },
+    runnerFor,
+    async () => null,
+    "linux",
+    resolveTailscale,
+  );
+  expect(params).toEqual({ workspaceId: "ws", runner: resolved });
+  expect(resolveTailscale).toHaveBeenCalledWith("ts-1", tsProfile);
+
+  // Fails closed if Tailscale gateway resolver is unavailable
+  await expect(
+    cloudMachineThreadParams({ desktopCloudMachineId: "ts-1" }, runnerFor, async () => null, "linux"),
+  ).rejects.toThrow(/Tailscale runner gateway is unavailable/);
+});

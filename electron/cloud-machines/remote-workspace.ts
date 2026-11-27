@@ -14,9 +14,13 @@ import type {
   WorkspaceFilesStatus,
   WorkspaceFilesStatusResult,
 } from "../../src/types/roder";
-import type { ThreadRunner } from "../../src/lib/cloud-machines";
+import {
+  effectiveRunnerProviderId,
+  type RemoteRunnerStatusSnapshot,
+  type ThreadRunner,
+} from "../../src/lib/cloud-machines";
 import type { BlaxelClient } from "./blaxel-client";
-import type { BlaxelAuth, CloudCredentialsService } from "./credentials";
+import type { BlaxelAuth, CloudCredentialsService, ResolvedTailscaleAuth } from "./credentials";
 import {
   RemoteRoderTunnelManager,
   RemoteRoderUnsupportedRuntimeError,
@@ -27,9 +31,20 @@ import {
   type RemoteTunnelNotification,
 } from "./remote-roder-tunnel";
 import type { CloudMachinesService } from "./service";
+import { parseSshMachineConfig } from "./ssh-config";
+import {
+  detectLocalTailscale,
+  parseTailscalePeerConfig,
+  type LocalTailscaleStatus,
+  type TailscalePeerConfig,
+} from "./tailscale";
+import { TailscaleSshClient, type SshConnectionTarget } from "./tailscale-ssh";
+
+export type { RemoteRunnerStatusSnapshot };
 
 export const REMOTE_WORKSPACE_ROOT_ID = "remote-root";
 const INDEX_CACHE_TTL_MS = 15_000;
+const LOCAL_TAILSCALE_CACHE_TTL_MS = 10_000;
 const SKIPPED_DIRECTORY_NAMES = new Set([
   ".cache",
   ".git",
@@ -52,21 +67,6 @@ export type ResolvedRemoteTarget = {
   targetName: string;
 };
 
-export type RemoteRunnerStatusSnapshot = {
-  workspaceId: string;
-  providerId: string;
-  targetName: string;
-  workspace: string;
-  blaxelWorkspace?: string | null;
-  status: string;
-  region?: string | null;
-  url?: string | null;
-  reachable: boolean;
-  bridgeMode?: "remote-roder-tunnel" | "blaxel-api" | "pending";
-  bridgeDetail?: string;
-  message?: string;
-};
-
 type IndexedRemoteEntry = {
   path: string;
   name: string;
@@ -85,7 +85,9 @@ export type RemoteWorkspaceServiceOptions = {
   credentialsService: CloudCredentialsService;
   machinesService: CloudMachinesService;
   readThreadRunner: (threadId: string) => Promise<ThreadRunner | null>;
+  sshClient?: TailscaleSshClient;
   tunnelManager?: RemoteRoderTunnelManager;
+  detectLocalTailscale?: () => Promise<LocalTailscaleStatus>;
   disableTunnel?: boolean;
 };
 
@@ -136,28 +138,54 @@ export function blaxelWorkspaceFromConfig(config: Record<string, unknown> | unde
 }
 
 export function remoteRunnerTargetLabel(runner: Pick<ThreadRunner, "providerId" | "workspace" | "config">): string {
-  if (runner.providerId === "blaxel") {
+  const providerId = effectiveRunnerProviderId(runner);
+  if (providerId === "ssh") {
+    const label = runner.config?.machine_name ?? runner.config?.ssh_host ?? runner.config?.host;
+    if (typeof label === "string" && label.trim()) {
+      return label.trim();
+    }
+  }
+  if (providerId === "tailscale") {
+    const label =
+      runner.config?.machine_name ??
+      runner.config?.tailscale_host ??
+      runner.config?.dns_name ??
+      runner.config?.tailscale_ip ??
+      runner.config?.host;
+    if (typeof label === "string" && label.trim()) {
+      return label.trim().replace(/\.+$/u, "");
+    }
+  }
+  if (providerId === "blaxel") {
     const sandboxName = blaxelSandboxNameFromConfig(runner.config);
     if (sandboxName) return sandboxName;
   }
-  if (runner.providerId === "sprites") {
+  if (providerId === "sprites") {
     const sprite = runner.config?.sprite_name;
     if (typeof sprite === "string" && sprite.trim()) return sprite.trim();
   }
-  return runner.workspace.split("/").filter(Boolean).pop() || runner.providerId;
+  return runner.workspace.split("/").filter(Boolean).pop() || providerId;
 }
 
 export class RemoteWorkspaceService extends EventEmitter {
   private readonly threadRunners = new Map<string, ThreadRunner>();
   private readonly pathIndexCache = new Map<string, CachedPathIndex>();
+  private readonly sshClient: TailscaleSshClient;
+  private readonly ownsSshClient: boolean;
   private readonly tunnelManager: RemoteRoderTunnelManager;
+  private readonly detectTailscaleFn: () => Promise<LocalTailscaleStatus>;
+  private cachedLocalTailscale: { status: LocalTailscaleStatus; expiresAt: number } | null = null;
 
   constructor(private readonly options: RemoteWorkspaceServiceOptions) {
     super();
+    this.ownsSshClient = !options.sshClient;
+    this.sshClient = options.sshClient ?? new TailscaleSshClient();
+    this.detectTailscaleFn = options.detectLocalTailscale ?? (() => detectLocalTailscale());
     this.tunnelManager =
       options.tunnelManager ??
       new RemoteRoderTunnelManager({
         blaxelClient: options.blaxelClient,
+        sshClient: this.sshClient,
       });
     this.tunnelManager.on(
       "notification",
@@ -170,6 +198,42 @@ export class RemoteWorkspaceService extends EventEmitter {
   closeAll(): void {
     this.tunnelManager.closeAll();
     this.pathIndexCache.clear();
+    this.cachedLocalTailscale = null;
+    if (this.ownsSshClient) {
+      this.sshClient.closeAll();
+    }
+  }
+
+  private async getLocalTailscaleCached(force = false): Promise<LocalTailscaleStatus> {
+    if (!force && this.cachedLocalTailscale && this.cachedLocalTailscale.expiresAt > Date.now()) {
+      return this.cachedLocalTailscale.status;
+    }
+    const status = await this.detectTailscaleFn().catch((): LocalTailscaleStatus => ({
+      installed: false,
+      running: false,
+      backendState: "Stopped",
+      version: null,
+      binaryPath: null,
+      self: null,
+      tailnetName: null,
+      magicDnsSuffix: null,
+      peers: [],
+    }));
+    this.cachedLocalTailscale = { status, expiresAt: Date.now() + LOCAL_TAILSCALE_CACHE_TTL_MS };
+    return status;
+  }
+
+  private async resolveSandboxTailscaleAuth(
+    config: Record<string, unknown>,
+  ): Promise<{ auth: ResolvedTailscaleAuth; preferTailscale: boolean } | null> {
+    if (config.tailscale_tunnel === false) return null;
+    const auth = await this.options.credentialsService.resolveTailscaleAuth();
+    if (!auth) return null;
+    const explicitOptIn = config.tailscale_tunnel === true;
+    if (!auth.preferForSandboxes && !explicitOptIn) return null;
+    const localTs = await this.getLocalTailscaleCached();
+    if (!localTs.running) return null;
+    return { auth, preferTailscale: true };
   }
 
   async proxyRequest(method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -183,16 +247,15 @@ export class RemoteWorkspaceService extends EventEmitter {
         return await this.requestViaTunnel(method, workspaceId, params);
       } catch (error) {
         if (!(error instanceof RemoteRoderUnsupportedRuntimeError)) {
-          // Only fall back to direct Blaxel API when the remote runtime cannot execute the glibc binary (e.g. Alpine).
+          // Only fall back to direct API/SSH when the remote runtime cannot execute remote-roder.
           if (!canFallbackToBlaxelApi(method)) {
             throw error;
           }
-          // If tunnel connect failed due to transient issue or unsupported image, try fallback for Files/VCS.
           if (method.startsWith("design/") || method === "skills/list") {
             throw error;
           }
           console.warn(
-            `[roder-remote-tunnel] ${method} fell back to Blaxel API: ${error instanceof Error ? error.message : String(error)}`,
+            `[roder-remote-tunnel] ${method} fell back to direct transport: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
@@ -207,7 +270,51 @@ export class RemoteWorkspaceService extends EventEmitter {
     params: Record<string, unknown>,
   ): Promise<unknown> {
     const target = await this.resolveTarget(desktopWorkspaceId);
+    const provider = effectiveRunnerProviderId(target);
+
+    if (provider === "tailscale" || provider === "ssh") {
+      const tsOption = provider === "ssh" ? await this.resolveSandboxTailscaleAuth(target.config) : null;
+      const openTunnel = () =>
+        provider === "ssh"
+          ? this.tunnelManager.ensureSshMachineTunnel({
+              desktopWorkspaceId,
+              desktopRootName: target.rootName,
+              target: parseSshMachineConfig(target.config),
+              workingDir: target.workspace,
+              tailscaleAuth: tsOption?.auth ?? null,
+              preferTailscale: tsOption?.preferTailscale ?? false,
+            })
+          : this.tunnelManager.ensureTailscalePeerTunnel({
+              desktopWorkspaceId,
+              desktopRootName: target.rootName,
+              peer: parseTailscalePeerConfig(target.config),
+              workingDir: target.workspace,
+            });
+      const tunnel = await openTunnel();
+      const forwardedParams = rewriteParamsToRemote(params, tunnel);
+      try {
+        const result = await tunnel.connection.request(method, forwardedParams);
+        return rewriteResultToDesktop(method, result, {
+          desktopWorkspaceId,
+          desktopRootId: target.rootId,
+          desktopRootName: target.rootName,
+        });
+      } catch (error) {
+        if (!tunnel.connection.isOpen()) {
+          const reconnected = await openTunnel();
+          const retryResult = await reconnected.connection.request(method, rewriteParamsToRemote(params, reconnected));
+          return rewriteResultToDesktop(method, retryResult, {
+            desktopWorkspaceId,
+            desktopRootId: target.rootId,
+            desktopRootName: target.rootName,
+          });
+        }
+        throw error;
+      }
+    }
+
     const endpoint = await this.resolveBlaxelEndpoint(target);
+    const tsOption = await this.resolveSandboxTailscaleAuth(target.config);
     const tunnel = await this.tunnelManager.ensureBlaxelTunnel({
       desktopWorkspaceId,
       desktopRootName: target.rootName,
@@ -215,6 +322,8 @@ export class RemoteWorkspaceService extends EventEmitter {
       sandboxName: endpoint.sandboxName,
       sandboxUrl: endpoint.sandboxUrl,
       workingDir: target.workspace,
+      tailscaleAuth: tsOption?.auth ?? null,
+      preferTailscale: tsOption?.preferTailscale ?? false,
     });
 
     const forwardedParams = rewriteParamsToRemote(params, tunnel);
@@ -235,6 +344,8 @@ export class RemoteWorkspaceService extends EventEmitter {
           sandboxName: endpoint.sandboxName,
           sandboxUrl: endpoint.sandboxUrl,
           workingDir: target.workspace,
+          tailscaleAuth: tsOption?.auth ?? null,
+          preferTailscale: tsOption?.preferTailscale ?? false,
         });
         const retryResult = await reconnected.connection.request(method, rewriteParamsToRemote(params, reconnected));
         return rewriteResultToDesktop(method, retryResult, {
@@ -435,8 +546,54 @@ export class RemoteWorkspaceService extends EventEmitter {
     };
   }
 
+  async resolveTailscalePeer(
+    runner: Pick<ThreadRunner, "providerId" | "workspace" | "config">,
+  ): Promise<TailscalePeerConfig> {
+    if (effectiveRunnerProviderId(runner) !== "tailscale") {
+      throw new Error(`Expected a Tailscale machine (got "${runner.providerId}").`);
+    }
+    return parseTailscalePeerConfig(runner.config);
+  }
+
+  async resolveSshConnectionTarget(
+    runner: Pick<ThreadRunner, "providerId" | "workspace" | "config">,
+  ): Promise<SshConnectionTarget> {
+    const provider = effectiveRunnerProviderId(runner);
+    if (provider === "ssh") {
+      return parseSshMachineConfig(runner.config);
+    }
+    if (provider === "tailscale") {
+      return parseTailscalePeerConfig(runner.config);
+    }
+    throw new Error(`Expected an SSH or Tailscale machine (got "${runner.providerId}").`);
+  }
+
+  private isSshBacked(runner: Pick<ThreadRunner, "providerId" | "config">): boolean {
+    const provider = effectiveRunnerProviderId(runner);
+    return provider === "tailscale" || provider === "ssh";
+  }
+
+  private parseSshBackedTarget(runner: Pick<ThreadRunner, "providerId" | "config">): SshConnectionTarget {
+    return effectiveRunnerProviderId(runner) === "ssh"
+      ? parseSshMachineConfig(runner.config)
+      : parseTailscalePeerConfig(runner.config);
+  }
+
   async workspaceFilesStatus(workspaceId: string): Promise<WorkspaceFilesStatusResult> {
     const target = await this.resolveTarget(workspaceId);
+    if (this.isSshBacked(target)) {
+      const peer = this.parseSshBackedTarget(target);
+      const check = await this.sshClient.execCommand(peer, `test -d ${shellQuotePosix(target.workspace)}`, {
+        timeoutMs: 10_000,
+      });
+      if (check.exitCode !== 0) {
+        throw new Error(
+          check.stderr.trim() || `Remote directory "${target.workspace}" is not accessible on "${peer.host}".`,
+        );
+      }
+      const cached = this.pathIndexCache.get(workspaceId);
+      return { status: buildRemoteFilesStatus(target, cached) };
+    }
     const endpoint = await this.resolveBlaxelEndpoint(target);
     await this.options.blaxelClient.wakeSandbox(endpoint.auth, endpoint.sandboxUrl);
     const cached = this.pathIndexCache.get(workspaceId);
@@ -475,9 +632,56 @@ export class RemoteWorkspaceService extends EventEmitter {
       };
     }
 
-    const endpoint = await this.resolveBlaxelEndpoint(target);
     const relativeDir = normalizePosixRelativePath(params.path);
     const absDir = joinPosixWorkspacePath(target.workspace, relativeDir);
+
+    if (this.isSshBacked(target)) {
+      const peer = this.parseSshBackedTarget(target);
+      const listScript = [
+        `cd -- ${shellQuotePosix(absDir)}`,
+        "for entry in .* *; do",
+        '  [ "$entry" = "." ] || [ "$entry" = ".." ] || [ "$entry" = ".git" ] || [ "$entry" = ".*" ] || [ "$entry" = "*" ] && continue',
+        '  if [ -d "$entry" ]; then printf "D\\t%s\\n" "$entry"; elif [ -e "$entry" ]; then printf "F\\t%s\\n" "$entry"; fi',
+        "done",
+      ].join("\n");
+      const proc = await this.sshClient.execCommand(peer, `sh -c ${shellQuotePosix(listScript)}`, {
+        timeoutMs: 15_000,
+      });
+      if (proc.exitCode !== 0) {
+        throw new Error(proc.stderr.trim() || `Could not list remote directory "${absDir}".`);
+      }
+      const directories: WorkspaceFileEntry[] = [];
+      const files: WorkspaceFileEntry[] = [];
+      for (const line of proc.stdout.split(/\r?\n/u)) {
+        const [kind, name] = line.split("\t");
+        if (!name) continue;
+        const entryPath = relativeDir ? `${relativeDir}/${name}` : name;
+        if (kind === "D") {
+          directories.push({
+            rootId: target.rootId,
+            rootName: target.rootName,
+            path: entryPath,
+            name,
+            kind: "directory",
+            hasChildren: true,
+          });
+        } else if (kind === "F") {
+          files.push({
+            rootId: target.rootId,
+            rootName: target.rootName,
+            path: entryPath,
+            name,
+            kind: "file",
+            hasChildren: false,
+          });
+        }
+      }
+      directories.sort((left, right) => left.name.localeCompare(right.name));
+      files.sort((left, right) => left.name.localeCompare(right.name));
+      return { status, entries: [...directories, ...files] };
+    }
+
+    const endpoint = await this.resolveBlaxelEndpoint(target);
     const listing = await this.options.blaxelClient.readDirectory(endpoint.auth, endpoint.sandboxUrl, absDir);
 
     const directories: WorkspaceFileEntry[] = listing.subdirectories
@@ -537,13 +741,18 @@ export class RemoteWorkspaceService extends EventEmitter {
     limit?: number;
   }): Promise<WorkspaceFilesReadResult> {
     const target = await this.resolveTarget(params.workspaceId);
-    const endpoint = await this.resolveBlaxelEndpoint(target);
     const relativePath = normalizePosixRelativePath(params.path);
     if (!relativePath) {
       throw new Error("A file path is required.");
     }
     const absPath = joinPosixWorkspacePath(target.workspace, relativePath);
-    const { bytes } = await this.options.blaxelClient.readFile(endpoint.auth, endpoint.sandboxUrl, absPath);
+    let bytes: Buffer;
+    if (this.isSshBacked(target)) {
+      bytes = await this.sshClient.readFile(this.parseSshBackedTarget(target), absPath);
+    } else {
+      const endpoint = await this.resolveBlaxelEndpoint(target);
+      bytes = (await this.options.blaxelClient.readFile(endpoint.auth, endpoint.sandboxUrl, absPath)).bytes;
+    }
     const offset = Math.max(0, params.offset ?? 0);
     const limit = Math.max(1, params.limit ?? 262_144);
     const totalBytes = bytes.length;
@@ -587,8 +796,8 @@ export class RemoteWorkspaceService extends EventEmitter {
 
   async listVcsChanges(params: { workspaceId: string; limit?: number }): Promise<VcsChangesListResult> {
     const target = await this.resolveTarget(params.workspaceId);
-    const endpoint = await this.resolveBlaxelEndpoint(target);
     const script = [
+      `cd -- ${shellQuotePosix(target.workspace)}`,
       'if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo "===RODER_NOT_GIT==="; exit 0; fi',
       'echo "===RODER_ROOT==="',
       "git rev-parse --show-toplevel 2>/dev/null || pwd",
@@ -606,12 +815,20 @@ export class RemoteWorkspaceService extends EventEmitter {
       'git ls-files --others --exclude-standard | head -n 300 | while IFS= read -r f; do if [ -f "$f" ]; then c=$(wc -l < "$f" 2>/dev/null || echo 0); printf "%s\\t%s\\n" "$c" "$f"; fi; done',
     ].join("\n");
 
-    const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
-      command: `sh -c ${shellQuotePosix(script)}`,
-      workingDir: target.workspace,
-      timeoutMs: 20_000,
-    });
-    const output = proc.stdout || proc.logs || "";
+    let output = "";
+    if (this.isSshBacked(target)) {
+      const peer = this.parseSshBackedTarget(target);
+      const proc = await this.sshClient.execCommand(peer, `sh -c ${shellQuotePosix(script)}`, { timeoutMs: 20_000 });
+      output = proc.stdout;
+    } else {
+      const endpoint = await this.resolveBlaxelEndpoint(target);
+      const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
+        command: `sh -c ${shellQuotePosix(script)}`,
+        workingDir: target.workspace,
+        timeoutMs: 20_000,
+      });
+      output = proc.stdout || proc.logs || "";
+    }
     if (output.includes("===RODER_NOT_GIT===")) {
       throw new Error(`No Git repository found in ${target.workspace}.`);
     }
@@ -627,7 +844,6 @@ export class RemoteWorkspaceService extends EventEmitter {
     ignoreWhitespace?: boolean;
   }): Promise<VcsChangesReadResult> {
     const target = await this.resolveTarget(params.workspaceId);
-    const endpoint = await this.resolveBlaxelEndpoint(target);
     const relativePath = normalizePosixRelativePath(params.path);
     if (!relativePath) {
       throw new Error("A changed file path is required.");
@@ -653,20 +869,82 @@ export class RemoteWorkspaceService extends EventEmitter {
       ].join(" ");
     }
 
-    const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
-      command: `sh -c ${shellQuotePosix(command)}`,
-      workingDir: target.workspace,
-      timeoutMs: 20_000,
-    });
-    const rawPatch = proc.stdout || proc.logs || "";
+    let rawPatch = "";
+    if (this.isSshBacked(target)) {
+      const peer = this.parseSshBackedTarget(target);
+      const proc = await this.sshClient.execCommand(
+        peer,
+        `sh -c ${shellQuotePosix(`cd -- ${shellQuotePosix(target.workspace)} && ${command}`)}`,
+        { timeoutMs: 20_000 },
+      );
+      rawPatch = proc.stdout;
+    } else {
+      const endpoint = await this.resolveBlaxelEndpoint(target);
+      const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
+        command: `sh -c ${shellQuotePosix(command)}`,
+        workingDir: target.workspace,
+        timeoutMs: 20_000,
+      });
+      rawPatch = proc.stdout || proc.logs || "";
+    }
     return paginateUnifiedDiff(relativePath, rawPatch, params.offset ?? 0, params.limit ?? 20_000);
   }
 
-  async testProfile(input: {
-    providerId: string;
-    workspace: string;
-    config: Record<string, unknown>;
-  }): Promise<{ ok: boolean; status: string; sandboxUrl?: string; directoryExists?: boolean; message: string }> {
+  async testProfile(input: { providerId: string; workspace: string; config: Record<string, unknown> }): Promise<{
+    ok: boolean;
+    status: string;
+    sandboxUrl?: string;
+    tailscaleIp?: string | null;
+    directoryExists?: boolean;
+    message: string;
+  }> {
+    const effectiveProvider = effectiveRunnerProviderId(input);
+    if (effectiveProvider === "tailscale" || effectiveProvider === "ssh") {
+      const peer =
+        effectiveProvider === "ssh" ? parseSshMachineConfig(input.config) : parseTailscalePeerConfig(input.config);
+      const probeScript = [
+        'printf "OS:%s\\n" "$(uname -s 2>/dev/null || echo unknown)"',
+        `if [ -d ${shellQuotePosix(input.workspace)} ]; then echo "DIR:YES"; else echo "DIR:NO"; fi`,
+        'if [ -x "$HOME/.roder/bin/remote-roder" ] || command -v remote-roder >/dev/null 2>&1 || command -v roder >/dev/null 2>&1; then echo "RODER:YES"; else echo "RODER:NO"; fi',
+        'if command -v tailscale >/dev/null 2>&1 && tailscale status --json >/dev/null 2>&1; then echo "TS:YES"; else echo "TS:NO"; fi',
+      ].join("\n");
+      const res = await this.sshClient.execCommand(peer, `sh -c ${shellQuotePosix(probeScript)}`, {
+        timeoutMs: 15_000,
+      });
+      if (res.exitCode !== 0) {
+        const detail = res.stderr.trim() || `SSH exited with code ${res.exitCode ?? "unknown"}`;
+        throw new Error(
+          effectiveProvider === "ssh"
+            ? `Could not connect to SSH server "${peer.host}": ${detail}. Check host, username, port, and SSH key permissions.`
+            : `Could not connect to Tailscale machine "${peer.host}": ${detail}. Ensure Tailscale SSH is enabled on the peer or SSH keys are authorized.`,
+        );
+      }
+      const directoryExists = res.stdout.includes("DIR:YES");
+      const hasRoder = res.stdout.includes("RODER:YES");
+      const hasTailscale = res.stdout.includes("TS:YES");
+      const osLine = /OS:([^\r\n]+)/u.exec(res.stdout)?.[1]?.trim() || "remote";
+      const label = peer.dnsName || peer.host;
+      const transportLabel = effectiveProvider === "ssh" ? "SSH" : "Tailscale";
+      const tsStatus = effectiveProvider === "ssh" ? await this.options.credentialsService.getTailscaleStatus() : null;
+      const tsNote =
+        effectiveProvider === "ssh"
+          ? hasTailscale
+            ? " · Tailscale active on host"
+            : tsStatus?.configured && tsStatus.preferForSandboxes && input.config.tailscale_tunnel !== false
+              ? " · Tailscale auto-injection ready"
+              : ""
+          : "";
+      return {
+        ok: true,
+        status: "CONNECTED",
+        tailscaleIp: peer.tailscaleIp ?? (effectiveProvider === "tailscale" ? peer.host : null),
+        directoryExists,
+        message: directoryExists
+          ? `Connected to ${label} (${osLine}) over ${transportLabel} · ${input.workspace} ready${hasRoder ? " · remote-roder available" : " · SSH bridge ready"}${tsNote}.`
+          : `Connected to ${label} (${osLine}) over ${transportLabel}, but ${input.workspace} does not exist yet${tsNote}.`,
+      };
+    }
+
     const endpoint = await this.resolveBlaxelEndpoint({
       providerId: input.providerId,
       workspace: input.workspace,
@@ -679,23 +957,116 @@ export class RemoteWorkspaceService extends EventEmitter {
     } catch {
       directoryExists = false;
     }
+    const tsStatus = await this.options.credentialsService.getTailscaleStatus();
+    const tsNote =
+      tsStatus.configured && tsStatus.preferForSandboxes && input.config.tailscale_tunnel !== false
+        ? " · Tailscale tunnel ready"
+        : "";
     return {
       ok: true,
       status: endpoint.status,
       sandboxUrl: endpoint.sandboxUrl,
       directoryExists,
       message: directoryExists
-        ? `Connected to ${endpoint.sandboxName} (${endpoint.region ?? "Blaxel"}) · ${input.workspace} ready.`
-        : `Connected to ${endpoint.sandboxName}, but ${input.workspace} does not exist yet (it will be created on first run).`,
+        ? `Connected to ${endpoint.sandboxName} (${endpoint.region ?? "Blaxel"}) · ${input.workspace} ready${tsNote}.`
+        : `Connected to ${endpoint.sandboxName}, but ${input.workspace} does not exist yet (it will be created on first run)${tsNote}.`,
     };
   }
 
   async getStatus(workspaceId: string): Promise<RemoteRunnerStatusSnapshot> {
     const target = await this.resolveTarget(workspaceId);
-    if (target.providerId !== "blaxel") {
+    const provider = effectiveRunnerProviderId(target);
+    if (provider === "ssh") {
+      try {
+        const sshTarget = parseSshMachineConfig(target.config);
+        const key = tunnelKey("ssh", sshTarget.sshUser ?? "", sshTarget.host, target.workspace);
+        const activeTunnel = this.tunnelManager.getActiveTunnel(key);
+        const unsupportedReason = this.tunnelManager.isUnsupported(key);
+        const tailscaleError = this.tunnelManager.getTailscaleError(key);
+        const tailscaleCreds = await this.options.credentialsService.getTailscaleStatus();
+        const tailscaleActive = activeTunnel?.transport === "tailscale";
+        return {
+          workspaceId,
+          providerId: "ssh",
+          targetName: target.targetName,
+          workspace: target.workspace,
+          status: "CONNECTED",
+          url:
+            activeTunnel?.wsUrl ??
+            `ssh://${sshTarget.sshUser ? `${sshTarget.sshUser}@` : ""}${sshTarget.host}:${sshTarget.sshPort}`,
+          reachable: true,
+          bridgeMode: activeTunnel
+            ? tailscaleActive
+              ? "tailscale-tunnel"
+              : "ssh-tunnel"
+            : unsupportedReason
+              ? "ssh-direct"
+              : "pending",
+          bridgeDetail: activeTunnel
+            ? tailscaleActive
+              ? `Tailscale WireGuard tunnel (${activeTunnel.tailscaleDnsName || activeTunnel.tailscaleIp})`
+              : `remote-roder over SSH tunnel (${sshTarget.host})`
+            : (unsupportedReason ?? "SSH tunnel connects automatically when workspace tools open"),
+          tailscaleActive,
+          tailscaleIp: activeTunnel?.tailscaleIp ?? sshTarget.tailscaleIp ?? null,
+          tailscaleDnsName: activeTunnel?.tailscaleDnsName ?? sshTarget.dnsName ?? null,
+          tailscaleConfigured: tailscaleCreds.configured,
+          tailscaleError,
+        };
+      } catch (error) {
+        return {
+          workspaceId,
+          providerId: "ssh",
+          targetName: target.targetName,
+          workspace: target.workspace,
+          status: "UNAVAILABLE",
+          reachable: false,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    if (provider === "tailscale") {
+      try {
+        const peer = parseTailscalePeerConfig(target.config);
+        const key = tunnelKey("tailscale", peer.sshUser ?? "", peer.host, target.workspace);
+        const activeTunnel = this.tunnelManager.getActiveTunnel(key);
+        const unsupportedReason = this.tunnelManager.isUnsupported(key);
+        return {
+          workspaceId,
+          providerId: "tailscale",
+          targetName: target.targetName,
+          workspace: target.workspace,
+          status: "CONNECTED",
+          url: `ws://${peer.tailscaleIp || peer.host}:${peer.remoteRoderPort}`,
+          reachable: true,
+          bridgeMode: activeTunnel ? "tailscale-tunnel" : unsupportedReason ? "tailscale-ssh" : "pending",
+          bridgeDetail: activeTunnel
+            ? `Tailscale remote-roder (${peer.tailscaleIp || peer.host})`
+            : (unsupportedReason ?? "Tailscale tunnel connects automatically when workspace tools open"),
+          tailscaleActive: Boolean(activeTunnel),
+          tailscaleIp: peer.tailscaleIp || peer.host,
+          tailscaleDnsName: peer.dnsName ?? null,
+          tailscaleConfigured: true,
+          tailscaleError: null,
+        };
+      } catch (error) {
+        return {
+          workspaceId,
+          providerId: "tailscale",
+          targetName: target.targetName,
+          workspace: target.workspace,
+          status: "UNAVAILABLE",
+          reachable: false,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    if (provider !== "blaxel") {
       return {
         workspaceId,
-        providerId: target.providerId,
+        providerId: provider,
         targetName: target.targetName,
         workspace: target.workspace,
         status: "CONNECTED",
@@ -707,6 +1078,9 @@ export class RemoteWorkspaceService extends EventEmitter {
       const key = tunnelKey("blaxel", endpoint.auth.workspace, endpoint.sandboxName, target.workspace);
       const activeTunnel = this.tunnelManager.getActiveTunnel(key);
       const unsupportedReason = this.tunnelManager.isUnsupported(key);
+      const tailscaleError = this.tunnelManager.getTailscaleError(key);
+      const tailscaleCreds = await this.options.credentialsService.getTailscaleStatus();
+      const tailscaleActive = activeTunnel?.transport === "tailscale";
       return {
         workspaceId,
         providerId: target.providerId,
@@ -717,10 +1091,23 @@ export class RemoteWorkspaceService extends EventEmitter {
         region: endpoint.region,
         url: endpoint.sandboxUrl,
         reachable: true,
-        bridgeMode: activeTunnel ? "remote-roder-tunnel" : unsupportedReason ? "blaxel-api" : "pending",
+        bridgeMode: activeTunnel
+          ? tailscaleActive
+            ? "tailscale-tunnel"
+            : "remote-roder-tunnel"
+          : unsupportedReason
+            ? "blaxel-api"
+            : "pending",
         bridgeDetail: activeTunnel
-          ? `remote-roder WSS tunnel (${activeTunnel.remoteWorkspaceId})`
+          ? tailscaleActive
+            ? `Tailscale WireGuard tunnel (${activeTunnel.tailscaleDnsName || activeTunnel.tailscaleIp || activeTunnel.remoteWorkspaceId})`
+            : `remote-roder WSS tunnel (${activeTunnel.remoteWorkspaceId})`
           : (unsupportedReason ?? "Tunnel connects automatically when workspace tools open"),
+        tailscaleActive,
+        tailscaleIp: activeTunnel?.tailscaleIp ?? null,
+        tailscaleDnsName: activeTunnel?.tailscaleDnsName ?? null,
+        tailscaleConfigured: tailscaleCreds.configured,
+        tailscaleError,
       };
     } catch (error) {
       return {
@@ -737,9 +1124,43 @@ export class RemoteWorkspaceService extends EventEmitter {
 
   async wake(workspaceId: string): Promise<RemoteRunnerStatusSnapshot> {
     const target = await this.resolveTarget(workspaceId);
+    const provider = effectiveRunnerProviderId(target);
+    if (provider === "tailscale") {
+      if (!this.options.disableTunnel) {
+        const peer = parseTailscalePeerConfig(target.config);
+        await this.tunnelManager
+          .ensureTailscalePeerTunnel({
+            desktopWorkspaceId: workspaceId,
+            desktopRootName: target.rootName,
+            peer,
+            workingDir: target.workspace,
+          })
+          .catch(() => undefined);
+      }
+      return this.getStatus(workspaceId);
+    }
+    if (provider === "ssh") {
+      if (!this.options.disableTunnel) {
+        const sshTarget = parseSshMachineConfig(target.config);
+        const tsOption = await this.resolveSandboxTailscaleAuth(target.config);
+        await this.tunnelManager
+          .ensureSshMachineTunnel({
+            desktopWorkspaceId: workspaceId,
+            desktopRootName: target.rootName,
+            target: sshTarget,
+            workingDir: target.workspace,
+            tailscaleAuth: tsOption?.auth ?? null,
+            preferTailscale: tsOption?.preferTailscale ?? false,
+          })
+          .catch(() => undefined);
+      }
+      return this.getStatus(workspaceId);
+    }
+
     const endpoint = await this.resolveBlaxelEndpoint(target);
     await this.options.blaxelClient.wakeSandbox(endpoint.auth, endpoint.sandboxUrl);
     if (!this.options.disableTunnel) {
+      const tsOption = await this.resolveSandboxTailscaleAuth(target.config);
       await this.tunnelManager
         .ensureBlaxelTunnel({
           desktopWorkspaceId: workspaceId,
@@ -748,21 +1169,110 @@ export class RemoteWorkspaceService extends EventEmitter {
           sandboxName: endpoint.sandboxName,
           sandboxUrl: endpoint.sandboxUrl,
           workingDir: target.workspace,
+          tailscaleAuth: tsOption?.auth ?? null,
+          preferTailscale: tsOption?.preferTailscale ?? false,
         })
         .catch(() => undefined);
     }
     return this.getStatus(workspaceId);
   }
 
-  async openPreviewPort(workspaceId: string, port: number): Promise<{ url: string; port: number }> {
+  async setupTailscaleTunnel(workspaceId: string): Promise<RemoteRunnerStatusSnapshot> {
+    const target = await this.resolveTarget(workspaceId);
+    const provider = effectiveRunnerProviderId(target);
+    const localTs = await this.getLocalTailscaleCached(true);
+    if (!localTs.running) {
+      throw new Error(
+        localTs.installed
+          ? "Local Tailscale is not running. Start Tailscale on this computer first."
+          : "Tailscale is not installed on this computer. Install and sign in to Tailscale first.",
+      );
+    }
+
+    if (provider === "tailscale") {
+      const peer = parseTailscalePeerConfig(target.config);
+      const key = tunnelKey("tailscale", peer.sshUser ?? "", peer.host, target.workspace);
+      this.tunnelManager.closeTunnel(key);
+      await this.tunnelManager.ensureTailscalePeerTunnel({
+        desktopWorkspaceId: workspaceId,
+        desktopRootName: target.rootName,
+        peer,
+        workingDir: target.workspace,
+      });
+      return this.getStatus(workspaceId);
+    }
+
+    const tailscaleAuth = await this.options.credentialsService.resolveTailscaleAuth();
+    if (!tailscaleAuth) {
+      throw new Error("Configure a Tailscale OAuth client or ephemeral auth key in Settings > Cloud Machines first.");
+    }
+
+    if (provider === "ssh") {
+      const sshTarget = parseSshMachineConfig(target.config);
+      const key = tunnelKey("ssh", sshTarget.sshUser ?? "", sshTarget.host, target.workspace);
+      this.tunnelManager.closeTunnel(key);
+      await this.tunnelManager.ensureSshMachineTunnel({
+        desktopWorkspaceId: workspaceId,
+        desktopRootName: target.rootName,
+        target: sshTarget,
+        workingDir: target.workspace,
+        tailscaleAuth,
+        preferTailscale: true,
+        requireTailscale: true,
+      });
+      return this.getStatus(workspaceId);
+    }
+
+    const endpoint = await this.resolveBlaxelEndpoint(target);
+    const key = tunnelKey("blaxel", endpoint.auth.workspace, endpoint.sandboxName, target.workspace);
+    this.tunnelManager.closeTunnel(key);
+    await this.tunnelManager.ensureBlaxelTunnel({
+      desktopWorkspaceId: workspaceId,
+      desktopRootName: target.rootName,
+      auth: endpoint.auth,
+      sandboxName: endpoint.sandboxName,
+      sandboxUrl: endpoint.sandboxUrl,
+      workingDir: target.workspace,
+      tailscaleAuth,
+      preferTailscale: true,
+      requireTailscale: true,
+    });
+    return this.getStatus(workspaceId);
+  }
+
+  async openPreviewPort(
+    workspaceId: string,
+    port: number,
+  ): Promise<{ url: string; port: number; transport?: "tailscale" | "ssh-forward" | "blaxel-preview" }> {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error("Port must be a number between 1 and 65535.");
     }
     const target = await this.resolveTarget(workspaceId);
+    const provider = effectiveRunnerProviderId(target);
+    if (provider === "tailscale") {
+      const peer = parseTailscalePeerConfig(target.config);
+      const host = peer.tailscaleIp || peer.dnsName || peer.host;
+      return { url: `http://${host}:${port}`, port, transport: "tailscale" };
+    }
+    if (provider === "ssh") {
+      const sshTarget = parseSshMachineConfig(target.config);
+      const key = tunnelKey("ssh", sshTarget.sshUser ?? "", sshTarget.host, target.workspace);
+      const activeTunnel = this.tunnelManager.getActiveTunnel(key);
+      if (activeTunnel?.transport === "tailscale" && activeTunnel.tailscaleIp) {
+        return { url: `http://${activeTunnel.tailscaleIp}:${port}`, port, transport: "tailscale" };
+      }
+      const forward = await this.sshClient.openLocalForward(sshTarget, port);
+      return { url: `http://127.0.0.1:${forward.localPort}`, port, transport: "ssh-forward" };
+    }
     const endpoint = await this.resolveBlaxelEndpoint(target);
+    const key = tunnelKey("blaxel", endpoint.auth.workspace, endpoint.sandboxName, target.workspace);
+    const activeTunnel = this.tunnelManager.getActiveTunnel(key);
+    if (activeTunnel?.transport === "tailscale" && activeTunnel.tailscaleIp) {
+      return { url: `http://${activeTunnel.tailscaleIp}:${port}`, port, transport: "tailscale" };
+    }
     await this.options.blaxelClient.wakeSandbox(endpoint.auth, endpoint.sandboxUrl);
     const preview = await this.options.blaxelClient.createPreview(endpoint.auth, endpoint.sandboxName, port);
-    return { url: preview.url, port };
+    return { url: preview.url, port, transport: "blaxel-preview" };
   }
 
   private async getOrBuildPathIndex(target: ResolvedRemoteTarget): Promise<CachedPathIndex> {
@@ -770,19 +1280,27 @@ export class RemoteWorkspaceService extends EventEmitter {
     if (cached && cached.expiresAt > Date.now()) {
       return cached;
     }
-    const endpoint = await this.resolveBlaxelEndpoint(target);
     const pruneArgs = [...SKIPPED_DIRECTORY_NAMES].map((name) => `-name ${shellQuotePosix(name)}`).join(" -o ");
     const script = [
+      `cd -- ${shellQuotePosix(target.workspace)}`,
       `find . -maxdepth 7 \\( ${pruneArgs} \\) -prune -o -type d -print`,
       'echo "===RODER_FILES==="',
       `find . -maxdepth 7 \\( ${pruneArgs} \\) -prune -o -type f -print`,
     ].join("\n");
-    const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
-      command: `sh -c ${shellQuotePosix(script)}`,
-      workingDir: target.workspace,
-      timeoutMs: 20_000,
-    });
-    const output = proc.stdout || proc.logs || "";
+    let output = "";
+    if (this.isSshBacked(target)) {
+      const peer = this.parseSshBackedTarget(target);
+      const proc = await this.sshClient.execCommand(peer, `sh -c ${shellQuotePosix(script)}`, { timeoutMs: 20_000 });
+      output = proc.stdout;
+    } else {
+      const endpoint = await this.resolveBlaxelEndpoint(target);
+      const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
+        command: `sh -c ${shellQuotePosix(script)}`,
+        workingDir: target.workspace,
+        timeoutMs: 20_000,
+      });
+      output = proc.stdout || proc.logs || "";
+    }
     const parsed = parseFindIndexOutput(output);
     const index: CachedPathIndex = {
       ...parsed,

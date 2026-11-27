@@ -1,6 +1,11 @@
-import { Cloud } from "lucide-react";
+import { Cloud, Network, Server } from "lucide-react";
 import { useMountEffect } from "@/hooks/use-mount-effect";
-import { isRemoteRunner, remoteRunnerLabel, WINDOWS_CLOUD_MACHINES_NOTICE } from "@/lib/cloud-machines";
+import {
+  effectiveRunnerProviderId,
+  isRemoteRunner,
+  remoteRunnerLabel,
+  WINDOWS_CLOUD_MACHINES_NOTICE,
+} from "@/lib/cloud-machines";
 import { cn } from "@/lib/utils";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useRoderStore } from "@/stores/roder-store";
@@ -9,21 +14,29 @@ export function ThreadExecutionMachine({ threadId }: { threadId: string }): Reac
   const thread = useRoderStore((state) => state.threads.find((entry) => entry.id === threadId));
   const machines = useCloudMachinesStore((state) => state.machines);
   const remote = Boolean(thread && isRemoteRunner(thread.runner));
+  const providerId = effectiveRunnerProviderId(thread?.runner);
   const label = !thread
     ? "Loading execution machine..."
     : remote && thread.runner
-      ? `${remoteRunnerLabel(thread.runner, machines)} (${thread.runner.providerId})`
+      ? `${remoteRunnerLabel(thread.runner, machines)} (${providerId})`
       : "Local machine";
   return (
     <span
       title={
         remote && thread?.runner
-          ? `${thread.runner.providerId}: ${thread.runner.workspace} — Execution machine is fixed for this thread.`
+          ? `${providerId}: ${thread.runner.workspace} — Execution machine is fixed for this thread.`
           : "Execution machine is fixed for this thread. Start a new thread to change it."
       }
       className="flex min-w-0 max-w-36 items-center gap-1 truncate px-1.5 text-sm text-muted-foreground @[520px]:max-w-56 @[520px]:px-2"
     >
-      {remote && <Cloud className="size-3.5 shrink-0" />}
+      {remote &&
+        (providerId === "tailscale" ? (
+          <Network className="size-3.5 shrink-0" />
+        ) : providerId === "ssh" ? (
+          <Server className="size-3.5 shrink-0" />
+        ) : (
+          <Cloud className="size-3.5 shrink-0" />
+        ))}
       <span className="truncate">{label}</span>
     </span>
   );

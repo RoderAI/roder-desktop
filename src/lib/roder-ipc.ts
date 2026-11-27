@@ -8,7 +8,10 @@ import type {
   CloudMachineTestResult,
   CloudProviderCredentialStatus,
   CloudRunnerProvider,
+  LocalSshEnvironment,
+  LocalTailscaleStatus,
   RemoteRunnerStatusSnapshot,
+  TailscaleCredentialStatus,
 } from "@/lib/cloud-machines";
 import type { IndexedTranscriptHistory, IndexedTranscriptPage, HistoryRange } from "@/lib/sparse-transcript-history";
 import { attachmentImageType } from "@/lib/attachment-preparation";
@@ -650,6 +653,38 @@ export const roderIpc = {
     window.roderDesktop.request("desktop/cloud-machines/credentials/status", {}) as Promise<{
       statuses: CloudProviderCredentialStatus[];
       blaxelCli: BlaxelCliStatus;
+      tailscaleCredentials: TailscaleCredentialStatus;
+      localTailscale: LocalTailscaleStatus;
+      localSsh?: LocalSshEnvironment;
+    }>,
+  sshStatus: () =>
+    window.roderDesktop.request("desktop/cloud-machines/ssh/status", {}) as Promise<{
+      local: LocalSshEnvironment;
+    }>,
+  tailscaleStatus: () =>
+    window.roderDesktop.request("desktop/cloud-machines/tailscale/status", {}) as Promise<{
+      local: LocalTailscaleStatus;
+      credentials: TailscaleCredentialStatus;
+    }>,
+  saveTailscaleAuthKey: (params: { authKey: string; preferForSandboxes?: boolean }) =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/saveTailscaleAuthKey", params) as Promise<{
+      status: TailscaleCredentialStatus;
+    }>,
+  saveTailscaleOAuth: (params: {
+    oauthClientId: string;
+    oauthClientSecret: string;
+    tags?: string[] | string;
+    tailnet?: string;
+    preferForSandboxes?: boolean;
+  }) =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/saveTailscaleOAuth", params) as Promise<{
+      status: TailscaleCredentialStatus;
+    }>,
+  setTailscaleSandboxPreference: (preferForSandboxes: boolean) =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/setTailscaleSandboxPreference", {
+      preferForSandboxes,
+    }) as Promise<{
+      status: TailscaleCredentialStatus;
     }>,
   saveBlaxelCredentials: (params: { apiKey: string; workspace?: string }) =>
     window.roderDesktop.request("desktop/cloud-machines/credentials/saveBlaxel", params) as Promise<{
@@ -703,10 +738,15 @@ export const roderIpc = {
     window.roderDesktop.request("desktop/cloud-machines/remote/wake", { workspaceId }) as Promise<{
       status: RemoteRunnerStatusSnapshot;
     }>,
+  setupRemoteTailscaleTunnel: (workspaceId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/remote/setupTailscale", { workspaceId }) as Promise<{
+      status: RemoteRunnerStatusSnapshot;
+    }>,
   openRemotePreviewPort: (workspaceId: string, port: number) =>
     window.roderDesktop.request("desktop/cloud-machines/remote/previewPort", { workspaceId, port }) as Promise<{
       url: string;
       port: number;
+      transport?: "tailscale" | "ssh-forward" | "blaxel-preview";
     }>,
   listProviders: () =>
     window.roderDesktop
