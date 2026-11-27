@@ -219,7 +219,7 @@ export function seedModelsCache(
   const id = normalizeCustomProviderId(providerId);
   const normalizedBase = normalizeBaseUrl(baseUrl);
   const next: ModelsCacheFile = {
-    providers: { ...(cache?.providers ?? {}) },
+    providers: { ...cache?.providers },
   };
   if (modelIds.length === 0) {
     return next;
@@ -243,7 +243,7 @@ export function removeModelsCacheProvider(
   providerId: string,
 ): ModelsCacheFile {
   const id = normalizeCustomProviderId(providerId);
-  const providers = { ...(cache?.providers ?? {}) };
+  const providers = { ...cache?.providers };
   delete providers[id];
   return { providers };
 }

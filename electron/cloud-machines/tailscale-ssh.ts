@@ -137,6 +137,8 @@ async function waitForLoopbackTcp(port: number, timeoutMs = 10_000): Promise<boo
   return false;
 }
 
+const MAX_SOCKET_PATH = 104;
+
 export class TailscaleSshClient {
   private readonly sshBinary: string;
   private readonly controlDir: string;
@@ -144,6 +146,7 @@ export class TailscaleSshClient {
   private readonly activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
   private readonly cancelledCommands = new Set<string>();
   private readonly portForwards = new Map<string, ActiveSshPortForward>();
+  private readonly extraControlDirs = new Set<string>();
 
   constructor(options: TailscaleSshRunnerOptions = {}) {
     this.sshBinary = options.sshBinary ?? "ssh";
@@ -154,16 +157,24 @@ export class TailscaleSshClient {
 
   controlPathFor(peer: SshConnectionTarget): string | undefined {
     if (!this.enableControlMaster) return undefined;
-    try {
-      mkdirSync(this.controlDir, { recursive: true, mode: 0o700 });
-    } catch {
-      return undefined;
-    }
     const hash = createHash("sha256")
       .update(`${peer.sshUser ?? ""}@${peer.host}:${peer.sshPort}:${peer.identityFile ?? ""}:${peer.proxyJump ?? ""}`)
       .digest("hex")
       .slice(0, 12);
-    return join(this.controlDir, `c-${hash}`);
+    // Unix socket paths are capped at 104 bytes on macOS; fall back to a short /tmp dir when needed.
+    let dir = this.controlDir;
+    if (join(dir, `c-${hash}`).length >= MAX_SOCKET_PATH && process.platform !== "win32") {
+      dir = join("/tmp", `rts-${process.getuid?.() ?? 0}-${process.pid}`);
+    }
+    const socketPath = join(dir, `c-${hash}`);
+    if (socketPath.length >= MAX_SOCKET_PATH) return undefined;
+    try {
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+    } catch {
+      return undefined;
+    }
+    if (dir !== this.controlDir) this.extraControlDirs.add(dir);
+    return socketPath;
   }
 
   async openLocalForward(
@@ -453,5 +464,13 @@ export class TailscaleSshClient {
     } catch {
       // ignore
     }
+    for (const dir of this.extraControlDirs) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+    this.extraControlDirs.clear();
   }
 }

@@ -299,7 +299,7 @@ function reduceTeamSubagentNotification(
       const titleKey = teamMemberTitleKey(teamId, memberId);
       patch = {
         ...patch,
-        teamMemberTitlesByKey: { ...(patch.teamMemberTitlesByKey ?? {}), [titleKey]: title },
+        teamMemberTitlesByKey: { ...patch.teamMemberTitlesByKey, [titleKey]: title },
       };
       nextSlice = { ...nextSlice, ...patch, teamMemberTitlesByKey: patch.teamMemberTitlesByKey! };
       const memberPatch = upsertTeamMemberTrace(nextSlice, {
