@@ -291,11 +291,19 @@ export function AppShellLayout({
       animating: true,
       frozenWorkspacePanelWidth: measuredWorkspacePanelWidthRef.current,
     });
+  }, [sidebarOpen, workspacePanelMaxOpenWidth, workspacePanelRef, workspacePanelVisible]);
+
+  // Width measurements can change during a transition. Only a new toggle or unmount
+  // should cancel the timer that releases the frozen panel width.
+  useLayoutEffect(() => {
+    if (!shellAnimationState.animating) {
+      return;
+    }
     const animationTimer = window.setTimeout(() => {
       setShellAnimationState({ animating: false, frozenWorkspacePanelWidth: null });
     }, shellLayoutAnimationMs);
     return () => window.clearTimeout(animationTimer);
-  }, [sidebarOpen, workspacePanelMaxOpenWidth, workspacePanelRef, workspacePanelVisible]);
+  }, [shellAnimationState]);
 
   // Keep the native window minimum width at "everything beside the main column + the readable main
   // minimum". `chromeWidth` (window width minus the group width) is the sidebar + its handle + the

@@ -6,5 +6,12 @@
   "singleQuote": false,
   "trailingComma": "all",
   "sortPackageJson": false,
-  "ignorePatterns": ["coverage/**", "out/**", "packages/*/dist/**", "pnpm-lock.yaml", "resources/bin/**"]
+  "ignorePatterns": [
+    "coverage/**",
+    "out/**",
+    "packages/*/dist/**",
+    "pnpm-lock.yaml",
+    "resources/bin/**",
+    "storybook-static/**"
+  ]
 }
