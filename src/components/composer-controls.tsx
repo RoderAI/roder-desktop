@@ -297,6 +297,14 @@ export function ModelPicker({
     visibleModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
     catalogModels.find((model) => model.id === selectedModel && model.modelProvider === selectedModelProvider) ??
     (!selectedModelProvider ? visibleModels.find((model) => model.id === selectedModel) : undefined) ??
+    // Keep the name of a current model whose provider lost its credentials; it is no longer listed.
+    providers
+      .find((provider) => provider.id === selectedModelProvider)
+      ?.models?.flatMap((model) =>
+        model.id === selectedModel
+          ? [{ ...model, modelProvider: selectedModelProvider, description: model.description ?? undefined }]
+          : [],
+      )[0] ??
     (selectedModel ? { id: selectedModel, name: selectedModel, modelProvider: selectedModelProvider } : undefined) ??
     groups.flatMap((group) => group.items).find((item) => item.type === "model")?.model;
   const selectedAutoItem =
