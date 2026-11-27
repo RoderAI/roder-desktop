@@ -4,6 +4,7 @@ import {
   displayModelName,
   effectiveSelectedModel,
   groupModelsByProvider,
+  mergeModelCatalogs,
   modelVisibilityKey,
   selectedModelProvider,
   visibleModelIdsFor,
@@ -114,5 +115,22 @@ test("groups configured models by provider in source order", () => {
   expect(groupModelsByProvider(models)).toEqual([
     { provider: "openai", models: [models[0]] },
     { provider: "claude-code", models: [models[1], models[2]] },
+  ]);
+});
+
+test("merges provider catalog models with supplementary dynamically listed models without duplicates", () => {
+  const providerModels: RoderModel[] = [
+    { id: "gpt-6.2-astra", name: "GPT-6.2 Astra", modelProvider: "codex" },
+    { id: "gpt-6.2-sol", name: "GPT-6.2 Sol", modelProvider: "codex" },
+  ];
+  const listedModels: RoderModel[] = [
+    { id: "gpt-6.2-sol", name: "GPT-6.2 Sol (duplicate)", modelProvider: "codex" },
+    { id: "claude-fable-5-2", name: "Claude Fable 5.2", modelProvider: "cursor" },
+  ];
+
+  expect(mergeModelCatalogs(providerModels, listedModels)).toEqual([
+    providerModels[0],
+    providerModels[1],
+    listedModels[1],
   ]);
 });

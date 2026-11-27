@@ -111,6 +111,11 @@ export const providerCopy: Readonly<Record<string, ProviderCopy>> = {
     method: "API key",
     apiKeyUrl: "https://platform.deepseek.com/api_keys",
   },
+  antigravity: {
+    title: "Antigravity",
+    description: "Google Antigravity models through your Google subscription.",
+    method: "Google sign-in",
+  },
 };
 
 export function authTypeLabel(authType: string | undefined): string {

@@ -785,6 +785,7 @@ dependencies = [
  "crossterm_winapi",
  "derive_more",
  "document-features",
+ "futures-core",
  "mio",
  "parking_lot",
  "rustix 1.1.6",
@@ -3471,8 +3472,8 @@ dependencies = [
 
 [[package]]
 name = "roder"
-version = "0.4.11"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.14"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "agent-client-protocol-schema",
  "anyhow",
@@ -3489,6 +3490,7 @@ dependencies = [
  "roder-core",
  "roder-evals",
  "roder-ext-anthropic",
+ "roder-ext-antigravity-backend",
  "roder-ext-browser-use",
  "roder-ext-codex-backend",
  "roder-ext-disk-context",
@@ -3521,8 +3523,8 @@ dependencies = [
 
 [[package]]
 name = "roder-api"
-version = "0.3.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.4"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3538,7 +3540,7 @@ dependencies = [
 [[package]]
 name = "roder-api-transcript"
 version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "serde",
@@ -3548,8 +3550,8 @@ dependencies = [
 
 [[package]]
 name = "roder-app-server"
-version = "0.7.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.7.5"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "agent-client-protocol-schema",
  "anyhow",
@@ -3600,7 +3602,7 @@ dependencies = [
 [[package]]
 name = "roder-automations"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3617,7 +3619,7 @@ dependencies = [
 [[package]]
 name = "roder-code-index"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "ignore",
@@ -3632,7 +3634,7 @@ dependencies = [
 [[package]]
 name = "roder-codex-auth"
 version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -3649,7 +3651,7 @@ dependencies = [
 [[package]]
 name = "roder-commands"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3663,8 +3665,8 @@ dependencies = [
 
 [[package]]
 name = "roder-config"
-version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "dirs 7.0.0",
@@ -3683,7 +3685,7 @@ dependencies = [
 [[package]]
 name = "roder-context"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3698,8 +3700,8 @@ dependencies = [
 
 [[package]]
 name = "roder-core"
-version = "0.4.5"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.5.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3730,7 +3732,7 @@ dependencies = [
 [[package]]
 name = "roder-dynamic-workflows"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3746,7 +3748,7 @@ dependencies = [
 [[package]]
 name = "roder-edit-core"
 version = "0.2.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "serde",
@@ -3757,8 +3759,8 @@ dependencies = [
 
 [[package]]
 name = "roder-evals"
-version = "0.4.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3779,8 +3781,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-anthropic"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3797,9 +3799,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "roder-ext-antigravity-backend"
+version = "0.1.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "dirs 7.0.0",
+ "flate2",
+ "libc",
+ "reqwest",
+ "roder-api",
+ "semver",
+ "serde_json",
+ "sha2 0.11.2",
+ "tar",
+ "tokio",
+ "which 8.0.6",
+]
+
+[[package]]
 name = "roder-ext-browser-use"
 version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3816,7 +3838,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-chrome"
 version = "0.3.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3836,8 +3858,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-claude-code"
-version = "0.4.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3853,8 +3875,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-codex-backend"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3866,8 +3888,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-cua"
-version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.2.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3885,7 +3907,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-cursor"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3905,8 +3927,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-deepseek"
-version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3919,7 +3941,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-disk-context"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3931,7 +3953,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-firecrawl-search"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3946,7 +3968,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-fireworks"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3958,7 +3980,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-fork-rift"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3972,7 +3994,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-gemini"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3988,7 +4010,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-git"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4002,7 +4024,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-github-review"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4019,7 +4041,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-google-embeddings"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4033,7 +4055,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-google-images"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4049,7 +4071,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-google-speech"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4065,7 +4087,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-honcho"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4082,8 +4104,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-hopper"
-version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.1.2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4097,7 +4119,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-inference-router"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4109,8 +4131,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-jev"
-version = "0.6.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.6.2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4137,7 +4159,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-jsonl-thread-store"
 version = "0.3.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4155,7 +4177,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-kimi-code"
 version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4173,7 +4195,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-knowledge-md"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4191,7 +4213,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-mcp"
 version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4207,7 +4229,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-memory"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4225,7 +4247,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-mysql-session"
 version = "0.5.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4243,7 +4265,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-notify-desktop"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4254,7 +4276,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-notify-terminal"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4266,7 +4288,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-openai-chat-completions"
 version = "0.4.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4283,7 +4305,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-openai-embeddings"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4297,7 +4319,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-openai-images"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4313,7 +4335,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-openai-responses"
 version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4335,7 +4357,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-openai-speech"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4348,8 +4370,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-opencode"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4368,7 +4390,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-openrouter"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4380,7 +4402,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-parallel-search"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4395,7 +4417,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-perplexity-search"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4410,7 +4432,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-plan-mode"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4423,8 +4445,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-poolside"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4442,8 +4464,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-postgres-session"
-version = "0.4.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4461,7 +4483,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-process-host"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4478,7 +4500,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-roder-cloud"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4495,7 +4517,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-blaxel"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4512,7 +4534,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-cloudflare"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4523,7 +4545,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-daytona"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4534,7 +4556,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-docker"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4547,7 +4569,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-e2b"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4558,7 +4580,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-hosted-common"
 version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4573,7 +4595,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-modal"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4584,7 +4606,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-runloop"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4594,8 +4616,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-runner-sprites"
-version = "0.4.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4615,7 +4637,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-unix-local"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4628,7 +4650,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-runner-vercel"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4639,7 +4661,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-subagents"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4655,8 +4677,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-synthetic"
-version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4671,7 +4693,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-synthetic-search"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4686,7 +4708,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-task-ledger"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4700,7 +4722,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-task-process"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4716,7 +4738,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-tavily-search"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4731,7 +4753,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-verification"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4744,7 +4766,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-vertex"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -4765,7 +4787,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-web-search"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4782,8 +4804,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-webwright"
-version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.1"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4799,7 +4821,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-xai"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4812,8 +4834,8 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-xiaomi-mimo"
-version = "0.3.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.3.2"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4832,7 +4854,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-zeroentropy-embeddings"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4847,7 +4869,7 @@ dependencies = [
 [[package]]
 name = "roder-ext-zerolang"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4861,8 +4883,8 @@ dependencies = [
 
 [[package]]
 name = "roder-extension-host"
-version = "0.7.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.7.4"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4950,8 +4972,8 @@ dependencies = [
 
 [[package]]
 name = "roder-protocol"
-version = "0.4.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.5.0"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4965,7 +4987,7 @@ dependencies = [
 [[package]]
 name = "roder-roadmap"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4979,7 +5001,7 @@ dependencies = [
 [[package]]
 name = "roder-sandbox"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -4991,7 +5013,7 @@ dependencies = [
 [[package]]
 name = "roder-search"
 version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "ignore",
  "regex",
@@ -5002,7 +5024,7 @@ dependencies = [
 [[package]]
 name = "roder-skills"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -5016,7 +5038,7 @@ dependencies = [
 [[package]]
 name = "roder-supergrok-auth"
 version = "0.2.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -5034,7 +5056,7 @@ dependencies = [
 [[package]]
 name = "roder-tasks"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5048,7 +5070,7 @@ dependencies = [
 [[package]]
 name = "roder-theme"
 version = "0.1.1"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "ratatui",
  "thiserror 2.0.21",
@@ -5057,7 +5079,7 @@ dependencies = [
 [[package]]
 name = "roder-tools"
 version = "0.3.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5078,8 +5100,8 @@ dependencies = [
 
 [[package]]
 name = "roder-tui"
-version = "0.4.3"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+version = "0.4.6"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5112,7 +5134,7 @@ dependencies = [
 [[package]]
 name = "roder-usage-analytics"
 version = "0.3.0"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5127,7 +5149,7 @@ dependencies = [
 [[package]]
 name = "roder-web-search"
 version = "0.1.2"
-source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.11#3013a3caa7f475c689346e88549164559305c9d3"
+source = "git+https://github.com/RoderAI/roder?tag=roder%2Fv0.4.14#3b9dc0789e814f4841536761b99a087fdb4ba3df"
 dependencies = [
  "anyhow",
  "reqwest",

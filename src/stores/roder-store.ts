@@ -26,6 +26,7 @@ import {
   displayModelName,
   effectiveSelectedModel,
   isRetiredModel,
+  mergeModelCatalogs,
   modelKey,
   resolveReasoningEffort,
   selectedModelProvider,
@@ -483,11 +484,10 @@ export const useRoderStore = create<RoderStore>()(
           const current = get();
           const providers = providerResult.providers ?? [];
           const providerModels = modelsFromProviders(providers);
-          const fallbackModels = normalizeModelRecords(modelResult.models);
-          const models = configuredModelsFor(
-            providerModels.length > 0 ? providerModels : fallbackModels,
-            providers,
-          ).filter((model) => !isRetiredModel(model));
+          const listedModels = normalizeModelRecords(Array.isArray(modelResult?.models) ? modelResult.models : []);
+          const models = configuredModelsFor(mergeModelCatalogs(providerModels, listedModels), providers).filter(
+            (model) => !isRetiredModel(model),
+          );
           const hiddenModelIds = compactHiddenModelIds(models, current.hiddenModelIds);
           const visibleModels = visibleModelsFor(models, hiddenModelIds);
           const activeThreadId = threads.some((thread) => thread.id === current.activeThreadId)
@@ -1318,8 +1318,12 @@ export const useRoderStore = create<RoderStore>()(
         }),
       resetVisibleModels: () => set({ hiddenModelIds: [] }),
       refreshProviders: async () => {
-        const providerResult = await roderIpc.listProviders();
-        set((state) => applyProviderCatalog(state, providerResult));
+        const [providerResult, modelResult] = await Promise.all([
+          roderIpc.listProviders(),
+          roderIpc.listModels().catch(() => ({ models: [] })),
+        ]);
+        const listedModels = Array.isArray(modelResult?.models) ? modelResult.models : [];
+        set((state) => applyProviderCatalog(state, providerResult, listedModels));
       },
       configureProvider: async (provider, apiKey) => {
         set({ error: null });
@@ -2008,11 +2012,14 @@ function normalizeModelRecord(model: RoderModel): RoderModel {
 function applyProviderCatalog(
   state: RoderStore,
   providerResult: { providers?: ProviderDescriptor[]; routingOptions?: InferenceRoutingOptionDescriptor[] },
+  listedModels: RoderModel[] = [],
 ): Partial<RoderStore> {
   const providers = providerResult.providers ?? [];
   const providerModels = modelsFromProviders(providers);
+  const normalizedListed = normalizeModelRecords(listedModels);
   const fallbackModels = normalizeModelRecords(state.models);
-  const models = configuredModelsFor(providerModels.length > 0 ? providerModels : fallbackModels, providers).filter(
+  const combined = mergeModelCatalogs(providerModels, normalizedListed);
+  const models = configuredModelsFor(combined.length > 0 ? combined : fallbackModels, providers).filter(
     (model) => !isRetiredModel(model),
   );
   const hiddenModelIds = compactHiddenModelIds(models, state.hiddenModelIds);

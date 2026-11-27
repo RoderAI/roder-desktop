@@ -23,8 +23,19 @@ test("retires GPT-6 Sol across providers and variants", () => {
   }
 });
 
-test("keeps GPT-6.1 Sol, other GPT-6 models and unrelated ids", () => {
-  for (const id of ["gpt-6-astra", "gpt-6-luna", "gpt-6.1-sol", "openai/gpt-6.1-sol-pro", "gpt-oss-120b", "claude-sonnet-5-5"]) {
+test("keeps GPT-6.2, GPT-6.1 Sol, other GPT-6 models and unrelated ids", () => {
+  for (const id of [
+    "gpt-6.2-astra",
+    "gpt-6.2-sol",
+    "openai/gpt-6.2-astra",
+    "openai/gpt-6.2-sol",
+    "gpt-6-astra",
+    "gpt-6-luna",
+    "gpt-6.1-sol",
+    "openai/gpt-6.1-sol-pro",
+    "gpt-oss-120b",
+    "claude-sonnet-5-5",
+  ]) {
     expect({ id, retired: isRetiredModel({ id }) }).toEqual({ id, retired: false });
   }
 });

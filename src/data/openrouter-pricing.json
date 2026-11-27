@@ -1,15 +1,15 @@
 {
   "source": "https://openrouter.ai/api/v1/models",
-  "fetchedAt": "2026-10-25T06:32:49.714Z",
+  "fetchedAt": "2026-11-27T04:24:35.870Z",
   "models": [
     {
       "id": "~anthropic/claude-fable-latest",
       "name": "Anthropic: Claude Fable Latest",
       "pricing": {
-        "prompt": "0.00001",
-        "completion": "0.00005",
-        "input_cache_read": "0.00000025",
-        "input_cache_write": "0.0000125"
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.00001"
       }
     },
     {
@@ -46,37 +46,37 @@
       "id": "~deepseek/deepseek-flash-latest",
       "name": "DeepSeek: DeepSeek Flash Latest",
       "pricing": {
-        "prompt": "0.00000002",
-        "completion": "0.000001",
-        "input_cache_read": "0.000000015"
+        "prompt": "0.000000036",
+        "completion": "0.0000005",
+        "input_cache_read": "0.00000001"
       }
     },
     {
       "id": "~deepseek/deepseek-pro-latest",
       "name": "DeepSeek: DeepSeek Pro Latest",
       "pricing": {
-        "prompt": "0.0000001188",
-        "completion": "0.000008",
-        "input_cache_read": "0.00000012"
+        "prompt": "0.0000000999",
+        "completion": "0.000005",
+        "input_cache_read": "0.0000000999"
       }
     },
     {
       "id": "~deepseek/deepseek-v4-flash-latest",
       "name": "DeepSeek: DeepSeek V4 Flash Latest",
       "pricing": {
-        "prompt": "0.0000000422",
-        "completion": "0.0000001694",
-        "input_cache_read": "0.000000028"
+        "prompt": "0.000000047",
+        "completion": "0.0000003",
+        "input_cache_read": "0.000000035"
       }
     },
     {
       "id": "~google/gemini-flash-latest",
       "name": "Google: Gemini Flash Latest",
       "pricing": {
-        "prompt": "0.00000075",
-        "completion": "0.00000375",
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
         "input_cache_read": "0.000000075",
-        "input_cache_write": "0.0000000416666666666667"
+        "input_cache_write": "0.0000000833333333333333"
       }
     },
     {
@@ -93,19 +93,19 @@
       "id": "~moonshotai/kimi-latest",
       "name": "MoonshotAI: Kimi Latest",
       "pricing": {
-        "prompt": "0.00000019",
-        "completion": "0.00000894",
-        "input_cache_read": "0.00000019"
+        "prompt": "0.0000001824",
+        "completion": "0.0000110055",
+        "input_cache_read": "0.00000018"
       }
     },
     {
       "id": "~openai/gpt-astra-latest",
       "name": "OpenAI: GPT Astra Latest",
       "pricing": {
-        "prompt": "0.00001",
-        "completion": "0.00005",
-        "input_cache_read": "0.000001",
-        "input_cache_write": "0.0000125"
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "input_cache_read": "0.0000004",
+        "input_cache_write": "0.00001"
       }
     },
     {
@@ -141,19 +141,18 @@
       "id": "~openai/gpt-terra-latest",
       "name": "OpenAI: GPT Terra Latest",
       "pricing": {
-        "prompt": "0.000002",
-        "completion": "0.000012",
-        "input_cache_read": "0.0000002",
-        "input_cache_write": "0.0000025"
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125"
       }
     },
     {
       "id": "~unbiased/pareto-latest",
       "name": "Pareto Latest",
       "pricing": {
-        "prompt": "0.0000008",
-        "completion": "0.0000032",
-        "input_cache_read": "0.00000003"
+        "prompt": "-1",
+        "completion": "-1"
       }
     },
     {
@@ -162,15 +161,16 @@
       "pricing": {
         "prompt": "0.000002",
         "completion": "0.000006",
-        "input_cache_read": "0.0000005"
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0"
       }
     },
     {
       "id": "~z-ai/glm-flash-latest",
       "name": "Z.ai: GLM Flash Latest",
       "pricing": {
-        "prompt": "0.0000000418",
-        "completion": "0.000000077",
+        "prompt": "0.0000000356",
+        "completion": "0.0000000815",
         "input_cache_read": "0.00000003"
       }
     },
@@ -178,9 +178,9 @@
       "id": "~z-ai/glm-latest",
       "name": "Z.ai: GLM Latest",
       "pricing": {
-        "prompt": "0.0000000703",
-        "completion": "0.0000043843",
-        "input_cache_read": "0.0000000703"
+        "prompt": "0.0000000699",
+        "completion": "0.0000014",
+        "input_cache_read": "0.0000000689"
       }
     },
     {
@@ -282,7 +282,8 @@
       "name": "Magnum v4 72B",
       "pricing": {
         "prompt": "0.0000025",
-        "completion": "0.000005"
+        "completion": "0.000005",
+        "input_cache_read": "0.0000025"
       }
     },
     {
@@ -323,6 +324,26 @@
         "completion": "0.000025",
         "input_cache_read": "0.000000125",
         "input_cache_write": "0.00000625"
+      }
+    },
+    {
+      "id": "anthropic/claude-fable-5.2",
+      "name": "Anthropic: Claude Fable 5.2",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "anthropic/claude-fable-5.2:batch",
+      "name": "Anthropic: Claude Fable 5.2 (batch)",
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.000005"
       }
     },
     {
@@ -586,28 +607,20 @@
       }
     },
     {
-      "id": "arcee-ai/trinity-large-thinking",
-      "name": "Arcee AI: Trinity Large Thinking",
+      "id": "baidu/ernie-5.5-flash-preview:free",
+      "name": "Baidu: ERNIE-5.5-Flash-Preview (free)",
       "pricing": {
-        "prompt": "0.00000025",
-        "completion": "0.0000008",
-        "input_cache_read": "0.00000006"
+        "prompt": "0",
+        "completion": "0"
       }
     },
     {
-      "id": "bytedance-seed/seed-1.6",
-      "name": "ByteDance Seed: Seed 1.6",
+      "id": "baidu/ernie-light-dt-1.0-intl",
+      "name": "Baidu: ERNIE-Light-DT-1.0",
       "pricing": {
-        "prompt": "0.00000025",
-        "completion": "0.000002"
-      }
-    },
-    {
-      "id": "bytedance-seed/seed-1.6-flash",
-      "name": "ByteDance Seed: Seed 1.6 Flash",
-      "pricing": {
-        "prompt": "0.000000075",
-        "completion": "0.0000003"
+        "prompt": "0.00000113",
+        "completion": "0.00000394",
+        "input_cache_read": "0.000000113"
       }
     },
     {
@@ -616,14 +629,6 @@
       "pricing": {
         "prompt": "0.0000005",
         "completion": "0.0000025"
-      }
-    },
-    {
-      "id": "bytedance-seed/seed-2.0-code",
-      "name": "ByteDance Seed: Seed-2.0-Code",
-      "pricing": {
-        "prompt": "0.0000005",
-        "completion": "0.000003"
       }
     },
     {
@@ -701,14 +706,6 @@
       }
     },
     {
-      "id": "cohere/north-mini-code:free",
-      "name": "Cohere: North Mini Code (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
-      }
-    },
-    {
       "id": "deepseek/deepseek-chat",
       "name": "DeepSeek: DeepSeek V3",
       "pricing": {
@@ -720,9 +717,8 @@
       "id": "deepseek/deepseek-chat-v3-0324",
       "name": "DeepSeek: DeepSeek V3 0324",
       "pricing": {
-        "prompt": "0.00000029",
-        "completion": "0.00000114",
-        "input_cache_read": "0.00000011"
+        "prompt": "0.00000025",
+        "completion": "0.000001"
       }
     },
     {
@@ -738,9 +734,8 @@
       "id": "deepseek/deepseek-r1-0528",
       "name": "DeepSeek: R1 0528",
       "pricing": {
-        "prompt": "0.0000005",
-        "completion": "0.00000215",
-        "input_cache_read": "0.00000035"
+        "prompt": "0.000000571",
+        "completion": "0.000002286"
       }
     },
     {
@@ -755,9 +750,9 @@
       "id": "deepseek/deepseek-v3.2",
       "name": "DeepSeek: DeepSeek V3.2",
       "pricing": {
-        "prompt": "0.00000028",
-        "completion": "0.00000042",
-        "input_cache_read": "0.000000028"
+        "prompt": "0.00000026",
+        "completion": "0.00000038",
+        "input_cache_read": "0.00000013"
       }
     },
     {
@@ -772,18 +767,27 @@
       "id": "deepseek/deepseek-v4-flash",
       "name": "DeepSeek: DeepSeek V4 Flash 0423",
       "pricing": {
-        "prompt": "0.000000091",
-        "completion": "0.000000182",
-        "input_cache_read": "0.0000000182"
+        "prompt": "0.00000009",
+        "completion": "0.00000018",
+        "input_cache_read": "0.000000018"
       }
     },
     {
       "id": "deepseek/deepseek-v4-flash-0731",
       "name": "DeepSeek: DeepSeek V4 Flash 0731",
       "pricing": {
-        "prompt": "0.0000000422",
-        "completion": "0.0000001694",
-        "input_cache_read": "0.000000028"
+        "prompt": "0.000000047",
+        "completion": "0.0000003",
+        "input_cache_read": "0.000000035"
+      }
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash-0731:batch",
+      "name": "DeepSeek: DeepSeek V4 Flash 0731 (batch)",
+      "pricing": {
+        "prompt": "0.000000048",
+        "completion": "0.000000144",
+        "input_cache_read": "0.000000012"
       }
     },
     {
@@ -799,27 +803,27 @@
       "id": "deepseek/deepseek-v4-pro",
       "name": "DeepSeek: DeepSeek V4 Pro 0423",
       "pricing": {
-        "prompt": "0.0000002088",
-        "completion": "0.0000004176",
-        "input_cache_read": "0.0000000174"
+        "prompt": "0.000000888188",
+        "completion": "0.0000015082",
+        "input_cache_read": "0.0000002"
       }
     },
     {
       "id": "deepseek/deepseek-v4-pro-0813",
       "name": "DeepSeek: DeepSeek V4 Pro 0813",
       "pricing": {
-        "prompt": "0.00000066",
-        "completion": "0.00000198",
-        "input_cache_read": "0.000000022"
+        "prompt": "0.0000000999",
+        "completion": "0.000005",
+        "input_cache_read": "0.0000000999"
       }
     },
     {
       "id": "deepseek/deepseek-v4.1-flash",
       "name": "DeepSeek: DeepSeek V4.1 Flash",
       "pricing": {
-        "prompt": "0.00000002",
-        "completion": "0.000001",
-        "input_cache_read": "0.000000015"
+        "prompt": "0.00000014",
+        "completion": "0.00000042",
+        "input_cache_read": "0.0000000042"
       }
     },
     {
@@ -832,20 +836,21 @@
       }
     },
     {
+      "id": "deepseek/deepseek-v4.1-flash-1017:batch",
+      "name": "DeepSeek: DeepSeek V4.1 Flash 1017 (batch)",
+      "pricing": {
+        "prompt": "0.000000035",
+        "completion": "0.000000149",
+        "input_cache_read": "0.0000000029"
+      }
+    },
+    {
       "id": "deepseek/deepseek-v4.1-flash:batch",
       "name": "DeepSeek: DeepSeek V4.1 Flash (batch)",
       "pricing": {
         "prompt": "0.00000005",
         "completion": "0.00000015",
         "input_cache_read": "0.000000004"
-      }
-    },
-    {
-      "id": "dots-studio/dots-3-note-preview:free",
-      "name": "Dots Studio: Dots3-Note Preview (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
       }
     },
     {
@@ -1154,11 +1159,87 @@
       }
     },
     {
+      "id": "google/gemini-4-carbon",
+      "name": "Google: Gemini 4 Carbon",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000001875"
+      }
+    },
+    {
+      "id": "google/gemini-4-carbon:batch",
+      "name": "Google: Gemini 4 Carbon (batch)",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.0000001875"
+      }
+    },
+    {
+      "id": "google/gemini-4-hydrogen",
+      "name": "Google: Gemini 4 Hydrogen",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
+        "input_cache_read": "0.000000075",
+        "input_cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-4-hydrogen:batch",
+      "name": "Google: Gemini 4 Hydrogen (batch)",
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "input_cache_read": "0.0000000375",
+        "input_cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-4-neon",
+      "name": "Google: Gemini 4 Neon",
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015",
+        "input_cache_read": "0.00000015",
+        "input_cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
+      "id": "google/gemini-4-neon:batch",
+      "name": "Google: Gemini 4 Neon (batch)",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.0000075",
+        "input_cache_read": "0.000000075",
+        "input_cache_write": "0.0000000833333333333333"
+      }
+    },
+    {
       "id": "google/gemini-nano-banana-2.1",
       "name": "Google: Nano Banana 2.1",
       "pricing": {
         "prompt": "0.0000015",
         "completion": "0.0000075"
+      }
+    },
+    {
+      "id": "google/gemini-omni-1.1-flash",
+      "name": "Google: Gemini Omni 1.1 Flash",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000009"
+      }
+    },
+    {
+      "id": "google/gemini-omni-1.2-flash",
+      "name": "Google: Gemini Omni 1.2 Flash",
+      "pricing": {
+        "prompt": "0.0000015",
+        "completion": "0.000009"
       }
     },
     {
@@ -1182,7 +1263,7 @@
       "name": "Google: Gemma 3 27B",
       "pricing": {
         "prompt": "0.00000008",
-        "completion": "0.00000035",
+        "completion": "0.00000045",
         "input_cache_read": "0.00000004"
       }
     },
@@ -1190,18 +1271,17 @@
       "id": "google/gemma-3-4b-it",
       "name": "Google: Gemma 3 4B",
       "pricing": {
-        "prompt": "0.00000004",
-        "completion": "0.00000005",
-        "input_cache_read": "0.00000002"
+        "prompt": "0.00000005",
+        "completion": "0.0000001"
       }
     },
     {
       "id": "google/gemma-4-26b-a4b-it",
       "name": "Google: Gemma 4 26B A4B ",
       "pricing": {
-        "prompt": "0.0000000675",
-        "completion": "0.000000225",
-        "input_cache_read": "0.0000000375"
+        "prompt": "0.0000000765",
+        "completion": "0.000000255",
+        "input_cache_read": "0.0000000425"
       }
     },
     {
@@ -1248,16 +1328,9 @@
       "id": "gryphe/mythomax-l2-13b",
       "name": "MythoMax 13B",
       "pricing": {
-        "prompt": "0.00000008",
-        "completion": "0.00000011"
-      }
-    },
-    {
-      "id": "ibm-granite/granite-4.0-h-micro",
-      "name": "IBM: Granite 4.0 Micro",
-      "pricing": {
-        "prompt": "0.000000017",
-        "completion": "0.000000112"
+        "prompt": "0.0000003",
+        "completion": "0.0000005",
+        "input_cache_read": "0.0000002"
       }
     },
     {
@@ -1265,35 +1338,8 @@
       "name": "IBM: Granite 4.2 8B",
       "pricing": {
         "prompt": "0.00000006",
-        "completion": "0.00000025",
-        "input_cache_read": "0.000000015"
-      }
-    },
-    {
-      "id": "inception/mercury-2",
-      "name": "Inception: Mercury 2",
-      "pricing": {
-        "prompt": "0.00000025",
-        "completion": "0.00000075",
-        "input_cache_read": "0.000000025"
-      }
-    },
-    {
-      "id": "inception/mercury-2.5",
-      "name": "Inception: Mercury 2.5",
-      "pricing": {
-        "prompt": "0.00000004",
         "completion": "0.00000015",
-        "input_cache_read": "0.000000004"
-      }
-    },
-    {
-      "id": "inception/mercury-3",
-      "name": "Inception: Mercury 3",
-      "pricing": {
-        "prompt": "0.0000001",
-        "completion": "0.00000035",
-        "input_cache_read": "0.00000001"
+        "input_cache_read": "0.000000015"
       }
     },
     {
@@ -1315,12 +1361,38 @@
       }
     },
     {
+      "id": "inclusionai/ling-3.0-tiny",
+      "name": "inclusionAI: Ling 3.0 Tiny",
+      "pricing": {
+        "prompt": "0.000000015",
+        "completion": "0.000000045",
+        "input_cache_read": "0.000000003"
+      }
+    },
+    {
       "id": "inclusionai/ling-3.1-flash",
       "name": "inclusionAI: Ling 3.1 Flash",
       "pricing": {
         "prompt": "0.000000075",
         "completion": "0.000000225",
         "input_cache_read": "0.000000015"
+      }
+    },
+    {
+      "id": "inclusionai/ling-3.2-flash:free",
+      "name": "inclusionAI: Ling 3.2 Flash (free)",
+      "pricing": {
+        "prompt": "0",
+        "completion": "0"
+      }
+    },
+    {
+      "id": "inclusionai/lingsante-3.1-air-vl",
+      "name": "inclusionAI: LingSante 3.1 Air VL",
+      "pricing": {
+        "prompt": "0.00000006",
+        "completion": "0.00000018",
+        "input_cache_read": "0.000000012"
       }
     },
     {
@@ -1342,20 +1414,12 @@
       }
     },
     {
-      "id": "liquid/lfm-2.5-2.6b",
-      "name": "LiquidAI: LFM2.5-2.6B",
+      "id": "kt/midm-k-3.0-pro",
+      "name": "KT: Mi:dm K 3.0 Pro",
       "pricing": {
-        "prompt": "0.00000035",
-        "completion": "0.0000005",
+        "prompt": "0.0000002",
+        "completion": "0.0000008",
         "input_cache_read": "0.00000004"
-      }
-    },
-    {
-      "id": "liquid/lfm-2.5-2.6b:free",
-      "name": "LiquidAI: LFM2.5-2.6B (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
       }
     },
     {
@@ -1368,28 +1432,37 @@
       }
     },
     {
-      "id": "mancer/weaver",
-      "name": "Mancer: Weaver (alpha)",
+      "id": "liquid/lfm-3-1.7b",
+      "name": "LiquidAI: LFM3-1.7B",
       "pricing": {
-        "prompt": "0.0000004",
-        "completion": "0.00000075"
+        "prompt": "0.00000008",
+        "completion": "0.0000002",
+        "input_cache_read": "0.00000002"
       }
     },
     {
-      "id": "meituan/longcat-2.0",
-      "name": "Meituan: LongCat 2.0",
+      "id": "liquid/lfm-3-1.7b:free",
+      "name": "LiquidAI: LFM3-1.7B (free)",
+      "pricing": {
+        "prompt": "0",
+        "completion": "0"
+      }
+    },
+    {
+      "id": "mancer/weaver",
+      "name": "Mancer: Weaver (alpha)",
       "pricing": {
         "prompt": "0.0000003",
-        "completion": "0.0000012",
-        "input_cache_read": "0.000000006"
+        "completion": "0.0000005",
+        "input_cache_read": "0.0000003"
       }
     },
     {
       "id": "meta-llama/llama-3.1-70b-instruct",
       "name": "Meta: Llama 3.1 70B Instruct",
       "pricing": {
-        "prompt": "0.0000004",
-        "completion": "0.0000004"
+        "prompt": "0.00000072",
+        "completion": "0.00000072"
       }
     },
     {
@@ -1399,14 +1472,6 @@
         "prompt": "0.00000005",
         "completion": "0.00000008",
         "input_cache_read": "0.000000025"
-      }
-    },
-    {
-      "id": "meta-llama/llama-3.2-1b-instruct",
-      "name": "Meta: Llama 3.2 1B Instruct",
-      "pricing": {
-        "prompt": "0.000000027",
-        "completion": "0.000000201"
       }
     },
     {
@@ -1421,17 +1486,18 @@
       "id": "meta-llama/llama-3.3-70b-instruct",
       "name": "Meta: Llama 3.3 70B Instruct",
       "pricing": {
-        "prompt": "0.0000001",
-        "completion": "0.00000032"
+        "prompt": "0.00000059",
+        "completion": "0.00000079",
+        "input_cache_read": "0.000000295"
       }
     },
     {
       "id": "meta-llama/llama-4-maverick",
       "name": "Meta: Llama 4 Maverick",
       "pricing": {
-        "prompt": "0.0000001875",
-        "completion": "0.0000006525",
-        "input_cache_read": "0.00000005"
+        "prompt": "0.00000035",
+        "completion": "0.000001",
+        "input_cache_read": "0.00000017"
       }
     },
     {
@@ -1451,12 +1517,31 @@
       }
     },
     {
+      "id": "meta/muse-ember",
+      "name": "Meta: Muse Ember",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "input_cache_read": "0.000000004",
+        "input_cache_write": "0.000000125"
+      }
+    },
+    {
       "id": "meta/muse-glimmer-30b",
       "name": "Meta: Muse Glimmer 30B",
       "pricing": {
         "prompt": "0.0000003",
         "completion": "0.0000012",
         "input_cache_read": "0.00000004"
+      }
+    },
+    {
+      "id": "meta/muse-glimmer-30b:batch",
+      "name": "Meta: Muse Glimmer 30B (batch)",
+      "pricing": {
+        "prompt": "0.00000024",
+        "completion": "0.00000096",
+        "input_cache_read": "0.000000032"
       }
     },
     {
@@ -1531,63 +1616,20 @@
       }
     },
     {
-      "id": "minimax/minimax-01",
-      "name": "MiniMax: MiniMax-01",
-      "pricing": {
-        "prompt": "0.0000002",
-        "completion": "0.0000011"
-      }
-    },
-    {
-      "id": "minimax/minimax-m1",
-      "name": "MiniMax: MiniMax M1",
-      "pricing": {
-        "prompt": "0.00000055",
-        "completion": "0.0000022"
-      }
-    },
-    {
-      "id": "minimax/minimax-m2",
-      "name": "MiniMax: MiniMax M2",
-      "pricing": {
-        "prompt": "0.000000255",
-        "completion": "0.00000102"
-      }
-    },
-    {
-      "id": "minimax/minimax-m2-her",
-      "name": "MiniMax: MiniMax M2-her",
-      "pricing": {
-        "prompt": "0.0000003",
-        "completion": "0.0000012",
-        "input_cache_read": "0.00000003"
-      }
-    },
-    {
-      "id": "minimax/minimax-m2.1",
-      "name": "MiniMax: MiniMax M2.1",
-      "pricing": {
-        "prompt": "0.0000003",
-        "completion": "0.0000012",
-        "input_cache_read": "0.00000003"
-      }
-    },
-    {
       "id": "minimax/minimax-m2.5",
       "name": "MiniMax: MiniMax M2.5",
       "pricing": {
         "prompt": "0.0000003",
         "completion": "0.0000012",
-        "input_cache_read": "0.00000003"
+        "input_cache_read": "0.00000006"
       }
     },
     {
       "id": "minimax/minimax-m2.7",
       "name": "MiniMax: MiniMax M2.7",
       "pricing": {
-        "prompt": "0.0000003",
-        "completion": "0.0000012",
-        "input_cache_read": "0.00000006"
+        "prompt": "0.0000006",
+        "completion": "0.0000018"
       }
     },
     {
@@ -1597,6 +1639,15 @@
         "prompt": "0.0000003",
         "completion": "0.0000012",
         "input_cache_read": "0.00000006"
+      }
+    },
+    {
+      "id": "minimax/minimax-m3:batch",
+      "name": "MiniMax: MiniMax M3 (batch)",
+      "pricing": {
+        "prompt": "0.000000224",
+        "completion": "0.00000088",
+        "input_cache_read": "0.0000000448"
       }
     },
     {
@@ -1711,18 +1762,9 @@
       "id": "mistralai/mistral-large-4-0",
       "name": "Mistral: Mistral Large 4",
       "pricing": {
-        "prompt": "0.00000136",
-        "completion": "0.00000418",
-        "input_cache_read": "0.00000014"
-      }
-    },
-    {
-      "id": "mistralai/mistral-medium-3",
-      "name": "Mistral: Mistral Medium 3",
-      "pricing": {
-        "prompt": "0.0000004",
-        "completion": "0.000002",
-        "input_cache_read": "0.00000004"
+        "prompt": "0.0000007",
+        "completion": "0.0000021",
+        "input_cache_read": "0.00000007"
       }
     },
     {
@@ -1739,24 +1781,6 @@
       "pricing": {
         "prompt": "0.00000075",
         "completion": "0.00000375"
-      }
-    },
-    {
-      "id": "mistralai/mistral-medium-3.1",
-      "name": "Mistral: Mistral Medium 3.1",
-      "pricing": {
-        "prompt": "0.0000004",
-        "completion": "0.000002",
-        "input_cache_read": "0.00000004"
-      }
-    },
-    {
-      "id": "mistralai/mistral-medium-3.1:batch",
-      "name": "Mistral: Mistral Medium 3.1 (batch)",
-      "pricing": {
-        "prompt": "0.0000002",
-        "completion": "0.000001",
-        "input_cache_read": "0.00000002"
       }
     },
     {
@@ -1828,6 +1852,14 @@
       }
     },
     {
+      "id": "mistralai/pixtral-large-2502",
+      "name": "Mistral: Pixtral Large 2502",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000006"
+      }
+    },
+    {
       "id": "mistralai/voxtral-small-24b-2507",
       "name": "Mistral: Voxtral Small 24B 2507",
       "pricing": {
@@ -1869,21 +1901,11 @@
       }
     },
     {
-      "id": "moonshotai/kimi-k2-thinking",
-      "name": "MoonshotAI: Kimi K2 Thinking",
-      "pricing": {
-        "prompt": "0.0000006",
-        "completion": "0.0000025",
-        "input_cache_read": "0.00000015"
-      }
-    },
-    {
       "id": "moonshotai/kimi-k2.5",
       "name": "MoonshotAI: Kimi K2.5",
       "pricing": {
-        "prompt": "0.0000005",
-        "completion": "0.0000025",
-        "input_cache_read": "0.00000015"
+        "prompt": "0.0000006",
+        "completion": "0.000003"
       }
     },
     {
@@ -1899,18 +1921,18 @@
       "id": "moonshotai/kimi-k2.7-code",
       "name": "MoonshotAI: Kimi K2.7 Code",
       "pricing": {
-        "prompt": "0.0000006712",
-        "completion": "0.00000335",
-        "input_cache_read": "0.00000015"
+        "prompt": "0.0000006",
+        "completion": "0.000003",
+        "input_cache_read": "0.00000012"
       }
     },
     {
       "id": "moonshotai/kimi-k3",
       "name": "MoonshotAI: Kimi K3",
       "pricing": {
-        "prompt": "0.000000239",
-        "completion": "0.0000108",
-        "input_cache_read": "0.00000021"
+        "prompt": "0.000000192",
+        "completion": "0.000016",
+        "input_cache_read": "0.000000182"
       }
     },
     {
@@ -1926,9 +1948,18 @@
       "id": "moonshotai/kimi-k3.1-pro",
       "name": "MoonshotAI: Kimi K3.1 Pro",
       "pricing": {
-        "prompt": "0.000002",
-        "completion": "0.00001",
+        "prompt": "0.0000002403",
+        "completion": "0.0000084023",
         "input_cache_read": "0.0000002"
+      }
+    },
+    {
+      "id": "moonshotai/kimi-k3.1-pro:batch",
+      "name": "MoonshotAI: Kimi K3.1 Pro (batch)",
+      "pricing": {
+        "prompt": "0.000000372",
+        "completion": "0.000005583",
+        "input_cache_read": "0.0000001"
       }
     },
     {
@@ -1940,11 +1971,36 @@
       }
     },
     {
+      "id": "morph/morph-v3-fast:batch",
+      "name": "Morph: Morph V3 Fast (batch)",
+      "pricing": {
+        "prompt": "0.0000004",
+        "completion": "0.0000006"
+      }
+    },
+    {
       "id": "morph/morph-v3-large",
       "name": "Morph: Morph V3 Large",
       "pricing": {
         "prompt": "0.0000009",
         "completion": "0.0000019"
+      }
+    },
+    {
+      "id": "morph/morph-v3-large:batch",
+      "name": "Morph: Morph V3 Large (batch)",
+      "pricing": {
+        "prompt": "0.00000045",
+        "completion": "0.00000095"
+      }
+    },
+    {
+      "id": "motif-technologies/motif-3",
+      "name": "Motif Technologies: Motif 3",
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.0000012",
+        "input_cache_read": "0.00000006"
       }
     },
     {
@@ -1966,19 +2022,12 @@
       }
     },
     {
-      "id": "nousresearch/hermes-3-llama-3.1-405b",
-      "name": "Nous: Hermes 3 405B Instruct",
+      "id": "nex-agi/nex-n2.6",
+      "name": "Nex AGI: Nex-N2.6",
       "pricing": {
-        "prompt": "0.000001",
-        "completion": "0.000001"
-      }
-    },
-    {
-      "id": "nousresearch/hermes-3-llama-3.1-70b",
-      "name": "Nous: Hermes 3 70B Instruct",
-      "pricing": {
-        "prompt": "0.0000007",
-        "completion": "0.0000007"
+        "prompt": "0.00000012",
+        "completion": "0.0000004",
+        "input_cache_read": "0.000000024"
       }
     },
     {
@@ -1986,7 +2035,8 @@
       "name": "Nous: Hermes 4 405B",
       "pricing": {
         "prompt": "0.000001",
-        "completion": "0.000003"
+        "completion": "0.000003",
+        "input_cache_read": "0.0000002"
       }
     },
     {
@@ -1994,7 +2044,8 @@
       "name": "NVIDIA: Nemotron 3 Nano 30B A3B",
       "pricing": {
         "prompt": "0.00000006",
-        "completion": "0.00000024"
+        "completion": "0.00000024",
+        "input_cache_read": "0.000000012"
       }
     },
     {
@@ -2009,26 +2060,17 @@
       "id": "nvidia/nemotron-3-super-120b-a12b",
       "name": "NVIDIA: Nemotron 3 Super",
       "pricing": {
-        "prompt": "0.0000003",
-        "completion": "0.0000024",
-        "input_cache_read": "0.00000015"
-      }
-    },
-    {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "name": "NVIDIA: Nemotron 3 Super (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
+        "prompt": "0.000000075",
+        "completion": "0.0000004"
       }
     },
     {
       "id": "nvidia/nemotron-3-ultra-550b-a55b",
       "name": "NVIDIA: Nemotron 3 Ultra",
       "pricing": {
-        "prompt": "0.0000006",
-        "completion": "0.0000024",
-        "input_cache_read": "0.00000012"
+        "prompt": "0.0000005",
+        "completion": "0.0000022",
+        "input_cache_read": "0.0000001"
       }
     },
     {
@@ -2045,14 +2087,6 @@
       "pricing": {
         "prompt": "0.0000002",
         "completion": "0.0000002"
-      }
-    },
-    {
-      "id": "nvidia/nemotron-3.5-content-safety:free",
-      "name": "NVIDIA: Nemotron 3.5 Content Safety (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
       }
     },
     {
@@ -2077,7 +2111,7 @@
       "name": "NVIDIA: Nemotron 3.5 Super VL",
       "pricing": {
         "prompt": "0.00000015",
-        "completion": "0.0000005",
+        "completion": "0.00000047",
         "input_cache_read": "0.00000002"
       }
     },
@@ -2122,14 +2156,6 @@
       }
     },
     {
-      "id": "openai/gpt-4-turbo",
-      "name": "OpenAI: GPT-4 Turbo",
-      "pricing": {
-        "prompt": "0.00001",
-        "completion": "0.00003"
-      }
-    },
-    {
       "id": "openai/gpt-4-turbo:batch",
       "name": "OpenAI: GPT-4 Turbo (batch)",
       "pricing": {
@@ -2170,7 +2196,7 @@
       "pricing": {
         "prompt": "0.0000001",
         "completion": "0.0000004",
-        "input_cache_read": "0.000000025"
+        "input_cache_read": "0.00000003"
       }
     },
     {
@@ -2846,6 +2872,126 @@
       }
     },
     {
+      "id": "openai/gpt-6.1-terra",
+      "name": "OpenAI: GPT-6.1 Terra",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125"
+      }
+    },
+    {
+      "id": "openai/gpt-6.1-terra-pro",
+      "name": "OpenAI: GPT-6.1 Terra Pro",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125"
+      }
+    },
+    {
+      "id": "openai/gpt-6.1-terra-pro:batch",
+      "name": "OpenAI: GPT-6.1 Terra Pro (batch)",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000025",
+        "input_cache_read": "0.000000025",
+        "input_cache_write": "0.000000625"
+      }
+    },
+    {
+      "id": "openai/gpt-6.1-terra:batch",
+      "name": "OpenAI: GPT-6.1 Terra (batch)",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000025",
+        "input_cache_read": "0.000000025",
+        "input_cache_write": "0.000000625"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-astra",
+      "name": "OpenAI: GPT-6.2 Astra",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "input_cache_read": "0.0000004",
+        "input_cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-astra-pro",
+      "name": "OpenAI: GPT-6.2 Astra Pro",
+      "pricing": {
+        "prompt": "0.000008",
+        "completion": "0.00004",
+        "input_cache_read": "0.0000004",
+        "input_cache_write": "0.00001"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-astra-pro:batch",
+      "name": "OpenAI: GPT-6.2 Astra Pro (batch)",
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000005"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-astra:batch",
+      "name": "OpenAI: GPT-6.2 Astra (batch)",
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000005"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol",
+      "name": "OpenAI: GPT-6.2 Sol",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol-pro",
+      "name": "OpenAI: GPT-6.2 Sol Pro",
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol-pro:batch",
+      "name": "OpenAI: GPT-6.2 Sol Pro (batch)",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125"
+      }
+    },
+    {
+      "id": "openai/gpt-6.2-sol:batch",
+      "name": "OpenAI: GPT-6.2 Sol (batch)",
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "input_cache_read": "0.00000005",
+        "input_cache_write": "0.00000125"
+      }
+    },
+    {
       "id": "openai/gpt-audio",
       "name": "OpenAI: GPT Audio",
       "pricing": {
@@ -2874,9 +3020,9 @@
       "id": "openai/gpt-oss-120b",
       "name": "OpenAI: gpt-oss-120b",
       "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000006",
-        "input_cache_read": "0.000000075"
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "input_cache_read": "0.00000005"
       }
     },
     {
@@ -2891,9 +3037,9 @@
       "id": "openai/gpt-oss-20b",
       "name": "OpenAI: gpt-oss-20b",
       "pricing": {
-        "prompt": "0.000000018",
-        "completion": "0.00000009",
-        "input_cache_read": "0.000000009"
+        "prompt": "0.00000003",
+        "completion": "0.00000013",
+        "input_cache_read": "0.00000003"
       }
     },
     {
@@ -2914,47 +3060,12 @@
       }
     },
     {
-      "id": "openai/o1",
-      "name": "OpenAI: o1",
-      "pricing": {
-        "prompt": "0.000015",
-        "completion": "0.00006",
-        "input_cache_read": "0.0000075"
-      }
-    },
-    {
-      "id": "openai/o1-pro",
-      "name": "OpenAI: o1-pro",
-      "pricing": {
-        "prompt": "0.00015",
-        "completion": "0.0006"
-      }
-    },
-    {
       "id": "openai/o3",
       "name": "OpenAI: o3",
       "pricing": {
         "prompt": "0.000002",
         "completion": "0.000008",
         "input_cache_read": "0.0000005"
-      }
-    },
-    {
-      "id": "openai/o3-mini",
-      "name": "OpenAI: o3 Mini",
-      "pricing": {
-        "prompt": "0.0000011",
-        "completion": "0.0000044",
-        "input_cache_read": "0.00000055"
-      }
-    },
-    {
-      "id": "openai/o3-mini-high",
-      "name": "OpenAI: o3 Mini High",
-      "pricing": {
-        "prompt": "0.0000011",
-        "completion": "0.0000044",
-        "input_cache_read": "0.00000055"
       }
     },
     {
@@ -2984,24 +3095,6 @@
       }
     },
     {
-      "id": "openai/o4-mini",
-      "name": "OpenAI: o4 Mini",
-      "pricing": {
-        "prompt": "0.0000011",
-        "completion": "0.0000044",
-        "input_cache_read": "0.000000275"
-      }
-    },
-    {
-      "id": "openai/o4-mini-high",
-      "name": "OpenAI: o4 Mini High",
-      "pricing": {
-        "prompt": "0.0000011",
-        "completion": "0.0000044",
-        "input_cache_read": "0.000000275"
-      }
-    },
-    {
       "id": "openai/o4-mini:batch",
       "name": "OpenAI: o4 Mini (batch)",
       "pricing": {
@@ -3021,6 +3114,14 @@
     {
       "id": "openrouter/auto-beta",
       "name": "Auto Router (Beta)",
+      "pricing": {
+        "prompt": "-1",
+        "completion": "-1"
+      }
+    },
+    {
+      "id": "openrouter/auto-code",
+      "name": "Auto Code",
       "pricing": {
         "prompt": "-1",
         "completion": "-1"
@@ -3056,6 +3157,23 @@
       "pricing": {
         "prompt": "-1",
         "completion": "-1"
+      }
+    },
+    {
+      "id": "particle-ai/particle-1",
+      "name": "Particle AI: Particle-1",
+      "pricing": {
+        "prompt": "0.00000007",
+        "completion": "0.0000005",
+        "input_cache_read": "0.00000003"
+      }
+    },
+    {
+      "id": "particle-ai/particle-1:free",
+      "name": "Particle AI: Particle-1 (free)",
+      "pricing": {
+        "prompt": "0",
+        "completion": "0"
       }
     },
     {
@@ -3115,40 +3233,6 @@
       }
     },
     {
-      "id": "poolside/laguna-s-2.1",
-      "name": "Poolside: Laguna S 2.1",
-      "pricing": {
-        "prompt": "0.00000009",
-        "completion": "0.00000018",
-        "input_cache_read": "0.000000009"
-      }
-    },
-    {
-      "id": "poolside/laguna-s-2.1:free",
-      "name": "Poolside: Laguna S 2.1 (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
-      }
-    },
-    {
-      "id": "poolside/laguna-xs-2.1",
-      "name": "Poolside: Laguna XS 2.1",
-      "pricing": {
-        "prompt": "0.00000006",
-        "completion": "0.00000012",
-        "input_cache_read": "0.00000003"
-      }
-    },
-    {
-      "id": "poolside/laguna-xs-2.1:free",
-      "name": "Poolside: Laguna XS 2.1 (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
-      }
-    },
-    {
       "id": "prism-ml/ternary-bonsai-2-27b",
       "name": "PrismML: Ternary Bonsai 2 27B",
       "pricing": {
@@ -3158,19 +3242,20 @@
       }
     },
     {
+      "id": "prism-ml/ternary-bonsai-2-9b",
+      "name": "PrismML: Ternary Bonsai 2 9B",
+      "pricing": {
+        "prompt": "0.00000008",
+        "completion": "0.00000013",
+        "input_cache_read": "0.00000004"
+      }
+    },
+    {
       "id": "qwen/qwen-2.5-72b-instruct",
       "name": "Qwen2.5 72B Instruct",
       "pricing": {
         "prompt": "0.00000036",
         "completion": "0.0000004"
-      }
-    },
-    {
-      "id": "qwen/qwen-2.5-7b-instruct",
-      "name": "Qwen: Qwen2.5 7B Instruct",
-      "pricing": {
-        "prompt": "0.0000001",
-        "completion": "0.0000002"
       }
     },
     {
@@ -3212,8 +3297,9 @@
       "id": "qwen/qwen3-235b-a22b-2507",
       "name": "Qwen: Qwen3 235B A22B Instruct 2507",
       "pricing": {
-        "prompt": "0.00000009",
-        "completion": "0.00000055"
+        "prompt": "0.00000014",
+        "completion": "0.0000008",
+        "input_cache_read": "0.00000005"
       }
     },
     {
@@ -3236,8 +3322,9 @@
       "id": "qwen/qwen3-30b-a3b-instruct-2507",
       "name": "Qwen: Qwen3 30B A3B Instruct 2507",
       "pricing": {
-        "prompt": "0.00000009",
-        "completion": "0.0000003"
+        "prompt": "0.0000001",
+        "completion": "0.0000003",
+        "input_cache_read": "0.0000001"
       }
     },
     {
@@ -3288,16 +3375,9 @@
       "id": "qwen/qwen3-next-80b-a3b-instruct",
       "name": "Qwen: Qwen3 Next 80B A3B Instruct",
       "pricing": {
-        "prompt": "0.00000009",
-        "completion": "0.0000011"
-      }
-    },
-    {
-      "id": "qwen/qwen3-next-80b-a3b-thinking",
-      "name": "Qwen: Qwen3 Next 80B A3B Thinking",
-      "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000012"
+        "prompt": "0.0000001",
+        "completion": "0.0000011",
+        "input_cache_read": "0.00000007"
       }
     },
     {
@@ -3318,14 +3398,6 @@
       }
     },
     {
-      "id": "qwen/qwen3-vl-30b-a3b-thinking",
-      "name": "Qwen: Qwen3 VL 30B A3B Thinking",
-      "pricing": {
-        "prompt": "0.00000029",
-        "completion": "0.000001"
-      }
-    },
-    {
       "id": "qwen/qwen3-vl-8b-instruct",
       "name": "Qwen: Qwen3 VL 8B Instruct",
       "pricing": {
@@ -3338,17 +3410,16 @@
       "id": "qwen/qwen3.5-122b-a10b",
       "name": "Qwen: Qwen3.5-122B-A10B",
       "pricing": {
-        "prompt": "0.0000004",
-        "completion": "0.0000032"
+        "prompt": "0.00000026",
+        "completion": "0.00000208"
       }
     },
     {
       "id": "qwen/qwen3.5-27b",
       "name": "Qwen: Qwen3.5-27B",
       "pricing": {
-        "prompt": "0.00000027",
-        "completion": "0.00000216",
-        "input_cache_read": "0.00000027"
+        "prompt": "0.00000026",
+        "completion": "0.0000026"
       }
     },
     {
@@ -3373,7 +3444,7 @@
       "id": "qwen/qwen3.5-9b",
       "name": "Qwen: Qwen3.5-9B",
       "pricing": {
-        "prompt": "0.00000017",
+        "prompt": "0.0000001",
         "completion": "0.00000025"
       }
     },
@@ -3406,9 +3477,8 @@
       "id": "qwen/qwen3.6-27b",
       "name": "Qwen: Qwen3.6 27B",
       "pricing": {
-        "prompt": "0.00000025",
-        "completion": "0.000002",
-        "input_cache_read": "0.000000025"
+        "prompt": "0.00000032",
+        "completion": "0.0000032"
       }
     },
     {
@@ -3416,8 +3486,8 @@
       "name": "Qwen: Qwen3.6 35B A3B",
       "pricing": {
         "prompt": "0.0000001",
-        "completion": "0.00000095",
-        "input_cache_read": "0.00000005"
+        "completion": "0.00000089",
+        "input_cache_read": "0.000000035"
       }
     },
     {
@@ -3489,9 +3559,18 @@
       "id": "qwen/qwen3.8-27b",
       "name": "Qwen: Qwen3.8 27B",
       "pricing": {
-        "prompt": "0.0000002",
-        "completion": "0.0000025",
-        "input_cache_read": "0.00000009"
+        "prompt": "0.00000006",
+        "completion": "0.00000196",
+        "input_cache_read": "0.000000059"
+      }
+    },
+    {
+      "id": "qwen/qwen3.8-27b:batch",
+      "name": "Qwen: Qwen3.8 27B (batch)",
+      "pricing": {
+        "prompt": "0.00000016",
+        "completion": "0.000002",
+        "input_cache_read": "0.00000004"
       }
     },
     {
@@ -3513,6 +3592,14 @@
       }
     },
     {
+      "id": "qwen/qwen3.8-max-0902:batch",
+      "name": "Qwen: Qwen3.8 Max (0902) (batch)",
+      "pricing": {
+        "prompt": "0.00000115",
+        "completion": "0.00000345"
+      }
+    },
+    {
       "id": "qwen/qwen3.8-max-prime",
       "name": "Qwen: Qwen3.8 Max Prime",
       "pricing": {
@@ -3531,6 +3618,25 @@
       }
     },
     {
+      "id": "qwen/qwen4-max",
+      "name": "Qwen: Qwen4 Max",
+      "pricing": {
+        "prompt": "0.000001425",
+        "completion": "0.000004275",
+        "input_cache_read": "0.00000007125",
+        "input_cache_write": "0.00000178125"
+      }
+    },
+    {
+      "id": "radixark/daisyrose-27b",
+      "name": "RadixArk: DaisyRose 27B",
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.000001875",
+        "input_cache_read": "0.0000000375"
+      }
+    },
+    {
       "id": "recursive/flint-v1.0:free",
       "name": "Recursive: Flint (free)",
       "pricing": {
@@ -3542,9 +3648,9 @@
       "id": "reflection/beam-1.0-501b-a23b",
       "name": "Reflection: Beam 1.0 501B A23B",
       "pricing": {
-        "prompt": "0.00000025",
+        "prompt": "0.0000003",
         "completion": "0.000001",
-        "input_cache_read": "0.00000005"
+        "input_cache_read": "0.00000004"
       }
     },
     {
@@ -3577,6 +3683,15 @@
       "pricing": {
         "prompt": "0.000001",
         "completion": "0.000003"
+      }
+    },
+    {
+      "id": "ricursiveai/ripple-65b-preview",
+      "name": "Ricursive: Ripple 65B Preview",
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000003",
+        "input_cache_read": "0.000000025"
       }
     },
     {
@@ -3648,14 +3763,6 @@
       }
     },
     {
-      "id": "stepfun/step-3.5-flash",
-      "name": "StepFun: Step 3.5 Flash",
-      "pricing": {
-        "prompt": "0.0000001",
-        "completion": "0.0000003"
-      }
-    },
-    {
       "id": "stepfun/step-3.7-flash",
       "name": "StepFun: Step 3.7 Flash",
       "pricing": {
@@ -3671,14 +3778,6 @@
         "prompt": "0.000001",
         "completion": "0.0000027",
         "input_cache_read": "0.0000001"
-      }
-    },
-    {
-      "id": "tencent/hunyuan-a13b-instruct",
-      "name": "Tencent: Hunyuan A13B Instruct",
-      "pricing": {
-        "prompt": "0.00000014",
-        "completion": "0.00000057"
       }
     },
     {
@@ -3715,12 +3814,21 @@
       }
     },
     {
-      "id": "tencent/hy3-preview",
-      "name": "Tencent: Hy3 preview",
+      "id": "tencent/hy4",
+      "name": "Tencent: Hy4",
       "pricing": {
-        "prompt": "0.00000018",
-        "completion": "0.0000006",
-        "input_cache_read": "0.00000006"
+        "prompt": "0.000000417",
+        "completion": "0.0000012505",
+        "input_cache_read": "0.000000021"
+      }
+    },
+    {
+      "id": "tencent/hy4-flash",
+      "name": "Tencent: Hy4 flash",
+      "pricing": {
+        "prompt": "0.000000035",
+        "completion": "0.0000001405",
+        "input_cache_read": "0.0000000015"
       }
     },
     {
@@ -3768,6 +3876,24 @@
       }
     },
     {
+      "id": "thinkingmachines/inkling-2-mini",
+      "name": "Thinking Machines: Inkling 2 Mini",
+      "pricing": {
+        "prompt": "0.000000075",
+        "completion": "0.0000003",
+        "input_cache_read": "0.000000015"
+      }
+    },
+    {
+      "id": "thinkingmachines/inkling-2-small",
+      "name": "Thinking Machines: Inkling 2 Small",
+      "pricing": {
+        "prompt": "0.0000003",
+        "completion": "0.000001",
+        "input_cache_read": "0.00000003"
+      }
+    },
+    {
       "id": "thinkingmachines/inkling-small",
       "name": "Thinking Machines: Inkling Small",
       "pricing": {
@@ -3777,19 +3903,21 @@
       }
     },
     {
-      "id": "thinkingmachines/inkling-small:free",
-      "name": "Thinking Machines: Inkling Small (free)",
+      "id": "thinkingmachines/inkling-small:batch",
+      "name": "Thinking Machines: Inkling Small (batch)",
       "pricing": {
-        "prompt": "0",
-        "completion": "0"
+        "prompt": "0.00000036",
+        "completion": "0.00000096",
+        "input_cache_read": "0.00000008"
       }
     },
     {
-      "id": "thinkingmachines/inkling:free",
-      "name": "Thinking Machines: Inkling (free)",
+      "id": "tngtech/deepseek-r1t2-chimera",
+      "name": "TNG: DeepSeek R1T2 Chimera",
       "pricing": {
-        "prompt": "0",
-        "completion": "0"
+        "prompt": "0.000001",
+        "completion": "0.000002625",
+        "input_cache_read": "0.00000002"
       }
     },
     {
@@ -3801,29 +3929,21 @@
       }
     },
     {
-      "id": "unbiased/pareto-26.10",
-      "name": "Pareto 26.10",
-      "pricing": {
-        "prompt": "0.0000008",
-        "completion": "0.0000032",
-        "input_cache_read": "0.00000003"
-      }
-    },
-    {
-      "id": "unbiased/pareto-26.9",
-      "name": "Pareto 26.9",
-      "pricing": {
-        "prompt": "0.0000025",
-        "completion": "0.0000075",
-        "input_cache_read": "0.00000025"
-      }
-    },
-    {
       "id": "undi95/remm-slerp-l2-13b",
       "name": "ReMM SLERP 13B",
       "pricing": {
-        "prompt": "0.00000035",
-        "completion": "0.00000065"
+        "prompt": "0.0000003",
+        "completion": "0.0000005",
+        "input_cache_read": "0.0000002"
+      }
+    },
+    {
+      "id": "upstage/solar-mini-4-5",
+      "name": "Upstage: Solar Mini 4.5 (Preview)",
+      "pricing": {
+        "prompt": "0.00000001",
+        "completion": "0.00000004",
+        "input_cache_read": "0.000000001"
       }
     },
     {
@@ -3836,12 +3956,12 @@
       }
     },
     {
-      "id": "upstage/solar-pro-3",
-      "name": "Upstage: Solar Pro 3",
+      "id": "upstage/solar-pro-4-contributor",
+      "name": "Upstage: Solar Pro 4 Contributor",
       "pricing": {
-        "prompt": "0.00000015",
-        "completion": "0.0000006",
-        "input_cache_read": "0.000000015"
+        "prompt": "0.00000009",
+        "completion": "0.00000036",
+        "input_cache_read": "0.000000018"
       }
     },
     {
@@ -3863,7 +3983,7 @@
     },
     {
       "id": "x-ai/grok-4.20",
-      "name": "SpaceXAI: Grok 4.20",
+      "name": "SpaceXSI: Grok 4.20",
       "pricing": {
         "prompt": "0.00000125",
         "completion": "0.0000025",
@@ -3872,7 +3992,7 @@
     },
     {
       "id": "x-ai/grok-4.20-multi-agent",
-      "name": "SpaceXAI: Grok 4.20 Multi-Agent",
+      "name": "SpaceXSI: Grok 4.20 Multi-Agent",
       "pricing": {
         "prompt": "0.00000125",
         "completion": "0.0000025",
@@ -3881,7 +4001,7 @@
     },
     {
       "id": "x-ai/grok-4.3",
-      "name": "SpaceXAI: Grok 4.3",
+      "name": "SpaceXSI: Grok 4.3",
       "pricing": {
         "prompt": "0.00000125",
         "completion": "0.0000025",
@@ -3890,7 +4010,7 @@
     },
     {
       "id": "x-ai/grok-4.3:batch",
-      "name": "SpaceXAI: Grok 4.3 (batch)",
+      "name": "SpaceXSI: Grok 4.3 (batch)",
       "pricing": {
         "prompt": "0.000001",
         "completion": "0.000002",
@@ -3899,7 +4019,7 @@
     },
     {
       "id": "x-ai/grok-4.5",
-      "name": "SpaceXAI: Grok 4.5",
+      "name": "SpaceXSI: Grok 4.5",
       "pricing": {
         "prompt": "0.000002",
         "completion": "0.000006",
@@ -3908,16 +4028,25 @@
     },
     {
       "id": "x-ai/grok-4.6",
-      "name": "SpaceXAI: Grok 4.6",
+      "name": "SpaceXSI: Grok 4.6",
       "pricing": {
         "prompt": "0.000002",
         "completion": "0.000006",
         "input_cache_read": "0.0000005"
+      }
+    },
+    {
+      "id": "x-ai/grok-4.6:batch",
+      "name": "SpaceXSI: Grok 4.6 (batch)",
+      "pricing": {
+        "prompt": "0.0000016",
+        "completion": "0.0000048",
+        "input_cache_read": "0.0000004"
       }
     },
     {
       "id": "x-ai/grok-4.7",
-      "name": "SpaceXAI: Grok 4.7",
+      "name": "SpaceXSI: Grok 4.7",
       "pricing": {
         "prompt": "0.000002",
         "completion": "0.000006",
@@ -3925,30 +4054,12 @@
       }
     },
     {
-      "id": "x-ai/grok-build-0.1",
-      "name": "SpaceXAI: Grok Build 0.1",
+      "id": "x-ai/grok-4.7:batch",
+      "name": "SpaceXSI: Grok 4.7 (batch)",
       "pricing": {
-        "prompt": "0.000001",
-        "completion": "0.000002",
-        "input_cache_read": "0.0000002"
-      }
-    },
-    {
-      "id": "xiaomi/mimo-v2.5",
-      "name": "Xiaomi: MiMo-V2.5",
-      "pricing": {
-        "prompt": "0.000000119",
-        "completion": "0.000000238",
-        "input_cache_read": "0.00000000255"
-      }
-    },
-    {
-      "id": "xiaomi/mimo-v2.5-pro",
-      "name": "Xiaomi: MiMo-V2.5-Pro",
-      "pricing": {
-        "prompt": "0.0000003045",
-        "completion": "0.000000609",
-        "input_cache_read": "0.0000000028"
+        "prompt": "0.0000016",
+        "completion": "0.0000048",
+        "input_cache_read": "0.0000004"
       }
     },
     {
@@ -3958,6 +4069,15 @@
         "prompt": "0.00000014",
         "completion": "0.00000028",
         "input_cache_read": "0.0000000028"
+      }
+    },
+    {
+      "id": "xiaomi/mimo-v2.6-flash-mopd",
+      "name": "Xiaomi: MiMo-V2.6-Flash-MOPD",
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.000001",
+        "input_cache_read": "0.00000005"
       }
     },
     {
@@ -3979,14 +4099,6 @@
       }
     },
     {
-      "id": "xingchen-agi/xing4.0-29b-a4b:free",
-      "name": "XingChen: Xing4.0 29B A4B (free)",
-      "pricing": {
-        "prompt": "0",
-        "completion": "0"
-      }
-    },
-    {
       "id": "z-ai/glm-4.5",
       "name": "Z.ai: GLM 4.5",
       "pricing": {
@@ -3999,9 +4111,9 @@
       "id": "z-ai/glm-4.5-air",
       "name": "Z.ai: GLM 4.5 Air",
       "pricing": {
-        "prompt": "0.00000013",
-        "completion": "0.00000085",
-        "input_cache_read": "0.000000025"
+        "prompt": "0.0000002",
+        "completion": "0.0000011",
+        "input_cache_read": "0.00000003"
       }
     },
     {
@@ -4017,9 +4129,9 @@
       "id": "z-ai/glm-4.6",
       "name": "Z.ai: GLM 4.6",
       "pricing": {
-        "prompt": "0.00000055",
-        "completion": "0.0000022",
-        "input_cache_read": "0.00000011"
+        "prompt": "0.0000005",
+        "completion": "0.000002",
+        "input_cache_read": "0.0000001"
       }
     },
     {
@@ -4035,9 +4147,9 @@
       "id": "z-ai/glm-4.7",
       "name": "Z.ai: GLM 4.7",
       "pricing": {
-        "prompt": "0.00000054",
-        "completion": "0.00000198",
-        "input_cache_read": "0.000000099"
+        "prompt": "0.0000006",
+        "completion": "0.0000022",
+        "input_cache_read": "0.00000011"
       }
     },
     {
@@ -4079,18 +4191,27 @@
       "id": "z-ai/glm-5.2",
       "name": "Z.ai: GLM 5.2",
       "pricing": {
-        "prompt": "0.0000000341",
-        "completion": "0.000007",
-        "input_cache_read": "0.000000033"
+        "prompt": "0.00000062",
+        "completion": "0.00000242",
+        "input_cache_read": "0.00000014"
+      }
+    },
+    {
+      "id": "z-ai/glm-5.2:batch",
+      "name": "Z.ai: GLM 5.2 (batch)",
+      "pricing": {
+        "prompt": "0.000000322",
+        "completion": "0.000000989",
+        "input_cache_read": "0.000000109"
       }
     },
     {
       "id": "z-ai/glm-5.3",
       "name": "Z.ai: GLM 5.3",
       "pricing": {
-        "prompt": "0.000000079",
+        "prompt": "0.0000000699",
         "completion": "0.0000014",
-        "input_cache_read": "0.000000078"
+        "input_cache_read": "0.0000000689"
       }
     },
     {
@@ -4106,9 +4227,9 @@
       "id": "z-ai/glm-5.3-flash:batch",
       "name": "Z.ai: GLM 5.3 Flash (batch)",
       "pricing": {
-        "prompt": "0.00000005",
-        "completion": "0.00000018",
-        "input_cache_read": "0.00000001"
+        "prompt": "0.000000023",
+        "completion": "0.000000068",
+        "input_cache_read": "0.000000009"
       }
     },
     {
@@ -4117,25 +4238,34 @@
       "pricing": {
         "prompt": "0.00000037",
         "completion": "0.00000125",
-        "input_cache_read": "0.00000009"
+        "input_cache_read": "0.000000075"
+      }
+    },
+    {
+      "id": "z-ai/glm-5.3-flashx-legal",
+      "name": "Z.ai: GLM 5.3 FlashX Legal",
+      "pricing": {
+        "prompt": "0.00000037",
+        "completion": "0.00000125",
+        "input_cache_read": "0.000000075"
       }
     },
     {
       "id": "z-ai/glm-5.3-prime",
       "name": "Z.ai: GLM 5.3 Prime",
       "pricing": {
-        "prompt": "0.0000028",
-        "completion": "0.0000088",
-        "input_cache_read": "0.00000056"
+        "prompt": "0.00000168",
+        "completion": "0.00000528",
+        "input_cache_read": "0.000000336"
       }
     },
     {
       "id": "z-ai/glm-5.3:batch",
       "name": "Z.ai: GLM 5.3 (batch)",
       "pricing": {
-        "prompt": "0.00000045",
-        "completion": "0.000002",
-        "input_cache_read": "0.0000001"
+        "prompt": "0.00000028",
+        "completion": "0.000001249",
+        "input_cache_read": "0.000000061"
       }
     },
     {

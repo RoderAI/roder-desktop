@@ -60,7 +60,7 @@ native app-server JSON-RPC methods directly to the remote engine:
 ## Providers
 
 Desktop discovers providers from the embedded harness's `runners/list` API rather
-than maintaining a fixed selectable catalog. The pinned Roder 0.4.11 build
+than maintaining a fixed selectable catalog. The pinned Roder 0.4.14 build
 includes Blaxel, Sprites, Docker, unix-local, Cloudflare, Daytona, E2B, Modal,
 Runloop, and Vercel.
 
