@@ -89,13 +89,14 @@ test("setThreadMode sends the policy mode wire value to the app-server", async (
     return { mode: params.mode };
   });
 
-  const result = await roderIpc.setThreadMode("accept_all", "desktop permission selector");
+  const result = await roderIpc.setThreadMode("accept_all", "desktop permission selector", "thread-1");
 
   expect(result).toEqual({ mode: "accept_all" });
   expect(JSON.parse(JSON.stringify(calls))).toEqual([
     {
       method: "thread/set_mode",
       params: {
+        threadId: "thread-1",
         mode: "accept_all",
         reason: "desktop permission selector",
       },

@@ -9,7 +9,37 @@ import {
   routeSearchParsers,
   selectWorkspacePanelTab,
   toggleWorkspacePanelShell,
+  workspacePanelForThreadSelection,
 } from "../src/lib/route-search";
+
+test("returning to a persistent agent restores its selected tab without changing sidebar visibility", () => {
+  const current = { panelTabs: ["browser"], panelActive: "browser", panelOpen: true } as const;
+  const remembered = { panelTabs: ["persistentAgent", "files"], panelActive: "files", panelOpen: false } as const;
+
+  expect(workspacePanelForThreadSelection(current, remembered)).toEqual({ ...remembered, panelOpen: true });
+});
+
+test("returning to a persistent agent cannot reopen a collapsed sidebar", () => {
+  const remembered = { panelTabs: ["persistentAgent"], panelActive: "persistentAgent", panelOpen: true } as const;
+
+  expect(workspacePanelForThreadSelection({ panelOpen: false }, remembered)).toEqual({
+    ...remembered,
+    panelOpen: false,
+  });
+});
+
+test("first visits preserve sidebar visibility and don't carry over another agent's settings tab", () => {
+  expect(
+    workspacePanelForThreadSelection({
+      panelTabs: ["persistentAgent", "files"],
+      panelActive: "persistentAgent",
+      panelOpen: false,
+    }),
+  ).toEqual({ panelTabs: ["files"], panelActive: "files", panelOpen: false });
+  expect(workspacePanelForThreadSelection({ panelTabs: ["browser"], panelActive: "browser", panelOpen: true })).toEqual(
+    { panelTabs: ["browser"], panelActive: "browser", panelOpen: true },
+  );
+});
 
 test("route search defaults preserve practical app layout state", () => {
   expect(normalizeRouteSearch({})).toEqual({

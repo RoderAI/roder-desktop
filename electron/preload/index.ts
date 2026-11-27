@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { AppUpdateStatus } from "../../src/lib/app-update";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
 import type { ClaudeCliStatus } from "../onboarding/claude-cli";
@@ -99,14 +100,7 @@ export type AppCommand = {
   command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch" | "checkForUpdates";
 };
 
-export type AppUpdateStatus =
-  | { state: "idle"; currentVersion: string }
-  | { state: "checking"; currentVersion: string }
-  | { state: "upToDate"; currentVersion: string }
-  | { state: "available"; currentVersion: string; availableVersion: string }
-  | { state: "downloading"; currentVersion: string; availableVersion: string }
-  | { state: "ready"; currentVersion: string; availableVersion: string }
-  | { state: "error"; currentVersion: string; message: string };
+export type { AppUpdateStatus } from "../../src/lib/app-update";
 
 import { homedir } from "node:os";
 

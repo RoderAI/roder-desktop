@@ -88,6 +88,7 @@ type RoderStore = {
   loadingMoreThreads: boolean;
   threadGoalsByThread: Record<string, RoderThreadGoal>;
   threadControlsByThread: Record<string, ThreadControlState>;
+  draftComposerPreferences: Partial<Pick<ThreadControlState, "reasoning" | "policyMode">>;
   queuedPromptsByThread: Record<string, QueuedPrompt[]>;
   hunkRevisionByThread: Record<string, number>;
   subagentTracesByThread: SubagentTracesByThread;
@@ -430,6 +431,7 @@ export const useRoderStore = create<RoderStore>()(
       loadingMoreThreads: false,
       threadGoalsByThread: {},
       threadControlsByThread: {},
+      draftComposerPreferences: {},
       queuedPromptsByThread: {},
       hunkRevisionByThread: {},
       subagentTracesByThread: {},
@@ -530,6 +532,9 @@ export const useRoderStore = create<RoderStore>()(
               providerResult.active_reasoning || settings.default_reasoning,
             );
           const activeSelectionMode = activeThread?.selectionMode ?? providerSelectionMode;
+          const savedControls = activeThreadId
+            ? current.threadControlsByThread[activeThreadId]
+            : current.draftComposerPreferences;
 
           set({
             status,
@@ -553,8 +558,12 @@ export const useRoderStore = create<RoderStore>()(
             selectedModel: activeThread?.model || currentSelectedModel,
             selectedModelProvider: activeThread?.modelProvider || currentSelectedModelProvider,
             selectedSelectionMode: activeSelectionMode,
-            selectedReasoning: defaultReasoning,
-            selectedPolicyMode: defaultPolicyMode,
+            selectedReasoning:
+              savedControls?.reasoning ??
+              (activeThread?.selectionMode?.reasoning
+                ? normalizeReasoningEffort(activeThread.selectionMode.reasoning)
+                : defaultReasoning),
+            selectedPolicyMode: savedControls?.policyMode ?? defaultPolicyMode,
             agentSwarmMode,
             agentSwarmModeAvailable,
             activeThreadId,
@@ -620,16 +629,17 @@ export const useRoderStore = create<RoderStore>()(
       selectThread: async (threadId, options = { pushHistory: true }) => {
         const current = get();
         if (!threadId) {
-          set({
+          set((state) => ({
             activeThreadId: "",
             busy: false,
+            ...draftComposerControls(state),
             backStack:
               options.pushHistory && current.activeThreadId
                 ? [...current.backStack, { threadId: current.activeThreadId, at: Date.now() }].slice(-80)
                 : current.backStack,
             forwardStack: options.pushHistory ? [] : current.forwardStack,
             error: null,
-          });
+          }));
           return;
         }
         if (
@@ -664,6 +674,7 @@ export const useRoderStore = create<RoderStore>()(
           return {
             activeThreadId: threadId,
             busy: isThreadRunning(selectedThread),
+            ...threadComposerControls(state, threadId, selectedThread),
             ...selectedWorkspacePatch,
             threadDetails: details,
             threadHistoryByThread: {
@@ -735,12 +746,7 @@ export const useRoderStore = create<RoderStore>()(
               selectedModel: threadIsActive
                 ? state.threadControlsByThread[threadId]?.model || thread.model || state.defaultModel
                 : state.selectedModel,
-              selectedReasoning: threadIsActive
-                ? state.threadControlsByThread[threadId]?.reasoning || state.defaultReasoning
-                : state.selectedReasoning,
-              selectedPolicyMode: threadIsActive
-                ? state.threadControlsByThread[threadId]?.policyMode || state.defaultPolicyMode
-                : state.selectedPolicyMode,
+              ...(threadIsActive ? threadComposerControls(state, threadId, thread) : {}),
               agentSwarmMode: threadIsActive
                 ? (state.threadControlsByThread[threadId]?.agentSwarmMode ?? state.agentSwarmMode)
                 : state.agentSwarmMode,
@@ -961,6 +967,7 @@ export const useRoderStore = create<RoderStore>()(
         set((state) => ({
           activeThreadId: "",
           busy: false,
+          ...draftComposerControls(state),
           ...workspaceSelectionPatchForCwd(state, cwd),
           error: null,
         }));
@@ -1333,7 +1340,7 @@ export const useRoderStore = create<RoderStore>()(
       setSelectedReasoning: (selectedReasoning) =>
         set((state) => ({
           selectedReasoning,
-          threadControlsByThread: updateActiveThreadControls(state, { reasoning: selectedReasoning }),
+          ...selectedComposerPreferencePatch(state, { reasoning: selectedReasoning }),
         })),
       setAgentSwarmMode: async (enabled) => {
         const state = get();
@@ -1363,25 +1370,37 @@ export const useRoderStore = create<RoderStore>()(
       },
       setSelectedPolicyMode: async (selectedPolicyMode) => {
         const mode = normalizePolicyMode(selectedPolicyMode);
-        const previousMode = get().selectedPolicyMode;
+        const { activeThreadId, selectedPolicyMode: previousMode } = get();
         set((state) => ({
           selectedPolicyMode: mode,
-          threadControlsByThread: updateActiveThreadControls(state, { policyMode: mode }),
+          ...selectedComposerPreferencePatch(state, { policyMode: mode }),
           error: null,
         }));
-        if (mode === previousMode) {
+        // A draft has no live thread. Its policy is sent when the first turn starts.
+        if (!activeThreadId || mode === previousMode) {
           return;
         }
         try {
-          const result = await roderIpc.setThreadMode(mode, "desktop permission selector");
+          const result = await roderIpc.setThreadMode(mode, "desktop permission selector", activeThreadId);
           const appliedMode = normalizePolicyMode(result.mode || mode);
-          set((state) => ({
-            selectedPolicyMode: appliedMode,
-            threadControlsByThread: updateActiveThreadControls(state, { policyMode: appliedMode }),
-            error: null,
-          }));
+          set((state) =>
+            state.activeThreadId === activeThreadId && state.selectedPolicyMode === mode
+              ? {
+                  selectedPolicyMode: appliedMode,
+                  ...selectedComposerPreferencePatch(state, { policyMode: appliedMode }),
+                }
+              : {},
+          );
         } catch (error) {
-          set({ error: (error as Error).message });
+          set((state) =>
+            state.activeThreadId === activeThreadId && state.selectedPolicyMode === mode
+              ? {
+                  selectedPolicyMode: previousMode,
+                  ...selectedComposerPreferencePatch(state, { policyMode: previousMode }),
+                  error: (error as Error).message,
+                }
+              : {},
+          );
         }
       },
       saveDefaults: async () => {
@@ -1411,13 +1430,20 @@ export const useRoderStore = create<RoderStore>()(
           roderIpc.setDefaultMode(state.defaultPolicyMode),
         ]);
 
-        set({
+        set((current) => ({
           defaultModel: selection.model || selectedModel,
           defaultModelProvider: selection.provider || selectedProvider,
           defaultSelectionMode: selection.selectionMode,
           defaultReasoning: normalizeReasoningEffort(selection.reasoning || state.defaultReasoning),
           defaultPolicyMode: normalizePolicyMode(mode.default_mode || state.defaultPolicyMode),
-        });
+          draftComposerPreferences: {},
+          ...(!current.activeThreadId
+            ? {
+                selectedReasoning: normalizeReasoningEffort(selection.reasoning || state.defaultReasoning),
+                selectedPolicyMode: normalizePolicyMode(mode.default_mode || state.defaultPolicyMode),
+              }
+            : {}),
+        }));
       },
       setSelectedWorkspaceCwd: (cwd) => set((state) => workspaceSelectionPatchForCwd(state, cwd)),
       openWorkspaceFolder: async () => {
@@ -1583,6 +1609,8 @@ export const useRoderStore = create<RoderStore>()(
         };
       },
       partialize: (state) => ({
+        threadControlsByThread: state.threadControlsByThread,
+        draftComposerPreferences: state.draftComposerPreferences,
         activeThreadId: state.activeThreadId,
         backStack: state.backStack,
         forwardStack: state.forwardStack,
@@ -1600,6 +1628,8 @@ export const useRoderStore = create<RoderStore>()(
 
 type PersistedRoderState = Pick<
   RoderStore,
+  | "threadControlsByThread"
+  | "draftComposerPreferences"
   | "activeThreadId"
   | "backStack"
   | "forwardStack"
@@ -1670,6 +1700,34 @@ function debouncedLocalStorage<S>(delayMs: number): PersistStorage<S> {
 }
 
 type RoderStoreSet = (partial: Partial<RoderStore> | ((state: RoderStore) => Partial<RoderStore>)) => void;
+
+function threadComposerControls(state: RoderStore, threadId: string, thread?: RoderThread) {
+  const saved = state.threadControlsByThread[threadId];
+  return {
+    selectedReasoning:
+      saved?.reasoning ??
+      (thread?.selectionMode?.reasoning
+        ? normalizeReasoningEffort(thread.selectionMode.reasoning)
+        : state.defaultReasoning),
+    selectedPolicyMode: saved?.policyMode ?? state.defaultPolicyMode,
+  };
+}
+
+function draftComposerControls(state: RoderStore) {
+  return {
+    selectedReasoning: state.draftComposerPreferences.reasoning ?? state.defaultReasoning,
+    selectedPolicyMode: state.draftComposerPreferences.policyMode ?? state.defaultPolicyMode,
+  };
+}
+
+function selectedComposerPreferencePatch(
+  state: RoderStore,
+  patch: RoderStore["draftComposerPreferences"],
+): Partial<RoderStore> {
+  return state.activeThreadId
+    ? { threadControlsByThread: updateActiveThreadControls(state, patch) }
+    : { draftComposerPreferences: { ...state.draftComposerPreferences, ...patch } };
+}
 
 function setThreadControls(
   controlsByThread: Record<string, ThreadControlState>,

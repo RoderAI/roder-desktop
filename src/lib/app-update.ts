@@ -11,13 +11,14 @@ export type AppUpdateStatus =
       state: "downloading";
       currentVersion: string;
       availableVersion: string;
+      percent?: number;
     }
   | {
       state: "ready";
       currentVersion: string;
       availableVersion: string;
     }
-  | { state: "error"; currentVersion: string; message: string };
+  | { state: "error"; currentVersion: string; message: string; availableVersion?: string };
 
 export const MACOS_UPDATE_FEED_URL = "https://dl.roder.sh/desktop/latest/updates.json";
 

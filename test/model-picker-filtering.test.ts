@@ -87,7 +87,7 @@ test("shared model picker renders only matching options from Base UI's filtered 
   expect(html).not.toContain("Auto coding");
 });
 
-test("shared search includes unconfigured catalog models as bottom provider setup actions", () => {
+test("shared search hides models from providers without credentials", () => {
   const html = renderPicker("GPT-6.1-Sol", [
     {
       id: "openrouter",
@@ -97,10 +97,9 @@ test("shared search includes unconfigured catalog models as bottom provider setu
       models: [{ id: "sol", name: "GPT-6.1-Sol" }],
     },
   ]);
-  expect(html.match(/role="option"/g)).toHaveLength(2);
-  expect(html).toContain("Set up provider");
-  expect(html).toContain("Set up OpenRouter");
-  expect(html.indexOf("OpenAI")).toBeLessThan(html.indexOf("Set up provider"));
+  expect(html.match(/role="option"/g)).toHaveLength(1);
+  expect(html).not.toContain("Set up provider");
+  expect(html).not.toContain("OpenRouter");
 });
 
 test("shared model picker searches provider names and Auto routing, and empties unmatched groups", () => {
@@ -110,31 +109,6 @@ test("shared model picker searches provider names and Auto routing, and empties 
   expect(auto).toContain("Auto coding");
   expect(renderPicker("no-such-model")).not.toContain('role="option"');
   expect(renderPicker("").match(/role="option"/g)).toHaveLength(4);
-});
-
-test("a setup row opens the exact provider Settings without selecting its model and retains panel search state", () => {
-  input.navigate.mockClear();
-  input.selectModel.mockClear();
-  renderPicker("sol", [
-    {
-      id: "openrouter",
-      name: "OpenRouter",
-      authType: "api_key",
-      authenticated: false,
-      models: [{ id: "sol", name: "GPT-6.1-Sol" }],
-    },
-  ]);
-  const setup = input.items.flatMap((group) => group.items).find((item) => item.type === "setup")!;
-  input.choose!(setup);
-  expect(input.selectModel).not.toHaveBeenCalled();
-  const target = input.navigate.mock.calls[0][0];
-  expect(target.to).toBe("/settings/$section");
-  expect(target.params).toEqual({ section: "providers" });
-  expect(target.search({ panelOpen: true, panelTabs: ["files"] })).toEqual({
-    panelOpen: true,
-    panelTabs: ["files"],
-    setupProvider: "openrouter",
-  });
 });
 
 test("an unavailable current model remains displayed instead of silently switching to an available model", () => {

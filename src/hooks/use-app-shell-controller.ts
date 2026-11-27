@@ -1,6 +1,6 @@
 import { useMatch, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryStates, type SetValues } from "nuqs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppShellContextValue } from "@/components/app-shell-context";
 import type { AppShellLayoutProps } from "@/components/app-shell-layout";
 import { useExtensionThemes } from "@/hooks/use-extension-themes";
@@ -35,12 +35,15 @@ import {
   closeWorkspacePanelShell,
   closeWorkspacePanelTab,
   mergeRouteSearchUpdate,
+  normalizeWorkspacePanelState,
   openWorkspacePanelTab,
   routeSearchParsers,
   selectWorkspacePanelTab,
   toggleWorkspacePanelShell,
+  workspacePanelForThreadSelection,
   type RouteReviewScope,
   type RouteWorkspacePanel,
+  type WorkspacePanelState,
 } from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
@@ -96,12 +99,20 @@ export function useAppShellController(): AppShellController {
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchSelectionIntent, setFileSearchSelectionIntent] = useState<FilePanelSelectionIntent | null>(null);
   const activePanel = routeSearch.panelActive;
+  const panelTabs = routeSearch.panelTabs;
   const workspacePanelOpen = routeSearch.panelOpen;
   const selectedExtensionId = routeSearch.extension || null;
   const sidebarOpen = routeSearch.sidebar;
   const isPluginsRoute = isPluginsRoutePath(pathname);
   const isNewRoute = isNewRoutePath(pathname);
   const routeThreadId = threadRouteMatch?.params.threadId ?? "";
+  const threadPanelStates = useRef(new Map<string, Pick<WorkspacePanelState, "panelTabs" | "panelActive">>());
+  useEffect(() => {
+    if (routeThreadId) {
+      const { panelTabs: tabs, panelActive } = normalizeWorkspacePanelState(panelTabs, activePanel);
+      threadPanelStates.current.set(routeThreadId, { panelTabs: tabs, panelActive });
+    }
+  }, [routeThreadId, panelTabs, activePanel]);
   const routeActiveThreadId = routeThreadId || (isNewRoute ? "" : activeThreadId);
   const activeThread = threads.find((thread) => thread.id === routeActiveThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
@@ -152,30 +163,19 @@ export function useAppShellController(): AppShellController {
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
-    (threadId: string, panel?: RouteWorkspacePanel) => {
+    (threadId: string, kind?: "persistent-agent") => {
+      const remembered = kind === "persistent-agent" ? threadPanelStates.current.get(threadId) : undefined;
       void navigate({
         to: "/threads/$threadId",
         params: { threadId },
-        search: (previous) => {
-          if (panel) {
-            return {
-              ...previous,
-              panelTabs: [...new Set([...(previous.panelTabs ?? []), panel])],
-              panelActive: panel,
-              panelOpen: true,
-            };
-          }
-          const panelTabs = (previous.panelTabs ?? []).filter((tab) => tab !== "persistentAgent");
-          return {
-            ...previous,
-            panelTabs,
-            panelActive: previous.panelActive === "persistentAgent" ? (panelTabs[0] ?? null) : previous.panelActive,
-          };
-        },
+        search:
+          threadId === routeThreadId
+            ? true
+            : (previous) => ({ ...previous, ...workspacePanelForThreadSelection(previous, remembered) }),
       });
       void selectAgentThread(threadId, { pushHistory: false });
     },
-    [navigate, selectAgentThread],
+    [navigate, routeThreadId, selectAgentThread],
   );
   const archiveThread = useCallback(
     (threadId: string) => {

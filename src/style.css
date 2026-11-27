@@ -729,6 +729,21 @@ code[data-streamdown="inline-code"] {
   -webkit-background-clip: text;
 }
 
+.update-progress-outline {
+  x: 0.75px;
+  y: 0.75px;
+  width: calc(100% - 1.5px);
+  height: calc(100% - 1.5px);
+  /* Match the h-7 pill at the center of the 1.5px stroke. */
+  rx: calc(0.875rem - 0.75px);
+}
+
+@keyframes update-progress-lap {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
 .tool-disclosure-panel {
   height: var(--collapsible-panel-height);
   opacity: 1;

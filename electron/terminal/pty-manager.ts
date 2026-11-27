@@ -57,7 +57,10 @@ export class TerminalManager extends EventEmitter {
     this.#remoteStarter = options.startRemoteTerminal;
   }
 
-  async start(options: TerminalStartOptions = {}): Promise<TerminalSnapshot> {
+  async start(
+    options: TerminalStartOptions = {},
+    localCommand?: { executable: string; args: string[] },
+  ): Promise<TerminalSnapshot> {
     const id = options.id?.trim() || defaultSessionId;
     const cols = options.cols ?? 96;
     const rows = options.rows ?? 28;
@@ -111,7 +114,7 @@ export class TerminalManager extends EventEmitter {
     }
 
     const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "zsh");
-    const term: IPty = nodePty.spawn(shell, terminalShellArgs(shell, process.platform), {
+    const term: IPty = nodePty.spawn(localCommand?.executable ?? shell, localCommand?.args ?? terminalShellArgs(shell, process.platform), {
       name: terminalName,
       cols,
       rows,
@@ -145,7 +148,7 @@ export class TerminalManager extends EventEmitter {
       }
     });
 
-    if (process.platform !== "win32" && os.platform() === "darwin") {
+    if (!localCommand && process.platform !== "win32" && os.platform() === "darwin") {
       term.write("clear\r");
     }
 

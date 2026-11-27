@@ -1033,12 +1033,14 @@ Response:
 
 ### `thread/set_mode`
 
-Purpose: Set the live policy mode.
+Purpose: Set the live policy mode for a thread. Omit `threadId` only to change
+the runtime-wide policy.
 
 Request:
 
 ```json
 {
+  "threadId": "thread-123",
   "mode": "accept_all",
   "reason": "desktop toggle"
 }

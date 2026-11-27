@@ -50,6 +50,7 @@ import {
   RemoteWorkspaceService,
 } from "../cloud-machines/remote-workspace";
 import { CloudMachinesService } from "../cloud-machines/service";
+import { machineProfilesChanged } from "../agents/cloud-machine-config";
 import { detectLocalSshEnvironment, parseSshMachineConfig } from "../cloud-machines/ssh-config";
 import {
   detectLocalTailscale,
@@ -862,7 +863,17 @@ function getDesktopAgentTools(): DesktopAgentTools {
       {
         ...desktopConfigTool,
         execute: (args: unknown, context: { threadId: string }) =>
-          configureDesktopFromTool(args, handleRoderRequest, context.threadId),
+          configureDesktopFromTool(
+            args,
+            async (method, params) => {
+              const result = await handleRoderRequest(method, params);
+              if (method === "desktop/cloud-machines/save") {
+                sendToRenderer("roder:notification", { method: machineProfilesChanged, params: {} });
+              }
+              return result;
+            },
+            context.threadId,
+          ),
       },
     ],
     (method, params) => roder.request(method, params),

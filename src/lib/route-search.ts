@@ -63,6 +63,7 @@ export const routeSearchParsers = {
 };
 
 export type RouteSearchState = inferParserType<typeof routeSearchParsers>;
+export type WorkspacePanelState = Pick<RouteSearchState, "panelTabs" | "panelActive" | "panelOpen">;
 export const validateRouteSearch = createStandardSchemaV1(routeSearchParsers, { partialOutput: true });
 
 type RouteSearchPatch = Partial<{ [Key in keyof RouteSearchState]: RouteSearchState[Key] | null }>;
@@ -95,7 +96,7 @@ export function normalizeWorkspacePanelState(
   panelTabs: readonly RouteWorkspacePanel[],
   panelActive: RouteWorkspacePanel | null,
   panelOpen = false,
-): Pick<RouteSearchState, "panelTabs" | "panelActive" | "panelOpen"> {
+): WorkspacePanelState {
   const normalizedTabs = coerceWorkspacePanels(panelTabs);
   const normalizedActive =
     panelActive && normalizedTabs.includes(panelActive) ? panelActive : (normalizedTabs[0] ?? null);
@@ -104,6 +105,28 @@ export function normalizeWorkspacePanelState(
     panelActive: normalizedActive,
     panelOpen,
   };
+}
+
+export function workspacePanelForThreadSelection(
+  current: {
+    panelTabs?: readonly RouteWorkspacePanel[];
+    panelActive?: RouteWorkspacePanel | null;
+    panelOpen?: boolean;
+  },
+  remembered?: {
+    panelTabs: readonly RouteWorkspacePanel[];
+    panelActive: RouteWorkspacePanel | null;
+  },
+): WorkspacePanelState {
+  if (remembered) {
+    return normalizeWorkspacePanelState(remembered.panelTabs, remembered.panelActive, current.panelOpen);
+  }
+  // An agent's settings tab belongs to that thread, not the next one.
+  return normalizeWorkspacePanelState(
+    (current.panelTabs ?? []).filter((tab) => tab !== "persistentAgent"),
+    current.panelActive ?? null,
+    current.panelOpen,
+  );
 }
 
 export function openWorkspacePanelShell(): Pick<RouteSearchState, "panelOpen"> {

@@ -193,6 +193,7 @@ export function PersistentAgentEditor({
           <Link
             to="/threads/$threadId"
             params={{ threadId: status.threadId }}
+            search={true}
             className="rounded-md px-3 py-2 underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             Open persistent agent thread

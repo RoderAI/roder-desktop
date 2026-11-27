@@ -837,8 +837,12 @@ export const roderIpc = {
     window.roderDesktop.request("thread/resolve_user_input", { requestId: params.requestId, answers: params.answers }),
   exitPlan: (params: { requestId: string; approved: boolean }) =>
     window.roderDesktop.request("thread/exit_plan", { requestId: params.requestId, approved: params.approved }),
-  setThreadMode: (mode: PolicyMode, reason: string) =>
-    window.roderDesktop.request("thread/set_mode", { mode, reason }) as Promise<ThreadSetModeResult>,
+  setThreadMode: (mode: PolicyMode, reason: string, threadId?: string) =>
+    window.roderDesktop.request("thread/set_mode", {
+      mode,
+      reason,
+      ...(threadId ? { threadId } : {}),
+    }) as Promise<ThreadSetModeResult>,
   setThreadAgentSwarmMode: (enabled: boolean, threadId?: string) =>
     window.roderDesktop.request("thread/set_agent_swarm_mode", {
       enabled,

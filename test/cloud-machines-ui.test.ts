@@ -78,6 +78,14 @@ test("empty settings explain local execution and disable unavailable provider se
   expect(html).toContain("Never enter passwords, API keys, or tokens here.");
 });
 
+test("machine settings opens on saved profiles and keeps the editor closed until requested", () => {
+  const html = renderToStaticMarkup(React.createElement(SettingsCloudMachinesPanel));
+  expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>Machines<\/button>/);
+  expect(html).toMatch(/<button[^>]*aria-pressed="false"[^>]*>Connections<\/button>/);
+  expect(html).toMatch(/<form[^>]*hidden=""/);
+  expect(html).toContain("Manage connections");
+});
+
 test("supported providers render their setup hint and relevant non-secret example", () => {
   snapshot.providers = [{ provider_id: "sprites", capabilities: {}, setup_hint: "Create a Sprite before connecting." }];
   const html = renderToStaticMarkup(React.createElement(SettingsCloudMachinesPanel));

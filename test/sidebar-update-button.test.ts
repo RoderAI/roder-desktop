@@ -34,8 +34,22 @@ test("download and pending install disable repeat clicks", () => {
     expect(html).toContain('disabled=""');
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain(">Updating</span>");
+    expect(html).toContain('role="progressbar"');
+    expect(html).not.toContain("aria-valuenow");
+    expect(html).toMatch(/<rect[^>]*pathLength="100"[^>]*stroke-dasharray="20 80"/);
     expect(html).toContain("motion-reduce:animate-none");
   }
+});
+
+test("reports measured progress when supplied but waits for the ready event to offer restart", () => {
+  const html = render({ ...available, state: "downloading", percent: 63.4 });
+  expect(html).toContain('aria-valuenow="63"');
+  expect(html).toContain(">63%</span>");
+  expect(html).toMatch(/<rect[^>]*pathLength="100"[^>]*stroke-dasharray="63 100"/);
+  const atEnd = render({ ...available, state: "downloading", percent: 100 });
+  expect(atEnd).toContain(">Finishing</span>");
+  expect(atEnd).not.toContain(">Restart</span>");
+  expect(render({ ...available, state: "ready" })).not.toContain('role="progressbar"');
 });
 
 test("downloaded updates clearly offer restart instead of starting another download", () => {
@@ -55,6 +69,7 @@ test("failed updates stay actionable and explain the retry", () => {
 test("pill calls its update action", () => {
   const onClick = vi.fn<() => void>();
   const pill = SidebarUpdatePill({ status: available, onClick });
-  const props = pill?.props as ComponentProps<"button">;
+  const [button] = (pill?.props as { children: Array<ReturnType<typeof createElement>> }).children;
+  const props = button.props as ComponentProps<"button">;
   expect(props.onClick).toBe(onClick);
 });

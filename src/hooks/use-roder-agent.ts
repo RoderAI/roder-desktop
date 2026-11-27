@@ -7,6 +7,7 @@ import { activeTurnIdForThread, messagesFromThread, shouldShowThreadWorkingIndic
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
+import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import type { ConversationMessage, QueuedPrompt } from "@/types/roder";
 
 const emptyQueuedPrompts: QueuedPrompt[] = [];
@@ -100,7 +101,16 @@ function useRoderStoreBootstrap(): void {
     const offAppearance = roderIpc.onAppearance(applyAppearance);
     const offStatus = roderIpc.onStatus(applyStatus);
     const offStderr = roderIpc.onStderr(applyStderr);
-    const offNotification = roderIpc.onNotification(applyNotification);
+    const offNotification = roderIpc.onNotification((notification) => {
+      if (notification.method === "desktop/cloud-machines/changed") {
+        void useCloudMachinesStore
+          .getState()
+          .refresh()
+          .catch(() => undefined);
+        return;
+      }
+      applyNotification(notification);
+    });
     const offMcpAuthRequested = window.roderDesktop.onMcpAuthRequested(mcpAuthRequested);
     const offMcpOAuthCallback = window.roderDesktop.onMcpOAuthCallback(({ id, status, error }) => {
       mcpOAuthComplete(id, status, error);

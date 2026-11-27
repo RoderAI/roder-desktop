@@ -1,4 +1,12 @@
 import { redactSecrets } from "../app-server-redaction";
+import {
+  checkMachineTarget,
+  cloudMachineConfigSkill,
+  MachineConfigInputError,
+  machineConfigMethods,
+  machineConfigParams,
+  machineConfigResult,
+} from "./cloud-machine-config";
 
 // Deliberately not a generic app-server proxy: no credentials, arbitrary writes,
 // process control, or execution routes are exposed.
@@ -21,12 +29,13 @@ const methods: Record<string, readonly string[]> = {
   "workflow/refresh": ["workspace"],
   "workflow/remove": ["workspace", "itemId"],
   "discovery/refresh": [],
+  ...machineConfigMethods,
 };
 
 export const desktopConfigTool = {
   name: "desktop_config",
   description:
-    "Read or live-configure Roder using allowlisted app-server methods. Use the roder-config skill. Change settings only as requested by the user; read current settings first and verify afterward. Never pass credentials. Workflow operations default to the calling thread's workspace and return catalog/approval metadata only, not raw config previews. Enabling executable MCP/workflow entries requires explicit user approval and approveSideEffects=true. Does not configure arbitrary Electron preferences.",
+    "Read or live-configure Roder using allowlisted methods. Use the roder-config skill for settings, machine profiles (including Blaxel and Sprites), and workflows. Change settings only as requested by the user; read current settings first and verify afterward. Never pass credentials. Workflow operations default to the calling thread's workspace and return catalog/approval metadata only, not raw config previews. Enabling executable MCP/workflow entries requires explicit user approval and approveSideEffects=true.",
   parameters: {
     type: "object",
     properties: {
@@ -42,7 +51,7 @@ export const desktopConfigTool = {
   },
 };
 
-export const desktopConfigInstructions = `For user-requested Roder configuration, use the built-in $roder-config skill and desktop_config when advertised. Read its body via desktop_config with method "skills/read" and params {"selector":{"name":{"name":"roder-config"}}}. This tool is a restricted live app-server bridge, not browser JavaScript or a shell command. Read current values before changes; preserve unrelated configuration and verify returned settings after applying changes. Do not put secrets in tool arguments or output. Ask for explicit approval before workflow/enable starts executable MCP integrations; never infer approval from a pasted snippet. Report restart-only settings honestly. If desktop_config is not advertised on an older thread, ask the user to start a new chat rather than claiming to have applied changes.`;
+export const desktopConfigInstructions = `For user-requested Roder configuration, including setting up Roder's cloud machines, use the built-in $roder-config skill and desktop_config when advertised. Read its body via desktop_config with method "skills/read" and params {"selector":{"name":{"name":"roder-config"}}}. This tool is a restricted live app-server bridge, not browser JavaScript or a shell command. Read current values before changes; preserve unrelated configuration and verify returned settings after applying changes. Do not put secrets in tool arguments or output. Ask for explicit approval before workflow/enable starts executable MCP integrations; never infer approval from a pasted snippet. Report restart-only settings honestly. If desktop_config is not advertised on an older thread, ask the user to start a new chat rather than claiming to have applied changes.`;
 
 export async function configureDesktopFromTool(
   args: unknown,
@@ -76,7 +85,8 @@ export async function configureDesktopFromTool(
   // Do not echo arbitrary backend errors: configuration diagnostics can contain
   // credentials from existing files even when this call supplied none.
   try {
-    const scopedParams = { ...params };
+    const machineMethod = Object.hasOwn(machineConfigMethods, args.method);
+    const scopedParams = machineMethod ? machineConfigParams(args.method, params) : { ...params };
     const workflow = args.method.startsWith("workflow/");
     const needsWorkspace = workflow && scopedParams.workspace == null;
     const needsSkillCwd = args.method === "skills/list" && !scopedParams.cwd && !scopedParams.workspaceId;
@@ -87,11 +97,28 @@ export async function configureDesktopFromTool(
       if (typeof cwd !== "string" || !cwd.trim()) throw new Error("Calling thread has no workspace path");
       scopedParams[needsWorkspace ? "workspace" : "cwd"] = cwd;
     }
+    if (args.method === "desktop/cloud-machines/save") await checkMachineTarget(scopedParams, request);
     const result = await request(args.method, scopedParams);
+    if (machineMethod) return machineConfigResult(args.method, result);
+    if (
+      args.method === "skills/read" &&
+      isRecord(result) &&
+      isRecord(result.skill) &&
+      isRecord(result.skill.descriptor) &&
+      result.skill.descriptor.name === "roder-config" &&
+      result.skill.descriptor.source === "builtIn" &&
+      typeof result.skill.body === "string"
+    ) {
+      return redactSecrets({
+        ...result,
+        skill: { ...result.skill, body: `${result.skill.body}\n\n${cloudMachineConfigSkill}` },
+      });
+    }
     return workflow
       ? { ...workflowMetadata(result), detailsOmitted: "Raw previews and diagnostics omitted to protect credentials." }
       : redactSecrets(result);
-  } catch {
+  } catch (error) {
+    if (error instanceof MachineConfigInputError) throw error;
     throw new Error(
       `Desktop configuration request failed (${args.method}); check local diagnostics. No success was confirmed.`,
     );

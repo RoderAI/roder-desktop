@@ -20,7 +20,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { PersistentAgent } from "@/types/persistent-agents";
-import type { RouteWorkspacePanel } from "@/lib/route-search";
 import { Link } from "@tanstack/react-router";
 import { useId, useReducer, useRef, useState } from "react";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
@@ -127,7 +126,7 @@ type AppSidebarProps = {
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
   reserveTitlebarSpace: boolean;
-  onSelectThread: (threadId: string, panel?: RouteWorkspacePanel) => void;
+  onSelectThread: (threadId: string, kind?: "persistent-agent") => void;
   onArchiveThread: (threadId: string) => void;
   onLoadMoreThreads: () => void;
   onNewProject: () => void;
@@ -620,7 +619,7 @@ function PersistentAgentLinks({
   onRetry: () => void;
   activeThreadId: string;
   activeManagement: boolean;
-  onSelectThread: (threadId: string, panel?: RouteWorkspacePanel) => void;
+  onSelectThread: (threadId: string, kind?: "persistent-agent") => void;
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(true);
   const [search, dispatchSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
@@ -698,7 +697,7 @@ function PersistentAgentLinks({
                 "h-11 focus-visible:ring-2 focus-visible:ring-ring",
                 persistentAgent.threadId === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
               )}
-              onClick={() => onSelectThread(persistentAgent.threadId, "persistentAgent")}
+              onClick={() => onSelectThread(persistentAgent.threadId, "persistent-agent")}
             >
               <PersistentAgentAvatar id={persistentAgent.id} sprite={persistentAgent.sprite} />
               <span className="min-w-0 flex-1" title={persistentAgent.mission}>

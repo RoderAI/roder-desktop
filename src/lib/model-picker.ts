@@ -1,11 +1,5 @@
 import type { InferenceRoutingOptionDescriptor, ProviderDescriptor, RoderModel } from "@/types/roder";
-import {
-  displayModelName,
-  groupModelsByProvider,
-  isProviderConfigured,
-  isRetiredModel,
-  providerName,
-} from "@/lib/roder-models";
+import { groupModelsByProvider, isProviderConfigured, providerName } from "@/lib/roder-models";
 
 export type ModelPickerItem =
   | { type: "auto"; option: InferenceRoutingOptionDescriptor }
@@ -31,28 +25,12 @@ export function buildModelPickerGroups(
   const catalog = new Map(providers.map((provider) => [providerId(provider.id), provider]));
   const key = (model: RoderModel) => `${providerId(model.modelProvider)}:${model.id}`;
   const knownModels = new Map(models.map((model) => [key(model), model]));
-  for (const provider of providers) {
-    if (isProviderConfigured(provider) || providerId(provider.id) === "mock") continue;
-    for (const model of provider.models ?? []) {
-      if (isRetiredModel(model)) continue;
-      const record: RoderModel = { ...model, modelProvider: provider.id, description: model.description ?? undefined };
-      record.displayName = displayModelName(record);
-      if (!knownModels.has(key(record))) knownModels.set(key(record), record);
-    }
-  }
+  // Only list models whose provider has credentials configured.
   const selectable: RoderModel[] = [];
-  const setup: ModelPickerItem[] = [];
   for (const model of knownModels.values()) {
     const provider = catalog.get(providerId(model.modelProvider));
     if (!provider || providerId(provider.id) === "mock") continue;
     if (isProviderConfigured(provider)) selectable.push(model);
-    else
-      setup.push({
-        type: "setup",
-        model,
-        providerId: provider.id,
-        providerLabel: provider.name || providerName(provider.id),
-      });
   }
   const auto = routingOptions.flatMap((option): ModelPickerItem[] =>
     option.available !== false && modelProviderReady({ modelProvider: option.baseline.provider }, providers)
@@ -66,7 +44,6 @@ export function buildModelPickerGroups(
       label: catalog.get(providerId(group.provider))?.name || providerName(group.provider),
       items: group.models.map((model): ModelPickerItem => ({ type: "model", model })),
     })),
-    ...(setup.length ? [{ id: "setup-providers", label: "Set up provider", items: setup }] : []),
   ];
 }
 

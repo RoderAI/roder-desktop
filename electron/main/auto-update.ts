@@ -28,7 +28,7 @@ type AutoUpdateDeps = {
 };
 
 /**
- * macOS: Electron autoUpdater is built on Squirrel.Mac (Sparkle-based).
+ * macOS: Electron autoUpdater is built on Squirrel.Mac.
  * Availability is detected from the R2 JSON feed so the sidebar can show a
  * self-update button before download starts.
  */
@@ -66,30 +66,40 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
 
   const canUseNativeUpdater = isPackaged && platform === "darwin";
 
+  const failNativeUpdate = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const availableVersion = "availableVersion" in status ? status.availableVersion : undefined;
+    setStatus({
+      state: "error",
+      currentVersion: currentVersion(),
+      message,
+      ...(availableVersion ? { availableVersion } : {}),
+    });
+    showError(message);
+    interactiveCheck = false;
+  };
+
   const ensureNativeUpdater = () => {
     if (!canUseNativeUpdater || started) {
       return;
     }
-    started = true;
-
     autoUpdater.setFeedURL({
       url: feedUrl,
       serverType: "json",
     });
+    started = true;
 
-    autoUpdater.on("error", (error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      setStatus({ state: "error", currentVersion: currentVersion(), message });
-      showError(message);
-      interactiveCheck = false;
-    });
+    autoUpdater.on("error", failNativeUpdate);
 
     autoUpdater.on("checking-for-update", () => {
-      setStatus({ state: "checking", currentVersion: currentVersion() });
+      if (status.state !== "downloading" && status.state !== "ready") {
+        setStatus({ state: "checking", currentVersion: currentVersion() });
+      }
     });
 
     autoUpdater.on("update-available", () => {
-      if (status.state === "available" || status.state === "downloading" || status.state === "ready") {
+      if (status.state === "downloading" || status.state === "ready") return;
+      if (status.state === "available") {
         setStatus({
           state: "downloading",
           currentVersion: status.currentVersion,
@@ -143,6 +153,19 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
     });
   };
 
+  const startNativeDownload = (availableVersion: string): AppUpdateStatus => {
+    setStatus({ state: "downloading", currentVersion: currentVersion(), availableVersion });
+    try {
+      ensureNativeUpdater();
+      autoUpdater.checkForUpdates();
+    } catch (error) {
+      failNativeUpdate(error);
+    }
+    return status;
+  };
+
+  const nativeUpdateActive = () => status.state === "downloading" || status.state === "ready";
+
   const fetchFeedStatus = async (): Promise<AppUpdateStatus> => {
     setStatus({ state: "checking", currentVersion: currentVersion() });
     try {
@@ -153,6 +176,8 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
         throw new Error(`Update feed returned HTTP ${response.status}`);
       }
       const feed = parseUpdateFeed(await response.json());
+      // A parallel feed check may finish after the user has started the download.
+      if (nativeUpdateActive()) return status;
       latestDownloadUrl = feed?.url ?? null;
       const next = resolveUpdateStatusFromFeed({
         currentVersion: currentVersion(),
@@ -161,6 +186,7 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
       setStatus(next);
       return next;
     } catch (error) {
+      if (nativeUpdateActive()) return status;
       const message = error instanceof Error ? error.message : String(error);
       const next = { state: "error" as const, currentVersion: currentVersion(), message };
       setStatus(next);
@@ -179,8 +205,10 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
       };
     },
     checkForUpdates: async ({ interactive = false } = {}) => {
+      if (nativeUpdateActive()) return status;
       interactiveCheck = interactive;
       const next = await fetchFeedStatus();
+      if (nativeUpdateActive()) return status;
       if (next.state === "upToDate" && interactive) {
         void dialog.showMessageBox({
           type: "info",
@@ -190,13 +218,7 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
         });
         interactiveCheck = false;
       } else if (next.state === "available" && canUseNativeUpdater && interactive) {
-        ensureNativeUpdater();
-        try {
-          autoUpdater.checkForUpdates();
-        } catch (error) {
-          showError(error instanceof Error ? error.message : String(error));
-          interactiveCheck = false;
-        }
+        return startNativeDownload(next.availableVersion);
       } else if (interactive) {
         interactiveCheck = false;
       }
@@ -208,22 +230,11 @@ export function createAutoUpdateController(deps: AutoUpdateDeps): AutoUpdateCont
         return status;
       }
 
-      if (status.state === "available" || status.state === "downloading") {
-        if (canUseNativeUpdater) {
-          ensureNativeUpdater();
-          setStatus({
-            state: "downloading",
-            currentVersion: status.currentVersion,
-            availableVersion: status.availableVersion,
-          });
-          try {
-            autoUpdater.checkForUpdates();
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            setStatus({ state: "error", currentVersion: currentVersion(), message });
-          }
-          return status;
-        }
+      if (status.state === "downloading") return status;
+      const availableVersion =
+        status.state === "available" || status.state === "error" ? status.availableVersion : undefined;
+      if (availableVersion) {
+        if (canUseNativeUpdater) return startNativeDownload(availableVersion);
 
         const fallbackUrl =
           latestDownloadUrl ||

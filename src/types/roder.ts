@@ -1,3 +1,4 @@
+import type { AppUpdateStatus } from "@/lib/app-update";
 import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
 
 export type RoderStatus = {
@@ -1275,14 +1276,7 @@ export type AppCommand = {
   command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch" | "checkForUpdates";
 };
 
-export type AppUpdateStatus =
-  | { state: "idle"; currentVersion: string }
-  | { state: "checking"; currentVersion: string }
-  | { state: "upToDate"; currentVersion: string }
-  | { state: "available"; currentVersion: string; availableVersion: string }
-  | { state: "downloading"; currentVersion: string; availableVersion: string }
-  | { state: "ready"; currentVersion: string; availableVersion: string }
-  | { state: "error"; currentVersion: string; message: string };
+export type { AppUpdateStatus } from "@/lib/app-update";
 
 declare global {
   interface Window {

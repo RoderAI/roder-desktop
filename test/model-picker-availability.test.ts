@@ -28,23 +28,12 @@ const models: RoderModel[] = [
   { id: "sol", name: "GPT-6.1-Sol", modelProvider: "openrouter" },
 ];
 
-test("configured models come first and unconfigured catalog models only become bottom setup actions", () => {
-  const groups = buildModelPickerGroups(models.slice(0, -1), providers, []);
-  expect(groups.at(-1)?.label).toBe("Set up provider");
-  expect(groups.at(-1)?.items).toEqual([
-    expect.objectContaining({
-      type: "setup",
-      model: expect.objectContaining(models.at(-1)!),
-      providerId: "openrouter",
-    }),
-  ]);
-  expect(
-    groups
-      .slice(0, -1)
-      .flatMap((group) => group.items)
-      .map((item) => item.type),
-  ).toEqual(["model", "model", "model", "model"]);
-  expect(buildModelPickerGroups(models, providers, []).at(-1)?.items).toHaveLength(1);
+test("only models from configured providers are listed; unconfigured providers are hidden", () => {
+  const groups = buildModelPickerGroups(models, providers, []);
+  expect(groups.some((group) => group.label === "Set up provider")).toBe(false);
+  const items = groups.flatMap((group) => group.items);
+  expect(items.map((item) => item.type)).toEqual(["model", "model", "model", "model"]);
+  expect(items.some((item) => item.type === "model" && item.model.modelProvider === "openrouter")).toBe(false);
   expect(modelProviderReady(models[1], providers)).toBe(true);
   expect(modelProviderReady(models[2], providers)).toBe(true);
   expect(modelProviderReady(models[3], providers)).toBe(true);
@@ -94,7 +83,7 @@ test("provider Settings search accepts only a bounded provider ID", () => {
     expect(validateProviderSettingsSearch({ setupProvider })).toEqual({});
 });
 
-test("provider case and documented aliases retain the original model metadata and target the real provider ID", () => {
+test("provider case and documented aliases retain the original model metadata", () => {
   const aliased = {
     id: "sol",
     name: "Internal catalog name",
@@ -112,8 +101,8 @@ test("provider case and documented aliases retain the original model metadata an
     },
   ];
   const groups = buildModelPickerGroups([aliased], catalog, []);
-  expect(groups.flatMap((group) => group.items)).toEqual([
-    { type: "setup", model: aliased, providerId: "opencode", providerLabel: "OpenCode Zen" },
-  ]);
+  expect(groups.flatMap((group) => group.items)).toEqual([]);
+  const ready = buildModelPickerGroups([aliased], [{ ...catalog[0], authenticated: true }], []);
+  expect(ready.flatMap((group) => group.items)).toEqual([{ type: "model", model: aliased }]);
   expect(modelProviderReady({ modelProvider: "OpenAI" }, providers)).toBe(true);
 });

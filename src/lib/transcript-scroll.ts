@@ -65,6 +65,16 @@ export type TranscriptScrollRestorationAction =
       scrollOffset: number;
     };
 
+export function transcriptVirtualPadding(
+  rows: readonly { start: number; end: number }[],
+  totalSize: number,
+): { paddingTop: number; paddingBottom: number } {
+  return {
+    paddingTop: rows[0]?.start ?? 0,
+    paddingBottom: Math.max(0, totalSize - (rows.at(-1)?.end ?? 0)),
+  };
+}
+
 export function canScrollTranscriptToBottom(
   source: TranscriptEndStateSource,
   threshold = transcriptScrollAffordanceThresholdPx,

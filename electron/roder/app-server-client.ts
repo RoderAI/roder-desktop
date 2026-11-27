@@ -61,7 +61,19 @@ const requestTimeoutsMs = new Map<string, number>([
 
 export type RoderAppServerClientOptions = {
   getExtraEnv?: () => Record<string, string>;
+  backend?: "antigravity";
 };
+
+export function resolveEmbeddedRoderBinary(): string {
+  const binaryName = process.platform === "win32" ? "roder.exe" : "roder";
+  const packaged = join(process.resourcesPath, "bin", binaryName);
+  if (app.isPackaged && existsSync(packaged)) return packaged;
+  const bundled = resolve(thisDir, "..", "..", "resources", "bin", binaryName);
+  if (existsSync(bundled)) return bundled;
+  throw new Error(
+    `Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`,
+  );
+}
 
 export class RoderAppServerClient extends EventEmitter {
   #child: ChildProcessWithoutNullStreams | null = null;
@@ -70,6 +82,7 @@ export class RoderAppServerClient extends EventEmitter {
   #pending = new Map<number | string, PendingRequest>();
   #startPromise: Promise<RoderStatus> | null = null;
   #getExtraEnv?: () => Record<string, string>;
+  readonly backend?: "antigravity";
   #status: RoderStatus = {
     state: "stopped",
     binary: "unresolved",
@@ -78,6 +91,7 @@ export class RoderAppServerClient extends EventEmitter {
   constructor(options: RoderAppServerClientOptions = {}) {
     super();
     this.#getExtraEnv = options.getExtraEnv;
+    this.backend = options.backend;
   }
 
   status(): RoderStatus {
@@ -327,30 +341,13 @@ export class RoderAppServerClient extends EventEmitter {
   }
 
   #resolveSpawnTarget(): SpawnTarget {
-    const binaryName = process.platform === "win32" ? "roder.exe" : "roder";
-    const packaged = join(process.resourcesPath, "bin", binaryName);
-    if (app.isPackaged && existsSync(packaged)) {
-      return {
-        command: packaged,
-        args: ["app-server", "--listen", "stdio://"],
-        cwd: process.cwd(),
-        label: packaged,
-      };
-    }
-
-    const bundled = resolve(thisDir, "..", "..", "resources", "bin", binaryName);
-    if (existsSync(bundled)) {
-      return {
-        command: bundled,
-        args: ["app-server", "--listen", "stdio://"],
-        cwd: process.cwd(),
-        label: bundled,
-      };
-    }
-
-    throw new Error(
-      `Could not find embedded roder binary at ${app.isPackaged ? packaged : bundled}. Run pnpm bundle:roder before launching the desktop app.`,
-    );
+    const binary = resolveEmbeddedRoderBinary();
+    return {
+      command: binary,
+      args: ["app-server", "--listen", "stdio://", ...(this.backend ? ["--backend", this.backend] : [])],
+      cwd: process.cwd(),
+      label: binary,
+    };
   }
 
   #handleStdinError(child: ChildProcessWithoutNullStreams, error: Error): void {

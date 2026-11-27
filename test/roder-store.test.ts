@@ -4,11 +4,14 @@ import type { RoderThread } from "../src/types/roder";
 async function loadRoderStore(
   request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(),
   desktopOverrides: Partial<Window["roderDesktop"]> = {},
+  saved = new Map<string, string>(),
 ) {
   vi.resetModules();
   const localStorage = {
-    getItem: vi.fn<(key: string) => string | null>(() => null),
-    setItem: vi.fn<(key: string, value: string) => void>(),
+    getItem: vi.fn<(key: string) => string | null>((key) => saved.get(key) ?? null),
+    setItem: vi.fn<(key: string, value: string) => void>((key, value) => {
+      saved.set(key, value);
+    }),
     removeItem: vi.fn<(key: string) => void>(),
     clear: vi.fn<() => void>(),
     key: vi.fn<(index: number) => string | null>(() => null),
@@ -55,6 +58,44 @@ async function loadRoderStore(
   });
   return module.useRoderStore;
 }
+
+test("composer permission and reasoning survive a renderer reload for the thread and the new-chat draft", async () => {
+  vi.useFakeTimers();
+  try {
+    const saved = new Map<string, string>();
+    const thread: RoderThread = {
+      id: "thread-1",
+      model: "test-model",
+      modelProvider: "test",
+      preview: "Thread",
+      cwd: "/workspace",
+      createdAt: 1,
+      updatedAt: 1,
+      status: { type: "idle", activeTurnId: null, activeFlags: [] },
+    };
+    const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+      if (method === "thread/set_mode") return params;
+      if (method === "thread/read") return { thread };
+      return {};
+    });
+    const first = await loadRoderStore(request, {}, saved);
+    first.getState().setSelectedReasoning("high");
+    await first.getState().setSelectedPolicyMode("bypass");
+    first.getState().stageNewThread("/workspace");
+    first.getState().setSelectedReasoning("low");
+    await first.getState().setSelectedPolicyMode("plan");
+    expect(request.mock.calls.filter(([method]) => method === "thread/set_mode")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(550);
+
+    const reloaded = await loadRoderStore(request, {}, saved);
+    reloaded.getState().stageNewThread("/workspace");
+    expect(reloaded.getState()).toMatchObject({ selectedReasoning: "low", selectedPolicyMode: "plan" });
+    await reloaded.getState().selectThread(thread.id);
+    expect(reloaded.getState()).toMatchObject({ selectedReasoning: "high", selectedPolicyMode: "bypass" });
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 test("external persistentAgent promotion refreshes cached model controls without losing the active transcript", async () => {
   const cached: RoderThread = {
@@ -224,11 +265,43 @@ test("changing selected policy mode applies it to the running thread immediately
     {
       method: "thread/set_mode",
       params: {
+        threadId: "thread-1",
         mode: "accept_all",
         reason: "desktop permission selector",
       },
     },
   ]);
+});
+
+test("a late permission response cannot replace the settings of a newly selected thread", async () => {
+  let finish!: (result: { mode: string }) => void;
+  const pending = new Promise<{ mode: string }>((resolve) => {
+    finish = resolve;
+  });
+  const thread: RoderThread = {
+    id: "thread-2",
+    model: "test-model",
+    modelProvider: "test",
+    preview: "Thread",
+    cwd: "/workspace",
+    createdAt: 1,
+    updatedAt: 1,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  };
+  const store = await loadRoderStore(
+    vi.fn(async (method) => {
+      if (method === "thread/set_mode") return pending;
+      if (method === "thread/read") return { thread };
+      return {};
+    }),
+  );
+  const change = store.getState().setSelectedPolicyMode("bypass");
+  await store.getState().selectThread(thread.id);
+  finish({ mode: "bypass" });
+  await change;
+  expect(store.getState().selectedPolicyMode).toBe(store.getState().defaultPolicyMode);
+  expect(store.getState().threadControlsByThread[thread.id]).toBeUndefined();
+  expect(store.getState().threadControlsByThread["thread-1"]?.policyMode).toBe("bypass");
 });
 
 test("bootstrap requests a bounded recent transcript without waiting for it", async () => {

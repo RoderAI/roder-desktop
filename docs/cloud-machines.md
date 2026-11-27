@@ -73,6 +73,18 @@ Runloop, and Vercel.
 
 ## Credentials and storage
 
+In **Settings > Cloud Machines**, **Machines** lists saved profiles and hosts the
+Add/Edit form. **Connections** contains Blaxel sign-in, SSH discovery, Tailscale,
+and runner provider setup.
+
+You can also ask a Desktop agent that has `desktop_config` to save a profile.
+For example: “Use `$roder-config` to save my existing Blaxel sandbox `dev-box`
+as `Dev`, with `/workspace` as the remote path.” Roder uses the configured
+connection, checks that the named Blaxel sandbox exists, and saves the profile
+to the same list shown in Settings and the new-thread machine picker. Existing
+Sprites can also be added by name. Chat does not provision cloud resources or
+accept runner credentials; connect the provider in **Connections** first.
+
 Do not put API keys, tokens, passwords, or credential-bearing URLs in profile
 JSON configuration. Roder persists runner configuration with each thread, so
 desktop rejects credential-like configuration fields.

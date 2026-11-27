@@ -1,6 +1,82 @@
 import { expect, test, vi } from "vitest";
+import { cloudMachineConfigSkill } from "../electron/agents/cloud-machine-config";
 import { configureDesktopFromTool, desktopConfigTool } from "../electron/agents/config-tool";
 
+test("desktop config saves an existing Blaxel sandbox as a retained machine profile", async () => {
+  const method = "desktop/cloud-machines/save";
+  const machine = { id: "m1", name: "Dev", providerId: "blaxel", workspace: "/workspace" };
+  const request = vi
+    .fn()
+    .mockResolvedValueOnce({ workspace: "my-team", sandboxes: [{ name: "dev-box" }] })
+    .mockResolvedValueOnce({ machine: { ...machine, config: { private: "omit" } } });
+  await expect(
+    configureDesktopFromTool(
+      { method, params: { providerId: "blaxel", name: "Dev", workspace: "/workspace", sandboxName: "dev-box" } },
+      request,
+    ),
+  ).resolves.toEqual({ machine });
+  expect(request).toHaveBeenCalledWith(method, {
+    name: "Dev",
+    providerId: "blaxel",
+    workspace: "/workspace",
+    config: { sandbox_name: "dev-box", workspace: "my-team", working_dir: "/workspace", cleanup: "keep" },
+  });
+});
+
+test("a missing Blaxel sandbox is not saved or provisioned", async () => {
+  const request = vi.fn().mockResolvedValue({ workspace: "my-team", sandboxes: [{ name: "other-box" }] });
+  await expect(
+    configureDesktopFromTool(
+      {
+        method: "desktop/cloud-machines/save",
+        params: { providerId: "blaxel", name: "Dev", workspace: "/workspace", sandboxName: "dev-box" },
+      },
+      request,
+    ),
+  ).rejects.toThrow("No matching sandbox");
+  expect(request.mock.calls).toEqual([["desktop/cloud-machines/blaxel/sandboxes", {}]]);
+});
+
+test("machine credential status only exposes connection metadata", async () => {
+  const request = vi.fn().mockResolvedValue({
+    statuses: [{ providerId: "blaxel", configured: true, preview: "sensitive", apiKey: "secret" }],
+    localSsh: { identityFiles: ["/private/.ssh/id"] },
+  });
+  await expect(
+    configureDesktopFromTool({ method: "desktop/cloud-machines/credentials/status" }, request),
+  ).resolves.toEqual({
+    statuses: [{ providerId: "blaxel", configured: true }],
+  });
+});
+
+test.each([
+  { config: { apiKey: "do-not-pass" }, sandboxName: "dev-box" },
+  { sandboxName: "https://example.com/?token=do-not-pass" },
+  { sandboxName: "dev-box", workspace: "relative/path" },
+])("machine tool rejects arbitrary configuration, unsafe identifiers and invalid paths", async (params) => {
+  const request = vi.fn();
+  await expect(
+    configureDesktopFromTool(
+      {
+        method: "desktop/cloud-machines/save",
+        params: { name: "Dev", providerId: "blaxel", workspace: "/workspace", ...params },
+      },
+      request,
+    ),
+  ).rejects.toThrow();
+  expect(request).not.toHaveBeenCalled();
+});
+
+test("config skill documents Desktop machine configuration", async () => {
+  const request = vi.fn().mockResolvedValue({
+    skill: { descriptor: { name: "roder-config", source: "builtIn" }, body: "Base skill" },
+  });
+  const result = await configureDesktopFromTool(
+    { method: "skills/read", params: { selector: { name: { name: "roder-config" } } } },
+    request,
+  );
+  expect(result).toMatchObject({ skill: { body: `Base skill\n\n${cloudMachineConfigSkill}` } });
+});
 test("configuration tool advertises only the restricted live RPC surface", () => {
   expect(desktopConfigTool.parameters.properties.method.enum).toContain("settings/get");
   expect(desktopConfigTool.parameters.properties.method.enum).toContain("skills/read");

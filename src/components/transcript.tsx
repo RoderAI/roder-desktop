@@ -41,6 +41,7 @@ import {
   transcriptScrollRestorationAction,
   transcriptScrollRestorationStateFromViewport,
   transcriptScrollAffordanceThresholdPx,
+  transcriptVirtualPadding,
   type TranscriptScrollRestorationState,
 } from "@/lib/transcript-scroll";
 import {
@@ -772,13 +773,9 @@ export function Transcript({
         onViewportScroll={syncCanScrollToBottom}
       >
         <main className="mx-auto w-full max-w-3xl px-4 pt-2">
-          <div
-            style={{
-              height: rowVirtualizer.getTotalSize(),
-              position: "relative",
-              width: "100%",
-            }}
-          >
+          {/* The virtual range is contiguous. Let mounted rows reflow together
+              while the virtualizer catches up with disclosure and streaming resizes. */}
+          <div style={transcriptVirtualPadding(virtualItems, rowVirtualizer.getTotalSize())}>
             {virtualItems.map((virtualItem) => {
               const row = transcriptRows[virtualItem.index];
               if (!row) {
@@ -788,17 +785,10 @@ export function Transcript({
               const rowSpacing = transcriptRowSpacing(row);
               return (
                 <div
-                  className={rowSpacing}
+                  className={cn("flow-root", rowSpacing)}
                   data-index={virtualItem.index}
                   key={rowKey}
                   ref={rowVirtualizer.measureElement}
-                  style={{
-                    left: 0,
-                    position: "absolute",
-                    top: 0,
-                    transform: `translateY(${virtualItem.start}px)`,
-                    width: "100%",
-                  }}
                 >
                   <TranscriptVirtualContent
                     row={row}

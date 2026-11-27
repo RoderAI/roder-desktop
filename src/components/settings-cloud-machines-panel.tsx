@@ -62,6 +62,8 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const remove = useCloudMachinesStore((state) => state.remove);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [view, setView] = useState<"machines" | "connections">("machines");
+  const [showMachineForm, setShowMachineForm] = useState(false);
   const [name, setName] = useState("");
   const [providerId, setProviderId] = useState("");
   const [workspace, setWorkspace] = useState("");
@@ -152,6 +154,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   });
 
   function resetForm(): void {
+    setShowMachineForm(false);
     setEditingId(null);
     setName("");
     setWorkspace("");
@@ -172,6 +175,19 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     setSshProxyJump("");
     setSshTailscaleEnabled(false);
     setFormError("");
+  }
+
+  function openMachineForm(focusField = "name"): void {
+    setView("machines");
+    setShowMachineForm(true);
+    requestAnimationFrame(() => {
+      const field = document.getElementById(`${formId}-${focusField}`);
+      if (field && !field.matches(":disabled")) {
+        field.focus();
+      } else {
+        document.getElementById(`${formId}-editor`)?.scrollIntoView({ block: "nearest" });
+      }
+    });
   }
 
   function syncSshGuidedConfig(next: {
@@ -229,11 +245,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       proxyJump: nextJump,
       tailscaleTunnel: defaultTs,
     });
-    requestAnimationFrame(() => {
-      const target = document.getElementById(`${formId}-workspace`);
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-      target?.focus();
-    });
+    openMachineForm("workspace");
   }
 
   function syncTailscaleGuidedConfig(nextHost: string, nextIp: string, nextUser: string, nextPort: string): void {
@@ -674,6 +686,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     try {
       const { machine } = await roderIpc.getCloudMachineProfile(id);
       setEditingId(machine.id);
+      openMachineForm();
       setName(machine.name);
       setProviderId(machine.providerId);
       setWorkspace(machine.workspace);
@@ -763,6 +776,22 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         </Button>
       </header>
 
+      <nav aria-label="Cloud machine settings" className="flex gap-1 border-b border-border px-5 py-2">
+        {(["machines", "connections"] as const).map((item) => (
+          <Button
+            key={item}
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={cn(view === item && "bg-accent/60")}
+            aria-pressed={view === item}
+            onClick={() => setView(item)}
+          >
+            {item === "machines" ? "Machines" : "Connections"}
+          </Button>
+        ))}
+      </nav>
+
       {((error && (credentialFeedback?.kind !== "error" || credentialFeedback.text !== error)) || formError) && (
         <div role="alert" className="border-b border-border px-5 py-3 text-base text-destructive">
           {formError || error}
@@ -776,7 +805,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       )}
 
       {cloudSupported && blaxelProviderAvailable && (
-        <div className="space-y-3 border-b border-border px-5 py-4">
+        <div hidden={view !== "connections"} className="space-y-3 border-b border-border px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-base font-medium">
@@ -912,7 +941,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       )}
 
       {cloudSupported && (tailscaleProviderAvailable || localTailscale?.installed || tailscaleConfigured) && (
-        <div className="space-y-3 border-b border-border px-5 py-4">
+        <div hidden={view !== "connections"} className="space-y-3 border-b border-border px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-base font-medium">
@@ -1170,7 +1199,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       )}
 
       {cloudSupported && (sshProviderAvailable || localSsh?.installed) && (
-        <div className="space-y-3 border-b border-border px-5 py-4">
+        <div hidden={view !== "connections"} className="space-y-3 border-b border-border px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-base font-medium">
@@ -1211,11 +1240,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                   disabled={busy}
                   onClick={() => {
                     applyProviderSelection("ssh");
-                    requestAnimationFrame(() => {
-                      const target = document.getElementById(`${formId}-ssh-quick`);
-                      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-                      target?.focus();
-                    });
+                    openMachineForm("ssh-quick");
                   }}
                 >
                   <Plus className="size-3.5" />
@@ -1262,7 +1287,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         </div>
       )}
 
-      <div className="border-b border-border px-5 py-4">
+      <div hidden={view !== "connections"} className="px-5 py-4">
         <details className="rounded-lg border border-border">
           <summary className="cursor-pointer px-3 py-3 text-base font-medium">Manage runner providers</summary>
           <div className="space-y-3 border-t border-border p-3">
@@ -1289,6 +1314,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                           disabled={!cloudSupported || busy || (configText.trim() !== "{}" && configText.trim() !== "")}
                           onClick={() => {
                             applyProviderSelection(provider.provider_id);
+                            openMachineForm();
                             document.getElementById(`${formId}-provider`)?.focus();
                           }}
                         >
@@ -1320,17 +1346,38 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         </details>
       </div>
 
-      <div className="space-y-4 px-5 py-4">
-        <div>
-          <h2 className="text-base font-medium">Saved machines</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Profiles apply to new threads only. Removing a profile does not stop or delete the remote machine.
-          </p>
+      <div hidden={view !== "machines"} className="space-y-4 px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-medium">
+              Saved machines <span className="ml-1 text-sm text-muted-foreground">{machines.length}</span>
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Profiles apply to new threads only. Removing a profile does not stop or delete the remote machine.
+            </p>
+          </div>
+          {!showMachineForm && (
+            <Button type="button" size="sm" disabled={!cloudSupported || busy} onClick={() => openMachineForm()}>
+              <Plus className="size-3.5" />
+              Add machine
+            </Button>
+          )}
         </div>
         {machines.length === 0 ? (
-          <p className="rounded-lg bg-muted/30 p-3 text-base text-muted-foreground">
-            No cloud machines configured. Add a profile below, or keep running threads locally.
-          </p>
+          <div className="flex gap-3 rounded-xl border border-dashed border-border p-4">
+            <Cloud className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-base font-medium">No cloud machines configured.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add a machine to run new threads remotely, or keep running threads locally.
+              </p>
+              {cloudSupported && (
+                <Button type="button" size="sm" variant="ghost" className="mt-2" onClick={() => setView("connections")}>
+                  Manage connections
+                </Button>
+              )}
+            </div>
+          </div>
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border">
             {machines.map((machine) => {
@@ -1441,14 +1488,17 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
           {WINDOWS_CLOUD_MACHINES_NOTICE}
         </p>
       )}
-      <form onSubmit={(event) => void addMachine(event)} className="space-y-4 border-t border-border px-5 py-4">
+      <form
+        id={`${formId}-editor`}
+        hidden={view !== "machines" || !showMachineForm}
+        onSubmit={(event) => void addMachine(event)}
+        className="space-y-4 border-t border-border px-5 py-4"
+      >
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-medium">{editingId ? "Edit cloud machine" : "Add a cloud machine"}</h2>
-          {editingId && (
-            <Button type="button" size="sm" variant="ghost" onClick={resetForm}>
-              Cancel edit
-            </Button>
-          )}
+          <Button type="button" size="sm" variant="ghost" disabled={busy || creatingSandbox} onClick={resetForm}>
+            Cancel
+          </Button>
         </div>
         {providers.length === 0 && (
           <p className="text-base text-muted-foreground" role="status">
