@@ -66,6 +66,8 @@ import {
   createPersistentAgentFromTool,
   mergePersistentAgentSkill,
   persistentAgentCreateTool,
+  persistentAgentWorkspacesTool,
+  listPersistentAgentWorkspaces,
   persistentAgentSkillBody,
   readPersistentAgentSkill,
 } from "../persistent-agents/creation-tool";
@@ -819,6 +821,10 @@ function getDesktopAgentTools(): DesktopAgentTools {
           createPersistentAgentFromTool(args, context.threadId, handleRoderRequest),
       },
       {
+        ...persistentAgentWorkspacesTool,
+        execute: (args: unknown) => listPersistentAgentWorkspaces(args, handleRoderRequest),
+      },
+      {
         ...desktopConfigTool,
         execute: (args: unknown, context: { threadId: string }) =>
           configureDesktopFromTool(args, handleRoderRequest, context.threadId),
@@ -850,13 +856,7 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
     params &&
     typeof params === "object"
   ) {
-    const input = params as Record<string, unknown>;
-    const context =
-      typeof input.threadId === "string" ? await persistentAgentService.contextForThread(input.threadId) : null;
-    if (context) {
-      const existing = typeof input.developerContext === "string" ? input.developerContext : "";
-      return roder.request(method, { ...input, developerContext: existing ? `${context}\n\n${existing}` : context });
-    }
+    params = await persistentAgentService.turnStartParams(params);
   }
   return roder.request(method, params);
 }

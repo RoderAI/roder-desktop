@@ -7,6 +7,7 @@ import { createPersistentAgentService } from "../electron/persistent-agents/serv
 import type { PersistentAgentDetail } from "../src/types/persistent-agents";
 import {
   createPersistentAgentFromTool,
+  listPersistentAgentWorkspaces,
   mergePersistentAgentSkill,
   persistentAgentCreateTool,
   persistentAgentSkill,
@@ -79,15 +80,82 @@ test.each([
   {},
   { name: "", mission: "Watch releases" },
   { name: "Release", mission: " " },
-  { name: "Release", mission: "Watch", workspaceId: "" },
+  { name: "Release", mission: "Watch", workspaceId: 42 },
+  { name: "Release", mission: "Watch", workspaceId: "ws", workspaceName: "site" },
   { name: "Release", mission: "Watch", model: "model-only" },
   { name: "Release", mission: "Watch", enabled: true },
   { name: "Release", mission: "Watch", nameExtra: "unexpected" },
 ])("creation validates input before looking up or creating a thread: %j", async (args) => {
   const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>();
   await expect(createPersistentAgentFromTool(args, "caller", request)).rejects.toThrow(
-    /Invalid|Unexpected|Choose both/,
+    /Invalid|Unexpected|Choose both|Choose either/,
   );
+  expect(request).not.toHaveBeenCalled();
+});
+
+test("empty optional fields default to the caller workspace without mutating arguments", async () => {
+  const args = {
+    name: "Docs",
+    mission: "Keep docs current",
+    workspaceId: "",
+    workspaceName: " ",
+    modelProvider: "",
+    model: "",
+    reasoning: "",
+  };
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async (method) =>
+    method === "thread/read" ? { thread: { workspaceId: "ws" } } : { id: "agent" },
+  );
+  await createPersistentAgentFromTool(args, "caller", request);
+  expect(request).toHaveBeenLastCalledWith("desktop/persistent-agents/create", {
+    name: "Docs",
+    mission: "Keep docs current",
+    workspaceId: "ws",
+  });
+  expect(args.workspaceId).toBe("");
+});
+
+test("workspace name resolves using desktop workspaces, not issue projects", async () => {
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async (method) =>
+    method === "workspace/list" ? { workspaces: [{ id: "site-id", name: "roder-site" }] } : { id: "agent" },
+  );
+  await createPersistentAgentFromTool(
+    { name: "Docs", mission: "Watch", workspaceName: "roder-site" },
+    "caller",
+    request,
+  );
+  expect(request).toHaveBeenNthCalledWith(1, "workspace/list", {});
+  expect(request).toHaveBeenLastCalledWith("desktop/persistent-agents/create", {
+    name: "Docs",
+    mission: "Watch",
+    workspaceId: "site-id",
+  });
+});
+
+test.each([
+  { workspaces: [] },
+  {
+    workspaces: [
+      { id: "a", name: "site" },
+      { id: "b", name: "site" },
+    ],
+  },
+])("missing or ambiguous workspace names never create an agent: %j", async ({ workspaces }) => {
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async () => ({ workspaces }));
+  await expect(
+    createPersistentAgentFromTool({ name: "Docs", mission: "Watch", workspaceName: "site" }, "caller", request),
+  ).rejects.toThrow(/persistent_agent_workspaces/);
+  expect(request).toHaveBeenCalledOnce();
+});
+
+test("workspace lookup uses the workspace API and rejects extra arguments", async () => {
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async () => ({
+    workspaces: [{ id: "ws", name: "site" }],
+  }));
+  expect(await listPersistentAgentWorkspaces({}, request)).toEqual({ workspaces: [{ id: "ws", name: "site" }] });
+  expect(request).toHaveBeenCalledWith("workspace/list", {});
+  request.mockClear();
+  await expect(listPersistentAgentWorkspaces({ path: "site" }, request)).rejects.toThrow("empty object");
   expect(request).not.toHaveBeenCalled();
 });
 

@@ -51,11 +51,26 @@ export const pickerMenuSurfaceClassName = "bg-card text-card-foreground ring-bor
 export function PolicyModePicker({
   selectedMode,
   onChange,
+  locked = false,
 }: {
   selectedMode: PolicyMode;
   onChange: (mode: PolicyMode) => void;
+  locked?: boolean;
 }): React.JSX.Element {
   const selected = policyModeOptions.find((option) => option.mode === selectedMode) ?? policyModeOptions[0];
+
+  if (locked) {
+    return (
+      <span
+        className="inline-flex items-center gap-2 px-2.5 text-base text-muted-foreground sm:px-3"
+        title="Persistent agents always use bypass permissions."
+        aria-label={`Permission mode: ${selected.label} (always on for persistent agents)`}
+      >
+        <ShieldCheck className="size-4 shrink-0" />
+        <span>{selected.label}</span>
+      </span>
+    );
+  }
 
   return (
     <DropdownMenu>

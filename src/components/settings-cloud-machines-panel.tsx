@@ -589,6 +589,64 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
         </div>
       )}
 
+      <div className="border-b border-border px-5 py-4">
+        <details className="rounded-lg border border-border">
+          <summary className="cursor-pointer px-3 py-3 text-base font-medium">Manage runner providers</summary>
+          <div className="space-y-3 border-t border-border p-3">
+            <p className="text-sm text-muted-foreground">
+              Sign-in and credential management are not available here. Set credentials in the app-server environment;
+              provider availability does not confirm authentication or connectivity.
+            </p>
+            {providers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {busy ? "Loading remote runner providers..." : "Refresh to discover available runner providers."}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {providers.map((provider) => {
+                  const help = machineProviderHelp(provider.provider_id);
+                  return (
+                    <li key={provider.provider_id} className="space-y-2 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-base font-medium">{provider.provider_id}</h3>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!cloudSupported || busy || (configText.trim() !== "{}" && configText.trim() !== "")}
+                          onClick={() => {
+                            applyProviderSelection(provider.provider_id);
+                            document.getElementById(`${formId}-provider`)?.focus();
+                          }}
+                        >
+                          Configure machine
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{help.description}</p>
+                      {provider.setup_hint && (
+                        <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                          {provider.setup_hint}
+                        </p>
+                      )}
+                      {help.environment.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          App-server environment: <span className="font-mono">{help.environment.join(", ")}</span>
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {configText.trim() !== "{}" && configText.trim() !== "" && (
+              <p className="text-sm text-muted-foreground">
+                Clear the current machine configuration before selecting another provider here.
+              </p>
+            )}
+          </div>
+        </details>
+      </div>
+
       <div className="space-y-4 px-5 py-4">
         <div>
           <h2 className="text-base font-medium">Saved machines</h2>

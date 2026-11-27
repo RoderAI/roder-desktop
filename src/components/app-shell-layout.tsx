@@ -13,11 +13,15 @@ import {
   type LayoutChangedMeta,
   type PanelSize,
 } from "react-resizable-panels";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar, useSidebarPersistentAgents } from "@/components/app-sidebar";
+import { PersistentAgentThreadContext } from "@/components/app-shell-context";
 import { FileSearchDialog } from "@/components/file-search-dialog";
 import { ProjectConfigDialog } from "@/components/project-config-dialog";
 import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
-import { renderRightWorkspacePanel, rightWorkspacePanelEntries } from "@/components/right-workspace-panel-registry";
+import {
+  renderRightWorkspacePanel,
+  rightWorkspacePanelEntriesForThread,
+} from "@/components/right-workspace-panel-registry";
 import { RightWorkspacePanelShell } from "@/components/right-workspace-panel-shell";
 import { TopBar, WorkspacePanelToggleButton, type WorkspacePanel } from "@/components/top-bar";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
@@ -112,7 +116,7 @@ export type AppShellLayoutProps = {
   onRestart: () => void;
   onSelectExtension: (extensionId: string) => void;
   onSelectFolder: (path: string) => void;
-  onSelectThread: (threadId: string) => void;
+  onSelectThread: (threadId: string, panel?: RouteWorkspacePanel) => void;
   onSelectWorkspacePanel: (panel: RouteWorkspacePanel) => void;
   onSelectedExtensionPanelChange: (extensionPanel: string) => void;
   onReviewPathChange: (path: string) => void;
@@ -183,6 +187,10 @@ export function AppShellLayout({
   onSendPrompt,
   onToggleSidebar,
 }: AppShellLayoutProps): React.JSX.Element {
+  const persistentAgentsState = useSidebarPersistentAgents();
+  const persistentAgentId =
+    persistentAgentsState.persistentAgents.find((agent) => agent.threadId === activeThreadId)?.id ?? null;
+  const panelEntries = rightWorkspacePanelEntriesForThread(persistentAgentId);
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
   const isFullPageRoute = fullPageRoute !== null;
   const fullPageTitle = fullPageRoute === "persistentAgents" ? "Persistent Agents" : fullPageRoute;
@@ -419,6 +427,7 @@ export function AppShellLayout({
         style={{ width: sidebarWidth }}
       >
         <AppSidebar
+          persistentAgentsState={persistentAgentsState}
           threads={threads}
           activeThreadId={activeThreadId}
           activeView={fullPageRoute ?? "chat"}
@@ -473,7 +482,9 @@ export function AppShellLayout({
               </div>
             ) : null}
             <div className="min-h-0 flex-1 overflow-hidden">
-              <Outlet />
+              <PersistentAgentThreadContext value={persistentAgentId !== null}>
+                <Outlet />
+              </PersistentAgentThreadContext>
             </div>
           </>
         ) : (
@@ -532,7 +543,7 @@ export function AppShellLayout({
         open={workspacePanelVisible}
         tabs={panelTabs}
         activePanel={activePanel}
-        entries={rightWorkspacePanelEntries}
+        entries={panelEntries}
         freezeLayout={!isFullPageRoute && shellLayoutAnimating}
         layoutWidth={shellAnimationState.frozenWorkspacePanelWidth ?? measuredWorkspacePanelWidth}
         onAddPanel={onOpenWorkspacePanel}
@@ -541,6 +552,7 @@ export function AppShellLayout({
         renderPanel={(entry, state) =>
           renderRightWorkspacePanel(entry.id, {
             active: state.active,
+            persistentAgentId,
             appServerMethods: status.appServerMethods ?? [],
             activeThreadId,
             activeWorkspaceCwd,

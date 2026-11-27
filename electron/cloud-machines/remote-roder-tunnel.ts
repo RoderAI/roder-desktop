@@ -176,7 +176,7 @@ export class RemoteRoderTunnelConnection extends EventEmitter {
       clientInfo: {
         name: "roder-desktop-bridge",
         title: "Roder Desktop",
-        version: this.options.clientVersion ?? "0.1.14",
+        version: this.options.clientVersion ?? "0.1.15",
       },
       capabilities: {
         experimentalApi: true,

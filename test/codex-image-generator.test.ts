@@ -1,14 +1,29 @@
 import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { delimiter } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   CodexImageModelUnsupportedError,
   createCodexImageGenerator,
+  codexImageEnvironment,
   type CodexImageClient,
 } from "../electron/persistent-agents/codex-image-generator";
 
 const directories: string[] = [];
+test("Finder-launched image jobs discover user CLI installs without leaking API keys or changing the parent environment", () => {
+  const env = { PATH: ["/usr/bin", "/bin"].join(delimiter), OPENAI_API_KEY: "secret" };
+  const result = codexImageEnvironment(env, "/home/test");
+  const dirs = result.PATH!.split(delimiter);
+  expect(dirs.slice(0, 2)).toEqual(["/usr/bin", "/bin"]);
+  expect(dirs).toContain("/opt/homebrew/bin");
+  expect(dirs).toContain(join("/home/test", ".local", "share", "mise", "shims"));
+  expect(new Set(dirs).size).toBe(dirs.length);
+  expect(result.OPENAI_API_KEY).toBeUndefined();
+  expect(env.OPENAI_API_KEY).toBe("secret");
+  expect(env.PATH).toBe(["/usr/bin", "/bin"].join(delimiter));
+});
+
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DQAAAEgQGALFXOsAAAAABJRU5ErkJggg==",
   "base64",

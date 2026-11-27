@@ -152,8 +152,27 @@ export function useAppShellController(): AppShellController {
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
-    (threadId: string) => {
-      void navigate({ to: "/threads/$threadId", params: { threadId }, search: true });
+    (threadId: string, panel?: RouteWorkspacePanel) => {
+      void navigate({
+        to: "/threads/$threadId",
+        params: { threadId },
+        search: (previous) => {
+          if (panel) {
+            return {
+              ...previous,
+              panelTabs: [...new Set([...(previous.panelTabs ?? []), panel])],
+              panelActive: panel,
+              panelOpen: true,
+            };
+          }
+          const panelTabs = (previous.panelTabs ?? []).filter((tab) => tab !== "persistentAgent");
+          return {
+            ...previous,
+            panelTabs,
+            panelActive: previous.panelActive === "persistentAgent" ? (panelTabs[0] ?? null) : previous.panelActive,
+          };
+        },
+      });
       void selectAgentThread(threadId, { pushHistory: false });
     },
     [navigate, selectAgentThread],
