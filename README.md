@@ -66,8 +66,12 @@ settings are reported as such.
 Ask, for example, "Create a persistent agent named Release Watcher to monitor
 this project's releases," or invoke `$persistent-agent`. The model asks for
 missing name/mission details and calls `persistent_agent_create` in the current
-workspace. A different existing workspace and an explicit provider/model pair
-can be supplied. No creation dialog is required.
+workspace. A different existing workspace can be selected by `workspaceName`
+or `workspaceId`; `persistent_agent_workspaces` lists available workspaces
+(separate from issue projects). Unused optional fields may be omitted or left
+blank. An explicit provider/model pair can be supplied. No creation dialog is
+required. A multi-repository mission does not automatically configure access
+or monitoring for those repositories.
 
 The persistent-agent skill is bundled into Desktop and supplied to the model in
 every chat turn, including workspaces without this repository's `.agents` files.

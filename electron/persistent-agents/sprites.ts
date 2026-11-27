@@ -3,6 +3,7 @@ import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { nativeImage } from "electron";
 import type { PersistentAgentSprite, PersistentAgentSpriteImage } from "../../src/types/persistent-agent-sprite";
+import { CodexImageCliUnavailableError } from "./codex-image-generator";
 
 type Persona = { id: string; name: string; mission: string };
 export type GeneratedSprite = { bytes: Buffer; model: string | null; artifactId: string | null };
@@ -184,17 +185,22 @@ export function createPersistentAgentSpriteManager(options: Options) {
       entry.status = "ready";
     } catch (error) {
       if (stopped) return;
-      const credentials = /api.?key|credential|401|403|unauth|sign.?in|log.?in|organi[sz]ation.*verif/iu.test(
-        error instanceof Error ? error.message : "",
-      );
+      const credentials =
+        !(error instanceof CodexImageCliUnavailableError) &&
+        /api.?key|credential|401|403|unauth|sign.?in|log.?in|organi[sz]ation.*verif/iu.test(
+          error instanceof Error ? error.message : "",
+        );
       entry.status = credentials ? "needs_credentials" : "failed";
-      entry.error = credentials
-        ? entry.generationProvider === "openai"
-          ? credentialMessage
-          : codexCredentialMessage
-        : entry.generationProvider === "openai"
-          ? "The API-key route could not generate a valid GPT Image 2.5 character. Retry explicitly; API generation may incur a charge."
-          : "Codex could not generate a valid transparent character. Check Codex image-generation support, then retry. No API-key fallback was attempted.";
+      entry.error =
+        error instanceof CodexImageCliUnavailableError
+          ? error.message
+          : credentials
+            ? entry.generationProvider === "openai"
+              ? credentialMessage
+              : codexCredentialMessage
+            : entry.generationProvider === "openai"
+              ? "The API-key route could not generate a valid GPT Image 2.5 character. Retry explicitly; API generation may incur a charge."
+              : "Codex could not generate a valid transparent character. Check Codex image-generation support, then retry. No API-key fallback was attempted.";
     }
     if (!stopped) {
       entry.updatedAt = Math.max(Date.now(), entry.updatedAt + 1);

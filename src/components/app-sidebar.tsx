@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { PersistentAgent } from "@/types/persistent-agents";
+import type { RouteWorkspacePanel } from "@/lib/route-search";
 import { Link } from "@tanstack/react-router";
 import { useId, useReducer, useRef, useState } from "react";
 import { useRoderStore } from "@/stores/roder-store";
@@ -117,13 +118,14 @@ export function SidebarSearchField({
 }
 
 type AppSidebarProps = {
+  persistentAgentsState: ReturnType<typeof useSidebarPersistentAgents>;
   threads: RoderThread[];
   activeThreadId: string;
   activeView: "chat" | "plugins" | "threads" | "issues" | "persistentAgents";
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
   reserveTitlebarSpace: boolean;
-  onSelectThread: (threadId: string) => void;
+  onSelectThread: (threadId: string, panel?: RouteWorkspacePanel) => void;
   onArchiveThread: (threadId: string) => void;
   onLoadMoreThreads: () => void;
   onNewProject: () => void;
@@ -134,6 +136,7 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({
+  persistentAgentsState,
   threads,
   activeThreadId,
   activeView,
@@ -158,7 +161,7 @@ export function AppSidebar({
     error: persistentAgentsError,
     loading: persistentAgentsLoading,
     refresh: refreshPersistentAgents,
-  } = useSidebarPersistentAgents();
+  } = persistentAgentsState;
   const subagentTracesByThread = useRoderStore((state) => state.subagentTracesByThread);
   const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents, subagentTracesByThread);
   const matchingThreads = ordinaryThreads.filter((thread) =>
@@ -539,7 +542,7 @@ function ThreadRow({
   );
 }
 
-function useSidebarPersistentAgents() {
+export function useSidebarPersistentAgents() {
   const [persistentAgents, setPersistentAgents] = useState<PersistentAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -593,7 +596,7 @@ function PersistentAgentLinks({
   onRetry: () => void;
   activeThreadId: string;
   activeManagement: boolean;
-  onSelectThread: (threadId: string) => void;
+  onSelectThread: (threadId: string, panel?: RouteWorkspacePanel) => void;
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(true);
   const [search, dispatchSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
@@ -671,7 +674,7 @@ function PersistentAgentLinks({
                 "h-11 focus-visible:ring-2 focus-visible:ring-ring",
                 persistentAgent.threadId === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
               )}
-              onClick={() => onSelectThread(persistentAgent.threadId)}
+              onClick={() => onSelectThread(persistentAgent.threadId, "persistentAgent")}
             >
               <PersistentAgentAvatar id={persistentAgent.id} sprite={persistentAgent.sprite} />
               <span className="min-w-0 flex-1" title={persistentAgent.mission}>

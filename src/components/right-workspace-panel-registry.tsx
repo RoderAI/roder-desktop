@@ -1,4 +1,14 @@
-import { Bot, Files, GitCompareArrows, Globe2, LayoutTemplate, Paintbrush, Puzzle, TerminalSquare } from "lucide-react";
+import {
+  Bot,
+  Files,
+  GitCompareArrows,
+  Globe2,
+  LayoutTemplate,
+  Paintbrush,
+  Puzzle,
+  Settings2,
+  TerminalSquare,
+} from "lucide-react";
 import React, { lazy, Suspense } from "react";
 import type { NativeOverlayOcclusion, RightWorkspacePanelEntry } from "@/components/right-workspace-panel-shell";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
@@ -20,6 +30,9 @@ const ExtensionsPanel = lazy(() =>
 const FilePanel = lazy(() => import("@/components/file-panel").then((m) => ({ default: m.FilePanel })));
 const ReviewPanel = lazy(() => import("@/components/review-panel").then((m) => ({ default: m.ReviewPanel })));
 const SubagentsPanel = lazy(() => import("@/components/subagents-panel").then((m) => ({ default: m.SubagentsPanel })));
+const PersistentAgentPanel = lazy(() =>
+  import("@/components/persistent-agent-panel").then((m) => ({ default: m.PersistentAgentPanel })),
+);
 
 function PanelFallback(): React.JSX.Element {
   return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading...</div>;
@@ -76,7 +89,22 @@ export const rightWorkspacePanelEntries: RightWorkspacePanelEntry[] = [
   },
 ];
 
+export function rightWorkspacePanelEntriesForThread(agentId: string | null): RightWorkspacePanelEntry[] {
+  return agentId
+    ? [
+        {
+          id: "persistentAgent",
+          title: "Agent settings",
+          description: "Memory, schedules, budgets, and run controls",
+          icon: <Settings2 />,
+        },
+        ...rightWorkspacePanelEntries,
+      ]
+    : rightWorkspacePanelEntries;
+}
+
 export type RightWorkspacePanelRenderContext = {
+  persistentAgentId?: string | null;
   active: boolean;
   appServerMethods: string[];
   activeThreadId: string;
@@ -111,6 +139,11 @@ export function renderRightWorkspacePanel(
 }
 
 function renderPanelContent(panel: RouteWorkspacePanel, context: RightWorkspacePanelRenderContext): React.ReactNode {
+  if (panel === "persistentAgent") {
+    return context.persistentAgentId ? (
+      <PersistentAgentPanel key={context.persistentAgentId} agentId={context.persistentAgentId} />
+    ) : null;
+  }
   if (panel === "terminal") {
     return <TerminalPanel active={context.active} cwd={context.activeWorkspaceCwd} />;
   }

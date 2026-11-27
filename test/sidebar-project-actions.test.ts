@@ -22,6 +22,7 @@ test("project creation lives in the Projects section instead of a duplicate top-
   const action = vi.fn<() => void>();
   const html = renderToStaticMarkup(
     createElement(AppSidebar, {
+      persistentAgentsState: { persistentAgents: [], error: null, loading: false, refresh: async () => undefined },
       threads: [],
       activeThreadId: "",
       activeView: "chat",
@@ -57,6 +58,7 @@ test("archived folder groups stay hidden after reload, including newly loaded co
   const action = vi.fn<() => void>();
   const html = renderToStaticMarkup(
     createElement(AppSidebar, {
+      persistentAgentsState: { persistentAgents: [], error: null, loading: false, refresh: async () => undefined },
       threads: [
         { id: "hidden-old", cwd: "/workspace/hidden", name: "Old hidden conversation" },
         { id: "hidden-new", cwd: "/workspace/hidden", name: "New hidden conversation" },

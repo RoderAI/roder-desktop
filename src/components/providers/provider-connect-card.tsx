@@ -47,7 +47,7 @@ export function ProviderConnectCard({
   const configureProvider = useRoderStore((state) => state.configureProvider);
   const restart = useRoderStore((state) => state.restart);
 
-  const [pending, setPending] = useState<"codex" | "oauth" | null>(null);
+  const [pending, setPending] = useState<"codex" | "oauth" | "sign-out" | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
@@ -111,6 +111,19 @@ export function ProviderConnectCard({
     } catch (loginError) {
       setPending(null);
       reportError(errorMessage(loginError));
+    }
+  }
+
+  async function signOutCodex(): Promise<void> {
+    reportError(null);
+    setPending("sign-out");
+    try {
+      await window.roderDesktop.codexLogout();
+      await refreshProviders();
+    } catch (logoutError) {
+      reportError(errorMessage(logoutError));
+    } finally {
+      setPending(null);
     }
   }
 
@@ -203,7 +216,17 @@ export function ProviderConnectCard({
       {kind === "codex-login" && (
         <div className="flex flex-col gap-3">
           {ready ? (
-            <p className="text-base text-muted-foreground">Signed in. Models from your plan are now available.</p>
+            <>
+              <p className="text-base text-muted-foreground">Signed in. Models from your plan are now available.</p>
+              <Button
+                variant="outline"
+                className="self-start"
+                disabled={pending !== null}
+                onClick={() => void signOutCodex()}
+              >
+                {pending === "sign-out" ? "Signing out..." : "Sign out"}
+              </Button>
+            </>
           ) : pending === "codex" ? (
             <PendingNote message="Finish signing in with ChatGPT in your browser. This card updates when you're done." />
           ) : (

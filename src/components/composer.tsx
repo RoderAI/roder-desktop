@@ -2,7 +2,18 @@ import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
 import { CloudMachinePicker, ThreadExecutionMachine } from "@/components/cloud-machine-picker";
 import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  use,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { PersistentAgentThreadContext } from "@/components/app-shell-context";
 import type {
   CommandDescriptor,
   DesktopAttachment,
@@ -138,7 +149,7 @@ export function Composer({
   selectedModel,
   selectedModelProvider,
   selectedSelectionMode,
-  selectedPolicyMode,
+  selectedPolicyMode: requestedPolicyMode,
   agentSwarmMode,
   agentSwarmModeAvailable,
   selectedReasoning,
@@ -160,6 +171,8 @@ export function Composer({
   onSteer,
   onStop,
 }: ComposerProps): React.JSX.Element {
+  const persistentAgentThread = use(PersistentAgentThreadContext);
+  const selectedPolicyMode = persistentAgentThread ? "bypass" : requestedPolicyMode;
   const [prompt, setPrompt] = useState("");
   const [drainingQueuedPromptId, setDrainingQueuedPromptId] = useState<string | null>(null);
   const [blockedQueuedPromptId, setBlockedQueuedPromptId] = useState<string | null>(null);
@@ -395,7 +408,7 @@ export function Composer({
     if (isPlanModeToggleKey(event)) {
       event.preventDefault();
       event.stopPropagation();
-      onSelectedPolicyModeChange(selectedPolicyMode === "plan" ? "default" : "plan");
+      togglePlanMode();
       return;
     }
     if (commandCompletion.handleCommandCompletionKeyDown(event)) {
@@ -408,6 +421,7 @@ export function Composer({
   }
 
   function togglePlanMode(): void {
+    if (persistentAgentThread) return;
     onSelectedPolicyModeChange(selectedPolicyMode === "plan" ? "default" : "plan");
   }
 
@@ -671,7 +685,9 @@ export function Composer({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-48">
                   <DropdownMenuGroup>
-                    <ComposerPlanModeMenuItem enabled={selectedPolicyMode === "plan"} onToggle={togglePlanMode} />
+                    {!persistentAgentThread ? (
+                      <ComposerPlanModeMenuItem enabled={selectedPolicyMode === "plan"} onToggle={togglePlanMode} />
+                    ) : null}
                     <ComposerAgentSwarmModeMenuItem
                       enabled={agentSwarmMode}
                       available={agentSwarmModeAvailable}
@@ -699,7 +715,11 @@ export function Composer({
                   <span className="truncate">Agent Swarm</span>
                 </Button>
               )}
-              <PolicyModePicker selectedMode={selectedPolicyMode} onChange={onSelectedPolicyModeChange} />
+              <PolicyModePicker
+                selectedMode={selectedPolicyMode}
+                onChange={onSelectedPolicyModeChange}
+                locked={persistentAgentThread}
+              />
               {activeThreadId ? (
                 <ThreadExecutionMachine threadId={activeThreadId} />
               ) : (

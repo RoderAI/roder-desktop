@@ -75,6 +75,20 @@ test("supported providers render their setup hint and relevant non-secret exampl
   expect(html).not.toContain("DAYTONA_API_KEY");
 });
 
+test("provider submenu lists discovered runners and explains authentication limitations", () => {
+  snapshot.providers = [
+    { provider_id: "sprites", capabilities: {} },
+    { provider_id: "daytona", capabilities: {} },
+  ];
+  const html = renderToStaticMarkup(React.createElement(SettingsCloudMachinesPanel));
+  expect(html).toContain("Manage runner providers");
+  expect(html).toContain("sprites");
+  expect(html).toContain("daytona");
+  expect(html).toContain("Sign-in and credential management are not available here");
+  expect(html).toContain("Configure machine");
+  expect(html).not.toContain('type="password"');
+});
+
 test("picker renders local and saved machines and preserves a supported selection", () => {
   snapshot.providers = [{ provider_id: "sprites", capabilities: {} }];
   snapshot.machines = [{ id: "dev", name: "Development", providerId: "sprites", workspace: "/work" }];

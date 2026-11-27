@@ -41,6 +41,7 @@ export type AppShellContextValue = {
 };
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
+export const PersistentAgentThreadContext = createContext(false);
 
 export const AppShellProvider = AppShellContext.Provider;
 
