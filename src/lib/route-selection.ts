@@ -1,3 +1,13 @@
+import {
+  isRemoteRunner,
+  REMOTE_WORKSPACE_ROOT_ID,
+  remoteRunnerLabel,
+  remoteRunnerTargetName,
+  remoteWorkspaceIdForMachine,
+  remoteWorkspaceIdForThread,
+  type ActiveRemoteWorkspace,
+  type CloudMachine,
+} from "@/lib/cloud-machines";
 import type { SettingsSection } from "@/stores/theme-store";
 import type { RoderThread, Workspace, WorkspaceRoot } from "@/types/roder";
 
@@ -30,6 +40,7 @@ export type ActiveWorkspaceContext = {
   cwd: string;
   ref: { workspaceId: string; rootId: string };
   roots: WorkspaceRoot[];
+  remote: ActiveRemoteWorkspace | null;
 };
 
 export const pluginSectionValues = ["installed", "explore"] as const;
@@ -98,15 +109,59 @@ export function activeWorkspaceContextForRoute({
   selectedRootId,
   statusCwd,
   workspaces,
+  cloudMachines = [],
+  selectedCloudMachineId = "",
 }: {
   isNewRoute: boolean;
-  routeThread?: Pick<RoderThread, "cwd" | "workspaceId" | "rootId">;
+  routeThread?: Pick<RoderThread, "id" | "cwd" | "workspaceId" | "rootId" | "runner">;
   selectedWorkspaceCwd: string;
   selectedWorkspaceId: string;
   selectedRootId: string;
   statusCwd?: string;
   workspaces: Workspace[];
+  cloudMachines?: readonly CloudMachine[];
+  selectedCloudMachineId?: string;
 }): ActiveWorkspaceContext {
+  if (!isNewRoute && routeThread && isRemoteRunner(routeThread.runner)) {
+    const workspaceId = remoteWorkspaceIdForThread(routeThread.id);
+    const label = remoteRunnerLabel(routeThread.runner, cloudMachines);
+    const targetName = remoteRunnerTargetName(routeThread.runner);
+    const workspacePath = routeThread.runner.workspace;
+    return {
+      cwd: workspacePath,
+      ref: { workspaceId, rootId: REMOTE_WORKSPACE_ROOT_ID },
+      roots: [{ id: REMOTE_WORKSPACE_ROOT_ID, name: label, path: workspacePath }],
+      remote: {
+        workspaceId,
+        providerId: routeThread.runner.providerId,
+        label,
+        workspacePath,
+        targetName,
+        threadId: routeThread.id,
+      },
+    };
+  }
+
+  if (isNewRoute && selectedCloudMachineId) {
+    const selectedMachine = cloudMachines.find((machine) => machine.id === selectedCloudMachineId);
+    if (selectedMachine && selectedMachine.providerId !== "unix-local") {
+      const workspaceId = remoteWorkspaceIdForMachine(selectedMachine.id);
+      return {
+        cwd: selectedMachine.workspace,
+        ref: { workspaceId, rootId: REMOTE_WORKSPACE_ROOT_ID },
+        roots: [{ id: REMOTE_WORKSPACE_ROOT_ID, name: selectedMachine.name, path: selectedMachine.workspace }],
+        remote: {
+          workspaceId,
+          providerId: selectedMachine.providerId,
+          label: selectedMachine.name,
+          workspacePath: selectedMachine.workspace,
+          targetName: selectedMachine.name,
+          machineId: selectedMachine.id,
+        },
+      };
+    }
+  }
+
   const workspaceSelection = isNewRoute
     ? resolveWorkspaceSelection(workspaces, {
         workspaceId: selectedWorkspaceId,
@@ -133,6 +188,7 @@ export function activeWorkspaceContextForRoute({
     cwd,
     ref: { workspaceId, rootId },
     roots,
+    remote: null,
   };
 }
 

@@ -1,22 +1,30 @@
+import { Cloud } from "lucide-react";
 import { useMountEffect } from "@/hooks/use-mount-effect";
-import { WINDOWS_CLOUD_MACHINES_NOTICE } from "@/lib/cloud-machines";
+import { isRemoteRunner, remoteRunnerLabel, WINDOWS_CLOUD_MACHINES_NOTICE } from "@/lib/cloud-machines";
 import { cn } from "@/lib/utils";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useRoderStore } from "@/stores/roder-store";
 
 export function ThreadExecutionMachine({ threadId }: { threadId: string }): React.JSX.Element {
   const thread = useRoderStore((state) => state.threads.find((entry) => entry.id === threadId));
+  const machines = useCloudMachinesStore((state) => state.machines);
+  const remote = Boolean(thread && isRemoteRunner(thread.runner));
   const label = !thread
     ? "Loading execution machine..."
-    : thread.runner && thread.runner.providerId !== "unix-local"
-      ? `${thread.runner.providerId}: ${thread.runner.workspace}`
+    : remote && thread.runner
+      ? `${remoteRunnerLabel(thread.runner, machines)} (${thread.runner.providerId})`
       : "Local machine";
   return (
     <span
-      title="Execution machine is fixed for this thread. Start a new thread to change it."
-      className="min-w-0 max-w-32 truncate px-1.5 text-sm text-muted-foreground @[520px]:max-w-52 @[520px]:px-2"
+      title={
+        remote && thread?.runner
+          ? `${thread.runner.providerId}: ${thread.runner.workspace} — Execution machine is fixed for this thread.`
+          : "Execution machine is fixed for this thread. Start a new thread to change it."
+      }
+      className="flex min-w-0 max-w-36 items-center gap-1 truncate px-1.5 text-sm text-muted-foreground @[520px]:max-w-56 @[520px]:px-2"
     >
-      {label}
+      {remote && <Cloud className="size-3.5 shrink-0" />}
+      <span className="truncate">{label}</span>
     </span>
   );
 }
@@ -55,7 +63,8 @@ export function CloudMachinePicker({
       value={selectedMachineId}
       onChange={(event) => select(event.currentTarget.value)}
       className={cn(
-        "h-7 min-w-0 max-w-32 rounded-lg border border-input bg-background px-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 @[520px]:h-8 @[520px]:max-w-52 @[520px]:px-2 @[520px]:text-base",
+        "h-7 min-w-0 max-w-32 cursor-pointer rounded-full border-0 bg-transparent px-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 @[520px]:h-8 @[520px]:max-w-52 @[520px]:px-2.5 @[520px]:text-base",
+        selectedMachineId && "bg-accent/60 text-foreground",
         className,
       )}
     >

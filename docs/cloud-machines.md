@@ -1,69 +1,84 @@
-# Cloud Machines
+# Cloud Machines & Remote Workspaces
 
-Open **Settings > Cloud Machines** to add a named execution profile. Choose an
-installed runner provider, an absolute workspace path on that runner, and its
-non-secret JSON configuration. Provider-specific examples and authentication
-environment variables appear below the provider selector.
+Open **Settings > Cloud Machines** to connect a remote runner provider (such as
+Blaxel) and save named cloud workspace profiles. Once connected, working in a
+remote thread uses the same native desktop panels — **Files**, **`Cmd+P` Quick
+Open**, **Terminal**, **Review** (Git diffs), and **Browser** port previews —
+directly against the remote workspace.
 
 Cloud machines are currently unavailable on Windows because the embedded
 runner validates remote POSIX paths using host path rules. Windows users can
 continue using **Local machine** with native Windows tools. Saved cloud profiles
 remain visible but cannot be selected or run on Windows.
 
-On a new thread, choose the profile from the execution-machine selector beside
-the policy controls. The default is **Local machine**. A thread's native coding
-tools use its chosen runner workspace. The binding is fixed when the thread is
-created and persists in Roder's thread metadata, including when the thread is
-reopened. Changing the new-thread selector does not move existing threads.
-Local selections preserve the native host tools, shell, and workspace behavior.
-If an upstream global runner destination is configured, local thread creation
-fails rather than inheriting that destination. Clear the global runner
-configuration and restart the app, or choose a cloud machine. Selecting a
-desktop cloud profile does not change the upstream global runner configuration.
+## Connecting Blaxel
 
-The local project remains the thread's desktop workspace context. This feature
-does not upload or synchronize a local repository. Prepare the remote directory
-and repository before using it. Desktop file, terminal, browser, and host-provided
-tools remain desktop-side; this is not a remote desktop connection or a second
-app-server connection.
+In **Settings > Cloud Machines**, the **Blaxel connection** card supports:
+
+- **Connect from Blaxel CLI**: detects an authenticated `~/.blaxel/config.yaml`
+  / `bl` CLI session and imports the active workspace credential into OS
+  encrypted storage in one click.
+- **Use API key**: paste a Blaxel API key directly (workspace is auto-discovered
+  via Blaxel's API or entered manually).
+
+Saving or clearing credentials restarts the embedded `roder app-server`
+automatically so the new environment variables take effect immediately without
+restarting the desktop app.
+
+With Blaxel connected, you can select an existing Blaxel sandbox from a live
+list or create a new sandbox directly from Settings without editing raw JSON.
+
+## Native Remote Workspace Bridge (`remote-roder` Tunnel)
+
+When an active thread is bound to a Blaxel remote runner (or while staging a new
+thread with a Blaxel profile selected), Roder Desktop injects the headless
+`remote-roder` binary into the sandbox, starts `remote-roder app-server --remote`
+on port `17373`, and opens a double-authenticated private Blaxel TLS WebSocket
+tunnel (`X-Blaxel-Authorization` + `roder.remote.v1` bearer token) to bridge
+native app-server JSON-RPC methods directly to the remote engine:
+
+- **Files & `Cmd+P` Quick Open**: served by the remote `remote-roder` Rust file
+  indexer with live `workspace/files/statusChanged` notifications.
+- **Review (Branch / Staged / Unstaged)**: served by the remote `remote-roder`
+  Git/VCS engine (`vcs/changes/list` and `vcs/changes/read`).
+- **Design & Skills**: forwarded directly to the remote `remote-roder` instance.
+- **Fallback for musl/Alpine sandboxes**: if an existing sandbox runs Alpine/musl
+  where the glibc `remote-roder` artifact cannot execute, Files/Search/Review
+  fall back cleanly to Blaxel's sandbox API. New sandboxes created from Settings
+  default to Debian glibc (`blaxel/py-app:latest`) so the `remote-roder` tunnel
+  runs natively out of the box.
+- **Terminal**: opens a persistent interactive ANSI shell over Blaxel's native
+  `/terminal/ws` WebSocket endpoint directly inside the remote workspace
+  directory (no local `bl` CLI required).
+- **Top bar status & Port Preview**: inspect sandbox status and bridge mode,
+  wake/pause/resume the runner, or expose a remote port via a Blaxel preview URL
+  directly inside Roder's built-in Browser panel.
+- **Sidebar grouping**: remote threads group under their remote workspace with a
+  cloud indicator, and starting a new agent from that group pre-selects the
+  matching remote profile.
 
 ## Providers
 
 Desktop discovers providers from the embedded harness's `runners/list` API rather
-than maintaining a fixed selectable catalog. The pinned Roder 0.4.11 build
-includes Sprites, Blaxel, Docker, unix-local, Cloudflare, Daytona, E2B, Modal,
+than maintaining a fixed selectable catalog. The pinned Roder 0.4.14 build
+includes Blaxel, Sprites, Docker, unix-local, Cloudflare, Daytona, E2B, Modal,
 Runloop, and Vercel.
 
-- Sprites and Blaxel profiles can name an existing machine or sandbox.
-- Docker requires Docker on the app-server host.
-- unix-local runs on the app-server host, not on a cloud machine.
-- Cloudflare, Daytona, E2B, Modal, Runloop, and Vercel currently use upstream's
-  compatible runner-gateway `/sessions` protocol. Their `base_url` must point to
-  such a gateway, not the vendor's ordinary API endpoint.
-- Upstream does not currently provide an SSH runner. An arbitrary SSH hostname
-  cannot be used as a profile.
+- **Blaxel** has full native desktop integration (CLI import, sandbox discovery
+  and creation, direct remote Files, Search, Review, Terminal, and Preview).
+- **Sprites** and gateway providers can store encrypted tokens in Settings and
+  bind threads to named remote workspaces.
+- **Docker** requires Docker on the app-server host.
+- **unix-local** runs on the app-server host, not on a cloud machine.
 
 ## Credentials and storage
 
-Supply credentials through the environment inherited by the desktop app's
-app-server process. Set the variables listed in the provider help before starting
-the app; restart the app after changing them. Credentials are shared per provider
-within that process. Desktop does not yet provide per-profile credential entry
-or isolated app-server processes.
+Do not put API keys, tokens, passwords, or credential-bearing URLs in profile
+JSON configuration. Roder persists runner configuration with each thread, so
+desktop rejects credential-like configuration fields.
 
-Do not put API keys, tokens, passwords, or credential-bearing URLs in the JSON
-configuration. Roder persists runner configuration with each thread, so desktop
-rejects credential-like configuration fields. This validation cannot identify
-every possible secret; keep the configuration non-secret.
-
-Saved profiles are encrypted with Electron `safeStorage` in
-`<userData>/cloud-machines.enc`. Storage fails closed when OS-backed encryption is
-unavailable. The renderer persists only the selected profile ID, not profile
-configuration. Invalid or deleted selections fail rather than silently executing
-the prompt locally. Removing a profile does not stop or delete cloud resources
-or change existing threads.
-
-Adding a profile checks configuration shape and provider availability. It does
-not provision infrastructure or verify cloud credentials. The harness validates
-the runner binding at thread creation and creates or resumes a runner session
-when a native coding tool first needs it.
+Saved credentials are encrypted with Electron `safeStorage` in
+`<userData>/cloud-credentials.enc`, and saved machine profiles are encrypted in
+`<userData>/cloud-machines.enc`. Both fail closed when OS-backed encryption is
+unavailable. Neither raw credentials nor profile configs are stored in renderer
+`localStorage` or recorded in diagnostic app-server event logs.

@@ -20,10 +20,7 @@ test("sidebar project order follows the most recently updated thread by default"
     thread("new-a", "/workspace/project-a", 300),
   ];
   expect(sidebarProjectOrder(threads, [])).toEqual(["/workspace/project-a", "/workspace/project-b"]);
-  expect(sidebarProjectOrder([threads[0], threads[1]], [])).toEqual([
-    "/workspace/project-b",
-    "/workspace/project-a",
-  ]);
+  expect(sidebarProjectOrder([threads[0], threads[1]], [])).toEqual(["/workspace/project-b", "/workspace/project-a"]);
 });
 
 test("sidebar project order preserves manually arranged projects and prepends new projects", () => {
@@ -76,4 +73,56 @@ test("sidebar project groups display Windows folder names", () => {
   );
 
   expect(Array.from(groups, (group) => group.title)).toEqual(["gode", "project"]);
+});
+
+test("remote runner threads group under their remote workspace instead of the local folder", () => {
+  const localThread = thread("local-1", "/Users/dev/app", 100);
+  const remoteThread = {
+    ...thread("remote-1", "/Users/dev/app", 200),
+    runner: {
+      providerId: "blaxel",
+      workspace: "/workspace",
+      config: { sandbox_name: "roder-demo" },
+    },
+  };
+  const otherRemoteThread = {
+    ...thread("remote-2", "/Users/dev/app", 150),
+    runner: {
+      providerId: "blaxel",
+      workspace: "/workspace",
+      config: { sandbox_name: "other-sandbox" },
+    },
+  };
+
+  const order = sidebarProjectOrder([localThread, remoteThread, otherRemoteThread], []);
+  const groups = groupThreadsByFolder([localThread, remoteThread, otherRemoteThread], order, [
+    { id: "m1", name: "roder-demo", providerId: "blaxel", workspace: "/workspace" },
+  ]);
+
+  expect(groups).toHaveLength(3);
+  expect(groups[0]).toMatchObject({
+    key: "remote:blaxel:roder-demo:/workspace",
+    title: "roder-demo",
+    remote: {
+      providerId: "blaxel",
+      workspace: "/workspace",
+      targetName: "roder-demo",
+      machineId: "m1",
+    },
+  });
+  expect(groups[1]).toMatchObject({
+    key: "remote:blaxel:other-sandbox:/workspace",
+    title: "other-sandbox",
+    remote: {
+      providerId: "blaxel",
+      workspace: "/workspace",
+      targetName: "other-sandbox",
+    },
+  });
+  expect(groups[1].remote?.machineId).toBeUndefined();
+  expect(groups[2]).toMatchObject({
+    key: "/Users/dev/app",
+    title: "app",
+  });
+  expect(groups[2].remote).toBeUndefined();
 });

@@ -1,8 +1,10 @@
 import { LayoutAlignLeftIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Check, ChevronDown, Folder, MessageSquare } from "lucide-react";
+import { Check, ChevronDown, Cloud, Folder, MessageSquare } from "lucide-react";
+import type { ActiveRemoteWorkspace } from "@/lib/cloud-machines";
 import type { RoderStatus, RoderThread, RoderThreadGoal } from "@/types/roder";
 import { Button } from "@/components/ui/button";
+import { RemoteRunnerPopover } from "@/components/remote-runner-popover";
 import { ThreadCostPopover } from "@/components/thread-cost-popover";
 import { chromeIconButtonClassNameForState } from "@/components/ui/chrome-icon-button";
 import {
@@ -35,6 +37,7 @@ type TopBarProps = {
   threads: RoderThread[];
   folders: FolderOption[];
   activeFolderPath: string;
+  remoteWorkspace?: ActiveRemoteWorkspace | null;
   status: RoderStatus;
   workspacePanelOpen: boolean;
   workspacePanelToggleVisible?: boolean;
@@ -43,6 +46,7 @@ type TopBarProps = {
   placement: "content" | "window";
   onNewProject: () => void;
   onNewThread: () => void;
+  onOpenBrowserPreview?: (url: string) => void;
   onOpenSettings: () => void;
   onRestart: () => void;
   onToggleSidebar: () => void;
@@ -57,6 +61,7 @@ export function TopBar({
   threads,
   folders,
   activeFolderPath,
+  remoteWorkspace = null,
   status,
   workspacePanelOpen,
   workspacePanelToggleVisible = true,
@@ -65,6 +70,7 @@ export function TopBar({
   placement,
   onNewProject,
   onNewThread,
+  onOpenBrowserPreview,
   onOpenSettings,
   onRestart,
   onToggleSidebar,
@@ -75,7 +81,10 @@ export function TopBar({
   const activeFolder = folders.find(
     (folder) => normalizeWorkspacePath(folder.path) === normalizeWorkspacePath(activeFolderPath),
   );
-  const activeFolderLabel = activeFolder?.name ?? workspaceName(activeFolderPath);
+  const activeFolderLabel = remoteWorkspace?.label ?? activeFolder?.name ?? workspaceName(activeFolderPath);
+  const breadcrumbTitle = remoteWorkspace
+    ? `${remoteWorkspace.providerId} · ${remoteWorkspace.targetName}:${remoteWorkspace.workspacePath} / ${threadTitle(thread)}`
+    : `${activeFolderPath} / ${threadTitle(thread)}`;
   const isWindowTopBar = placement === "window";
   const goalLabel = goal?.objective.trim() ?? "";
   const viewMenuItems: WindowMenuItem[] = [
@@ -120,17 +129,22 @@ export function TopBar({
             <WindowMenuButton label="Help" items={[{ label: "Settings", onSelect: onOpenSettings }]} />
           </nav>
         </div>
-        <h1
-          className="drag-region flex min-w-0 items-center justify-center gap-1.5 text-sm"
-          title={`${activeFolderPath} / ${threadTitle(thread)}`}
-        >
-          <span className="min-w-0 truncate font-medium text-muted-foreground">{activeFolderLabel}</span>
+        <h1 className="drag-region flex min-w-0 items-center justify-center gap-1.5 text-sm" title={breadcrumbTitle}>
+          {remoteWorkspace && <Cloud className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
+          <span className="max-w-[45%] shrink-0 truncate font-medium text-muted-foreground">{activeFolderLabel}</span>
           <span className="shrink-0 text-muted-foreground/55" aria-hidden="true">
             /
           </span>
           <span className="min-w-0 truncate font-semibold text-foreground">{threadTitle(thread)}</span>
         </h1>
         <div className="flex min-w-0 items-center justify-end gap-2">
+          {remoteWorkspace && status.state === "ready" && (
+            <RemoteRunnerPopover
+              key={remoteWorkspace.workspaceId}
+              remoteWorkspace={remoteWorkspace}
+              onOpenBrowserPreview={onOpenBrowserPreview}
+            />
+          )}
           {thread && status.state === "ready" && <ThreadCostPopover key={thread.id} threadId={thread.id} />}
           {(status.state === "error" || status.state === "stopped") && (
             <Button variant="outline" size="sm" onClick={onRestart}>
@@ -173,7 +187,10 @@ export function TopBar({
       </Button>
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
         {sidebarOpen ? (
-          <h1 className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-base">
+          <h1 className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-base" title={breadcrumbTitle}>
+            {remoteWorkspace && (
+              <Cloud className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden="true" />
+            )}
             <span className="max-w-48 shrink-0 truncate font-normal text-muted-foreground">{activeFolderLabel}</span>
             <span className="shrink-0 text-muted-foreground/60" aria-hidden="true">
               /
@@ -209,6 +226,13 @@ export function TopBar({
           extensionSidebarVisible && workspacePanelToggleVisible && "mr-12",
         )}
       >
+        {remoteWorkspace && status.state === "ready" && (
+          <RemoteRunnerPopover
+            key={remoteWorkspace.workspaceId}
+            remoteWorkspace={remoteWorkspace}
+            onOpenBrowserPreview={onOpenBrowserPreview}
+          />
+        )}
         {thread && status.state === "ready" && <ThreadCostPopover key={thread.id} threadId={thread.id} />}
         {(status.state === "error" || status.state === "stopped") && (
           <Button variant="outline" size="sm" onClick={onRestart}>

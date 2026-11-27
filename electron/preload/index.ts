@@ -23,6 +23,7 @@ export type SystemAppearance = "dark" | "light";
 export type TerminalSnapshot = {
   id: string;
   pid: number;
+  remote?: boolean;
 };
 
 export type BrowserSnapshot = {
@@ -125,11 +126,18 @@ const api = {
     ipcRenderer.invoke("workspace:openFolder", defaultPath) as Promise<string | null>,
   openWorkspaceFolders: (defaultPath?: string) =>
     ipcRenderer.invoke("workspace:openFolders", defaultPath) as Promise<string[] | null>,
-  terminalStart: (options?: { cols?: number; rows?: number; cwd?: string }) =>
-    ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
-  terminalWrite: (data: string) => ipcRenderer.invoke("terminal:write", data) as Promise<void>,
-  terminalResize: (cols: number, rows: number) => ipcRenderer.invoke("terminal:resize", cols, rows) as Promise<void>,
-  terminalStop: () => ipcRenderer.invoke("terminal:stop") as Promise<void>,
+  terminalStart: (options?: {
+    id?: string;
+    cols?: number;
+    rows?: number;
+    cwd?: string;
+    remoteWorkspaceId?: string;
+    forceRestart?: boolean;
+  }) => ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
+  terminalWrite: (data: string, id?: string) => ipcRenderer.invoke("terminal:write", data, id) as Promise<void>,
+  terminalResize: (cols: number, rows: number, id?: string) =>
+    ipcRenderer.invoke("terminal:resize", cols, rows, id) as Promise<void>,
+  terminalStop: (id?: string) => ipcRenderer.invoke("terminal:stop", id) as Promise<void>,
   browserToggle: (bounds?: BrowserBounds) => ipcRenderer.invoke("browser:toggle", bounds) as Promise<BrowserSnapshot>,
   browserShow: (bounds: BrowserBounds) => ipcRenderer.invoke("browser:show", bounds) as Promise<BrowserSnapshot>,
   browserHide: () => ipcRenderer.invoke("browser:hide") as Promise<BrowserSnapshot>,

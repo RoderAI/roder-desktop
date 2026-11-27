@@ -1,4 +1,15 @@
-import type { CloudMachine, CloudMachineInput, CloudRunnerProvider } from "@/lib/cloud-machines";
+import type {
+  BlaxelCliStatus,
+  BlaxelSandboxSummary,
+  BlaxelWorkspaceInfo,
+  CloudMachine,
+  CloudMachineInput,
+  CloudMachineProfileDetail,
+  CloudMachineTestResult,
+  CloudProviderCredentialStatus,
+  CloudRunnerProvider,
+  RemoteRunnerStatusSnapshot,
+} from "@/lib/cloud-machines";
 import type { IndexedTranscriptHistory, IndexedTranscriptPage, HistoryRange } from "@/lib/sparse-transcript-history";
 import { attachmentImageType } from "@/lib/attachment-preparation";
 import type {
@@ -612,12 +623,91 @@ export const roderIpc = {
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
     window.roderDesktop.request("providers/select", { provider, model, reasoning }) as Promise<ProviderSelectResult>,
   listRunners: () => window.roderDesktop.request("runners/list", {}) as Promise<{ providers: CloudRunnerProvider[] }>,
+  pauseThreadRunner: (threadId: string) =>
+    window.roderDesktop.request("runners/pause", { threadId }) as Promise<Record<string, unknown>>,
+  resumeThreadRunner: (threadId: string) =>
+    window.roderDesktop.request("runners/resume", { threadId }) as Promise<Record<string, unknown>>,
+  detachThreadRunner: (threadId: string) =>
+    window.roderDesktop.request("runners/detach", { threadId }) as Promise<Record<string, unknown>>,
+  rejoinThreadRunner: (threadId: string, sandbox?: string) =>
+    window.roderDesktop.request("runners/rejoin", { threadId, ...(sandbox ? { sandbox } : {}) }) as Promise<
+      Record<string, unknown>
+    >,
   listCloudMachines: () =>
     window.roderDesktop.request("desktop/cloud-machines/list", {}) as Promise<{ machines: CloudMachine[] }>,
+  getCloudMachineProfile: (id: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/get", { id }) as Promise<{
+      machine: CloudMachineProfileDetail;
+    }>,
   saveCloudMachine: (input: CloudMachineInput) =>
     window.roderDesktop.request("desktop/cloud-machines/save", input) as Promise<{ machine: CloudMachine }>,
   removeCloudMachine: (id: string) =>
     window.roderDesktop.request("desktop/cloud-machines/remove", { id }) as Promise<{ removed: true }>,
+  testCloudMachine: (
+    params: { id: string } | { providerId: string; workspace: string; config: Record<string, unknown> },
+  ) => window.roderDesktop.request("desktop/cloud-machines/test", params) as Promise<CloudMachineTestResult>,
+  cloudCredentialsStatus: () =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/status", {}) as Promise<{
+      statuses: CloudProviderCredentialStatus[];
+      blaxelCli: BlaxelCliStatus;
+    }>,
+  saveBlaxelCredentials: (params: { apiKey: string; workspace?: string }) =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/saveBlaxel", params) as Promise<{
+      status: CloudProviderCredentialStatus;
+      workspaces: BlaxelWorkspaceInfo[];
+    }>,
+  importBlaxelCliCredentials: (workspace?: string) =>
+    window.roderDesktop.request(
+      "desktop/cloud-machines/credentials/importBlaxelCli",
+      workspace ? { workspace } : {},
+    ) as Promise<{
+      status: CloudProviderCredentialStatus;
+      workspaces: BlaxelWorkspaceInfo[];
+    }>,
+  saveProviderCredentialToken: (providerId: string, token: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/saveProviderToken", {
+      providerId,
+      token,
+    }) as Promise<{
+      status: CloudProviderCredentialStatus;
+    }>,
+  clearProviderCredentials: (providerId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/credentials/clear", { providerId }) as Promise<{
+      cleared: true;
+    }>,
+  listBlaxelWorkspaces: () =>
+    window.roderDesktop.request("desktop/cloud-machines/blaxel/workspaces", {}) as Promise<{
+      workspaces: BlaxelWorkspaceInfo[];
+    }>,
+  listBlaxelSandboxes: (workspace?: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/blaxel/sandboxes", workspace ? { workspace } : {}) as Promise<{
+      sandboxes: BlaxelSandboxSummary[];
+      workspace: string | null;
+    }>,
+  createBlaxelSandbox: (params: {
+    name: string;
+    workspace?: string;
+    image?: string;
+    memory?: number;
+    region?: string;
+    workingDir?: string;
+  }) =>
+    window.roderDesktop.request("desktop/cloud-machines/blaxel/createSandbox", params) as Promise<{
+      sandbox: BlaxelSandboxSummary;
+    }>,
+  remoteRunnerStatus: (workspaceId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/remote/status", { workspaceId }) as Promise<{
+      status: RemoteRunnerStatusSnapshot;
+    }>,
+  wakeRemoteRunner: (workspaceId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/remote/wake", { workspaceId }) as Promise<{
+      status: RemoteRunnerStatusSnapshot;
+    }>,
+  openRemotePreviewPort: (workspaceId: string, port: number) =>
+    window.roderDesktop.request("desktop/cloud-machines/remote/previewPort", { workspaceId, port }) as Promise<{
+      url: string;
+      port: number;
+    }>,
   listProviders: () =>
     window.roderDesktop
       .request("providers/list", {})

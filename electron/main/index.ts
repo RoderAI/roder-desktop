@@ -40,6 +40,15 @@ import {
 } from "../codex/codex-account";
 import { ExtensionCatalog } from "../extensions/catalog";
 import { redactSecrets } from "../app-server-redaction";
+import { BlaxelClient } from "../cloud-machines/blaxel-client";
+import { detectBlaxelCli, readBlaxelCliCredentials } from "../cloud-machines/blaxel-cli";
+import { BlaxelTerminalSession } from "../cloud-machines/blaxel-terminal";
+import { CloudCredentialsService } from "../cloud-machines/credentials";
+import {
+  isRemoteWorkspaceId,
+  remoteWorkspaceIdForThread,
+  RemoteWorkspaceService,
+} from "../cloud-machines/remote-workspace";
 import { CloudMachinesService } from "../cloud-machines/service";
 import { cloudMachineThreadParams } from "../cloud-machines/thread-routing";
 import { findClaudeCli } from "../onboarding/claude-cli";
@@ -70,7 +79,7 @@ import { createOpenAiImageGenerator } from "../persistent-agents/openai-image-ge
 import type { Issue, IssueProject } from "../../src/types/issues";
 import type { PersistentAgentDetail } from "../../src/types/persistent-agents";
 import type { Workspace } from "../../src/types/roder";
-import { TerminalManager } from "../terminal/pty-manager";
+import { TerminalManager, type TerminalStartOptions } from "../terminal/pty-manager";
 import { createAutoUpdateController } from "./auto-update";
 import {
   createApplicationMenuTemplate,
@@ -83,7 +92,9 @@ import {
 import { rendererZoomFactor, scaleRendererBounds } from "./renderer-scale";
 import { mainPanelMinWidth, mainWindowMinHeight, mainWindowMinWidth } from "./window-options";
 
-const roder = new RoderAppServerClient();
+const roder = new RoderAppServerClient({
+  getExtraEnv: () => getCloudCredentialsService().getCachedRunnerEnv(process.env),
+});
 const threadHistory = createThreadHistoryService({
   request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
 });
@@ -91,7 +102,23 @@ const threadHistoryIndex = createThreadHistoryIndexService({
   request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
 });
 let changingImageCredentials = false;
-const terminal = new TerminalManager();
+const terminal = new TerminalManager({
+  startRemoteTerminal: async ({ id, remoteWorkspaceId, cols, rows }) => {
+    const remoteService = getRemoteWorkspaceService();
+    const target = await remoteService.resolveTarget(remoteWorkspaceId);
+    const endpoint = await remoteService.resolveBlaxelEndpoint(target);
+    await getBlaxelClient().wakeSandbox(endpoint.auth, endpoint.sandboxUrl);
+    const stableSessionId = `roder-${id.replace(/[^a-zA-Z0-9_-]/gu, "_").slice(0, 48)}`;
+    return new BlaxelTerminalSession({
+      sandboxUrl: endpoint.sandboxUrl,
+      auth: endpoint.auth,
+      sessionId: stableSessionId,
+      workingDir: target.workspace,
+      cols,
+      rows,
+    });
+  },
+});
 const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
 const browser = new BrowserManager(cdpPort, () => sendAppCommand("newThread"));
 const chromeBridge = new ChromeBridgeManager();
@@ -128,6 +155,18 @@ if (!app.isPackaged) {
 app.setAboutPanelOptions({ applicationName: appName });
 if (!app.commandLine.hasSwitch("remote-debugging-port")) {
   app.commandLine.appendSwitch("remote-debugging-port", cdpPort);
+}
+// Chromium only auto-selects gnome-libsecret for GNOME/XFCE/Unity desktops and falls back to
+// basic_text on Hyprland/Sway/i3/etc. even when org.freedesktop.secrets (gnome-keyring-daemon)
+// is active. Opt non-KDE Linux desktops into gnome-libsecret so OS-backed safeStorage works;
+// if no secret service is running, safeStorage still fails closed.
+if (
+  process.platform === "linux" &&
+  !app.commandLine.hasSwitch("password-store") &&
+  !/\b(?:kde|plasma|lxqt)\b/iu.test(process.env.XDG_CURRENT_DESKTOP ?? "") &&
+  Boolean(process.env.DBUS_SESSION_BUS_ADDRESS || process.env.XDG_RUNTIME_DIR)
+) {
+  app.commandLine.appendSwitch("password-store", "gnome-libsecret");
 }
 
 function currentAppearance(): "dark" | "light" {
@@ -238,6 +277,7 @@ ipcMain.handle("appUpdate:install", () => autoUpdate.installUpdate());
 roder.on("notification", (payload) => {
   recordAppServerEvent("notification", payload.method, payload.params);
   sendToRenderer("roder:notification", payload);
+  maybeNotifyRemoteFilesChanged(payload.method, payload.params);
   void getDesktopAgentTools()
     .onNotification(payload.method, payload.params)
     .catch(() => {
@@ -267,15 +307,20 @@ ipcMain.handle("roder:start", async () => {
   await startPersistentAgents().catch(reportPersistentAgentStartupError);
   return status;
 });
-ipcMain.handle("roder:restart", async () => {
+async function restartRoderEngine() {
   await persistentAgentService?.stop();
   persistentAgentService = null;
   spriteManager = null;
+  blaxelClient?.clearCache();
+  remoteWorkspaceService?.closeAll();
+  await getCloudCredentialsService().hydrate();
   const status = await roder.restart();
   persistentAgentStartPromise = null;
   await startPersistentAgents().catch(reportPersistentAgentStartupError);
   return status;
-});
+}
+
+ipcMain.handle("roder:restart", () => restartRoderEngine());
 ipcMain.handle("imageGeneration:configure", async (_event, input: unknown) => {
   if (changingImageCredentials) throw Error("Image credential setup is already running.");
   if (!isRecord(input) || typeof input.apiKey !== "string") throw Error("Enter an OpenAI API key.");
@@ -319,12 +364,12 @@ ipcMain.handle("workspace:openFolders", async (_event, defaultPath?: string) => 
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths;
 });
-ipcMain.handle("terminal:start", (_event, options: { cols?: number; rows?: number; cwd?: string }) =>
-  terminal.start({ ...options, cwd: options.cwd || process.cwd() }),
+ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
+  terminal.start({ ...options, cwd: options?.cwd || process.cwd() }),
 );
-ipcMain.handle("terminal:write", (_event, data: string) => terminal.write(data));
-ipcMain.handle("terminal:resize", (_event, cols: number, rows: number) => terminal.resize(cols, rows));
-ipcMain.handle("terminal:stop", () => terminal.stop());
+ipcMain.handle("terminal:write", (_event, data: string, id?: string) => terminal.write(data, id));
+ipcMain.handle("terminal:resize", (_event, cols: number, rows: number, id?: string) => terminal.resize(cols, rows, id));
+ipcMain.handle("terminal:stop", (_event, id?: string) => terminal.stop(id));
 ipcMain.handle("browser:toggle", (_event, bounds?: Rectangle) => browser.toggle(scaleRendererBounds(bounds)));
 ipcMain.handle("browser:show", (_event, bounds: Rectangle) => browser.show(scaleRendererBounds(bounds)));
 ipcMain.handle("browser:hide", () => browser.hide());
@@ -597,6 +642,7 @@ app.whenReady().then(async () => {
     void autoUpdate.checkForUpdates({ interactive: false });
   }, 4_000);
   try {
+    await getCloudCredentialsService().hydrate();
     await roder.start();
     await startPersistentAgents().catch(reportPersistentAgentStartupError);
   } catch (error) {
@@ -620,6 +666,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   shuttingDown = true;
   terminal.stop();
+  remoteWorkspaceService?.closeAll();
   browser.destroy();
   void (async () => {
     try {
@@ -815,16 +862,90 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
 }
 
 let cloudMachinesService: CloudMachinesService | undefined;
+let cloudCredentialsService: CloudCredentialsService | undefined;
+let blaxelClient: BlaxelClient | undefined;
+let remoteWorkspaceService: RemoteWorkspaceService | undefined;
+
+function cloudEncryptionAvailable(): boolean {
+  return (
+    safeStorage.isEncryptionAvailable() &&
+    (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text")
+  );
+}
 
 function getCloudMachinesService(): CloudMachinesService {
   return (cloudMachinesService ??= new CloudMachinesService({
     filePath: join(app.getPath("userData"), "cloud-machines.enc"),
     encrypt: (value) => safeStorage.encryptString(value),
     decrypt: (value) => safeStorage.decryptString(value),
-    encryptionAvailable: () =>
-      safeStorage.isEncryptionAvailable() &&
-      (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"),
+    encryptionAvailable: cloudEncryptionAvailable,
   }));
+}
+
+function getCloudCredentialsService(): CloudCredentialsService {
+  return (cloudCredentialsService ??= new CloudCredentialsService({
+    filePath: join(app.getPath("userData"), "cloud-credentials.enc"),
+    encrypt: (value) => safeStorage.encryptString(value),
+    decrypt: (value) => safeStorage.decryptString(value),
+    encryptionAvailable: cloudEncryptionAvailable,
+  }));
+}
+
+function getBlaxelClient(): BlaxelClient {
+  return (blaxelClient ??= new BlaxelClient());
+}
+
+function getRemoteWorkspaceService(): RemoteWorkspaceService {
+  if (!remoteWorkspaceService) {
+    const service = new RemoteWorkspaceService({
+      blaxelClient: getBlaxelClient(),
+      credentialsService: getCloudCredentialsService(),
+      machinesService: getCloudMachinesService(),
+      readThreadRunner: async (threadId) => {
+        const result = (await roder.request("thread/read", { threadId, includeTurns: false })) as {
+          thread?: { runner?: unknown };
+        };
+        const runner = result?.thread?.runner;
+        if (!runner || typeof runner !== "object") return null;
+        const record = runner as Record<string, unknown>;
+        if (typeof record.providerId !== "string" || typeof record.workspace !== "string") return null;
+        return {
+          providerId: record.providerId,
+          workspace: record.workspace,
+          config: isRecord(record.config) ? record.config : {},
+        };
+      },
+    });
+    service.on("notification", (notification) => {
+      sendToRenderer("roder:notification", notification);
+    });
+    remoteWorkspaceService = service;
+  }
+  return remoteWorkspaceService;
+}
+
+function maybeNotifyRemoteFilesChanged(method: string, params: unknown): void {
+  if (!remoteWorkspaceService || !isRecord(params)) return;
+  const threadId = typeof params.threadId === "string" ? params.threadId : "";
+  if (!threadId || !remoteWorkspaceService.hasCachedThreadRunner(threadId)) return;
+  const shouldRefresh =
+    method === "turn/completed" ||
+    (method === "item/completed" && isRecord(params.item) && params.item.type === "toolExecution");
+  if (!shouldRefresh) return;
+  remoteWorkspaceService.invalidateThread(threadId);
+  sendToRenderer("roder:notification", {
+    method: "workspace/files/statusChanged",
+    params: {
+      status: {
+        workspaceId: remoteWorkspaceIdForThread(threadId),
+        state: "ready",
+        stale: false,
+        roots: [],
+        fileCount: 0,
+        directoryCount: 0,
+      },
+    },
+  });
 }
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
@@ -860,6 +981,7 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       limit: input.limit as number | undefined,
       maxBytes: input.maxBytes as number | undefined,
     });
+    getRemoteWorkspaceService().observeResponse(method, page);
     recordAppServerEvent("response", method, {
       threadId: input.threadId,
       itemCount: page.thread?.turns?.reduce((count, turn) => count + turn.items.length, 0) ?? 0,
@@ -867,16 +989,41 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     });
     return page;
   }
-  // Config may contain pasted credentials even when validation later rejects it.
-  recordAppServerEvent(
-    "request",
-    method,
-    method === "desktop/cloud-machines/save" ? "[redacted]" : redactSecrets(params ?? {}),
-  );
+  // Config and credentials may contain secrets even when validation later rejects them.
+  const redactRequestPayload =
+    method === "desktop/cloud-machines/save" || method.startsWith("desktop/cloud-machines/credentials/");
+  recordAppServerEvent("request", method, redactRequestPayload ? "[redacted]" : redactSecrets(params ?? {}));
+
+  // Route remote workspace requests through the tunneled remote-roder app-server inside the sandbox.
+  if (
+    isRecord(params) &&
+    isRemoteWorkspaceId(params.workspaceId) &&
+    (method.startsWith("workspace/files/") ||
+      method.startsWith("vcs/changes/") ||
+      method.startsWith("design/") ||
+      method === "skills/list")
+  ) {
+    const remoteService = getRemoteWorkspaceService();
+    try {
+      const result = await remoteService.proxyRequest(method, params);
+      recordAppServerEvent("response", method, { remote: true, workspaceId: params.workspaceId });
+      return result;
+    } catch (error) {
+      recordAppServerEvent("error", method, (error as Error).message);
+      throw error;
+    }
+  }
+
   if (method.startsWith("desktop/cloud-machines/")) {
     const service = getCloudMachinesService();
+    const credentials = getCloudCredentialsService();
+    const blaxel = getBlaxelClient();
+    const remoteService = getRemoteWorkspaceService();
     const input = params && typeof params === "object" ? (params as Record<string, unknown>) : {};
     if (method === "desktop/cloud-machines/list") return service.list();
+    if (method === "desktop/cloud-machines/get" && typeof input.id === "string") {
+      return { machine: await service.getProfile(input.id) };
+    }
     if (method === "desktop/cloud-machines/save") {
       const runners = (await roder.request("runners/list", {})) as { providers: { provider_id: string }[] };
       if (!runners.providers.some((provider) => provider.provider_id === input.providerId)) {
@@ -885,6 +1032,112 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       return service.save(input);
     }
     if (method === "desktop/cloud-machines/remove" && typeof input.id === "string") return service.remove(input.id);
+    if (method === "desktop/cloud-machines/test") {
+      if (typeof input.id === "string" && input.id) {
+        const runner = await service.runnerFor(input.id);
+        return remoteService.testProfile(runner);
+      }
+      if (typeof input.providerId === "string" && typeof input.workspace === "string" && isRecord(input.config)) {
+        return remoteService.testProfile({
+          providerId: input.providerId,
+          workspace: input.workspace,
+          config: input.config,
+        });
+      }
+      throw new Error("Invalid cloud machine test request.");
+    }
+    if (method === "desktop/cloud-machines/credentials/status") {
+      const [{ statuses }, blaxelCli] = await Promise.all([
+        credentials.listStatuses(process.env),
+        detectBlaxelCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
+      ]);
+      return { statuses, blaxelCli };
+    }
+    if (method === "desktop/cloud-machines/credentials/saveBlaxel") {
+      const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
+      if (!apiKey) throw new Error("Enter a Blaxel API key.");
+      const requestedWorkspace = typeof input.workspace === "string" ? input.workspace.trim() : "";
+      const workspaces = await blaxel.listWorkspaces(apiKey);
+      const workspace = requestedWorkspace || workspaces[0]?.name || "";
+      if (!workspace) {
+        throw new Error("Enter a Blaxel workspace name or use a key with workspace access.");
+      }
+      const status = await credentials.saveBlaxel({ apiKey, workspace, source: "manual" });
+      await restartRoderEngine();
+      return { status, workspaces };
+    }
+    if (method === "desktop/cloud-machines/credentials/importBlaxelCli") {
+      const requestedWorkspace = typeof input.workspace === "string" ? input.workspace.trim() : undefined;
+      const imported = await readBlaxelCliCredentials(requestedWorkspace, {
+        env: process.env,
+        platform: process.platform,
+        homeDir: homedir(),
+      });
+      if (!imported?.apiKey) {
+        throw new Error("No authenticated Blaxel CLI credentials found. Run `bl login` or paste an API key.");
+      }
+      const workspaces = await blaxel.listWorkspaces(imported.apiKey).catch(() => []);
+      const workspace = requestedWorkspace || imported.workspace || workspaces[0]?.name || "";
+      if (!workspace) {
+        throw new Error("Blaxel CLI is authenticated but no workspace was found.");
+      }
+      const status = await credentials.saveBlaxel({ apiKey: imported.apiKey, workspace, source: "blaxel-cli" });
+      await restartRoderEngine();
+      return { status, workspaces };
+    }
+    if (method === "desktop/cloud-machines/credentials/saveProviderToken") {
+      const providerId = typeof input.providerId === "string" ? input.providerId : "";
+      const token = typeof input.token === "string" ? input.token : "";
+      const status = await credentials.saveProviderToken(providerId, token);
+      await restartRoderEngine();
+      return { status };
+    }
+    if (method === "desktop/cloud-machines/credentials/clear" && typeof input.providerId === "string") {
+      const result = await credentials.clearProvider(input.providerId);
+      await restartRoderEngine();
+      return result;
+    }
+    if (method === "desktop/cloud-machines/blaxel/workspaces") {
+      const auth = await credentials.resolveBlaxelAuth(undefined, process.env);
+      if (!auth?.apiKey) return { workspaces: [] };
+      return { workspaces: await blaxel.listWorkspaces(auth.apiKey) };
+    }
+    if (method === "desktop/cloud-machines/blaxel/sandboxes") {
+      const requestedWorkspace = typeof input.workspace === "string" ? input.workspace.trim() : undefined;
+      const auth = await credentials.resolveBlaxelAuth(requestedWorkspace, process.env);
+      if (!auth?.apiKey || !auth.workspace) {
+        return { sandboxes: [], workspace: auth?.workspace ?? null };
+      }
+      return { sandboxes: await blaxel.listSandboxes(auth), workspace: auth.workspace };
+    }
+    if (method === "desktop/cloud-machines/blaxel/createSandbox") {
+      const requestedWorkspace = typeof input.workspace === "string" ? input.workspace.trim() : undefined;
+      const auth = await credentials.resolveBlaxelAuth(requestedWorkspace, process.env);
+      if (!auth?.apiKey || !auth.workspace) {
+        throw new Error("Connect Blaxel in Settings > Cloud Machines before creating a sandbox.");
+      }
+      const sandbox = await blaxel.createSandbox(auth, {
+        name: typeof input.name === "string" ? input.name : "",
+        image: typeof input.image === "string" ? input.image : undefined,
+        memory: typeof input.memory === "number" ? input.memory : undefined,
+        region: typeof input.region === "string" ? input.region : undefined,
+        workingDir: typeof input.workingDir === "string" ? input.workingDir : "/workspace",
+      });
+      return { sandbox };
+    }
+    if (method === "desktop/cloud-machines/remote/status" && typeof input.workspaceId === "string") {
+      return { status: await remoteService.getStatus(input.workspaceId) };
+    }
+    if (method === "desktop/cloud-machines/remote/wake" && typeof input.workspaceId === "string") {
+      return { status: await remoteService.wake(input.workspaceId) };
+    }
+    if (
+      method === "desktop/cloud-machines/remote/previewPort" &&
+      typeof input.workspaceId === "string" &&
+      typeof input.port === "number"
+    ) {
+      return remoteService.openPreviewPort(input.workspaceId, input.port);
+    }
     throw new Error("Invalid cloud machine request.");
   }
   if (method.startsWith("desktop/issues/") || method.startsWith("desktop/projects/")) {
@@ -966,6 +1219,7 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
   }
   try {
     const result = await requestEngine(method, params);
+    getRemoteWorkspaceService().observeResponse(method, result);
     if (method === "thread/start") {
       rememberStartedThreadBrowserProvider(result, requestedBrowserProvider);
     }

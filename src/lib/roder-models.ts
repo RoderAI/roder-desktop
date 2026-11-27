@@ -68,6 +68,26 @@ export function modelKeys(models: RoderModel[]): string[] {
   return models.map(modelKey);
 }
 
+/** Merge primary (`providers/list`) models with supplementary (`model/list`) live-discovered models without duplicating keys. */
+export function mergeModelCatalogs(primary: RoderModel[], supplementary: RoderModel[]): RoderModel[] {
+  if (supplementary.length === 0) {
+    return primary;
+  }
+  if (primary.length === 0) {
+    return supplementary;
+  }
+  const seen = new Set(primary.map(modelKey));
+  const merged = [...primary];
+  for (const model of supplementary) {
+    const key = modelKey(model);
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(model);
+    }
+  }
+  return merged;
+}
+
 /** Resolve which model keys are visible. `hiddenIds` is a blocklist: empty means all visible. */
 export function visibleModelIdsFor(models: RoderModel[], hiddenIds: string[]): string[] {
   const allIds = modelKeys(models);

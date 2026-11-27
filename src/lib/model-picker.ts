@@ -1,5 +1,11 @@
 import type { InferenceRoutingOptionDescriptor, ProviderDescriptor, RoderModel } from "@/types/roder";
-import { displayModelName, groupModelsByProvider, isProviderConfigured, providerName } from "@/lib/roder-models";
+import {
+  displayModelName,
+  groupModelsByProvider,
+  isProviderConfigured,
+  isRetiredModel,
+  providerName,
+} from "@/lib/roder-models";
 
 export type ModelPickerItem =
   | { type: "auto"; option: InferenceRoutingOptionDescriptor }
@@ -28,6 +34,7 @@ export function buildModelPickerGroups(
   for (const provider of providers) {
     if (isProviderConfigured(provider) || providerId(provider.id) === "mock") continue;
     for (const model of provider.models ?? []) {
+      if (isRetiredModel(model)) continue;
       const record: RoderModel = { ...model, modelProvider: provider.id, description: model.description ?? undefined };
       record.displayName = displayModelName(record);
       if (!knownModels.has(key(record))) knownModels.set(key(record), record);

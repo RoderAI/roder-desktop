@@ -121,7 +121,7 @@ Forge packages the app as **Roder** (`sc.roder.desktop`), unpacks `node-pty` fro
 
 ### The embedded harness
 
-The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.4.11` release tag, pinned to its immutable source revision. This includes Hopper inference and image input through Chat Completions.
+The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.4.14` release tag, pinned to its immutable source revision. This includes GPT-6.2 Astra/Sol models, configurable GPT context windows, Antigravity backend support, Hopper inference, and native remote workspaces over Blaxel.
 
 | Goal                                              | Command                              |
 | ------------------------------------------------- | ------------------------------------ |

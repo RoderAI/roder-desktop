@@ -155,6 +155,7 @@ const providerImages: ReadonlyArray<{ token: string; src: string }> = [{ token: 
 
 /** Two-letter tiles for providers with no published mark, so every row keeps the same shape. */
 const monogramOverrides: Readonly<Record<string, string>> = {
+  antigravity: "AG",
   fireworks: "FW",
   poolside: "PS",
   synthetic: "SY",

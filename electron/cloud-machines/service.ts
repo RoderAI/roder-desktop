@@ -183,4 +183,13 @@ export class CloudMachinesService {
       return { providerId, config, workspace, ...(readRoots === undefined ? {} : { readRoots }) };
     });
   }
+
+  getProfile(id: string): Promise<CloudMachine & { config: Record<string, unknown> }> {
+    return this.serialized(async () => {
+      text(id, "id");
+      const machine = (await this.read()).find((candidate) => candidate.id === id);
+      if (!machine) throw new Error("Cloud machine not found");
+      return JSON.parse(JSON.stringify(machine)) as CloudMachine & { config: Record<string, unknown> };
+    });
+  }
 }

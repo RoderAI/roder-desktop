@@ -43,6 +43,7 @@ import {
   type RouteWorkspacePanel,
 } from "@/lib/route-search";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
+import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useCommandsStore } from "@/stores/commands-store";
 import type { DesktopAttachment } from "@/types/roder";
 
@@ -104,6 +105,9 @@ export function useAppShellController(): AppShellController {
   const routeActiveThreadId = routeThreadId || (isNewRoute ? "" : activeThreadId);
   const activeThread = threads.find((thread) => thread.id === routeActiveThreadId);
   const activeThreadBusy = isThreadRunning(activeThread);
+  const cloudMachines = useCloudMachinesStore((state) => state.machines);
+  const selectedCloudMachineId = useCloudMachinesStore((state) => state.selectedMachineId);
+  const selectCloudMachine = useCloudMachinesStore((state) => state.select);
   const activeWorkspaceContext = useMemo(
     () =>
       activeWorkspaceContextForRoute({
@@ -114,13 +118,17 @@ export function useAppShellController(): AppShellController {
         selectedRootId: agent.selectedRootId,
         statusCwd: status.cwd,
         workspaces: agent.workspaces,
+        cloudMachines,
+        selectedCloudMachineId,
       }),
     [
       activeThread,
       agent.selectedRootId,
       agent.selectedWorkspaceId,
       agent.workspaces,
+      cloudMachines,
       isNewRoute,
+      selectedCloudMachineId,
       selectedWorkspaceCwd,
       status.cwd,
     ],
@@ -128,6 +136,7 @@ export function useAppShellController(): AppShellController {
   const activeWorkspaceCwd = activeWorkspaceContext.cwd;
   const activeWorkspaceRef = activeWorkspaceContext.ref;
   const activeWorkspaceRoots = activeWorkspaceContext.roots;
+  const activeRemoteWorkspace = activeWorkspaceContext.remote;
   const loadedTurnsKey = useRoderStore((state) => loadedTurnIdsKey(state.threadDetails[routeActiveThreadId]?.turns));
   const loadedTurnIds = JSON.parse(loadedTurnsKey) as string[];
   const hunkSummary = useThreadHunkSummary(
@@ -210,12 +219,22 @@ export function useAppShellController(): AppShellController {
     void selectAgentThread("", { pushHistory: false });
   }, [followBottom, navigate, selectAgentThread]);
   const newThreadInFolder = useCallback(
-    (path: string) => {
+    (path: string, cloudMachineId?: string) => {
+      if (cloudMachineId !== undefined) {
+        selectCloudMachine(cloudMachineId);
+      }
       followBottom();
       setComposerFocusSignal((value) => value + 1);
       void stageNewThreadAfterNavigation(() => navigate({ to: "/new", search: true }), stageAgentNewThread, path);
     },
-    [followBottom, navigate, stageAgentNewThread],
+    [followBottom, navigate, selectCloudMachine, stageAgentNewThread],
+  );
+  const openBrowserPreview = useCallback(
+    (url: string) => {
+      void setRouteSearch((current) => openWorkspacePanelTab(current, "browser"), { history: "replace" });
+      void window.roderDesktop.browserNavigate(url);
+    },
+    [setRouteSearch],
   );
   const newProject = useCallback(() => {
     if (projectCreating) return;
@@ -548,6 +567,7 @@ export function useAppShellController(): AppShellController {
       activeWorkspaceCwd,
       activeWorkspaceRef,
       activeWorkspaceRoots,
+      activeRemoteWorkspace,
       folderOptions,
       isPluginsRoute,
       fullPageRoute: fullPageRouteForPathname(pathname),
@@ -583,6 +603,7 @@ export function useAppShellController(): AppShellController {
       onNewProject: newProject,
       onNewThread: newThread,
       onNewThreadInFolder: newThreadInFolder,
+      onOpenBrowserPreview: openBrowserPreview,
       onOpenPlugins: openPlugins,
       onOpenWorkspacePanel: openWorkspacePanel,
       onToggleWorkspacePanelShell: toggleWorkspacePanelShellOnly,

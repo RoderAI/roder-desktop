@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
-import { Check, ChevronDown, Folder, FolderPlus, MessageSquare } from "lucide-react";
+import { Check, ChevronDown, Cloud, Folder, FolderPlus, MessageSquare } from "lucide-react";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { McpAuthWaitCards } from "@/components/mcp-auth-wait-card";
 import { useAppShell } from "@/components/app-shell-context";
@@ -9,6 +9,7 @@ import { Composer } from "@/components/composer";
 import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
 import { IndexedTranscript as Transcript } from "@/components/indexed-transcript";
+import { isRemoteRunner, remoteRunnerLabel, type CloudMachine } from "@/lib/cloud-machines";
 import { finishedFolderTurnSummaries, finishedReviewTurnKey } from "@/lib/review-changes";
 import { emptyThreadHistoryState } from "@/lib/thread-history-state";
 import { loadTranscriptNavigationMessage } from "@/lib/transcript-navigation-loading";
@@ -26,6 +27,7 @@ import { threadTitle } from "@/lib/roder-thread";
 import { normalizeWorkspacePath, normalizedTimestamp, type FolderOption } from "@/lib/workspace-thread-options";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
 import { useActiveThreadMessages, useShowWorkingIndicator } from "@/hooks/use-roder-agent";
+import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useCommandsStore } from "@/stores/commands-store";
 import { useRoderStore } from "@/stores/roder-store";
 import { skillsLoadContextKey, useSkillsStore } from "@/stores/skills-store";
@@ -63,6 +65,9 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
     steerPrompt,
     localTranscriptOffset,
   } = shell;
+  const cloudMachines = useCloudMachinesStore((state) => state.machines);
+  const selectedCloudMachineId = useCloudMachinesStore((state) => state.selectedMachineId);
+  const selectCloudMachine = useCloudMachinesStore((state) => state.select);
   const commands = useCommandsStore((state) => state.commands);
   const mergedCommands = useMemo(() => mergedCommandDescriptors(commands), [commands]);
   const commandsLoaded = useCommandsStore((state) => state.loaded);
@@ -223,11 +228,20 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         <NewAgentEmptyState
           activeFolderPath={agent.selectedWorkspaceCwd}
           projects={projectOptionsForEmptyState(agent.workspaces, folderOptions, agent.selectedWorkspaceCwd)}
+          cloudMachines={cloudMachines}
+          selectedCloudMachineId={selectedCloudMachineId}
           recentThreads={recentThreadsForEmptyState(agent.threads)}
           composerBottomInsetPx={transcriptBottomInsetPx}
           onNewProject={newProject}
           onSelectFolder={(path) => {
+            selectCloudMachine("");
             agent.stageNewThread(path);
+          }}
+          onSelectCloudMachine={(machineId) => {
+            selectCloudMachine(machineId);
+          }}
+          onOpenCloudSettings={() => {
+            void navigate({ to: "/settings/$section", params: { section: "cloud-machines" }, search: true });
           }}
           onSelectThread={(selectedThreadId) => {
             void navigate({ to: "/threads/$threadId", params: { threadId: selectedThreadId }, search: true });
@@ -336,44 +350,59 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
 function NewAgentEmptyState({
   activeFolderPath,
   projects,
+  cloudMachines = [],
+  selectedCloudMachineId = "",
   recentThreads,
   composerBottomInsetPx,
   onSelectFolder,
+  onSelectCloudMachine,
+  onOpenCloudSettings,
   onSelectThread,
   onNewProject,
 }: {
   activeFolderPath: string;
   projects: ProjectOption[];
+  cloudMachines?: CloudMachine[];
+  selectedCloudMachineId?: string;
   recentThreads: RoderThread[];
   composerBottomInsetPx: number;
   onSelectFolder: (path: string) => void;
+  onSelectCloudMachine?: (machineId: string) => void;
+  onOpenCloudSettings?: () => void;
   onSelectThread: (threadId: string) => void;
   onNewProject: () => void;
 }): React.JSX.Element {
   const activeFolderKey = normalizeWorkspacePath(activeFolderPath);
   const activeProject = projects.find((project) => normalizeWorkspacePath(project.path) === activeFolderKey);
   const activeProjectLabel = activeProject?.name ?? folderLabel(activeFolderPath);
+  const selectedMachine = cloudMachines.find((machine) => machine.id === selectedCloudMachineId) ?? null;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-8" style={{ paddingBottom: composerBottomInsetPx }}>
       <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col items-center justify-center py-8 text-center">
         <div className="mb-6 flex size-12 items-center justify-center rounded-2xl bg-muted/40 text-muted-foreground">
-          <MessageSquare className="size-5" />
+          {selectedMachine ? <Cloud className="size-5" /> : <MessageSquare className="size-5" />}
         </div>
         <h2 className="text-base font-semibold text-foreground">Start a new agent</h2>
         <p className="mt-2 max-w-md text-base font-normal leading-6 text-muted-foreground">
-          Pick a project, then tell Roder what you want to build, fix, or explore.
+          {selectedMachine
+            ? `Working remotely in ${selectedMachine.name} (${selectedMachine.workspace}).`
+            : "Pick a project or cloud workspace, then tell Roder what you want to build, fix, or explore."}
         </p>
         <div className="mt-5">
           <ProjectPicker
             projects={projects}
+            cloudMachines={cloudMachines}
+            selectedCloudMachineId={selectedCloudMachineId}
             activeFolderPath={activeFolderPath}
             activeFolderLabel={activeProjectLabel}
             onSelectFolder={onSelectFolder}
+            onSelectCloudMachine={onSelectCloudMachine}
+            onOpenCloudSettings={onOpenCloudSettings}
             onNewProject={onNewProject}
           />
         </div>
-        <RecentThreads threads={recentThreads} onSelectThread={onSelectThread} />
+        <RecentThreads threads={recentThreads} cloudMachines={cloudMachines} onSelectThread={onSelectThread} />
       </div>
     </div>
   );
@@ -381,35 +410,77 @@ function NewAgentEmptyState({
 
 export function ProjectPicker({
   projects,
+  cloudMachines = [],
+  selectedCloudMachineId = "",
   activeFolderPath,
   activeFolderLabel,
   onSelectFolder,
+  onSelectCloudMachine,
+  onOpenCloudSettings,
   onNewProject,
 }: {
   projects: ProjectOption[];
+  cloudMachines?: CloudMachine[];
+  selectedCloudMachineId?: string;
   activeFolderPath: string;
   activeFolderLabel: string;
   onSelectFolder: (path: string) => void;
+  onSelectCloudMachine?: (machineId: string) => void;
+  onOpenCloudSettings?: () => void;
   onNewProject: () => void;
 }): React.JSX.Element {
   const activeFolderKey = normalizeWorkspacePath(activeFolderPath);
+  const selectedMachine = cloudMachines.find((machine) => machine.id === selectedCloudMachineId) ?? null;
+  const triggerLabel = selectedMachine ? selectedMachine.name : activeFolderLabel;
+  const triggerTitle = selectedMachine
+    ? `${selectedMachine.providerId} · ${selectedMachine.workspace}`
+    : activeFolderPath;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         variant="pill"
         className="h-8 max-w-[320px] bg-card px-3 text-base shadow-sm ring-1 ring-border/70 hover:bg-card"
-        aria-label={`Choose project: ${activeFolderLabel}`}
-        title={activeFolderPath}
+        aria-label={`Choose project: ${triggerLabel}`}
+        title={triggerTitle}
       >
-        <Folder className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 truncate">{activeFolderLabel}</span>
+        {selectedMachine ? (
+          <Cloud className="size-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <Folder className="size-4 shrink-0 text-muted-foreground" />
+        )}
+        <span className="min-w-0 truncate">{triggerLabel}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center" side="bottom" sideOffset={8} className="w-[340px] rounded-xl p-1">
-        <DropdownMenuGroup className="max-h-[300px] overflow-y-auto">
+        {cloudMachines.length > 0 && onSelectCloudMachine && (
+          <>
+            <DropdownMenuGroup className="max-h-[180px] overflow-y-auto">
+              <div className="px-2 pb-1 pt-1 text-base font-medium text-muted-foreground">Cloud workspaces</div>
+              {cloudMachines.map((machine) => {
+                const selected = machine.id === selectedCloudMachineId;
+                return (
+                  <DropdownMenuItem
+                    key={machine.id}
+                    selected={selected}
+                    className="h-8 rounded-lg px-2 text-base"
+                    onSelect={() => onSelectCloudMachine(machine.id)}
+                  >
+                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-foreground">{machine.name}</span>
+                    <span className="shrink-0 font-mono text-sm text-muted-foreground">{machine.workspace}</span>
+                    {selected && <Check className="size-3.5 shrink-0 text-primary" />}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuGroup>
+            <Separator className="my-1" />
+          </>
+        )}
+        <DropdownMenuGroup className="max-h-[260px] overflow-y-auto">
           <div className="px-2 pb-1 pt-1 text-base font-medium text-muted-foreground">Projects</div>
           {projects.length > 0 ? (
             projects.map((project) => {
-              const selected = normalizeWorkspacePath(project.path) === activeFolderKey;
+              const selected = !selectedMachine && normalizeWorkspacePath(project.path) === activeFolderKey;
               return (
                 <DropdownMenuItem
                   key={project.path}
@@ -435,6 +506,16 @@ export function ProjectPicker({
           <FolderPlus className="size-4 shrink-0 text-muted-foreground" />
           <span>Add project</span>
         </DropdownMenuItem>
+        {onOpenCloudSettings && (
+          <DropdownMenuItem
+            aria-label="Manage cloud workspaces"
+            className="h-8 rounded-lg px-2 text-base"
+            onSelect={onOpenCloudSettings}
+          >
+            <Cloud className="size-4 shrink-0 text-muted-foreground" />
+            <span>Manage cloud machines</span>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -442,9 +523,11 @@ export function ProjectPicker({
 
 function RecentThreads({
   threads,
+  cloudMachines = [],
   onSelectThread,
 }: {
   threads: RoderThread[];
+  cloudMachines?: CloudMachine[];
   onSelectThread: (threadId: string) => void;
 }): React.JSX.Element {
   return (
@@ -455,29 +538,38 @@ function RecentThreads({
       <p className="mt-1 text-sm font-normal text-muted-foreground">Jump back into your last work.</p>
       <div className="mt-3 flex flex-col gap-1.5">
         {threads.length > 0 ? (
-          threads.map((thread) => (
-            <button
-              key={thread.id}
-              type="button"
-              className={cn(
-                "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-colors",
-                "hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
-              )}
-              onClick={() => void onSelectThread(thread.id)}
-            >
-              <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-base font-medium text-foreground">{threadTitle(thread)}</span>
-                <span className="block truncate text-sm font-normal text-muted-foreground">
-                  {folderLabel(thread.cwd)}
+          threads.map((thread) => {
+            const remote = isRemoteRunner(thread.runner);
+            const subtitle =
+              remote && thread.runner
+                ? `${remoteRunnerLabel(thread.runner, cloudMachines)} · ${thread.runner.workspace}`
+                : folderLabel(thread.cwd);
+            return (
+              <button
+                key={thread.id}
+                type="button"
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-colors",
+                  "hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
+                )}
+                onClick={() => void onSelectThread(thread.id)}
+              >
+                {remote ? (
+                  <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                ) : (
+                  <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base font-medium text-foreground">{threadTitle(thread)}</span>
+                  <span className="block truncate text-sm font-normal text-muted-foreground">{subtitle}</span>
                 </span>
-              </span>
-              <span className="shrink-0 text-sm font-normal text-muted-foreground">
-                {relativeAge(thread.updatedAt)}
-              </span>
-              <ChevronDown className="size-4 shrink-0 -rotate-90 text-muted-foreground/70" aria-hidden="true" />
-            </button>
-          ))
+                <span className="shrink-0 text-sm font-normal text-muted-foreground">
+                  {relativeAge(thread.updatedAt)}
+                </span>
+                <ChevronDown className="size-4 shrink-0 -rotate-90 text-muted-foreground/70" aria-hidden="true" />
+              </button>
+            );
+          })
         ) : (
           <div className="rounded-xl bg-muted/30 px-3 py-3 text-base font-normal text-muted-foreground">
             No recent threads yet.
