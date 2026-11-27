@@ -1543,7 +1543,10 @@ export const useRoderStore = create<RoderStore>()(
             selectedWorkspaceCwd: state.selectedWorkspaceCwd || status.cwd || "",
           };
           if (status.state !== "stopped" && status.state !== "error") {
-            return statusPatch;
+            return {
+              ...statusPatch,
+              ...(typeof state.error === "string" && state.error.startsWith("Roder engine ") ? { error: null } : {}),
+            };
           }
           // The engine process is gone, so no in-flight turn can finish. Clear busy so the composer stops
           // queueing prompts, and settle running threads so they are not shown as working forever.

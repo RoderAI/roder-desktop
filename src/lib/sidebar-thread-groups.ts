@@ -1,11 +1,33 @@
+import {
+  isRemoteRunner,
+  remoteRunnerLabel,
+  remoteRunnerTargetName,
+  remoteWorkspaceGroupKey,
+  type CloudMachine,
+} from "@/lib/cloud-machines";
 import type { RoderThread } from "@/types/roder";
+
+export type SidebarThreadGroupRemote = {
+  providerId: string;
+  workspace: string;
+  targetName: string;
+  machineId?: string;
+};
 
 export type SidebarThreadGroup = {
   key: string;
   title: string;
   path: string;
   threads: RoderThread[];
+  remote?: SidebarThreadGroupRemote;
 };
+
+export function sidebarThreadGroupKey(thread: Pick<RoderThread, "cwd" | "runner">): string {
+  if (isRemoteRunner(thread.runner)) {
+    return remoteWorkspaceGroupKey(thread.runner);
+  }
+  return normalizeFolderKey(thread.cwd);
+}
 
 export function sidebarProjectOrder(threads: RoderThread[], currentOrder: string[]): string[] {
   const latestByKey = new Map<string, number>();
@@ -14,7 +36,7 @@ export function sidebarProjectOrder(threads: RoderThread[], currentOrder: string
     if (thread.id.startsWith("demo-")) {
       continue;
     }
-    const key = normalizeFolderKey(thread.cwd);
+    const key = sidebarThreadGroupKey(thread);
     latestByKey.set(key, Math.max(latestByKey.get(key) ?? -Infinity, thread.updatedAt));
   }
 
@@ -22,7 +44,9 @@ export function sidebarProjectOrder(threads: RoderThread[], currentOrder: string
   const knownKeys = new Set(existingOrder);
   const newKeys = [...latestByKey.keys()]
     .filter((key) => !knownKeys.has(key))
-    .toSorted((left, right) => (latestByKey.get(right) ?? 0) - (latestByKey.get(left) ?? 0) || left.localeCompare(right));
+    .toSorted(
+      (left, right) => (latestByKey.get(right) ?? 0) - (latestByKey.get(left) ?? 0) || left.localeCompare(right),
+    );
   return [...newKeys, ...existingOrder];
 }
 
@@ -35,21 +59,50 @@ export function moveSidebarProject(order: string[], source: string, target: stri
   return next;
 }
 
-export function groupThreadsByFolder(threads: RoderThread[], projectOrder: string[]): SidebarThreadGroup[] {
+export function groupThreadsByFolder(
+  threads: RoderThread[],
+  projectOrder: string[],
+  machines: readonly CloudMachine[] = [],
+): SidebarThreadGroup[] {
   const groups = new Map<string, SidebarThreadGroup>();
 
   for (const thread of threads) {
     if (thread.id.startsWith("demo-")) {
       continue;
     }
-    const key = normalizeFolderKey(thread.cwd);
+    const key = sidebarThreadGroupKey(thread);
     const existing = groups.get(key);
-    const group = existing ?? {
-      key,
-      title: folderName(thread.cwd),
-      path: thread.cwd || "",
-      threads: [],
-    };
+    let group: SidebarThreadGroup;
+    if (existing) {
+      group = existing;
+    } else if (isRemoteRunner(thread.runner)) {
+      const targetName = remoteRunnerTargetName(thread.runner);
+      const matchingMachine = machines.find(
+        (machine) =>
+          machine.providerId === thread.runner!.providerId &&
+          machine.workspace === thread.runner!.workspace &&
+          machine.name.toLowerCase() === targetName.toLowerCase(),
+      );
+      group = {
+        key,
+        title: remoteRunnerLabel(thread.runner, machines),
+        path: thread.cwd || "",
+        threads: [],
+        remote: {
+          providerId: thread.runner.providerId,
+          workspace: thread.runner.workspace,
+          targetName,
+          ...(matchingMachine ? { machineId: matchingMachine.id } : {}),
+        },
+      };
+    } else {
+      group = {
+        key,
+        title: folderName(thread.cwd),
+        path: thread.cwd || "",
+        threads: [],
+      };
+    }
     group.threads.push(thread);
     groups.set(key, group);
   }

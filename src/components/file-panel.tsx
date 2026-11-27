@@ -8,6 +8,7 @@ import { useOpenFileTabs } from "@/components/file-panel/use-open-file-tabs";
 import { Button } from "@/components/ui/button";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { useFilePanelTree } from "@/hooks/use-file-panel-tree";
+import { isRemoteWorkspaceId } from "@/lib/cloud-machines";
 import {
   filePanelDirectoryChain,
   filePanelRootItems,
@@ -37,7 +38,7 @@ export function FilePanel({
   appServerMethods,
   selectionIntent = null,
 }: FilePanelProps): React.JSX.Element {
-  const filesystemAvailable = filePanelWorkspaceFilesAvailable(appServerMethods);
+  const filesystemAvailable = isRemoteWorkspaceId(workspaceId) || filePanelWorkspaceFilesAvailable(appServerMethods);
   const orderedRoots = orderWorkspaceRoots(roots, selectedRootId);
   const workspaceKey = filePanelWorkspaceKey(workspaceId, orderedRoots, selectedRootId, filesystemAvailable);
   const scopedSelectionIntent = selectionIntent?.workspaceId === workspaceId ? selectionIntent : null;

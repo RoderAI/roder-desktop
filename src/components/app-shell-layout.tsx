@@ -30,6 +30,7 @@ import {
   sidebarWidthBounds,
   workspacePanelMaxOpenWidthForGroup,
 } from "@/lib/app-shell-layout";
+import { isRemoteWorkspaceId, type ActiveRemoteWorkspace } from "@/lib/cloud-machines";
 import { getSidebarExtensions } from "@/lib/extension-sidebar";
 import {
   filePanelWorkspaceFilesAvailable,
@@ -65,6 +66,7 @@ export type AppShellLayoutProps = {
   activeWorkspaceCwd: string;
   activeWorkspaceRef: { workspaceId: string; rootId: string };
   activeWorkspaceRoots: WorkspaceRoot[];
+  activeRemoteWorkspace?: ActiveRemoteWorkspace | null;
   folderOptions: FolderOption[];
   isPluginsRoute: boolean;
   fullPageRoute?: FullPageRoute | null;
@@ -101,7 +103,8 @@ export type AppShellLayoutProps = {
   onCloseWorkspacePanelShell: () => void;
   onNewProject: () => void;
   onNewThread: () => void;
-  onNewThreadInFolder: (path: string) => void;
+  onNewThreadInFolder: (path: string, cloudMachineId?: string) => void;
+  onOpenBrowserPreview?: (url: string) => void;
   onOpenPlugins: () => void;
   onOpenWorkspacePanel: (panel: RouteWorkspacePanel) => void;
   onToggleWorkspacePanelShell: () => void;
@@ -126,6 +129,7 @@ export function AppShellLayout({
   activeWorkspaceCwd,
   activeWorkspaceRef,
   activeWorkspaceRoots,
+  activeRemoteWorkspace = null,
   folderOptions,
   isPluginsRoute,
   fullPageRoute = isPluginsRoute ? "plugins" : null,
@@ -163,6 +167,7 @@ export function AppShellLayout({
   onNewProject,
   onNewThread,
   onNewThreadInFolder,
+  onOpenBrowserPreview,
   onOpenPlugins,
   onOpenWorkspacePanel,
   onToggleWorkspacePanelShell,
@@ -480,6 +485,7 @@ export function AppShellLayout({
                 threads={threadOptions}
                 folders={folderOptions}
                 activeFolderPath={activeWorkspaceCwd}
+                remoteWorkspace={activeRemoteWorkspace}
                 status={status}
                 workspacePanelOpen={workspacePanelOpen}
                 workspacePanelToggleVisible={false}
@@ -488,6 +494,7 @@ export function AppShellLayout({
                 placement="content"
                 onNewProject={onNewProject}
                 onNewThread={onNewThread}
+                onOpenBrowserPreview={onOpenBrowserPreview}
                 onOpenSettings={() => onOpenSettings("general")}
                 onRestart={onRestart}
                 onToggleSidebar={onToggleSidebar}
@@ -539,6 +546,7 @@ export function AppShellLayout({
             activeWorkspaceCwd,
             activeWorkspaceRef,
             activeWorkspaceRoots,
+            activeRemoteWorkspace,
             hunkSummary,
             reviewPath,
             reviewScope,
@@ -616,7 +624,10 @@ export function AppShellLayout({
       open={fileSearchOpen}
       workspaceId={activeWorkspaceRef.workspaceId}
       roots={activeWorkspaceRoots}
-      filesystemAvailable={filePanelWorkspaceFilesAvailable(status.appServerMethods ?? [])}
+      filesystemAvailable={
+        isRemoteWorkspaceId(activeWorkspaceRef.workspaceId) ||
+        filePanelWorkspaceFilesAvailable(status.appServerMethods ?? [])
+      }
       onOpenChange={onFileSearchOpenChange}
       onSelect={onFileSearchSelect}
     />
@@ -662,6 +673,7 @@ export function AppShellLayout({
             threads={threadOptions}
             folders={folderOptions}
             activeFolderPath={activeWorkspaceCwd}
+            remoteWorkspace={activeRemoteWorkspace}
             status={status}
             workspacePanelOpen={workspacePanelOpen}
             workspacePanelToggleVisible={workspacePanelToggleVisible}
@@ -670,6 +682,7 @@ export function AppShellLayout({
             placement="window"
             onNewProject={onNewProject}
             onNewThread={onNewThread}
+            onOpenBrowserPreview={onOpenBrowserPreview}
             onOpenSettings={() => onOpenSettings("general")}
             onRestart={onRestart}
             onToggleSidebar={onToggleSidebar}

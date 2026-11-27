@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isRemoteWorkspaceId } from "@/lib/cloud-machines";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { RouteReviewScope } from "@/lib/route-search";
 import {
@@ -131,7 +132,8 @@ export function useReviewChanges({
   );
   const diffLimitsByPath = activeDiffCollection?.limitsByPath ?? emptyDiffLimitsByPath;
   const branchReviewAvailable =
-    appServerMethods.includes("vcs/changes/list") && appServerMethods.includes("vcs/changes/read");
+    isRemoteWorkspaceId(workspaceId) ||
+    (appServerMethods.includes("vcs/changes/list") && appServerMethods.includes("vcs/changes/read"));
   const scopedLatestTurnId = listState.latestTurnId ?? "";
   const effectiveTurnId = reviewTurnIdCandidate(turnId, scopedLatestTurnId, threadLatestTurnId);
 

@@ -2,6 +2,7 @@ import { Bot, Files, GitCompareArrows, Globe2, LayoutTemplate, Paintbrush, Puzzl
 import React, { lazy, Suspense } from "react";
 import type { NativeOverlayOcclusion, RightWorkspacePanelEntry } from "@/components/right-workspace-panel-shell";
 import type { ThreadHunkSummary } from "@/hooks/use-thread-hunk-summary";
+import type { ActiveRemoteWorkspace } from "@/lib/cloud-machines";
 import type { FilePanelSelectionIntent } from "@/lib/file-panel";
 import type { RouteReviewScope, RouteWorkspacePanel } from "@/lib/route-search";
 import type { DesktopAttachment, WorkspaceRoot } from "@/types/roder";
@@ -83,6 +84,7 @@ export type RightWorkspacePanelRenderContext = {
   activeWorkspaceCwd: string;
   activeWorkspaceRef: { workspaceId: string; rootId: string };
   activeWorkspaceRoots: WorkspaceRoot[];
+  activeRemoteWorkspace?: ActiveRemoteWorkspace | null;
   hunkSummary: ThreadHunkSummary;
   reviewPath: string;
   reviewScope: RouteReviewScope;
@@ -112,7 +114,13 @@ export function renderRightWorkspacePanel(
 
 function renderPanelContent(panel: RouteWorkspacePanel, context: RightWorkspacePanelRenderContext): React.ReactNode {
   if (panel === "terminal") {
-    return <TerminalPanel active={context.active} cwd={context.activeWorkspaceCwd} />;
+    return (
+      <TerminalPanel
+        active={context.active}
+        cwd={context.activeWorkspaceCwd}
+        remoteWorkspace={context.activeRemoteWorkspace}
+      />
+    );
   }
   if (panel === "browser") {
     return (

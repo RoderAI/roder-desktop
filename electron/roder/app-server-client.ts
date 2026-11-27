@@ -59,16 +59,26 @@ const requestTimeoutsMs = new Map<string, number>([
   ["settings/get", 60_000],
 ]);
 
+export type RoderAppServerClientOptions = {
+  getExtraEnv?: () => Record<string, string>;
+};
+
 export class RoderAppServerClient extends EventEmitter {
   #child: ChildProcessWithoutNullStreams | null = null;
   #buffer = "";
   #nextId = 1;
   #pending = new Map<number | string, PendingRequest>();
   #startPromise: Promise<RoderStatus> | null = null;
+  #getExtraEnv?: () => Record<string, string>;
   #status: RoderStatus = {
     state: "stopped",
     binary: "unresolved",
   };
+
+  constructor(options: RoderAppServerClientOptions = {}) {
+    super();
+    this.#getExtraEnv = options.getExtraEnv;
+  }
 
   status(): RoderStatus {
     return this.#status;
@@ -99,12 +109,16 @@ export class RoderAppServerClient extends EventEmitter {
     let appServerMethods: string[] | undefined;
     this.#setStatus({ state: "starting", binary: target.label, cwd: target.cwd });
 
+    const extraEnv = this.#getExtraEnv ? this.#getExtraEnv() : undefined;
+    const childEnv: NodeJS.ProcessEnv =
+      extraEnv && Object.keys(extraEnv).length > 0 ? { ...process.env, ...extraEnv } : process.env;
+
     // Each listener below belongs to one spawned engine. Once that engine is no
     // longer the current child (after stop or restart), its events must not touch
     // shared state, or a late exit would clobber the replacement engine.
     const child = spawn(target.command, target.args, {
       cwd: target.cwd,
-      env: process.env,
+      env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.#child = child;

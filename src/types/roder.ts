@@ -867,6 +867,7 @@ export type WorkspaceFilesReadResult = {
 export type TerminalSnapshot = {
   id: string;
   pid: number;
+  remote?: boolean;
 };
 
 export type ChromeBridgeStatus = {
@@ -1298,10 +1299,17 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       openWorkspaceFolders: (defaultPath?: string) => Promise<string[] | null>;
-      terminalStart: (options?: { cols?: number; rows?: number; cwd?: string }) => Promise<TerminalSnapshot>;
-      terminalWrite: (data: string) => Promise<void>;
-      terminalResize: (cols: number, rows: number) => Promise<void>;
-      terminalStop: () => Promise<void>;
+      terminalStart: (options?: {
+        id?: string;
+        cols?: number;
+        rows?: number;
+        cwd?: string;
+        remoteWorkspaceId?: string;
+        forceRestart?: boolean;
+      }) => Promise<TerminalSnapshot>;
+      terminalWrite: (data: string, id?: string) => Promise<void>;
+      terminalResize: (cols: number, rows: number, id?: string) => Promise<void>;
+      terminalStop: (id?: string) => Promise<void>;
       browserToggle: (bounds?: BrowserBounds) => Promise<BrowserSnapshot>;
       browserShow: (bounds: BrowserBounds) => Promise<BrowserSnapshot>;
       browserHide: () => Promise<BrowserSnapshot>;

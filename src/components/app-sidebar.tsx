@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   CirclePlus,
+  Cloud,
   Plus,
   Search,
   Settings,
@@ -21,6 +22,7 @@ import { roderIpc } from "@/lib/roder-ipc";
 import type { PersistentAgent } from "@/types/persistent-agents";
 import { Link } from "@tanstack/react-router";
 import { useId, useReducer, useRef, useState } from "react";
+import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useRoderStore } from "@/stores/roder-store";
 import type { RoderThread, SubagentTraceView } from "@/types/roder";
 import { DotMatrixSpinner } from "@/components/ui/dot-matrix-spinner";
@@ -128,7 +130,7 @@ type AppSidebarProps = {
   onLoadMoreThreads: () => void;
   onNewProject: () => void;
   onNewThread: () => void;
-  onNewThreadInFolder: (path: string) => void;
+  onNewThreadInFolder: (path: string, cloudMachineId?: string) => void;
   onOpenPlugins: () => void;
   onOpenSettings: () => void;
 };
@@ -160,9 +162,10 @@ export function AppSidebar({
     refresh: refreshPersistentAgents,
   } = useSidebarPersistentAgents();
   const subagentTracesByThread = useRoderStore((state) => state.subagentTracesByThread);
+  const cloudMachines = useCloudMachinesStore((state) => state.machines);
   const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents, subagentTracesByThread);
   const matchingThreads = ordinaryThreads.filter((thread) =>
-    `${thread.name ?? ""}\n${thread.preview}\n${thread.cwd}`
+    `${thread.name ?? ""}\n${thread.preview}\n${thread.cwd}\n${thread.runner?.providerId ?? ""}\n${thread.runner?.workspace ?? ""}`
       .toLowerCase()
       .includes(threadSearch.query.trim().toLowerCase()),
   );
@@ -177,7 +180,7 @@ export function AppSidebar({
   });
   const projectOrder = sidebarProjectOrder(ordinaryThreads, manualProjectOrder);
   const archivedProjects = new Set(archivedProjectKeys);
-  const threadGroups = groupThreadsByFolder(matchingThreads, projectOrder).filter(
+  const threadGroups = groupThreadsByFolder(matchingThreads, projectOrder, cloudMachines).filter(
     (group) => archivedProjects.has(group.key) === showArchivedProjects,
   );
 
@@ -345,17 +348,36 @@ export function AppSidebar({
                       onDrop={(event) => handleProjectDrop(event, group.key)}
                     >
                       {showArchivedProjects ? (
-                        <span className="min-w-0 flex-1 truncate px-2.5 pr-8" title={group.path || group.title}>
-                          {group.title}
+                        <span
+                          className="flex min-w-0 flex-1 items-center gap-1.5 truncate px-2.5 pr-8"
+                          title={
+                            group.remote
+                              ? `${group.remote.providerId} · ${group.remote.targetName}:${group.remote.workspace}`
+                              : group.path || group.title
+                          }
+                        >
+                          {group.remote && (
+                            <Cloud className="size-3.5 shrink-0 text-sidebar-muted" aria-hidden="true" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate">{group.title}</span>
                         </span>
                       ) : (
                         <button
                           type="button"
-                          className="flex h-full min-w-0 flex-1 items-center rounded-xl px-2.5 pr-14 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
-                          title={group.path || group.title}
+                          className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2.5 pr-14 text-left outline-none focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+                          title={
+                            group.remote
+                              ? `${group.remote.providerId} · ${group.remote.targetName}:${group.remote.workspace}`
+                              : group.path || group.title
+                          }
                           aria-label={`New agent in ${group.title}`}
-                          onClick={() => onNewThreadInFolder(group.path)}
+                          onClick={() =>
+                            onNewThreadInFolder(group.path, group.remote ? (group.remote.machineId ?? "") : "")
+                          }
                         >
+                          {group.remote && (
+                            <Cloud className="size-3.5 shrink-0 text-sidebar-muted" aria-hidden="true" />
+                          )}
                           <span className="min-w-0 flex-1 truncate">{group.title}</span>
                         </button>
                       )}
@@ -385,7 +407,9 @@ export function AppSidebar({
                             type="button"
                             className="absolute right-1 flex size-6 items-center justify-center rounded-md text-sidebar-muted opacity-0 outline-none transition-opacity hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground group-hover:opacity-100 group-focus-within:opacity-100"
                             aria-label={`New agent in ${group.title}`}
-                            onClick={() => onNewThreadInFolder(group.path)}
+                            onClick={() =>
+                              onNewThreadInFolder(group.path, group.remote ? (group.remote.machineId ?? "") : "")
+                            }
                           >
                             <CirclePlus className="size-3.5" />
                           </TooltipTrigger>
