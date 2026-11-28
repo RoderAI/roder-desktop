@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { Button } from "@/components/ui/button";
 import { RoderAgentCreateDialog } from "@/components/roder-agent-create-dialog";
 import { RoderAgentAvatar } from "@/components/roder-agent-avatar";
 import { RoderAgentFiles } from "@/components/roder-agent-files";
 import { RoderAgentImageSetup } from "@/components/roder-agent-image-setup";
+import { RoderAgentView } from "@/components/roder-agent-view";
+import { useIssuesStore } from "@/lib/issues-ipc";
+import { answerIssue } from "@/lib/roder-board";
 import { roderAgentsIpc } from "@/lib/roder-agents-ipc";
 import { roderAgentCharacterPresentation } from "@/lib/roder-agent-character";
 import { roderIpc } from "@/lib/roder-ipc";
 import { cn } from "@/lib/utils";
+import { useRoderStore } from "@/stores/roder-store";
 import type { RoderAgent, RoderAgentDetail } from "@/types/roder-agents";
 import type { RoderModel, Workspace } from "@/types/roder";
 
@@ -28,6 +32,9 @@ export function RoderAgentsPage({
   const [creating, setCreating] = useState(false);
   const [models, setModels] = useState<RoderModel[]>([]);
   const [observedAt, setObservedAt] = useState(() => Date.now());
+  const { projects, issues } = useIssuesStore();
+  const threads = useRoderStore((state) => state.threads);
+  const navigate = useNavigate();
 
   async function refresh() {
     const result = await roderAgentsIpc.list();
@@ -57,9 +64,11 @@ export function RoderAgentsPage({
     const timer = setInterval(() => {
       if (mounted) void refresh().catch((cause) => setError(String(cause)));
     }, 15000);
+    void useIssuesStore.getState().refresh();
     const unsubscribe = roderIpc.onNotification((notification) => {
       if (mounted && notification.method === "desktop/roders/changed")
         void refresh().catch((cause) => setError(String(cause)));
+      if (mounted && notification.method === "desktop/issues/changed") void useIssuesStore.getState().refresh();
     });
     return () => {
       mounted = false;
@@ -149,17 +158,35 @@ export function RoderAgentsPage({
           </section>
           <section className="lg:col-span-2">
             {selected ? (
-              <RoderAgentEditor
+              <RoderAgentView
                 key={selected.id}
-                initial={selected}
-                status={roderAgents.find((c) => c.id === selected.id) ?? selected}
-                busy={busy}
-                observedAt={observedAt}
-                perform={perform}
+                roder={roderAgents.find((c) => c.id === selected.id) ?? selected}
+                files={selected.files}
+                projects={projects}
+                issues={issues}
+                threads={threads}
+                onComment={async (issueId, text) => {
+                  await answerIssue(issueId, text);
+                  await useIssuesStore.getState().refresh();
+                }}
+                onOpenThread={(threadId) =>
+                  void navigate({ to: "/threads/$threadId", params: { threadId }, search: true })
+                }
+                onOpenPullRequest={(url) => void window.roderDesktop.openExternal(url)}
+                settings={
+                  <RoderAgentEditor
+                    initial={selected}
+                    status={roderAgents.find((c) => c.id === selected.id) ?? selected}
+                    busy={busy}
+                    observedAt={observedAt}
+                    perform={perform}
+                    showFiles={false}
+                  />
+                }
               />
             ) : (
               <p className="rounded-xl border border-dashed border-border p-4 text-muted-foreground font-normal">
-                Select a Roder to edit its files and opt in to proactive work.
+                Select a Roder to see what needs you, its issues, threads and files.
               </p>
             )}
           </section>
@@ -176,6 +203,7 @@ export function RoderAgentEditor({
   observedAt,
   perform,
   showThreadLink = true,
+  showFiles = true,
 }: {
   initial: RoderAgentDetail;
   status: RoderAgent;
@@ -183,6 +211,8 @@ export function RoderAgentEditor({
   observedAt: number;
   perform: <T>(action: () => Promise<T>) => Promise<T | undefined>;
   showThreadLink?: boolean;
+  /** The Roder page shows files in their own tab. */
+  showFiles?: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   return (
@@ -305,7 +335,7 @@ export function RoderAgentEditor({
           </ul>
         </section>
       ) : null}
-      <RoderAgentFiles key={status.id} roderId={status.id} initialFiles={initial.files} />
+      {showFiles ? <RoderAgentFiles key={status.id} roderId={status.id} initialFiles={initial.files} /> : null}
       <form
         className="space-y-3"
         onSubmit={async (event) => {

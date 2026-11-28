@@ -1,6 +1,7 @@
 import { useRoderStore } from "@/stores/roder-store";
 import type { BrowserSnapshot, ChromeBridgeStatus } from "@/types/roder";
 import { models, noop, noopAsync, threads, workspace } from "./fixtures";
+import { roderFileFixture, roderFileFixtures } from "./roder-fixtures";
 
 // No fixture may fall through to real IPC, navigate, or run terminal commands.
 const claudeBackendStatus = {
@@ -43,10 +44,20 @@ export function installNativeFixture(): void {
     platform: "darwin",
     homeDir: "/storybook",
     hostName: "Storybook",
-    async request(method) {
+    async request(method, params) {
       switch (method) {
         case "desktop/roders/list":
           return { roders: [] };
+        case "desktop/roders/files/read":
+          return roderFileFixture((params as { path: string }).path);
+        case "desktop/roders/files/list":
+          return { files: roderFileFixtures };
+        case "desktop/roders/files/history": {
+          const file = roderFileFixture((params as { path: string }).path);
+          return { versions: [file] };
+        }
+        case "desktop/roders/sprite/read":
+          return { sprite: null, image: null };
         case "desktop/projects/list":
           return { projects: [] };
         case "desktop/issues/list":
