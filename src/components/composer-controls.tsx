@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ProviderLogo } from "@/components/provider-logo";
+import { backendDisplayName } from "@/components/agent-backend-picker";
 import { reasoningEffortsFor, resolveReasoningEffort } from "@/lib/roder-models";
 import {
   buildModelPickerGroups,
@@ -159,6 +160,7 @@ export function ComposerAgentSwarmModeMenuItem({
 }
 
 export function ModelPicker({
+  disabled,
   models,
   routingOptions,
   selectedModel,
@@ -169,6 +171,7 @@ export function ModelPicker({
   onAutoChange,
   onReasoningChange,
 }: {
+  disabled?: boolean;
   models: RoderModel[];
   routingOptions: InferenceRoutingOptionDescriptor[];
   selectedModel: string;
@@ -190,7 +193,7 @@ export function ModelPicker({
       : [
           {
             id: activeBackend,
-            name: activeBackend === "codex" ? "Codex" : "Antigravity",
+            name: backendDisplayName(activeBackend),
             authType: "none",
             authenticated: true,
           },
@@ -257,6 +260,7 @@ export function ModelPicker({
         }}
       >
         <Combobox.Trigger
+          disabled={disabled}
           className={cn(
             dropdownMenuTriggerVariants({ variant: "pill" }),
             "min-w-0 max-w-full gap-1 px-2 text-sm @[520px]:gap-1.5 @[520px]:px-2.5 @[520px]:text-base",
