@@ -10,7 +10,14 @@ const issues: Issue[] = [
     title: "Shipped fix",
     description: "",
     status: "done",
-    threadId: "thread-one",
+    owner: { type: "thread", threadId: "thread-one" },
+    threadIds: ["thread-one"],
+    priority: "normal",
+    doneCriteria: "",
+    outOfScope: "",
+    parent: null,
+    pullRequests: [],
+    activity: [],
     createdAt: "",
     updatedAt: "",
   },
@@ -21,7 +28,14 @@ const issues: Issue[] = [
     title: "Next fix",
     description: "",
     status: "todo",
-    threadId: null,
+    owner: { type: "roder" },
+    threadIds: [],
+    priority: "normal",
+    doneCriteria: "",
+    outOfScope: "",
+    parent: null,
+    pullRequests: [],
+    activity: [],
     createdAt: "",
     updatedAt: "",
   },
@@ -32,7 +46,14 @@ const issues: Issue[] = [
     title: "Old fix",
     description: "",
     status: "cancelled",
-    threadId: null,
+    owner: { type: "roder" },
+    threadIds: [],
+    priority: "normal",
+    doneCriteria: "",
+    outOfScope: "",
+    parent: null,
+    pullRequests: [],
+    activity: [],
     createdAt: "",
     updatedAt: "",
   },
@@ -60,4 +81,18 @@ test("explicit filters expose matching terminal rows without altering saved coll
   expect(groupIssues(issues, { assignment: "assigned" })).toMatchObject([{ status: "done", expanded: true }]);
   expect(groupIssues(issues, { query: "missing" })).toEqual([]);
   expect(groupIssues(issues).find((group) => group.status === "done")?.expanded).toBe(false);
+});
+
+test("needs_you and in_review get their own groups in lifecycle order", () => {
+  const base = issues[1];
+  const groups = groupIssues([
+    { ...base, id: "review", status: "in_review" },
+    { ...base, id: "waiting", status: "needs_you", owner: { type: "user" } },
+    { ...base, id: "working", status: "in_progress" },
+  ]);
+  expect(groups.map((group) => [group.status, group.expanded])).toEqual([
+    ["in_progress", true],
+    ["needs_you", true],
+    ["in_review", true],
+  ]);
 });

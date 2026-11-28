@@ -1,4 +1,11 @@
-import { issueStatuses, type Issue, type IssueProject, type IssueStatus } from "@/types/issues";
+import {
+  issueStatuses,
+  type Issue,
+  type IssueOwner,
+  type IssuePriority,
+  type IssueProject,
+  type IssueStatus,
+} from "@/types/issues";
 import { create } from "zustand";
 
 export function groupIssues(
@@ -12,8 +19,8 @@ export function groupIssues(
   for (const issue of issues) {
     if (filters.projectId && issue.projectId !== filters.projectId) continue;
     if (filters.status && issue.status !== filters.status) continue;
-    if (filters.assignment === "assigned" && !issue.threadId) continue;
-    if (filters.assignment === "unassigned" && issue.threadId) continue;
+    if (filters.assignment === "assigned" && issue.owner.type !== "thread") continue;
+    if (filters.assignment === "unassigned" && issue.owner.type === "thread") continue;
     if (query && !`${issue.title}\n${issue.description}\n${issue.number}`.toLowerCase().includes(query)) continue;
     const group = byStatus.get(issue.status) ?? [];
     group.push(issue);
@@ -26,6 +33,51 @@ export function groupIssues(
     if (matches?.length) groups.push({ status, issues: matches, expanded: revealMatches || !collapsed.has(status) });
   }
   return groups;
+}
+
+/** Fields a person can edit on an issue; threads, pull requests and activity change through their own requests. */
+export type IssueEdit = Partial<
+  Pick<
+    Issue,
+    "projectId" | "title" | "description" | "status" | "priority" | "owner" | "doneCriteria" | "outOfScope" | "parent"
+  >
+>;
+
+/** The issue editor's owner select value: `roder`, `user`, or `thread:<id>`. */
+export const ownerKey = (owner: IssueOwner) => (owner.type === "thread" ? `thread:${owner.threadId}` : owner.type);
+export const ownerFromKey = (key: string): IssueOwner =>
+  key.startsWith("thread:") ? { type: "thread", threadId: key.slice(7) } : { type: key === "user" ? "user" : "roder" };
+
+/** What the issue editor saves from its form. */
+export function issueSaveFields(
+  form: {
+    title: string;
+    description: string;
+    projectId: string;
+    status: IssueStatus;
+    priority: IssuePriority;
+    owner: string;
+    doneCriteria: string;
+    outOfScope: string;
+    parent: string;
+  },
+  { isNew, issues }: { isNew: boolean; issues: Issue[] },
+): IssueEdit & { projectId: string; title: string } {
+  const parent = issues.find((item) => item.id === form.parent);
+  return {
+    title: form.title,
+    description: form.description,
+    projectId: form.projectId,
+    status: form.status,
+    priority: form.priority,
+    // A new issue created waiting on you is yours; otherwise the service would
+    // hand a needs_you issue owned by the Roder straight back to todo.
+    owner: ownerFromKey(isNew && form.status === "needs_you" ? "user" : form.owner),
+    doneCriteria: form.doneCriteria,
+    outOfScope: form.outOfScope,
+    // Parents live in the same project: a parent left over from another one is dropped.
+    parent: parent && parent.projectId !== form.projectId ? null : form.parent || null,
+  };
 }
 
 export const issuesIpc = {
@@ -42,15 +94,12 @@ export const issuesIpc = {
     window.roderDesktop.request("desktop/projects/update", params) as Promise<{ project: IssueProject }>,
   deleteProject: (id: string) => window.roderDesktop.request("desktop/projects/delete", { id }),
   listIssues: () => window.roderDesktop.request("desktop/issues/list", {}) as Promise<{ issues: Issue[] }>,
-  createIssue: (params: {
-    projectId: string;
-    title: string;
-    description: string;
-    status?: IssueStatus;
-    threadId?: string | null;
-  }) => window.roderDesktop.request("desktop/issues/create", params) as Promise<{ issue: Issue }>,
-  updateIssue: (params: Partial<Issue> & { id: string }) =>
+  createIssue: (params: IssueEdit & { projectId: string; title: string }) =>
+    window.roderDesktop.request("desktop/issues/create", params) as Promise<{ issue: Issue }>,
+  updateIssue: (params: IssueEdit & { id: string }) =>
     window.roderDesktop.request("desktop/issues/update", params) as Promise<{ issue: Issue }>,
+  commentIssue: (id: string, text: string) =>
+    window.roderDesktop.request("desktop/issues/comment", { id, text }) as Promise<{ issue: Issue }>,
   deleteIssue: (id: string) => window.roderDesktop.request("desktop/issues/delete", { id }),
   launchIssue: (id: string) =>
     window.roderDesktop.request("desktop/issues/launch", { id }) as Promise<{ issue: Issue; threadId: string }>,
