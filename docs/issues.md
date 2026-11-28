@@ -15,9 +15,9 @@ the status headers toggle each group's rows. Active filters reveal every matchin
 row, including completed and cancelled issues. Clear the filters to restore the
 saved group expansion choices.
 
-When a workspace has a project persistentAgent, selecting that project exposes
-**Open project persistentAgent**. The persistentAgent link uses the same persistent thread as
-the workspace's persistentAgent; it does not create a second agent.
+When a workspace has a project Roder, selecting that project exposes
+**Open project Roder**. The Roder link uses the same persistent thread as
+the workspace's Roder; it does not create a second agent.
 
 Statuses are `backlog`, `todo`, `in_progress`, `blocked`, `done`, and `cancelled`.
 Assignment is a Roder thread ID, or `null` when unassigned. The UI picker shows
@@ -65,16 +65,16 @@ Forward `desktop/projects/*` and `desktop/issues/*` requests to
 | `delete`      | `id` (must have no issues)                                      | `id`                                                                     | `{ deleted: true }`           |
 | `launch`      | not supported                                                   | `id`                                                                     | `{ issue, threadId }`         |
 
-After workspace creation or persistentAgent promotion, call
-`desktop/projects/ensureWorkspace` with `{workspaceId, name, description?, persistentAgentThreadId?}`
+After workspace creation or Roder promotion, call
+`desktop/projects/ensureWorkspace` with `{workspaceId, name, description?, roderThreadId?}`
 to get `{project}` and reuse its tracker project. Registration is serialized and
 idempotent across concurrent calls and restarts. It prefers an existing
 nonarchived project with that workspace ID, otherwise reuses an archived one
 without unarchiving it. Existing project names and descriptions are preserved;
 supplied name/description initialize only a new record. Explicitly supplied
-`persistentAgentThreadId` updates the link; omitting it preserves the link and `null`
-clears it. Project `update` also accepts `persistentAgentThreadId`. Schema-1 records
-without persistentAgent metadata load as `persistentAgentThreadId: null`.
+`roderThreadId` updates the link; omitting it preserves the link and `null`
+clears it. Project `update` also accepts `roderThreadId`. Schema-1 records
+without Roder metadata load as `roderThreadId: null`.
 
 Project IDs are local stable UUIDs; `workspaceId` references an existing harness
 workspace identity rather than an arbitrary path. Issue IDs are stable UUIDs;

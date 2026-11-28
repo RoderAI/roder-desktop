@@ -8,7 +8,7 @@ const projectFields = {
   name: string,
   description: string,
   workspaceId: nullableString,
-  persistentAgentThreadId: nullableString,
+  roderThreadId: nullableString,
   archived: { type: "boolean" },
 };
 const issueFields = { projectId: string, title: string, description: string, status, threadId: nullableString };

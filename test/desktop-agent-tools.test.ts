@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { desktopConfigInstructions } from "../electron/agents/config-tool";
-import { persistentAgentSkillBody } from "../electron/persistent-agents/creation-tool";
+import { roderAgentSkillBody } from "../electron/roder-agents/creation-tool";
 import { DesktopAgentTools } from "../electron/agents/desktop-agent-tools";
 
 function fixture() {
@@ -86,7 +86,7 @@ test("leaves unknown tools and malformed notifications alone", async () => {
   expect(request).not.toHaveBeenCalled();
 });
 test("desktop skills reach every turn outside the repo while preserving existing context", () => {
-  const instructions = `${desktopConfigInstructions}\n\n${persistentAgentSkillBody}`;
+  const instructions = `${desktopConfigInstructions}\n\n${roderAgentSkillBody}`;
   const bridge = new DesktopAgentTools(
     [],
     vi.fn<(method: string, params: unknown) => Promise<unknown>>(),
@@ -95,8 +95,8 @@ test("desktop skills reach every turn outside the repo while preserving existing
   const original = { threadId: "existing-thread", developerContext: "Caller context", input: [] };
   const prepared = bridge.turnStartParams(original);
   expect(prepared.developerContext).toContain("desktop_config");
-  expect(prepared.developerContext).toContain("$persistent-agent");
-  expect(prepared.developerContext).toContain("persistent_agent_create");
+  expect(prepared.developerContext).toContain("$roder");
+  expect(prepared.developerContext).toContain("roder_create");
   expect(prepared.developerContext).toContain("Caller context");
   expect(prepared.developerContext).toContain("start paused");
   expect(prepared.input).toBe(original.input);

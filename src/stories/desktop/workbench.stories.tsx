@@ -10,7 +10,7 @@ import { useState } from "react";
 import { AppShellLayout } from "@/components/app-shell-layout";
 import { Transcript } from "@/components/transcript";
 import { IssuesPage } from "@/components/issues-page";
-import { PersistentAgentsPage } from "@/components/persistent-agents-page";
+import { RoderAgentsPage } from "@/components/roder-agents-page";
 import { ThreadsPage } from "@/components/threads-page";
 import { toolPanelWidthBounds, type RouteWorkspacePanel } from "@/lib/route-search";
 import { messages, noop, noopAsync, threads, workspace, workspacePath } from "./fixtures";
@@ -116,8 +116,8 @@ function WorkbenchExample({ initialPath = "/" }: { initialPath?: string }) {
     const issues = createRoute({ getParentRoute: () => root, path: "issues", component: IssuesPage });
     const agents = createRoute({
       getParentRoute: () => root,
-      path: "persistent-agents",
-      component: PersistentAgentsPage,
+      path: "roders",
+      component: RoderAgentsPage,
     });
     const threadsRoute = createRoute({ getParentRoute: () => root, path: "threads", component: ThreadsPage });
     const threadRoute = createRoute({
@@ -138,4 +138,4 @@ function WorkbenchExample({ initialPath = "/" }: { initialPath?: string }) {
 export const ThreadWorkspace: Story = { render: () => <WorkbenchExample /> };
 export const Threads: Story = { render: () => <WorkbenchExample initialPath="/threads" /> };
 export const Issues: Story = { render: () => <WorkbenchExample initialPath="/issues" /> };
-export const PersistentAgents: Story = { render: () => <WorkbenchExample initialPath="/persistent-agents" /> };
+export const RoderAgents: Story = { render: () => <WorkbenchExample initialPath="/roders" /> };

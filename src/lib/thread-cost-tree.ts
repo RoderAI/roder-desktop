@@ -218,7 +218,7 @@ async function persistentChildren(api: CostApi, warnings: Set<string>): Promise<
       cursors.add(result.nextCursor);
       cursor = result.nextCursor;
     }
-    warnings.add("The thread index is incomplete; some persistent agents may be missing.");
+    warnings.add("The thread index is incomplete; some Roders may be missing.");
   } catch {
     warnings.add("The thread index could not be loaded; agent discovery is limited to available traces.");
   }

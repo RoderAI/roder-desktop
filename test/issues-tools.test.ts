@@ -13,10 +13,10 @@ test("discoverable agent tools share the same records as desktop requests", asyn
     const { project } = await service.request("desktop/projects/create", { name: "Shared" });
     await handleIssueToolCall(service, "projects_update", {
       id: project.id,
-      persistentAgentThreadId: "persistentAgent-thread",
+      roderThreadId: "roderAgent-thread",
     });
     expect(await handleIssueToolCall(service, "projects_read", { id: project.id })).toMatchObject({
-      project: { persistentAgentThreadId: "persistentAgent-thread" },
+      project: { roderThreadId: "roderAgent-thread" },
     });
     const created = (await handleIssueToolCall(service, "issues_create", {
       projectId: project.id,

@@ -12,8 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as NewRouteImport } from './routes/new'
-import { Route as PersistentAgentsRouteImport } from './routes/persistent-agents'
 import { Route as PluginsRouteImport } from './routes/plugins'
+import { Route as RodersRouteImport } from './routes/roders'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PluginsExploreRouteImport } from './routes/plugins.explore'
 import { Route as PluginsInstalledRouteImport } from './routes/plugins.installed'
@@ -36,14 +36,14 @@ const NewRoute = NewRouteImport.update({
   path: '/new',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PersistentAgentsRoute = PersistentAgentsRouteImport.update({
-  id: '/persistent-agents',
-  path: '/persistent-agents',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PluginsRoute = PluginsRouteImport.update({
   id: '/plugins',
   path: '/plugins',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RodersRoute = RodersRouteImport.update({
+  id: '/roders',
+  path: '/roders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -81,8 +81,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/issues': typeof IssuesRoute
   '/new': typeof NewRoute
-  '/persistent-agents': typeof PersistentAgentsRoute
   '/plugins': typeof PluginsRouteWithChildren
+  '/roders': typeof RodersRoute
   '/settings': typeof SettingsRouteWithChildren
   '/plugins/explore': typeof PluginsExploreRoute
   '/plugins/installed': typeof PluginsInstalledRoute
@@ -94,8 +94,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/issues': typeof IssuesRoute
   '/new': typeof NewRoute
-  '/persistent-agents': typeof PersistentAgentsRoute
   '/plugins': typeof PluginsRouteWithChildren
+  '/roders': typeof RodersRoute
   '/settings': typeof SettingsRouteWithChildren
   '/plugins/explore': typeof PluginsExploreRoute
   '/plugins/installed': typeof PluginsInstalledRoute
@@ -108,8 +108,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/issues': typeof IssuesRoute
   '/new': typeof NewRoute
-  '/persistent-agents': typeof PersistentAgentsRoute
   '/plugins': typeof PluginsRouteWithChildren
+  '/roders': typeof RodersRoute
   '/settings': typeof SettingsRouteWithChildren
   '/plugins/explore': typeof PluginsExploreRoute
   '/plugins/installed': typeof PluginsInstalledRoute
@@ -123,8 +123,8 @@ export interface FileRouteTypes {
     | '/'
     | '/issues'
     | '/new'
-    | '/persistent-agents'
     | '/plugins'
+    | '/roders'
     | '/settings'
     | '/plugins/explore'
     | '/plugins/installed'
@@ -136,8 +136,8 @@ export interface FileRouteTypes {
     | '/'
     | '/issues'
     | '/new'
-    | '/persistent-agents'
     | '/plugins'
+    | '/roders'
     | '/settings'
     | '/plugins/explore'
     | '/plugins/installed'
@@ -149,8 +149,8 @@ export interface FileRouteTypes {
     | '/'
     | '/issues'
     | '/new'
-    | '/persistent-agents'
     | '/plugins'
+    | '/roders'
     | '/settings'
     | '/plugins/explore'
     | '/plugins/installed'
@@ -163,8 +163,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   IssuesRoute: typeof IssuesRoute
   NewRoute: typeof NewRoute
-  PersistentAgentsRoute: typeof PersistentAgentsRoute
   PluginsRoute: typeof PluginsRouteWithChildren
+  RodersRoute: typeof RodersRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   ThreadsThreadIdRoute: typeof ThreadsThreadIdRoute
   ThreadsIndexRoute: typeof ThreadsIndexRoute
@@ -193,18 +193,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/persistent-agents': {
-      id: '/persistent-agents'
-      path: '/persistent-agents'
-      fullPath: '/persistent-agents'
-      preLoaderRoute: typeof PersistentAgentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/plugins': {
       id: '/plugins'
       path: '/plugins'
       fullPath: '/plugins'
       preLoaderRoute: typeof PluginsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roders': {
+      id: '/roders'
+      path: '/roders'
+      fullPath: '/roders'
+      preLoaderRoute: typeof RodersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -281,8 +281,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   IssuesRoute: IssuesRoute,
   NewRoute: NewRoute,
-  PersistentAgentsRoute: PersistentAgentsRoute,
   PluginsRoute: PluginsRouteWithChildren,
+  RodersRoute: RodersRoute,
   SettingsRoute: SettingsRouteWithChildren,
   ThreadsThreadIdRoute: ThreadsThreadIdRoute,
   ThreadsIndexRoute: ThreadsIndexRoute,

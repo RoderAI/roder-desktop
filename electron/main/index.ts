@@ -88,23 +88,23 @@ import type { AgentBackendId, ExternalAgentBackendId } from "../roder/desktop-ba
 import { DesktopAgentTools } from "../agents/desktop-agent-tools";
 import { IssuesService } from "../issues/service";
 import { handleIssueToolCall, issueToolDefinitions } from "../issues/tools";
-import { persistentAgentToolDefinitions, createPersistentAgentService } from "../persistent-agents/service";
+import { roderAgentToolDefinitions, createRoderAgentService } from "../roder-agents/service";
 import {
-  createPersistentAgentFromTool,
-  mergePersistentAgentSkill,
-  persistentAgentCreateTool,
-  persistentAgentWorkspacesTool,
-  listPersistentAgentWorkspaces,
-  persistentAgentSkillBody,
-  readPersistentAgentSkill,
-} from "../persistent-agents/creation-tool";
+  createRoderAgentFromTool,
+  mergeRoderAgentSkill,
+  roderAgentCreateTool,
+  roderAgentWorkspacesTool,
+  listRoderAgentWorkspaces,
+  roderAgentSkillBody,
+  readRoderAgentSkill,
+} from "../roder-agents/creation-tool";
 import { configureDesktopFromTool, desktopConfigInstructions, desktopConfigTool } from "../agents/config-tool";
-import { createPersistentAgentSpriteManager, createSpriteImageNormalizer } from "../persistent-agents/sprites";
-import { createCodexImageGenerator } from "../persistent-agents/codex-image-generator";
-import { createImageGenerationCredentials, configureImageGenerationKey } from "../persistent-agents/image-credentials";
-import { createOpenAiImageGenerator } from "../persistent-agents/openai-image-generator";
+import { createRoderAgentSpriteManager, createSpriteImageNormalizer } from "../roder-agents/sprites";
+import { createCodexImageGenerator } from "../roder-agents/codex-image-generator";
+import { createImageGenerationCredentials, configureImageGenerationKey } from "../roder-agents/image-credentials";
+import { createOpenAiImageGenerator } from "../roder-agents/openai-image-generator";
 import type { Issue, IssueProject } from "../../src/types/issues";
-import type { PersistentAgentDetail } from "../../src/types/persistent-agents";
+import type { RoderAgentDetail } from "../../src/types/roder-agents";
 import type { Workspace } from "../../src/types/roder";
 import type { LocalWorktreeContext } from "../../src/lib/local-worktrees";
 import { DesktopWorktrees } from "../worktrees/desktop-worktrees";
@@ -186,10 +186,10 @@ let mainWindow: BrowserWindow | null = null;
 let extensionCatalog: ExtensionCatalog | null = null;
 let extensionHost: ExtensionHost | null = null;
 let issuesService: IssuesService | null = null;
-let persistentAgentService: ReturnType<typeof createPersistentAgentService> | null = null;
-let spriteManager: ReturnType<typeof createPersistentAgentSpriteManager> | null = null;
+let roderAgentService: ReturnType<typeof createRoderAgentService> | null = null;
+let spriteManager: ReturnType<typeof createRoderAgentSpriteManager> | null = null;
 let imageCredentials: ReturnType<typeof createImageGenerationCredentials> | null = null;
-let persistentAgentStartPromise: Promise<void> | null = null;
+let roderAgentStartPromise: Promise<void> | null = null;
 let desktopAgentTools: DesktopAgentTools | null = null;
 const appServerEvents: AppServerEvent[] = [];
 const appName = devApp ? "Roder Dev" : "Roder";
@@ -341,9 +341,9 @@ roder.on("notification", (payload) => {
       recordAppServerEvent("error", "desktop/tools", "Could not resolve a desktop tool execution");
     });
   if (payload.method === "thread/toolExecutionResolved") getDesktopAgentTools().onResolved(payload.params);
-  if (persistentAgentService)
-    void persistentAgentService.onNotification(payload.method, payload.params).catch(() => {
-      recordAppServerEvent("error", "desktop/persistent-agents", "Could not process a persistent agent event");
+  if (roderAgentService)
+    void roderAgentService.onNotification(payload.method, payload.params).catch(() => {
+      recordAppServerEvent("error", "desktop/roders", "Could not process a Roder event");
     });
 });
 roder.on("status", (payload) => {
@@ -361,12 +361,12 @@ chromeBridge.on("status", (payload) => sendToRenderer("chromeBridge:status", pay
 ipcMain.handle("roder:status", () => roder.status());
 ipcMain.handle("roder:start", async () => {
   const status = await roder.start();
-  await startPersistentAgents().catch(reportPersistentAgentStartupError);
+  await startRoderAgents().catch(reportRoderAgentStartupError);
   return status;
 });
 async function restartRoderEngine() {
-  await persistentAgentService?.stop();
-  persistentAgentService = null;
+  await roderAgentService?.stop();
+  roderAgentService = null;
   spriteManager = null;
   blaxelClient?.clearCache();
   remoteWorkspaceService?.closeAll();
@@ -374,8 +374,8 @@ async function restartRoderEngine() {
   await getCloudCredentialsService().hydrate();
   const status = await roder.restart();
   agentBackends?.probeInBackground();
-  persistentAgentStartPromise = null;
-  await startPersistentAgents().catch(reportPersistentAgentStartupError);
+  roderAgentStartPromise = null;
+  await startRoderAgents().catch(reportRoderAgentStartupError);
   return status;
 }
 
@@ -784,7 +784,7 @@ app.whenReady().then(async () => {
     }
     await roder.start();
     getAgentBackends().probeInBackground();
-    await startPersistentAgents().catch(reportPersistentAgentStartupError);
+    await startRoderAgents().catch(reportRoderAgentStartupError);
   } catch (error) {
     sendToRenderer("roder:status", {
       state: "error",
@@ -812,7 +812,7 @@ app.on("before-quit", (event) => {
   browser.destroy();
   void (async () => {
     try {
-      await persistentAgentService?.stop();
+      await roderAgentService?.stop();
     } finally {
       tailscaleSshClient?.closeAll();
       await Promise.allSettled([
@@ -856,9 +856,9 @@ function getIssuesService(): IssuesService {
     storagePath: join(app.getPath("userData"), "issues", "issues.json"),
     onEvent: (event) => {
       sendToRenderer("roder:notification", event);
-      if (persistentAgentService)
-        void persistentAgentService.onNotification(event.method, event.params).catch(() => {
-          recordAppServerEvent("error", "desktop/persistent-agents", "Could not process an issue event");
+      if (roderAgentService)
+        void roderAgentService.onNotification(event.method, event.params).catch(() => {
+          recordAppServerEvent("error", "desktop/roders", "Could not process an issue event");
         });
     },
     launchIssue,
@@ -885,19 +885,19 @@ async function launchIssue(issue: Issue, project: IssueProject): Promise<{ threa
   return { threadId };
 }
 
-function getPersistentAgentService(): ReturnType<typeof createPersistentAgentService> {
-  persistentAgentService ??= createPersistentAgentService({
-    directory: join(app.getPath("userData"), "persistent-agents"),
+function getRoderAgentService(): ReturnType<typeof createRoderAgentService> {
+  roderAgentService ??= createRoderAgentService({
+    directory: join(app.getPath("userData"), "roders"),
     request: (method, params) => requestEngine(method, params, false),
     sprites: getSpriteManager(),
-    notify: () => sendToRenderer("roder:notification", { method: "desktop/persistent-agents/changed", params: {} }),
+    notify: () => sendToRenderer("roder:notification", { method: "desktop/roders/changed", params: {} }),
   });
-  return persistentAgentService;
+  return roderAgentService;
 }
 
 function getImageCredentials(): ReturnType<typeof createImageGenerationCredentials> {
   imageCredentials ??= createImageGenerationCredentials({
-    directory: join(app.getPath("userData"), "persistent-agents", "credentials"),
+    directory: join(app.getPath("userData"), "roders", "credentials"),
     storage: safeStorage,
     onUnavailable: () => {
       recordAppServerEvent(
@@ -906,7 +906,7 @@ function getImageCredentials(): ReturnType<typeof createImageGenerationCredentia
         "The saved image API key is unavailable. Codex and inference credentials are unchanged. Unlock OS secure storage or save the image key again before explicitly using the API route.",
       );
       sendToRenderer("roder:notification", {
-        method: "desktop/persistent-agents/imageCredentialUnavailable",
+        method: "desktop/roders/imageCredentialUnavailable",
         params: {},
       });
     },
@@ -914,12 +914,12 @@ function getImageCredentials(): ReturnType<typeof createImageGenerationCredentia
   return imageCredentials;
 }
 
-function getSpriteManager(): ReturnType<typeof createPersistentAgentSpriteManager> {
-  spriteManager ??= createPersistentAgentSpriteManager({
-    directory: join(app.getPath("userData"), "persistent-agents", "sprites"),
+function getSpriteManager(): ReturnType<typeof createRoderAgentSpriteManager> {
+  spriteManager ??= createRoderAgentSpriteManager({
+    directory: join(app.getPath("userData"), "roders", "sprites"),
     generateCodex: async (prompt) => {
       const generator = createCodexImageGenerator({
-        directory: join(app.getPath("userData"), "persistent-agents", "image-work"),
+        directory: join(app.getPath("userData"), "roders", "image-work"),
       });
       const capability = await generator.probe();
       if (!capability.authenticated) throw Error("Codex sign-in required");
@@ -930,21 +930,21 @@ function getSpriteManager(): ReturnType<typeof createPersistentAgentSpriteManage
       getApiKey: async () => (await getImageCredentials().load()) ?? process.env.OPENAI_API_KEY ?? null,
     }),
     normalizeImage: createSpriteImageNormalizer(nativeImage),
-    notify: () => sendToRenderer("roder:notification", { method: "desktop/persistent-agents/changed", params: {} }),
+    notify: () => sendToRenderer("roder:notification", { method: "desktop/roders/changed", params: {} }),
   });
   return spriteManager;
 }
 
-function startPersistentAgents(): Promise<void> {
-  persistentAgentStartPromise ??= getPersistentAgentService().start();
-  return persistentAgentStartPromise;
+function startRoderAgents(): Promise<void> {
+  roderAgentStartPromise ??= getRoderAgentService().start();
+  return roderAgentStartPromise;
 }
 
-function reportPersistentAgentStartupError(): void {
+function reportRoderAgentStartupError(): void {
   recordAppServerEvent(
     "error",
-    "desktop/persistent-agents",
-    "Persistent agent startup failed; open Persistent Agents for the error. Engine remains available.",
+    "desktop/roders",
+    "Roder startup failed; open Roders for the error. Engine remains available.",
   );
 }
 
@@ -957,21 +957,21 @@ function getDesktopAgentTools(): DesktopAgentTools {
         parameters: tool.inputSchema,
         execute: (args: unknown) => handleIssueToolCall(getIssuesService(), tool.name, args),
       })),
-      ...persistentAgentToolDefinitions.map((tool) => ({
+      ...roderAgentToolDefinitions.map((tool) => ({
         ...tool,
         execute: async (args: unknown, context: { threadId: string }) => {
-          await startPersistentAgents();
-          return getPersistentAgentService().handleTool(tool.name, args, context);
+          await startRoderAgents();
+          return getRoderAgentService().handleTool(tool.name, args, context);
         },
       })),
       {
-        ...persistentAgentCreateTool,
+        ...roderAgentCreateTool,
         execute: (args: unknown, context: { threadId: string }) =>
-          createPersistentAgentFromTool(args, context.threadId, handleRoderRequest),
+          createRoderAgentFromTool(args, context.threadId, handleRoderRequest),
       },
       {
-        ...persistentAgentWorkspacesTool,
-        execute: (args: unknown) => listPersistentAgentWorkspaces(args, handleRoderRequest),
+        ...roderAgentWorkspacesTool,
+        execute: (args: unknown) => listRoderAgentWorkspaces(args, handleRoderRequest),
       },
       {
         ...desktopConfigTool,
@@ -990,7 +990,7 @@ function getDesktopAgentTools(): DesktopAgentTools {
       },
     ],
     (method, params) => roder.request(method, params),
-    `${desktopConfigInstructions}\n\nDesktop built-in skill ($persistent-agent):\n${persistentAgentSkillBody}`,
+    `${desktopConfigInstructions}\n\nDesktop built-in skill ($roder):\n${roderAgentSkillBody}`,
   );
   return desktopAgentTools;
 }
@@ -1005,7 +1005,7 @@ function getDesktopWorktrees(): DesktopWorktrees {
   return desktopWorktrees;
 }
 
-async function requestEngine(method: string, params: unknown, enrichPersistentAgentContext = true): Promise<unknown> {
+async function requestEngine(method: string, params: unknown, enrichRoderAgentContext = true): Promise<unknown> {
   if (method === "turn/start") params = getDesktopAgentTools().turnStartParams(params);
   if (method === "thread/start") {
     const input = await cloudMachineThreadParams(
@@ -1068,14 +1068,8 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
     const start = () => roder.request(method, getDesktopAgentTools().threadStartParams(threadParams));
     return input.runner === undefined ? getDesktopWorktrees().startInCurrentFolder(start) : start();
   }
-  if (
-    method === "turn/start" &&
-    enrichPersistentAgentContext &&
-    persistentAgentService &&
-    params &&
-    typeof params === "object"
-  ) {
-    params = await persistentAgentService.turnStartParams(params);
+  if (method === "turn/start" && enrichRoderAgentContext && roderAgentService && params && typeof params === "object") {
+    params = await roderAgentService.turnStartParams(params);
   }
   if (method === "turn/start") {
     params = await applyDesktopTurnPolicy((rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams), params);
@@ -1630,16 +1624,16 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
   if (method.startsWith("desktop/issues/") || method.startsWith("desktop/projects/")) {
     return getIssuesService().request(method, params ?? {});
   }
-  if (method.startsWith("desktop/persistent-agents/")) {
-    await startPersistentAgents();
-    const result = await getPersistentAgentService().handleRequest(method, params ?? {});
-    if (method === "desktop/persistent-agents/create" || method === "desktop/persistent-agents/promote") {
-      const persistentAgent = result as PersistentAgentDetail;
+  if (method.startsWith("desktop/roders/")) {
+    await startRoderAgents();
+    const result = await getRoderAgentService().handleRequest(method, params ?? {});
+    if (method === "desktop/roders/create" || method === "desktop/roders/promote") {
+      const roderAgent = result as RoderAgentDetail;
       await getIssuesService().request("desktop/projects/ensureWorkspace", {
-        workspaceId: persistentAgent.workspaceId,
-        name: persistentAgent.name,
-        description: persistentAgent.mission,
-        persistentAgentThreadId: persistentAgent.threadId,
+        workspaceId: roderAgent.workspaceId,
+        name: roderAgent.name,
+        description: roderAgent.mission,
+        roderThreadId: roderAgent.threadId,
       });
     }
     return result;
@@ -1690,13 +1684,13 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     }
   }
   if (method === "skills/read") {
-    const skill = readPersistentAgentSkill(params);
+    const skill = readRoderAgentSkill(params);
     if (skill) return skill;
   }
   if (method === "skills/list") {
     try {
       const baseSkills = await roder.request(method, params);
-      const result = mergePersistentAgentSkill(mergeDesktopBrowserSkill(baseSkills));
+      const result = mergeRoderAgentSkill(mergeDesktopBrowserSkill(baseSkills));
       recordAppServerEvent("response", method, result);
       return result;
     } catch (error) {

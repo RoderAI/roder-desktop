@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { afterEach, expect, test, vi } from "vitest";
-import { createCodexImageClient, createCodexImageGenerator } from "../electron/persistent-agents/codex-image-generator";
+import { createCodexImageClient, createCodexImageGenerator } from "../electron/roder-agents/codex-image-generator";
 
 const transport = vi.hoisted(() => ({ factory: null as null | (() => unknown) }));
 vi.mock("node:child_process", () => ({ spawn: () => transport.factory!() }));

@@ -217,13 +217,13 @@ export function isPluginsRoutePath(pathname: string): boolean {
   return normalizedPathname === "/plugins" || normalizedPathname.startsWith("/plugins/");
 }
 
-export type FullPageRoute = "threads" | "issues" | "persistentAgents" | "plugins";
+export type FullPageRoute = "threads" | "issues" | "roders" | "plugins";
 
 export function fullPageRouteForPathname(pathname: string): FullPageRoute | null {
   const normalized = pathname.replace(/\/+$/u, "") || "/";
   if (normalized === "/threads") return "threads";
   if (normalized === "/issues") return "issues";
-  if (normalized === "/persistent-agents") return "persistentAgents";
+  if (normalized === "/roders") return "roders";
   return isPluginsRoutePath(normalized) ? "plugins" : null;
 }
 

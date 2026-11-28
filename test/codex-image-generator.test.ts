@@ -8,7 +8,7 @@ import {
   createCodexImageGenerator,
   codexImageEnvironment,
   type CodexImageClient,
-} from "../electron/persistent-agents/codex-image-generator";
+} from "../electron/roder-agents/codex-image-generator";
 
 const directories: string[] = [];
 test("Finder-launched image jobs discover user CLI installs without leaking API keys or changing the parent environment", () => {

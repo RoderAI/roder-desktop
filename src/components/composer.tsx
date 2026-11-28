@@ -16,7 +16,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { PersistentAgentThreadContext } from "@/components/app-shell-context";
+import { RoderAgentThreadContext } from "@/components/app-shell-context";
 import type {
   CommandDescriptor,
   DesktopAttachment,
@@ -166,7 +166,7 @@ export function Composer({
   onSteer,
   onStop,
 }: ComposerProps): React.JSX.Element {
-  const persistentAgentThread = use(PersistentAgentThreadContext);
+  const roderAgentThread = use(RoderAgentThreadContext);
   const activeBackend = useRoderStore((state) => state.activeBackend) ?? "roder";
   const [prompt, setPrompt] = useState("");
   // Guard only, never rendered: refs avoid synchronous setState inside the drain effect.
@@ -733,7 +733,7 @@ export function Composer({
                   <Mic className="size-3.5 @[520px]:size-4" />
                 )}
               </Button>
-              <AgentBackendPicker disabled={busy || persistentAgentThread} />
+              <AgentBackendPicker disabled={busy || roderAgentThread} />
               <ModelPicker
                 models={models}
                 routingOptions={routingOptions}

@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { createOpenAiImageGenerator } from "../electron/persistent-agents/openai-image-generator";
+import { createOpenAiImageGenerator } from "../electron/roder-agents/openai-image-generator";
 
 const png = Buffer.from("test-png");
 test("uses the explicit GPT Image 2.5 Flare API without trusting an old engine catalog", async () => {

@@ -123,14 +123,14 @@ export function IssuesPage(): React.JSX.Element {
             Edit project
           </Button>
         ) : null}
-        {selectedProject?.persistentAgentThreadId ? (
+        {selectedProject?.roderThreadId ? (
           <Link
             className="inline-flex h-8 items-center rounded-lg px-2.5 text-sm hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
             to="/threads/$threadId"
-            params={{ threadId: selectedProject.persistentAgentThreadId }}
+            params={{ threadId: selectedProject.roderThreadId }}
             search={true}
           >
-            Open project PA
+            Open project Roder
           </Link>
         ) : null}
       </div>

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { roderIpc } from "@/lib/roder-ipc";
-import type { ProjectPersistentAgentConfig } from "@/lib/project-persistent-agent";
+import type { ProjectRoderAgentConfig } from "@/lib/project-roder-agent";
 import { modelKey, resolveReasoningEffort } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ type ProjectConfigDialogProps = {
   error?: string | null;
   projectCreated?: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateProject: (params: ProjectPersistentAgentConfig) => Promise<void>;
+  onCreateProject: (params: ProjectRoderAgentConfig) => Promise<void>;
 };
 
 export function ProjectConfigDialog(props: ProjectConfigDialogProps): React.JSX.Element | null {
@@ -111,10 +111,10 @@ function ProjectConfigForm({
     >
       <DialogContent className="max-w-2xl" showCloseButton={!creating}>
         <DialogHeader>
-          <DialogTitle>Add project persistent agent</DialogTitle>
+          <DialogTitle>Add project Roder</DialogTitle>
           <DialogDescription>
-            Give this project a persistent agent thread and a mission. It keeps the same conversation and durable
-            memory, and starts paused until you enable it in Persistent Agents.
+            Give this project a Roder thread and a mission. It keeps the same conversation and durable memory, and
+            starts paused until you enable it in Roders.
           </DialogDescription>
         </DialogHeader>
 
@@ -211,7 +211,7 @@ function ProjectConfigForm({
               required
               disabled={creating}
               rows={3}
-              placeholder="What should this persistent agent keep moving forward?"
+              placeholder="What should this Roder keep moving forward?"
               className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-base font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
@@ -243,8 +243,8 @@ function ProjectConfigForm({
           </fieldset>
           {projectCreated ? (
             <p className="text-sm font-normal text-muted-foreground">
-              Your project and thread are already created. Retry to finish persistent agent setup without creating
-              another conversation.
+              Your project and thread are already created. Retry to finish Roder setup without creating another
+              conversation.
             </p>
           ) : null}
           {error ? (
@@ -262,11 +262,7 @@ function ProjectConfigForm({
               variant="accent"
               disabled={creating || folders.length === 0 || !mission.trim() || !selectedModel}
             >
-              {creating
-                ? "Creating…"
-                : projectCreated
-                  ? "Retry persistent agent setup"
-                  : "Create project persistent agent"}
+              {creating ? "Creating…" : projectCreated ? "Retry Roder setup" : "Create project Roder"}
             </Button>
           </DialogFooter>
         </form>
