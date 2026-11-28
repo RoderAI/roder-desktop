@@ -36,7 +36,7 @@ export const issuesIpc = {
     workspaceId: string;
     name: string;
     description?: string;
-    persistentAgentThreadId?: string | null;
+    roderThreadId?: string | null;
   }) => window.roderDesktop.request("desktop/projects/ensureWorkspace", params) as Promise<{ project: IssueProject }>,
   updateProject: (params: Partial<IssueProject> & { id: string }) =>
     window.roderDesktop.request("desktop/projects/update", params) as Promise<{ project: IssueProject }>,

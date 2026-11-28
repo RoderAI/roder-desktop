@@ -12,12 +12,12 @@ import { mergedCommandDescriptors } from "@/lib/native-commands";
 import type { NativeCommandOutput } from "@/lib/native-command-formatters";
 import { runNativeCommandInvocation, type LocalTranscriptOffset } from "@/lib/native-command-router";
 import { roderIpc } from "@/lib/roder-ipc";
-import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
+import { roderAgentsIpc } from "@/lib/roder-agents-ipc";
 import {
-  createProjectPersistentAgent,
-  type ProjectPersistentAgentConfig,
+  createProjectRoderAgent,
+  type ProjectRoderAgentConfig,
   type CreatedProjectThread,
-} from "@/lib/project-persistent-agent";
+} from "@/lib/project-roder-agent";
 import { useRoderStore } from "@/stores/roder-store";
 import { commandInvocation, slashCommandLikeText, type CommandInvocation } from "@/lib/roder-commands";
 import { useThemeApplication } from "@/hooks/use-theme-application";
@@ -166,8 +166,8 @@ export function useAppShellController(): AppShellController {
   const threadOptions = useMemo(() => buildThreadOptions(threads, activeWorkspaceCwd), [activeWorkspaceCwd, threads]);
   const followBottom = useCallback(() => setFollowSignal((value) => value + 1), []);
   const selectThread = useCallback(
-    (threadId: string, kind?: "persistent-agent") => {
-      const remembered = kind === "persistent-agent" ? threadPanelStates.current.get(threadId) : undefined;
+    (threadId: string, kind?: "roder") => {
+      const remembered = kind === "roder" ? threadPanelStates.current.get(threadId) : undefined;
       void navigate({
         to: "/threads/$threadId",
         params: { threadId },
@@ -254,16 +254,16 @@ export function useAppShellController(): AppShellController {
     setCreatedProjectThread(null);
     setProjectConfigOpen(true);
   }, []);
-  async function createConfiguredProject(params: ProjectPersistentAgentConfig): Promise<void> {
+  async function createConfiguredProject(params: ProjectRoderAgentConfig): Promise<void> {
     if (projectCreating) return;
     setProjectCreating(true);
     setProjectCreationError(null);
     try {
-      const project = await createProjectPersistentAgent(
+      const project = await createProjectRoderAgent(
         params,
         {
           createProject: createProjectThread,
-          promote: persistentAgentsIpc.promote,
+          promote: roderAgentsIpc.promote,
           snapshot: useRoderStore.getState,
           onCreated: (project) => {
             setCreatedProjectThread(project);

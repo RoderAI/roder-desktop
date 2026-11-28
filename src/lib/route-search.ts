@@ -20,7 +20,7 @@ export const workspacePanelValues = [
   "review",
   "files",
   "subagents",
-  "persistentAgent",
+  "roderAgent",
 ] as const;
 export const pluginProviderValues = ["all", "anthropic", "cursor", "codex", "local"] as const;
 export const reviewScopeValues = ["thread", "turn", "branch"] as const;
@@ -123,7 +123,7 @@ export function workspacePanelForThreadSelection(
   }
   // An agent's settings tab belongs to that thread, not the next one.
   return normalizeWorkspacePanelState(
-    (current.panelTabs ?? []).filter((tab) => tab !== "persistentAgent"),
+    (current.panelTabs ?? []).filter((tab) => tab !== "roderAgent"),
     current.panelActive ?? null,
     current.panelOpen,
   );

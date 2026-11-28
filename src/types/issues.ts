@@ -6,7 +6,7 @@ export type IssueProject = {
   name: string;
   description: string;
   workspaceId: string | null;
-  persistentAgentThreadId?: string | null;
+  roderThreadId?: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;

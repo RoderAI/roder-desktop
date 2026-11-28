@@ -135,10 +135,10 @@ test("notification failures do not report persisted writes as failed", async () 
 test("ensures one project per workspace across concurrent registration and restart", async () => {
   const { service, storagePath } = await setup();
   const params = {
-    workspaceId: "persistentAgent-workspace",
-    name: "PersistentAgent project",
+    workspaceId: "roderAgent-workspace",
+    name: "RoderAgent project",
     description: "Ship it",
-    persistentAgentThreadId: "persistentAgent-thread",
+    roderThreadId: "roderAgent-thread",
   };
   const results = await Promise.all(
     Array.from({ length: 20 }, () => service.request("desktop/projects/ensureWorkspace", params)),
@@ -153,52 +153,50 @@ test("ensures one project per workspace across concurrent registration and resta
   );
 });
 
-test("workspace registration preserves existing project edits and archive state while linking its persistentAgent", async () => {
+test("workspace registration preserves existing project edits and archive state while linking its Roder", async () => {
   const { service, project } = await setup();
   await service.request("desktop/projects/update", { id: project.id, archived: true, description: "Keep my notes" });
   const { project: registered } = await service.request("desktop/projects/ensureWorkspace", {
     workspaceId: "ws-1",
     name: "New workspace name",
     description: "New mission",
-    persistentAgentThreadId: "persistentAgent-1",
+    roderThreadId: "roderAgent-1",
   });
   expect(registered).toMatchObject({
     id: project.id,
     name: "Desktop",
     archived: true,
     description: "Keep my notes",
-    persistentAgentThreadId: "persistentAgent-1",
+    roderThreadId: "roderAgent-1",
   });
   const { project: unchanged } = await service.request("desktop/projects/ensureWorkspace", {
     workspaceId: "ws-1",
     name: "Ignored",
   });
-  expect(unchanged.persistentAgentThreadId).toBe("persistentAgent-1");
+  expect(unchanged.roderThreadId).toBe("roderAgent-1");
   const { project: cleared } = await service.request("desktop/projects/update", {
     id: project.id,
-    persistentAgentThreadId: null,
+    roderThreadId: null,
   });
-  expect(cleared.persistentAgentThreadId).toBeNull();
+  expect(cleared.roderThreadId).toBeNull();
   await expect(
     service.request("desktop/projects/ensureWorkspace", { workspaceId: " ", name: "Invalid" }),
   ).rejects.toThrow("workspaceId must be a non-empty string");
 });
 
-test("schema one projects without persistentAgent metadata load and register without losing issues", async () => {
+test("schema one projects without Roder metadata load and register without losing issues", async () => {
   const { service, storagePath, project } = await setup();
   await service.request("desktop/issues/create", { projectId: project.id, title: "Existing issue" });
   const legacy = JSON.parse(await readFile(storagePath, "utf8"));
-  delete legacy.projects[0].persistentAgentThreadId;
+  delete legacy.projects[0].roderThreadId;
   await writeFile(storagePath, JSON.stringify(legacy));
   const restarted = new IssuesService({ storagePath });
-  expect(
-    (await restarted.request("desktop/projects/read", { id: project.id })).project.persistentAgentThreadId,
-  ).toBeNull();
+  expect((await restarted.request("desktop/projects/read", { id: project.id })).project.roderThreadId).toBeNull();
   const result = await restarted.request("desktop/projects/ensureWorkspace", {
     workspaceId: "ws-1",
     name: "Desktop",
-    persistentAgentThreadId: "promoted-thread",
+    roderThreadId: "promoted-thread",
   });
-  expect(result.project).toMatchObject({ id: project.id, persistentAgentThreadId: "promoted-thread" });
+  expect(result.project).toMatchObject({ id: project.id, roderThreadId: "promoted-thread" });
   expect((await restarted.request("desktop/issues/list", { projectId: project.id })).issues).toHaveLength(1);
 });

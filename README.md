@@ -55,7 +55,7 @@ Installers are on [roder.sh/desktop](https://roder.sh/desktop/) and on the [GitH
 3. **Add a project.** Choose the folder agents should work in.
 4. **Send your first message.** Start the agent and watch it work in the transcript.
 
-## Configure Roder and create persistent agents from chat
+## Configure Roder and create Roders from chat
 
 Ask Roder to configure itself, or invoke `$roder-config`. Desktop provides the
 `desktop_config` tool for live runtime settings, provider/model defaults, skill
@@ -65,17 +65,17 @@ Credential changes and arbitrary Electron preferences are not exposed through
 this tool. Executable MCP integrations require explicit approval; restart-only
 settings are reported as such.
 
-Ask, for example, "Create a persistent agent named Release Watcher to monitor
-this project's releases," or invoke `$persistent-agent`. The model asks for
-missing name/mission details and calls `persistent_agent_create` in the current
+Ask, for example, "Create a Roder named Release Watcher to monitor
+this project's releases," or invoke `$roder`. The model asks for
+missing name/mission details and calls `roder_create` in the current
 workspace. A different existing workspace can be selected by `workspaceName`
-or `workspaceId`; `persistent_agent_workspaces` lists available workspaces
+or `workspaceId`; `roder_workspaces` lists available workspaces
 (separate from issue projects). Unused optional fields may be omitted or left
 blank. An explicit provider/model pair can be supplied. No creation dialog is
 required. A multi-repository mission does not automatically configure access
 or monitoring for those repositories.
 
-The persistent-agent skill is bundled into Desktop and supplied to the model in
+The Roder skill is bundled into Desktop and supplied to the model in
 every chat turn, including workspaces without this repository's `.agents` files.
 New agents are persisted **paused**; creation does not enable proactive work or
 start a run. Proactive execution requires enablement and a running Desktop app.

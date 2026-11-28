@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useMountEffect } from "@/hooks/use-mount-effect";
-import { PersistentAgentAvatar } from "@/components/persistent-agent-avatar";
+import { RoderAgentAvatar } from "@/components/roder-agent-avatar";
 import { SidebarUpdateButton } from "@/components/sidebar-update-button";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -29,9 +29,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
+import { roderAgentsIpc } from "@/lib/roder-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
-import type { PersistentAgent } from "@/types/persistent-agents";
+import type { RoderAgent } from "@/types/roder-agents";
 import { Link } from "@tanstack/react-router";
 import { useId, useReducer, useRef, useState } from "react";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
@@ -47,7 +47,7 @@ import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 import { readArchivedSidebarProjects, setSidebarProjectArchived } from "@/lib/sidebar-project-archive";
 import { readSidebarThreadNames, renameSidebarThread } from "@/lib/sidebar-thread-names";
 
-export function filterPersistentAgents<T extends Pick<PersistentAgent, "name" | "mission" | "workspaceId">>(
+export function filterRoderAgents<T extends Pick<RoderAgent, "name" | "mission" | "workspaceId">>(
   agents: T[],
   query: string,
   workspaces: { id: string; name: string }[],
@@ -132,14 +132,14 @@ export function SidebarSearchField({
 }
 
 type AppSidebarProps = {
-  persistentAgentsState: ReturnType<typeof useSidebarPersistentAgents>;
+  roderAgentsState: ReturnType<typeof useSidebarRoderAgents>;
   threads: RoderThread[];
   activeThreadId: string;
-  activeView: "chat" | "plugins" | "threads" | "issues" | "persistentAgents";
+  activeView: "chat" | "plugins" | "threads" | "issues" | "roders";
   hasMoreThreads: boolean;
   loadingMoreThreads: boolean;
   reserveTitlebarSpace: boolean;
-  onSelectThread: (threadId: string, kind?: "persistent-agent") => void;
+  onSelectThread: (threadId: string, kind?: "roder") => void;
   onArchiveThread: (threadId: string) => void;
   onLoadMoreThreads: () => void;
   onNewProject: () => void;
@@ -150,7 +150,7 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({
-  persistentAgentsState,
+  roderAgentsState,
   threads,
   activeThreadId,
   activeView,
@@ -172,14 +172,14 @@ export function AppSidebar({
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [threadSearch, dispatchThreadSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
   const {
-    persistentAgents,
-    error: persistentAgentsError,
-    loading: persistentAgentsLoading,
-    refresh: refreshPersistentAgents,
-  } = persistentAgentsState;
+    roderAgents,
+    error: roderAgentsError,
+    loading: roderAgentsLoading,
+    refresh: refreshRoderAgents,
+  } = roderAgentsState;
   const subagentTracesByThread = useRoderStore((state) => state.subagentTracesByThread);
   const cloudMachines = useCloudMachinesStore((state) => state.machines);
-  const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents, subagentTracesByThread);
+  const ordinaryThreads = ordinarySidebarThreads(threads, roderAgents, subagentTracesByThread);
   const matchingThreads = ordinaryThreads.filter((thread) =>
     `${threadNames.get(thread.id) ?? thread.name ?? ""}\n${thread.preview}\n${thread.cwd}\n${thread.runner?.providerId ?? ""}\n${thread.runner?.workspace ?? ""}`
       .toLowerCase()
@@ -297,13 +297,13 @@ export function AppSidebar({
         onViewportScroll={handleThreadListScroll}
       >
         <div className="flex flex-col gap-4">
-          <PersistentAgentLinks
-            persistentAgents={persistentAgents}
-            error={persistentAgentsError}
-            loading={persistentAgentsLoading}
-            onRetry={() => void refreshPersistentAgents()}
+          <RoderAgentLinks
+            roderAgents={roderAgents}
+            error={roderAgentsError}
+            loading={roderAgentsLoading}
+            onRetry={() => void refreshRoderAgents()}
             activeThreadId={activeView === "chat" ? activeThreadId : ""}
-            activeManagement={activeView === "persistentAgents"}
+            activeManagement={activeView === "roders"}
             onSelectThread={onSelectThread}
           />
           <section aria-label="Projects" className="space-y-1">
@@ -688,8 +688,8 @@ function RenameSidebarThreadDialog({
   );
 }
 
-export function useSidebarPersistentAgents() {
-  const [persistentAgents, setPersistentAgents] = useState<PersistentAgent[]>([]);
+export function useSidebarRoderAgents() {
+  const [roderAgents, setRoderAgents] = useState<RoderAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const refreshRef = useRef<() => Promise<void>>(async () => undefined);
@@ -701,9 +701,9 @@ export function useSidebarPersistentAgents() {
       revision = revision + 1;
       const request = revision;
       try {
-        const result = await persistentAgentsIpc.list();
+        const result = await roderAgentsIpc.list();
         if (mounted && request === revision) {
-          setPersistentAgents(result.persistentAgents);
+          setRoderAgents(result.roders);
           setError(null);
           setLoading(false);
         }
@@ -716,7 +716,7 @@ export function useSidebarPersistentAgents() {
     }
     refreshRef.current = refresh;
     const unsubscribe = roderIpc.onNotification((notification) => {
-      if (notification.method === "desktop/persistent-agents/changed") void refresh();
+      if (notification.method === "desktop/roders/changed") void refresh();
     });
     void refresh();
     return () => {
@@ -724,11 +724,11 @@ export function useSidebarPersistentAgents() {
       unsubscribe();
     };
   });
-  return { persistentAgents, error, loading, refresh: () => refreshRef.current() };
+  return { roderAgents, error, loading, refresh: () => refreshRef.current() };
 }
 
-function PersistentAgentLinks({
-  persistentAgents,
+function RoderAgentLinks({
+  roderAgents,
   error,
   loading,
   onRetry,
@@ -736,27 +736,27 @@ function PersistentAgentLinks({
   activeManagement,
   onSelectThread,
 }: {
-  persistentAgents: PersistentAgent[];
+  roderAgents: RoderAgent[];
   error: string | null;
   loading: boolean;
   onRetry: () => void;
   activeThreadId: string;
   activeManagement: boolean;
-  onSelectThread: (threadId: string, kind?: "persistent-agent") => void;
+  onSelectThread: (threadId: string, kind?: "roder") => void;
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(true);
   const [search, dispatchSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
   const workspaces = useRoderStore((state) => state.workspaces);
   const listId = useId();
-  const filtered = filterPersistentAgents(persistentAgents, search.query, workspaces);
+  const filtered = filterRoderAgents(roderAgents, search.query, workspaces);
   return (
-    <section aria-label="Persistent Agents">
+    <section aria-label="Roders">
       <div className="flex h-7 items-center gap-1 text-sidebar-heading">
         <button
           type="button"
           aria-expanded={expanded}
           aria-controls={listId}
-          aria-label={expanded ? "Collapse persistent agents" : "Expand persistent agents"}
+          aria-label={expanded ? "Collapse Roders" : "Expand Roders"}
           className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-sidebar-active/20 focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => {
             setExpanded(!expanded);
@@ -771,7 +771,7 @@ function PersistentAgentLinks({
         </button>
         <h2 className="min-w-0 flex-1 text-base font-medium">
           <Link
-            to="/persistent-agents"
+            to="/roders"
             search={{ create: undefined }}
             aria-current={activeManagement ? "page" : undefined}
             className={cn(
@@ -779,13 +779,13 @@ function PersistentAgentLinks({
               activeManagement && "bg-sidebar-active/20 text-sidebar-active-foreground",
             )}
           >
-            <span className="truncate">Persistent Agents</span>
-            <span className="ml-auto text-sm text-sidebar-muted">{persistentAgents.length}</span>
+            <span className="truncate">Roders</span>
+            <span className="ml-auto text-sm text-sidebar-muted">{roderAgents.length}</span>
           </Link>
         </h2>
         <button
           type="button"
-          aria-label={search.open ? "Close persistent agent search" : "Search persistent agents"}
+          aria-label={search.open ? "Close Roder search" : "Search Roders"}
           aria-expanded={search.open}
           className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => {
@@ -796,10 +796,10 @@ function PersistentAgentLinks({
           <Search className="size-4" />
         </button>
         <Link
-          to="/persistent-agents"
+          to="/roders"
           search={{ create: true }}
-          aria-label="Add persistent agent"
-          title="Add persistent agent"
+          aria-label="Add Roder"
+          title="Add Roder"
           className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-sidebar-active/25 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Plus className="size-4" />
@@ -808,45 +808,41 @@ function PersistentAgentLinks({
       <div id={listId} hidden={!expanded} className="mt-1 space-y-1">
         <SidebarSearchField
           search={search}
-          label="Search persistent agents"
+          label="Search Roders"
           onChange={(query) => dispatchSearch({ type: "query", query })}
           onClose={() => dispatchSearch({ type: "close" })}
         />
         <div className="space-y-0.5">
-          {filtered.map((persistentAgent) => (
+          {filtered.map((roderAgent) => (
             <SidebarRowButton
-              key={persistentAgent.id}
+              key={roderAgent.id}
               className={cn(
                 "h-11 focus-visible:ring-2 focus-visible:ring-ring",
-                persistentAgent.threadId === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
+                roderAgent.threadId === activeThreadId && "bg-sidebar-active/20 text-sidebar-active-foreground",
               )}
-              onClick={() => onSelectThread(persistentAgent.threadId, "persistent-agent")}
+              onClick={() => onSelectThread(roderAgent.threadId, "roder")}
             >
-              <PersistentAgentAvatar id={persistentAgent.id} sprite={persistentAgent.sprite} />
-              <span className="min-w-0 flex-1" title={persistentAgent.mission}>
-                <span className="block truncate">{persistentAgent.name}</span>
-                <span className="block truncate text-sm font-normal text-sidebar-muted">{persistentAgent.mission}</span>
+              <RoderAgentAvatar id={roderAgent.id} sprite={roderAgent.sprite} />
+              <span className="min-w-0 flex-1" title={roderAgent.mission}>
+                <span className="block truncate">{roderAgent.name}</span>
+                <span className="block truncate text-sm font-normal text-sidebar-muted">{roderAgent.mission}</span>
               </span>
             </SidebarRowButton>
           ))}
         </div>
-        {loading && !persistentAgents.length ? (
+        {loading && !roderAgents.length ? (
           <p role="status" className="px-2.5 text-sm text-sidebar-muted">
-            Loading persistent agents…
+            Loading Roders…
           </p>
         ) : null}
         {!loading && !error && !filtered.length ? (
           <div className="px-2.5 text-sm text-sidebar-muted">
-            {persistentAgents.length ? (
-              "No matching persistent agents"
-            ) : (
-              <p>No persistent agents yet. Use + to add one.</p>
-            )}
+            {roderAgents.length ? "No matching Roders" : <p>No Roders yet. Use + to add one.</p>}
           </div>
         ) : null}
         {error ? (
           <p role="alert" className="px-2.5 py-1 text-sm text-destructive">
-            Couldn’t load persistent agents: {error}{" "}
+            Couldn’t load Roders: {error}{" "}
             <button
               type="button"
               className="rounded-md underline focus-visible:ring-2 focus-visible:ring-ring"

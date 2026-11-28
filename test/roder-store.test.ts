@@ -275,7 +275,7 @@ test("Full access can be saved as the app default without a model or changing an
   expect(store.getState().selectedPolicyMode).toBe("bypass");
 });
 
-test("external persistentAgent promotion refreshes cached model controls without losing the active transcript", async () => {
+test("external Roder promotion refreshes cached model controls without losing the active transcript", async () => {
   const cached: RoderThread = {
     id: "thread-1",
     preview: "Project",

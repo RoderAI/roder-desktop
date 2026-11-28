@@ -31,8 +31,8 @@ const ExtensionsPanel = lazy(() =>
 const FilePanel = lazy(() => import("@/components/file-panel").then((m) => ({ default: m.FilePanel })));
 const ReviewPanel = lazy(() => import("@/components/review-panel").then((m) => ({ default: m.ReviewPanel })));
 const SubagentsPanel = lazy(() => import("@/components/subagents-panel").then((m) => ({ default: m.SubagentsPanel })));
-const PersistentAgentPanel = lazy(() =>
-  import("@/components/persistent-agent-panel").then((m) => ({ default: m.PersistentAgentPanel })),
+const RoderAgentPanel = lazy(() =>
+  import("@/components/roder-agent-panel").then((m) => ({ default: m.RoderAgentPanel })),
 );
 
 function PanelFallback(): React.JSX.Element {
@@ -94,7 +94,7 @@ export function rightWorkspacePanelEntriesForThread(agentId: string | null): Rig
   return agentId
     ? [
         {
-          id: "persistentAgent",
+          id: "roderAgent",
           title: "Agent settings",
           description: "Memory, schedules, budgets, and run controls",
           icon: <Settings2 />,
@@ -105,7 +105,7 @@ export function rightWorkspacePanelEntriesForThread(agentId: string | null): Rig
 }
 
 export type RightWorkspacePanelRenderContext = {
-  persistentAgentId?: string | null;
+  roderAgentId?: string | null;
   active: boolean;
   appServerMethods: string[];
   activeThreadId: string;
@@ -141,10 +141,8 @@ export function renderRightWorkspacePanel(
 }
 
 function renderPanelContent(panel: RouteWorkspacePanel, context: RightWorkspacePanelRenderContext): React.ReactNode {
-  if (panel === "persistentAgent") {
-    return context.persistentAgentId ? (
-      <PersistentAgentPanel key={context.persistentAgentId} agentId={context.persistentAgentId} />
-    ) : null;
+  if (panel === "roderAgent") {
+    return context.roderAgentId ? <RoderAgentPanel key={context.roderAgentId} agentId={context.roderAgentId} /> : null;
   }
   if (panel === "terminal") {
     return (

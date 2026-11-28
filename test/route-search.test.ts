@@ -12,15 +12,15 @@ import {
   workspacePanelForThreadSelection,
 } from "../src/lib/route-search";
 
-test("returning to a persistent agent restores its selected tab without changing sidebar visibility", () => {
+test("returning to a Roder restores its selected tab without changing sidebar visibility", () => {
   const current = { panelTabs: ["browser"], panelActive: "browser", panelOpen: true } as const;
-  const remembered = { panelTabs: ["persistentAgent", "files"], panelActive: "files", panelOpen: false } as const;
+  const remembered = { panelTabs: ["roderAgent", "files"], panelActive: "files", panelOpen: false } as const;
 
   expect(workspacePanelForThreadSelection(current, remembered)).toEqual({ ...remembered, panelOpen: true });
 });
 
-test("returning to a persistent agent cannot reopen a collapsed sidebar", () => {
-  const remembered = { panelTabs: ["persistentAgent"], panelActive: "persistentAgent", panelOpen: true } as const;
+test("returning to a Roder cannot reopen a collapsed sidebar", () => {
+  const remembered = { panelTabs: ["roderAgent"], panelActive: "roderAgent", panelOpen: true } as const;
 
   expect(workspacePanelForThreadSelection({ panelOpen: false }, remembered)).toEqual({
     ...remembered,
@@ -31,8 +31,8 @@ test("returning to a persistent agent cannot reopen a collapsed sidebar", () => 
 test("first visits preserve sidebar visibility and don't carry over another agent's settings tab", () => {
   expect(
     workspacePanelForThreadSelection({
-      panelTabs: ["persistentAgent", "files"],
-      panelActive: "persistentAgent",
+      panelTabs: ["roderAgent", "files"],
+      panelActive: "roderAgent",
       panelOpen: false,
     }),
   ).toEqual({ panelTabs: ["files"], panelActive: "files", panelOpen: false });

@@ -71,10 +71,8 @@ export class IssuesService {
       text(project.name, "name", true);
       text(project.description, "description");
       nullableText(project.workspaceId, "workspaceId");
-      project.persistentAgentThreadId =
-        project.persistentAgentThreadId === undefined
-          ? null
-          : nullableText(project.persistentAgentThreadId, "persistentAgentThreadId");
+      project.roderThreadId =
+        project.roderThreadId === undefined ? null : nullableText(project.roderThreadId, "roderThreadId");
       if (typeof project.archived !== "boolean") throw new Error("Invalid project archive state");
     }
     const projectIds = new Set(db.projects.map((project) => project.id));
@@ -140,17 +138,14 @@ export class IssuesService {
           : p.workspaceId === undefined
             ? null
             : nullableText(p.workspaceId, "workspaceId");
-      const persistentAgentThreadId =
-        p.persistentAgentThreadId === undefined
-          ? null
-          : nullableText(p.persistentAgentThreadId, "persistentAgentThreadId");
+      const roderThreadId = p.roderThreadId === undefined ? null : nullableText(p.roderThreadId, "roderThreadId");
       if (method === "desktop/projects/ensureWorkspace") {
         const existing =
           db.projects.find((project) => project.workspaceId === workspaceId && !project.archived) ??
           db.projects.find((project) => project.workspaceId === workspaceId);
         if (existing) {
-          if (p.persistentAgentThreadId !== undefined && existing.persistentAgentThreadId !== persistentAgentThreadId) {
-            existing.persistentAgentThreadId = persistentAgentThreadId;
+          if (p.roderThreadId !== undefined && existing.roderThreadId !== roderThreadId) {
+            existing.roderThreadId = roderThreadId;
             existing.updatedAt = now;
             await this.save(db);
           }
@@ -162,7 +157,7 @@ export class IssuesService {
         name,
         description,
         workspaceId,
-        persistentAgentThreadId,
+        roderThreadId,
         archived: false,
         createdAt: now,
         updatedAt: now,
@@ -176,8 +171,7 @@ export class IssuesService {
       if (p.name !== undefined) project.name = text(p.name, "name", true);
       if (p.description !== undefined) project.description = text(p.description, "description");
       if (p.workspaceId !== undefined) project.workspaceId = nullableText(p.workspaceId, "workspaceId");
-      if (p.persistentAgentThreadId !== undefined)
-        project.persistentAgentThreadId = nullableText(p.persistentAgentThreadId, "persistentAgentThreadId");
+      if (p.roderThreadId !== undefined) project.roderThreadId = nullableText(p.roderThreadId, "roderThreadId");
       if (p.archived !== undefined) {
         if (typeof p.archived !== "boolean") throw new Error("archived must be a boolean");
         project.archived = p.archived;

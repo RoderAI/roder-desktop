@@ -45,8 +45,8 @@ export function installNativeFixture(): void {
     hostName: "Storybook",
     async request(method) {
       switch (method) {
-        case "desktop/persistent-agents/list":
-          return { persistentAgents: [] };
+        case "desktop/roders/list":
+          return { roders: [] };
         case "desktop/projects/list":
           return { projects: [] };
         case "desktop/issues/list":

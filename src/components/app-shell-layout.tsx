@@ -13,8 +13,8 @@ import {
   type LayoutChangedMeta,
   type PanelSize,
 } from "react-resizable-panels";
-import { AppSidebar, useSidebarPersistentAgents } from "@/components/app-sidebar";
-import { PersistentAgentThreadContext } from "@/components/app-shell-context";
+import { AppSidebar, useSidebarRoderAgents } from "@/components/app-sidebar";
+import { RoderAgentThreadContext } from "@/components/app-shell-context";
 import { FileSearchDialog } from "@/components/file-search-dialog";
 import { ProjectConfigDialog } from "@/components/project-config-dialog";
 import { ProjectPickerDialog } from "@/components/project-picker-dialog";
@@ -42,7 +42,7 @@ import {
   type FilePanelIndexedPath,
   type FilePanelSelectionIntent,
 } from "@/lib/file-panel";
-import type { ProjectPersistentAgentConfig } from "@/lib/project-persistent-agent";
+import type { ProjectRoderAgentConfig } from "@/lib/project-roder-agent";
 import { toolPanelWidthBounds, type RouteReviewScope, type RouteWorkspacePanel } from "@/lib/route-search";
 import { useExtensionsStore } from "@/stores/extensions-store";
 import type { FolderOption } from "@/lib/workspace-thread-options";
@@ -102,7 +102,7 @@ export type AppShellLayoutProps = {
   onArchiveThread: (threadId: string) => void;
   onLoadMoreThreads: () => void;
   onAttachToComposer: (attachment: DesktopAttachment) => void;
-  onCreateProject: (params: ProjectPersistentAgentConfig) => Promise<void>;
+  onCreateProject: (params: ProjectRoderAgentConfig) => Promise<void>;
   onFileSearchOpenChange: (open: boolean) => void;
   onFileSearchSelect: (indexedPath: FilePanelIndexedPath) => void;
   onProjectConfigOpenChange: (open: boolean) => void;
@@ -121,7 +121,7 @@ export type AppShellLayoutProps = {
   onRestart: () => void;
   onSelectExtension: (extensionId: string) => void;
   onSelectFolder: (path: string) => void;
-  onSelectThread: (threadId: string, kind?: "persistent-agent") => void;
+  onSelectThread: (threadId: string, kind?: "roder") => void;
   onSelectWorkspacePanel: (panel: RouteWorkspacePanel) => void;
   onSelectedExtensionPanelChange: (extensionPanel: string) => void;
   onReviewPathChange: (path: string) => void;
@@ -196,13 +196,12 @@ export function AppShellLayout({
   onSendPrompt,
   onToggleSidebar,
 }: AppShellLayoutProps): React.JSX.Element {
-  const persistentAgentsState = useSidebarPersistentAgents();
-  const persistentAgentId =
-    persistentAgentsState.persistentAgents.find((agent) => agent.threadId === activeThreadId)?.id ?? null;
-  const panelEntries = rightWorkspacePanelEntriesForThread(persistentAgentId);
+  const roderAgentsState = useSidebarRoderAgents();
+  const roderAgentId = roderAgentsState.roderAgents.find((agent) => agent.threadId === activeThreadId)?.id ?? null;
+  const panelEntries = rightWorkspacePanelEntriesForThread(roderAgentId);
   const useWindowTopBar = window.roderDesktop.platform !== "darwin";
   const isFullPageRoute = fullPageRoute !== null;
-  const fullPageTitle = fullPageRoute === "persistentAgents" ? "Persistent Agents" : fullPageRoute;
+  const fullPageTitle = fullPageRoute === "roders" ? "Roders" : fullPageRoute;
   const workspacePanelRequested = shouldRenderWorkspacePanel({ isPluginsRoute: isFullPageRoute, workspacePanelOpen });
   const extensions = useExtensionsStore((state) => state.extensions);
   const extensionSidebarVisible = !isFullPageRoute && getSidebarExtensions(extensions).length > 0;
@@ -444,7 +443,7 @@ export function AppShellLayout({
         style={{ width: sidebarWidth }}
       >
         <AppSidebar
-          persistentAgentsState={persistentAgentsState}
+          roderAgentsState={roderAgentsState}
           threads={threads}
           activeThreadId={activeThreadId}
           activeView={fullPageRoute ?? "chat"}
@@ -499,9 +498,9 @@ export function AppShellLayout({
               </div>
             ) : null}
             <div className="min-h-0 flex-1 overflow-hidden">
-              <PersistentAgentThreadContext value={persistentAgentId !== null}>
+              <RoderAgentThreadContext value={roderAgentId !== null}>
                 <Outlet />
-              </PersistentAgentThreadContext>
+              </RoderAgentThreadContext>
             </div>
           </>
         ) : (
@@ -569,7 +568,7 @@ export function AppShellLayout({
         renderPanel={(entry, state) =>
           renderRightWorkspacePanel(entry.id, {
             active: state.active,
-            persistentAgentId,
+            roderAgentId,
             appServerMethods: status.appServerMethods ?? [],
             activeThreadId,
             activeWorkspaceCwd,

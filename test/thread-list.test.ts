@@ -71,7 +71,7 @@ test("approval and input flags are waiting, not working", () => {
 test("management routes are full pages, but actual threads remain chat routes", () => {
   expect(fullPageRouteForPathname("/threads/")).toBe("threads");
   expect(fullPageRouteForPathname("/issues")).toBe("issues");
-  expect(fullPageRouteForPathname("/persistent-agents")).toBe("persistentAgents");
+  expect(fullPageRouteForPathname("/roders")).toBe("roders");
   expect(fullPageRouteForPathname("/plugins/explore")).toBe("plugins");
   expect(fullPageRouteForPathname("/threads/real-id")).toBeNull();
 });

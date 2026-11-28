@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   createImageGenerationCredentials,
   configureImageGenerationKey,
-} from "../electron/persistent-agents/image-credentials";
+} from "../electron/roder-agents/image-credentials";
 const directories: string[] = [];
 afterEach(async () => {
   for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true });
