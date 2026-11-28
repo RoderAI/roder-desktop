@@ -69,10 +69,11 @@ change.
 - Create: only in `backlog` or `todo`; `todo` needs `doneCriteria`; the owner
   can't be the user.
 - Update: `done` and `cancelled` only through `close`; `in_review` needs a
-  linked pull request; `in_progress` needs a linked thread, or a child issue in
-  progress; `needs_you` and a user owner only through `askUser`; moving out of
-  `backlog` needs `doneCriteria`; a non-empty `doneCriteria` can be edited but
-  not cleared.
+  linked pull request; `in_progress` needs a linked thread, past or present, or
+  a child issue in progress; `needs_you` and a user owner only through
+  `askUser`; moving out of `backlog` needs `doneCriteria`; a non-empty
+  `doneCriteria` can be edited but not cleared. The evidence for `in_review` and
+  `in_progress` is checked only when the status changes into them.
 - Launch: refused on a closed issue, even one a thread still owns.
 
 Operations for every actor:
@@ -86,6 +87,9 @@ Operations for every actor:
   issue. Refused on a closed issue.
 - `close {id, outcome, note}`: `merged` moves the issue to `done` and needs a
   linked pull request; `dropped` moves it to `cancelled`. The note is required.
+  Closing an issue that is already `done` or `cancelled` changes nothing.
+- `delete {id}` removes the issue. Each child loses its `parent` and records
+  that in its activity.
 
 In the UI, changing only the status into `needs_you` makes you the owner, and
 changing it out of `needs_you` hands the issue back the same way a comment does.

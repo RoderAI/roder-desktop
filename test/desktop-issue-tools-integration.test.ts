@@ -57,11 +57,13 @@ test("engine-issued desktop tool calls manage the same persisted issues the UI r
       requestId: `request-${++next}`,
       call: { name: "issues_update", arguments: { id: other.id, status: "done" } },
     });
-    expect(replies.at(-1)).toMatchObject({ isError: true });
-    expect((await reloaded.request("desktop/issues/read", { id: other.id })).issue.activity[0].actor).toEqual({
-      type: "thread",
-      threadId: "agent-thread",
+    expect(replies.at(-1)).toMatchObject({
+      isError: true,
+      output: expect.stringContaining("close issues with issues_close (outcome merged or dropped, plus a note)"),
     });
+    const { issue: unchanged } = await reloaded.request("desktop/issues/read", { id: other.id });
+    expect(unchanged.status).toBe("backlog");
+    expect(unchanged.activity[0].actor).toEqual({ type: "thread", threadId: "agent-thread" });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

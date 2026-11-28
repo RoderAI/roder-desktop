@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
+  issueOutcomes,
   issuePriorities,
   issueStatuses,
   type Issue,
@@ -518,25 +519,30 @@ export class IssuesService {
     }
     if (method === "desktop/issues/close") {
       const issue = issueById();
-      const outcome = oneOf(p.outcome, ["merged", "dropped"] as const, "outcome");
+      const outcome = oneOf(p.outcome, issueOutcomes, "outcome");
       const note = text(p.note, "note", true, 8_192);
+      // A closed issue is history: closing it again changes nothing.
+      if (terminal(issue.status)) return { issue };
       if (outcome === "merged" && !issue.pullRequests.length)
         throw new Error("link the merged pull request before closing the issue as merged");
       const status = outcome === "merged" ? "done" : "cancelled";
-      const changes: IssueChange[] =
-        issue.status === status ? [] : [{ field: "status", before: issue.status, after: status }];
+      const changes: IssueChange[] = [{ field: "status", before: issue.status, after: status }];
       issue.status = status;
-      record(issue, {
-        kind: "closed",
-        text: `${outcome === "merged" ? "Merged" : "Dropped"} · ${note}`,
-        ...(changes.length ? { changes } : {}),
-      });
+      record(issue, { kind: "closed", text: `${outcome === "merged" ? "Merged" : "Dropped"} · ${note}`, changes });
       return issueResult(issue);
     }
     if (method === "desktop/issues/delete") {
       const issue = issueById();
       db.issues = db.issues.filter((item) => item.id !== issue.id);
-      for (const child of db.issues) if (child.parent === issue.id) child.parent = null;
+      for (const child of db.issues) {
+        if (child.parent !== issue.id) continue;
+        child.parent = null;
+        record(child, {
+          kind: "updated",
+          text: "Parent issue deleted",
+          changes: [{ field: "parent", before: issue.id, after: null }],
+        });
+      }
       await this.save(db);
       return { deleted: true };
     }

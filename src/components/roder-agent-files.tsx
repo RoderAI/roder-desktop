@@ -254,13 +254,15 @@ export function RoderAgentFiles({
             <Button
               variant="outline"
               disabled={working || !dirty}
-              onClick={() =>
+              onClick={() => {
                 setDrafts((previous) => {
                   const next = { ...previous };
                   delete next[selected];
                   return next;
-                })
-              }
+                });
+                setConflict(null);
+                setError(null);
+              }}
             >
               Discard changes
             </Button>
