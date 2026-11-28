@@ -14,7 +14,7 @@ test.skipIf(process.env.RODER_DESKTOP_LIVE_CLAUDE !== "1")(
     const directory = await mkdtemp(join(tmpdir(), "roder-desktop-live-"));
     const config = join(directory, "config");
     await mkdir(config);
-    await writeFile(join(config, "config.toml"), '[policy_modes]\ndefault = "bypass"\n');
+    await writeFile(join(config, "config.toml"), '[policy_modes]\ndefault = "plan"\n');
     await writeFile(join(directory, "sample.txt"), "RODER_DESKTOP_CLAUDE_OK\n");
     Object.defineProperty(process, "resourcesPath", { value: directory, configurable: true });
     const notify = vi.fn<(event: { method: string; params: unknown }) => void>();
@@ -56,6 +56,8 @@ test.skipIf(process.env.RODER_DESKTOP_LIVE_CLAUDE !== "1")(
       }, wait);
       expect(result.turn.usage?.total_tokens).toBeGreaterThan(0);
       expect(event<{ workingStatus: string }>("turn/progress")?.workingStatus).toContain("…");
+      const idleFrame = (await manager.handleRequest(backend, "thread/terminal/read", identity)) as { lines: string[] };
+      expect(idleFrame.lines.some((line) => line.includes("bypass permissions on"))).toBe(true);
       for (const [command, heading] of [
         ["workflows", "Dynamic workflows"],
         ["tasks", "Background"],

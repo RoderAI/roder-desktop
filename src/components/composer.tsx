@@ -212,7 +212,9 @@ export function Composer({
         .join("|"),
     [skills],
   );
-  skillsRef.current = skills;
+  useLayoutEffect(() => {
+    skillsRef.current = skills;
+  }, [skills]);
 
   useEffect(() => {
     if (focusSignal > 0) {
