@@ -40,6 +40,7 @@ test("engine-issued desktop tool calls manage the same persisted issues the UI r
     const { issue } = await call("issues_create", {
       projectId: project.id,
       title: "Fix regression",
+      doneCriteria: "The regression test passes",
       owner: { type: "thread", threadId: "agent-thread" },
     });
     await call("issues_update", { id: issue.id, status: "in_progress", description: "Verified the fix" });

@@ -116,6 +116,31 @@ const refusals: Case[] = [
     }),
   },
   {
+    name: "move out of backlog without doneCriteria",
+    refusal: "add doneCriteria: what must be true for this issue to be done",
+    call: async ({ create }) => ({
+      method: "desktop/issues/update",
+      params: { id: (await create()).id, status: "todo" },
+    }),
+  },
+  {
+    name: "move to blocked without doneCriteria",
+    refusal: "add doneCriteria: what must be true for this issue to be done",
+    call: async ({ create }) => ({
+      method: "desktop/issues/update",
+      params: { id: (await create()).id, status: "blocked" },
+    }),
+  },
+  {
+    name: "launch a closed issue a thread still owns",
+    refusal: "reopen the issue before starting work",
+    call: async ({ service, create }) => {
+      const issue = await create({ owner: { type: "thread", threadId: "old-thread" } });
+      await service.request("desktop/issues/close", { id: issue.id, outcome: "dropped", note: "Moot" }, user);
+      return { method: "desktop/issues/launch", params: { id: issue.id } };
+    },
+  },
+  {
     name: "clear doneCriteria",
     refusal: "keep the issue's doneCriteria; edit it rather than clearing it",
     call: async ({ create }) => ({
@@ -160,7 +185,7 @@ test("agents move issues forward once the evidence exists", async () => {
 
 test("a parent issue is in_progress while one of its children is", async () => {
   const { service, create } = await setup();
-  const parent = await create({ title: "Request" });
+  const parent = await create({ title: "Request", doneCriteria: "Every part ships" });
   const child = await create({ title: "Part", parent: parent.id });
   await expect(
     service.request("desktop/issues/update", { id: parent.id, status: "in_progress" }, agent),
@@ -344,4 +369,47 @@ test("a person moving the status alone moves the owner with it", async () => {
     user,
   );
   expect(back).toMatchObject({ owner: { type: "roder" }, status: "todo" });
+});
+
+test("agents fill in doneCriteria and then move the issue out of backlog", async () => {
+  const { service, create } = await setup();
+  const issue = await create();
+  const { issue: todo } = await service.request(
+    "desktop/issues/update",
+    { id: issue.id, status: "todo", doneCriteria: "Tests pass" },
+    agent,
+  );
+  expect(todo).toMatchObject({ status: "todo", doneCriteria: "Tests pass" });
+});
+
+test("the user's launch of a closed issue a thread owns opens that thread", async () => {
+  const { service, create } = await setup();
+  const issue = await create({ owner: { type: "thread", threadId: "old-thread" } });
+  await service.request("desktop/issues/close", { id: issue.id, outcome: "dropped", note: "Moot" }, user);
+  const result = await service.request("desktop/issues/launch", { id: issue.id }, user);
+  expect(result).toMatchObject({ threadId: "old-thread", issue: { status: "cancelled" } });
+});
+
+test("an issue with children can't move to another project until they are moved or detached", async () => {
+  const { service, create } = await setup();
+  const { project: other } = await service.request("desktop/projects/create", { name: "Other" }, user);
+  const parent = await create({ title: "Request" });
+  const child = await create({ title: "Part", parent: parent.id });
+  for (const actor of [agent, user] as IssueActor[])
+    await expect(
+      service.request("desktop/issues/update", { id: parent.id, projectId: other.id }, actor),
+    ).rejects.toThrow("move or detach this issue's child issues before moving it to another project");
+  expect((await service.request("desktop/issues/read", { id: parent.id })).issue.projectId).not.toBe(other.id);
+  await service.request("desktop/issues/update", { id: child.id, parent: null }, user);
+  const { issue: moved } = await service.request("desktop/issues/update", { id: parent.id, projectId: other.id }, user);
+  expect(moved.projectId).toBe(other.id);
+});
+
+test("owners carry a threadId exactly when the owner is a thread", async () => {
+  const { service, create } = await setup();
+  const issue = await create();
+  for (const owner of [{ type: "roder", threadId: "x" }, { type: "user", threadId: "x" }, { type: "thread" }])
+    await expect(service.request("desktop/issues/update", { id: issue.id, owner }, user)).rejects.toThrow(
+      /owner must be|owner threadId/,
+    );
 });

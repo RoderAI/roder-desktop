@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMountEffect } from "@/hooks/use-mount-effect";
-import { groupIssues, issuesIpc, useIssuesStore } from "@/lib/issues-ipc";
+import { groupIssues, issueSaveFields, issuesIpc, ownerKey, useIssuesStore } from "@/lib/issues-ipc";
 import { useRoderStore } from "@/stores/roder-store";
 import {
   issuePriorities,
@@ -20,9 +20,6 @@ import type { RoderThread, Workspace } from "@/types/roder";
 const controlClass =
   "h-8 rounded-lg border border-input bg-background px-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const statusLabel = (status: string) => status.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase());
-const ownerKey = (owner: IssueOwner) => (owner.type === "thread" ? `thread:${owner.threadId}` : owner.type);
-const ownerFromKey = (key: string): IssueOwner =>
-  key.startsWith("thread:") ? { type: "thread", threadId: key.slice(7) } : { type: key === "user" ? "user" : "roder" };
 const threadName = (threads: RoderThread[], id: string) => {
   const thread = threads.find((item) => item.id === id);
   return thread?.name || thread?.preview || id;
@@ -327,17 +324,10 @@ function IssueEditor({
     setBusy(true);
     setError(null);
     try {
-      const fields = {
-        title,
-        description,
-        projectId,
-        status,
-        priority,
-        owner: ownerFromKey(owner),
-        doneCriteria,
-        outOfScope,
-        parent: parent || null,
-      };
+      const fields = issueSaveFields(
+        { title, description, projectId, status, priority, owner, doneCriteria, outOfScope, parent },
+        { isNew: !issue, issues },
+      );
       const saved = issue
         ? await issuesIpc.updateIssue({ id: issue.id, ...fields })
         : await issuesIpc.createIssue(fields);
@@ -419,7 +409,11 @@ function IssueEditor({
             required
             className={`${controlClass} w-full`}
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
+            onChange={(event) => {
+              // Parents live in the same project, so a move clears the parent.
+              if (event.target.value !== projectId) setParent("");
+              setProjectId(event.target.value);
+            }}
           >
             {projects.map((item) =>
               !item.archived || item.id === projectId ? (

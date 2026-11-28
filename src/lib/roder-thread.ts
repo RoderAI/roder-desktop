@@ -816,6 +816,12 @@ function toolDetailOutput(toolName: string, detailOutput: string, descriptive = 
   if (!detailOutput) {
     return undefined;
   }
+  if (toolName === "Read") {
+    const result = toolInputRecord(detailOutput);
+    if (result.type === "text" && isRecord(result.file) && typeof result.file.content === "string") {
+      return result.file.content;
+    }
+  }
   if (isShellToolName(toolName) || descriptive) {
     const cleaned = stripShellHarnessMetadata(detailOutput);
     return cleaned || undefined;
@@ -845,8 +851,15 @@ function summarizeTool(
 ): string {
   const canonicalName = canonicalToolName(toolName);
   if (canonicalName === "read_file") {
-    const path = firstString(payload.path, payload.file, input.path, input.file);
+    const path = readFilePath(input, payload);
     return path ? toolActionSummary(status, "Read", "Reading", "Failed to read", basename(path)) : "";
+  }
+
+  if (toolName === "Agent") {
+    const name = firstString(input.description);
+    const subject = name ? `subagent ${name}` : "subagent";
+    const completed = input.run_in_background === true ? "Started" : "Ran";
+    return toolActionSummary(status, completed, "Running", "Failed to run", subject);
   }
 
   if (canonicalName === "read_skill") {
@@ -1056,7 +1069,7 @@ function toolSubject(
 ): string | undefined {
   const canonicalName = canonicalToolName(toolName);
   if (canonicalName === "read_file") {
-    const path = firstString(payload.path, payload.file, input.path, input.file);
+    const path = readFilePath(input, payload);
     return path ? basename(path) : undefined;
   }
   if (canonicalName === "read_skill") {
@@ -1370,6 +1383,10 @@ function basename(path: string): string {
 
 function toolSkillName(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
   return firstString(payload.displayName, payload.name, payload.skill, input.displayName, input.name, input.skill);
+}
+
+function readFilePath(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {
+  return firstString(payload.path, payload.file, input.path, input.file, input.file_path);
 }
 
 function toolPath(input: Record<string, unknown>, payload: Record<string, unknown>): string | undefined {

@@ -58,10 +58,13 @@ test("a thread that is not a Roder can file, take, report on and close an issue"
     const { issues } = await service.request("desktop/issues/list", { status: "done", threadId: "origin-thread" });
     expect(issues).toHaveLength(1);
     expect(issues[0].description).toBe("Investigating");
-    expect(issues[0].activity.map((entry) => entry.actor)).toContainEqual({
-      type: "thread",
-      threadId: "origin-thread",
-    });
+    // Every entry the tools wrote is attributed to the calling thread.
+    expect(issues[0].activity.map((entry) => [entry.kind, entry.actor])).toEqual(
+      ["created", "updated", "comment", "pullRequest", "updated", "closed"].map((kind) => [
+        kind,
+        { type: "thread", threadId: "origin-thread" },
+      ]),
+    );
     await expect(call("issues_ask_user", { id: issue.id, question: "Reopen?" })).rejects.toThrow("reopen the issue");
   } finally {
     await rm(directory, { recursive: true, force: true });

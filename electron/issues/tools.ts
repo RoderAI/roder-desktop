@@ -4,11 +4,16 @@ import type { IssuesService } from "./service";
 const string = { type: "string" };
 const nullableString = { type: ["string", "null"] };
 const status = { type: "string", enum: issueStatuses };
+// Flat rather than oneOf: not every provider's function-calling schema accepts
+// oneOf, and no other desktop tool uses it. The service enforces the variants.
 const owner = {
   type: "object",
   description:
-    'Who holds the issue: {type: "roder"} (the project\'s Roder), {type: "thread", threadId} (a thread doing the work, which also links it), or {type: "user"} (agents hand over with issues_ask_user instead).',
-  properties: { type: { type: "string", enum: ["roder", "thread", "user"] }, threadId: string },
+    'Who holds the issue, one of: {type: "roder"} (the project\'s Roder), {type: "thread", threadId} (a thread doing the work, which also links it), or {type: "user"} (agents hand over with issues_ask_user instead). threadId is required for thread and not allowed otherwise.',
+  properties: {
+    type: { type: "string", enum: ["roder", "thread", "user"] },
+    threadId: { type: "string", description: 'Required when type is "thread"; omit it for "roder" and "user".' },
+  },
   required: ["type"],
   additionalProperties: false,
 };

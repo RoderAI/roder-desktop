@@ -101,6 +101,32 @@ test("thread snapshots derive messages from canonical typed items only", () => {
   ]);
 });
 
+test("Claude Read shows the filename and readable file content", () => {
+  const [message] = messagesFromTurn(
+    "thread-1",
+    turn(
+      [
+        tool(
+          "read",
+          "Read",
+          { file_path: "/workspace/sample.txt" },
+          "completed",
+          JSON.stringify({
+            type: "text",
+            file: { filePath: "/workspace/sample.txt", content: "line one\nline two", numLines: 2 },
+          }),
+        ),
+      ],
+      "completed",
+    ),
+  );
+  expect(message).toMatchObject({
+    toolSummary: "Read sample.txt",
+    toolSubject: "sample.txt",
+    toolOutput: "line one\nline two",
+  });
+});
+
 test("typed tool execution items summarize input and output", () => {
   const messages = messagesFromTurn(
     "thread-1",
@@ -112,6 +138,18 @@ test("typed tool execution items summarize input and output", () => {
   expect(messages[0].toolName).toBe("list_files");
   expect(messages[0].toolSummary).toBe("Listed files in .");
   expect(messages[0].toolOutput).toBe("src\nCargo.toml");
+});
+
+test("Claude Agent shows its description while keeping launch metadata in the details", () => {
+  const output = JSON.stringify({ isAsync: true, status: "async_launched", description: "Desktop menu probe" });
+  const [message] = messagesFromTurn(
+    "thread-1",
+    turn(
+      [tool("agent", "Agent", { description: "Desktop menu probe", run_in_background: true }, "completed", output)],
+      "completed",
+    ),
+  );
+  expect(message).toMatchObject({ toolSummary: "Started subagent Desktop menu probe", toolOutput: output });
 });
 
 test("routing decision items hydrate as timeline tool messages", () => {

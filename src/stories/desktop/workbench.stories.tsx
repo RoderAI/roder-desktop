@@ -26,6 +26,7 @@ function WorkbenchShell() {
   const [panel, setPanel] = useState<RouteWorkspacePanel>("browser");
   const [tabs, setTabs] = useState<RouteWorkspacePanel[]>(["browser"]);
   const [projectOpen, setProjectOpen] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
   function openPanel(next: RouteWorkspacePanel) {
     setTabs((current) => (current.includes(next) ? current : [...current, next]));
@@ -66,6 +67,8 @@ function WorkbenchShell() {
       selectedExtensionId={null}
       selectedExtensionPanelId={null}
       initialWorkspacePanelWidth={toolPanelWidthBounds.defaultValue}
+      projectPickerOpen={projectPickerOpen}
+      projectPickerInitialPath="/storybook"
       projectConfigOpen={projectOpen}
       projectCreating={false}
       projectInitialFolders={[workspacePath]}
@@ -81,9 +84,14 @@ function WorkbenchShell() {
       onFileSearchOpenChange={noop}
       onFileSearchSelect={noop}
       onProjectConfigOpenChange={setProjectOpen}
+      onProjectPickerOpenChange={setProjectPickerOpen}
+      onPickProjectFolder={() => {
+        setProjectPickerOpen(false);
+        setProjectOpen(true);
+      }}
       onCloseWorkspacePanel={(next) => setTabs((current) => current.filter((tab) => tab !== next))}
       onCloseWorkspacePanelShell={() => setPanelOpen(false)}
-      onNewProject={() => setProjectOpen(true)}
+      onNewProject={() => setProjectPickerOpen(true)}
       onNewThread={noop}
       onNewThreadInFolder={noop}
       onOpenPlugins={noop}

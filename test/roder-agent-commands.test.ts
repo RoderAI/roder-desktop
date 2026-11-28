@@ -291,6 +291,13 @@ test("every action reaches its service, acting as the Roder", async () => {
 
   // The agent lifecycle still applies, with errors that name roder_command actions.
   const other = (await command(todo("Docs"))).issue!;
+  const idea = (await command({ type: "createIssue", details: { title: "Idea" } })).issue!;
+  await expect(command({ type: "editIssue", issueId: idea.id, details: { status: "todo" } })).rejects.toThrow(
+    "add doneCriteria: what must be true for this issue to be done",
+  );
+  await expect(
+    command({ type: "editIssue", issueId: idea.id, details: { owner: { type: "roder", threadId: "x" } } }),
+  ).rejects.toThrow(/owner must be/);
   await expect(command({ type: "editIssue", issueId: other.id, details: { status: "in_review" } })).rejects.toThrow(
     "link the pull request with roder_command linkIssuePullRequest before moving the issue to in_review",
   );

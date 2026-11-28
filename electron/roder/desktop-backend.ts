@@ -1,5 +1,5 @@
-export type AgentBackendId = "roder" | "codex" | "antigravity";
-export type ExternalAgentBackendId = "codex" | "antigravity";
+import type { ExternalAgentBackendId } from "../../src/types/roder";
+export type { AgentBackendId, ExternalAgentBackendId } from "../../src/types/roder";
 
 export const antigravitySetupSession = "setup:antigravity";
 export const codexSetupSession = "setup:codex";
@@ -33,7 +33,7 @@ export async function prepareExternalBackendCatalog<T extends BackendClient>(
     };
     const models = (result?.models ?? []).filter((model) => Boolean(model?.id) && model.modelProvider === backend);
     if (models.length === 0) {
-      const label = backend === "codex" ? "Codex" : "Antigravity";
+      const label = backend === "codex" ? "Codex" : backend === "claude-code" ? "Claude Code" : "Antigravity";
       throw new Error(`No ${label} models are available for this account.`);
     }
     return { client: candidate, models };
