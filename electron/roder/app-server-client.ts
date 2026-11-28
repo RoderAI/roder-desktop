@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { type ChildProcessWithoutNullStreams, execFile, spawn } from "node:child_process";
 import { app } from "electron";
+import { DESKTOP_POLICY_MODE } from "./desktop-turn-policy";
 
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
@@ -346,7 +347,13 @@ export class RoderAppServerClient extends EventEmitter {
     const binary = resolveEmbeddedRoderBinary();
     return {
       command: binary,
-      args: ["app-server", "--listen", "stdio://", ...(this.backend ? ["--backend", this.backend] : [])],
+      args: [
+        "app-server",
+        "--listen",
+        "stdio://",
+        ...(this.backend ? ["--backend", this.backend] : []),
+        ...(this.backend === "claude-code" ? ["--mode", DESKTOP_POLICY_MODE] : []),
+      ],
       cwd: process.cwd(),
       label: binary,
     };
