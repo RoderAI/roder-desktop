@@ -5,7 +5,10 @@ export type RoderAgent = {
   /** One-line summary for lists. It mirrors the opening paragraph of INSTRUCTIONS.md once that is written. */
   mission: string;
   workspaceId: string;
+  /** The thread the Roder talks in now. */
   threadId: string;
+  /** Threads it talked in before a fresh conversation, oldest first. They stay readable. */
+  previousThreadIds: string[];
   modelProvider?: string;
   model?: string;
   reasoning?: string;
@@ -20,6 +23,57 @@ export type RoderAgent = {
   lastError: string | null;
   lastRunAt: number | null;
   sprite: RoderAgentSprite | null;
+  /** Worker threads running at once (1-32); more delegates wait in the queue. */
+  maxConcurrentWorkers: number;
+  /** Automatic messages a worker takes before the Roder must ask the user (0-32). */
+  maxFollowups: number;
+  /** Permission mode for worker turns (decision D7). */
+  workerPolicyMode: RoderWorkerPolicyMode;
+  workers: RoderWorker[];
+  /** Worker deliveries not yet made, oldest first. */
+  outbox: RoderWorkerDelivery[];
+};
+
+export const roderWorkerPolicyModes = ["bypass", "accept_all", "default"] as const;
+export type RoderWorkerPolicyMode = (typeof roderWorkerPolicyModes)[number];
+
+/**
+ * A thread doing work for a Roder in its own git worktree.
+ * - `queued`: delegated, waiting for a free slot to start its objective.
+ * - `running`: a turn is in progress; it holds one of `maxConcurrentWorkers`.
+ * - `idle`: its last turn ended; messageWorker sends it more work.
+ */
+export type RoderWorkerState = "queued" | "running" | "idle";
+export type RoderWorker = {
+  threadId: string;
+  /** The issue it was delegated, if any. */
+  issueId: string | null;
+  objective: string;
+  /** Its checkout, on `branch` made from `base`. */
+  worktreePath: string;
+  branch: string;
+  base: string;
+  state: RoderWorkerState;
+  /** Place in the delegate queue, 1 starts next. Null unless waiting for a slot. */
+  queuePosition: number | null;
+  /** Automatic messages since the user last spoke to it. */
+  followups: number;
+  /** Who stopped it: the user's stop needs the user before automatic messages resume. */
+  hold: "user" | "roder" | null;
+  delegatedAt: number;
+  lastError: string | null;
+};
+export type RoderWorkerDelivery = {
+  id: string;
+  threadId: string;
+  kind: "start" | "message" | "stop";
+  text: string;
+  createdAt: number;
+  /** `sending` survives a crash mid-delivery so it is checked, not sent twice. */
+  phase: "pending" | "sending";
+  /** The thread's turn count before sending, to tell whether a `sending` delivery arrived. */
+  turnsBefore: number | null;
+  attempts: number;
 };
 
 /** The five reserved files every Roder has, in display order. */
@@ -45,7 +99,18 @@ export type RoderAgentCreate = Pick<
 >;
 export type RoderAgentPromote = RoderAgentCreate & { threadId: string };
 export type RoderAgentUpdate = Partial<
-  Pick<RoderAgent, "name" | "enabled" | "intervalMinutes" | "eventMethods" | "maxRunsPerDay" | "maxRunMinutes">
+  Pick<
+    RoderAgent,
+    | "name"
+    | "enabled"
+    | "intervalMinutes"
+    | "eventMethods"
+    | "maxRunsPerDay"
+    | "maxRunMinutes"
+    | "maxConcurrentWorkers"
+    | "maxFollowups"
+    | "workerPolicyMode"
+  >
 > & { id: string };
 export type RoderFileWrite = { id: string; path: RoderFilePath; content: string; expectedVersion: number };
 export type RoderFileRestore = { id: string; path: RoderFilePath; version: number; expectedVersion: number };

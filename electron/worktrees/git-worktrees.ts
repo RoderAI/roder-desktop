@@ -82,11 +82,52 @@ export class GitWorktrees {
     };
   }
 
-  createForThread(cwd: string, onProgress: (step: WorktreeCheckoutStep) => void): Promise<LocalWorktree> {
-    return this.create(cwd, `roder-thread-${randomUUID()}`, onProgress);
+  createForThread(
+    cwd: string,
+    onProgress: (step: WorktreeCheckoutStep) => void,
+    options: { branch?: string; base?: string } = {},
+  ): Promise<LocalWorktree> {
+    return this.create(cwd, options.branch ?? `roder-thread-${randomUUID()}`, onProgress, options.base);
   }
 
-  async create(cwd: string, branch: string, onProgress?: (step: WorktreeCheckoutStep) => void): Promise<LocalWorktree> {
+  /**
+   * The repository's default branch at origin (`origin/HEAD`, else
+   * `origin/main` or `origin/master`), fetched first when the remote is
+   * reachable. A repository without an origin falls back to `HEAD`.
+   */
+  async defaultBase(cwd: string): Promise<string> {
+    const remotes = (await git(cwd, "remote")).split(/\r?\n/);
+    if (!remotes.includes("origin")) return "HEAD";
+    const head = (await git(cwd, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD").catch(() => ""))
+      .trim()
+      .replace(/^refs\/remotes\//, "");
+    // Best effort, and only the default branch when it's known: an offline or
+    // slow remote still leaves the last fetched copy.
+    await git(cwd, "fetch", "--quiet", "--no-tags", "origin", ...(head ? [head.slice("origin/".length)] : [])).catch(
+      () => {},
+    );
+    const candidates = [head, "origin/main", "origin/master"].filter(Boolean);
+    for (const candidate of candidates) if (await this.commit(cwd, candidate).catch(() => null)) return candidate;
+    return "HEAD";
+  }
+
+  /** The commit a base ref names; rejects anything that isn't one. */
+  async commit(cwd: string, base: string): Promise<string> {
+    if (typeof base !== "string" || !base || base.startsWith("-") || base.length > 200 || /[\0\s]/.test(base))
+      throw new Error(`Base ${JSON.stringify(base)} is not a Git branch, tag or commit.`);
+    try {
+      return (await git(cwd, "rev-parse", "--verify", "--quiet", `${base}^{commit}`)).trim();
+    } catch {
+      throw new Error(`Base ${JSON.stringify(base)} is not a Git branch, tag or commit in this repository.`);
+    }
+  }
+
+  async create(
+    cwd: string,
+    branch: string,
+    onProgress?: (step: WorktreeCheckoutStep) => void,
+    base = "HEAD",
+  ): Promise<LocalWorktree> {
     if (typeof branch !== "string" || !branch || branch.startsWith("-") || branch.length > 200) {
       throw new Error("Enter a valid new Git branch name.");
     }
@@ -98,11 +139,13 @@ export class GitWorktrees {
     const { currentPath, worktrees } = await this.list(cwd);
     const primary = worktrees.find((entry) => entry.primary);
     if (!currentPath || !primary) throw new Error("Open a local Git repository with a primary checkout first.");
+    const start = await this.commit(currentPath, base);
     const directory = this.managedDirectory(primary.path);
     await mkdir(directory, { recursive: true });
     const path = join(directory, `worktree-${randomUUID()}`);
     onProgress?.("checking-out");
-    await git(currentPath, "worktree", "add", "-b", branch, "--", path, "HEAD");
+    // `--no-track`: the new branch is the thread's own, not a tracking copy of its base.
+    await git(currentPath, "worktree", "add", "--no-track", "-b", branch, "--", path, start);
     return this.resolve(cwd, path);
   }
 
