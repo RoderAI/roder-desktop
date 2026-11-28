@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useRoderStore } from "@/stores/roder-store";
 import type { AgentBackendId, AgentBackendStatus } from "@/types/roder";
 
-const BACKEND_ORDER: readonly AgentBackendId[] = ["roder", "codex", "antigravity"];
+export const BACKEND_ORDER: readonly AgentBackendId[] = ["roder", "claude-code", "codex", "antigravity"];
 
 export function AgentBackendPicker({ disabled = false }: { disabled?: boolean }): React.JSX.Element {
   const activeBackend = useRoderStore((state) => state.activeBackend) ?? "roder";
@@ -129,7 +129,8 @@ export function BackendIcon({ backend }: { backend: AgentBackendId }): React.JSX
   return <ProviderLogo provider={backend} />;
 }
 
-function backendDisplayName(backend: AgentBackendId): string {
+export function backendDisplayName(backend: AgentBackendId): string {
+  if (backend === "claude-code") return "Claude Code";
   if (backend === "codex") return "Codex";
   if (backend === "antigravity") return "Antigravity";
   return "Roder";
@@ -141,8 +142,10 @@ function backendSubtitle(backend: AgentBackendId, info: AgentBackendStatus | und
   }
   if (info?.connected) {
     const count = info.modelCount;
-    return `${backend === "codex" ? "Codex CLI" : "Antigravity CLI"} · ${count} ${count === 1 ? "model" : "models"}`;
+    return `${backendDisplayName(backend)} CLI · ${count} ${count === 1 ? "model" : "models"}`;
   }
+  if (backend === "claude-code")
+    return info?.runtimeInstalled ? "Claude CLI found · click to connect" : "Install and sign in to Claude Code";
   if (info?.runtimeInstalled) {
     return backend === "codex" ? "Codex CLI found · click to connect" : "agy CLI found · sign in with Google";
   }

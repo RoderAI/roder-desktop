@@ -212,7 +212,9 @@ export function Composer({
         .join("|"),
     [skills],
   );
-  skillsRef.current = skills;
+  useLayoutEffect(() => {
+    skillsRef.current = skills;
+  }, [skills]);
 
   useEffect(() => {
     if (focusSignal > 0) {
@@ -735,6 +737,7 @@ export function Composer({
               </Button>
               <AgentBackendPicker disabled={busy || persistentAgentThread} />
               <ModelPicker
+                disabled={Boolean(activeThreadId) && activeBackend === "claude-code"}
                 models={models}
                 routingOptions={routingOptions}
                 selectedModel={selectedModel}

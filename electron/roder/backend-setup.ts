@@ -123,6 +123,9 @@ export class BackendSetupController {
   }
 
   async start(backend: ExternalAgentBackendId, options: { forceInstall?: boolean } = {}): Promise<BackendSetupState> {
+    if (backend === "claude-code") {
+      throw new Error("Install Claude Code, then run claude auth login in a terminal and check the connection.");
+    }
     this.#cancelInternal(false);
     const generation = ++this.#generation;
     const abortController = new AbortController();

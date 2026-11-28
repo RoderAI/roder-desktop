@@ -3,6 +3,19 @@ import type { BrowserSnapshot, ChromeBridgeStatus } from "@/types/roder";
 import { models, noop, noopAsync, threads, workspace } from "./fixtures";
 
 // No fixture may fall through to real IPC, navigate, or run terminal commands.
+const claudeBackendStatus = {
+  id: "claude-code",
+  name: "Claude Code",
+  description: "Interactive Claude Code CLI.",
+  state: "disconnected",
+  runtimeInstalled: false,
+  runtimePath: null,
+  connected: false,
+  modelCount: 0,
+  models: [],
+  error: null,
+} as const;
+
 export function installNativeFixture(): void {
   useRoderStore.setState({ threads, workspaces: [workspace], models, hydrated: true });
 
@@ -129,6 +142,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",
@@ -170,6 +184,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",
@@ -211,6 +226,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",
@@ -252,6 +268,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",

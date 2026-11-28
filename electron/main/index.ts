@@ -1125,10 +1125,14 @@ function getAgentBackends(): AgentBackendsManager {
     createClient: (backend) =>
       new RoderAppServerClient({
         backend,
-        getExtraEnv: () => ({
-          ...getRoderExtraEnv(),
-          ...runtimePathExtraEnv(process.env, findExternalBackendRuntime(backend)),
-        }),
+        getExtraEnv: () => {
+          const runtime = findExternalBackendRuntime(backend);
+          return {
+            ...getRoderExtraEnv(),
+            ...runtimePathExtraEnv(process.env, runtime),
+            ...(backend === "claude-code" && runtime ? { RODER_CLAUDE_CODE_CLI_PATH: runtime } : {}),
+          };
+        },
       }),
     storagePath: join(app.getPath("userData"), "agent-backends.json"),
     runLogoutCommand: (backend) =>
@@ -1810,6 +1814,9 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     if (
       owningExternalBackend &&
       (method === "thread/read" ||
+        method === "thread/resume" ||
+        method === "thread/unload" ||
+        method.startsWith("thread/terminal/") ||
         method === "turn/start" ||
         method === "turn/steer" ||
         method === "turn/interrupt" ||

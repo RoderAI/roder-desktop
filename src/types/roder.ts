@@ -440,6 +440,7 @@ export type RoderTurn = {
   completedAt?: number | null;
   durationMs?: number | null;
   usage?: RoderTokenUsage | null;
+  workingStatus?: string;
 };
 
 export type RoderItemStatus = "inProgress" | "completed" | "failed";
@@ -1274,8 +1275,8 @@ export type DesignSpawnAgentsResult = {
   instructions: string;
 };
 
-export type AgentBackendId = "roder" | "codex" | "antigravity";
-export type ExternalAgentBackendId = "codex" | "antigravity";
+export type AgentBackendId = "roder" | ExternalAgentBackendId;
+export type ExternalAgentBackendId = "codex" | "antigravity" | "claude-code";
 
 export type AgentBackendStatus = {
   id: AgentBackendId;

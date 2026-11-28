@@ -138,7 +138,11 @@ static copy into `storybook-static/`.
 
 ### The embedded harness
 
-The desktop never compiles Roder from a sibling checkout. It embeds the published `roder/v0.4.14` release tag, pinned to its immutable source revision. This includes GPT-6.2 Astra/Sol models, configurable GPT context windows, Antigravity backend support, Hopper inference, and native remote workspaces over Blaxel.
+Desktop embeds the published `roder/v0.4.26` release tag. The bundled harness includes the interactive Claude Code backend and the extensions used by Desktop.
+
+To use Claude Code, install the `claude` CLI and run `claude auth login` in a terminal. Choose **Claude Code** from the composer’s agent backend picker or in **Settings → Providers**. Claude Code runs locally in the selected workspace with Desktop’s Full access policy. In an idle Claude conversation, `/workflows` opens Dynamic Workflows, and `/tasks`, `/agents`, and `/subagents` open Claude’s Background view.
+
+To exercise the bundled sidecar with an authenticated CLI, run `RODER_DESKTOP_LIVE_CLAUDE=1 pnpm exec vitest run test/claude-code-live.test.ts`. The test uses bypass permissions in a temporary workspace.
 
 | Goal                                              | Command                              |
 | ------------------------------------------------- | ------------------------------------ |
