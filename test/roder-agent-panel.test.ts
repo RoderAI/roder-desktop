@@ -20,7 +20,7 @@ test("agent settings can be opened and restored through thread route search", ()
   expect(search.panelOpen).toBe(true);
 });
 
-test("inline editor exposes paused agent controls and memory without navigating away from chat", () => {
+test("inline editor exposes paused agent controls and files without navigating away from chat", () => {
   const agent: RoderAgentDetail = {
     id: "agent-one",
     threadId: "thread-one",
@@ -38,8 +38,14 @@ test("inline editor exposes paused agent controls and memory without navigating 
     lastError: null,
     lastRunAt: null,
     sprite: null,
-    memory: "Remember release notes",
-    memoryPath: "/agents/website.md",
+    files: (["INSTRUCTIONS.md", "AGENTS.md", "NOTES.md", "WORKERS.md", "DIGEST.md"] as const).map((path, at) => ({
+      path,
+      version: at + 1,
+      bytes: 0,
+      author: "user" as const,
+      writtenAt: 0,
+      restoredFrom: null,
+    })),
   };
   let actions = 0;
   const html = renderToStaticMarkup(
@@ -58,8 +64,13 @@ test("inline editor exposes paused agent controls and memory without navigating 
   expect(html).toContain("Proactive work is paused");
   expect(html).toContain("Enable proactive work");
   expect(html).toContain("Run once");
-  expect(html).toContain('name="memory"');
-  expect(html).toContain("Remember release notes");
+  expect(html).toContain("Roder file list");
+  for (const path of ["INSTRUCTIONS.md", "AGENTS.md", "NOTES.md", "WORKERS.md", "DIGEST.md"])
+    expect(html).toContain(path);
+  expect(html).toContain("Version 3");
+  expect(html).toContain("Save INSTRUCTIONS.md");
+  expect(html).toContain("History");
+  expect(html).not.toContain('name="mission"');
   expect(html).toContain('name="interval"');
   expect(html).toContain('name="runs"');
   expect(html).toContain('name="minutes"');
