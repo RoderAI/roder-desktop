@@ -286,9 +286,21 @@ export function ModelPicker({
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const providers = useRoderStore((state) => state.providers);
+  const activeBackend = useRoderStore((state) => state.activeBackend) ?? "roder";
   const navigate = useNavigate();
   const visibleModels: RoderModel[] = models.length > 0 ? models : [];
-  const groups = buildModelPickerGroups(visibleModels, providers, routingOptions);
+  const effectiveProviders =
+    activeBackend === "roder"
+      ? providers
+      : [
+          {
+            id: activeBackend,
+            name: activeBackend === "codex" ? "Codex" : "Antigravity",
+            authType: "none",
+            authenticated: true,
+          },
+        ];
+  const groups = buildModelPickerGroups(visibleModels, effectiveProviders, routingOptions);
   const catalogModels = groups.flatMap((group) =>
     group.items.flatMap((item) => (item.type === "auto" ? [] : [item.model])),
   );

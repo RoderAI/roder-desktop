@@ -1,7 +1,9 @@
 import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
+import { AgentBackendPicker } from "@/components/agent-backend-picker";
 import { CloudMachinePicker, ThreadExecutionMachine } from "@/components/cloud-machine-picker";
 import { WorktreePicker } from "@/components/worktree-picker";
+import { useRoderStore } from "@/stores/roder-store";
 import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
 import {
   use,
@@ -173,6 +175,7 @@ export function Composer({
   onStop,
 }: ComposerProps): React.JSX.Element {
   const persistentAgentThread = use(PersistentAgentThreadContext);
+  const activeBackend = useRoderStore((state) => state.activeBackend) ?? "roder";
   const selectedPolicyMode = persistentAgentThread ? "bypass" : requestedPolicyMode;
   const [prompt, setPrompt] = useState("");
   // Guard only, never rendered: a ref avoids a synchronous setState inside the drain effect.
@@ -725,7 +728,7 @@ export function Composer({
                 <ThreadExecutionMachine threadId={activeThreadId} />
               ) : (
                 <>
-                  <CloudMachinePicker disabled={busy} />
+                  <CloudMachinePicker disabled={busy || activeBackend !== "roder"} />
                   <WorktreePicker disabled={busy || queueBusy} />
                 </>
               )}
@@ -750,6 +753,7 @@ export function Composer({
                   <Mic className="size-3.5 @[520px]:size-4" />
                 )}
               </Button>
+              <AgentBackendPicker disabled={busy || persistentAgentThread} />
               <ModelPicker
                 models={models}
                 routingOptions={routingOptions}

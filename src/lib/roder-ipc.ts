@@ -16,6 +16,8 @@ import type {
 import type { IndexedTranscriptHistory, IndexedTranscriptPage, HistoryRange } from "@/lib/sparse-transcript-history";
 import { attachmentImageType } from "@/lib/attachment-preparation";
 import type {
+  AgentBackendId,
+  AgentBackendsSnapshot,
   CommandsListResult,
   CommandsRunResult,
   DesktopAttachment,
@@ -29,6 +31,7 @@ import type {
   DesignSpawnAgentsResult,
   DesignSnapshotLayoutResult,
   DesignVariablesResult,
+  ExternalAgentBackendId,
   FileSystemReadDirectoryResult,
   FileSystemReadFileResult,
   AgentsListResult,
@@ -93,6 +96,7 @@ export type ThreadStartOptions = {
   selection?: ModelSelectChoice;
   cloudMachineId?: string;
   worktreePath?: string;
+  agentBackend?: AgentBackendId;
 };
 
 export type ThreadStartWorkspace = {
@@ -624,6 +628,7 @@ export const roderIpc = {
         initialPrompt: options.initialPrompt || undefined,
         ...(options.cloudMachineId === undefined ? {} : { desktopCloudMachineId: options.cloudMachineId }),
         ...(options.worktreePath === undefined ? {} : { desktopWorktreePath: options.worktreePath }),
+        ...(options.agentBackend === undefined ? {} : { agentBackend: options.agentBackend }),
       })
       .then((result) => threadStartResultFromWire(result as WireThreadStartResult)) as Promise<ThreadStartResult>,
   selectProviderDefaults: (provider: string, model?: string, reasoning?: string) =>
@@ -760,13 +765,21 @@ export const roderIpc = {
       provider,
       api_key: apiKey,
     }) as Promise<ProviderConfigureResult>,
-  selectModel: (selection: ModelSelectChoice, threadId?: string) =>
+  selectModel: (selection: ModelSelectChoice, threadId?: string, agentBackend?: AgentBackendId) =>
     window.roderDesktop
       .request("model/select", {
         ...(threadId ? { threadId } : {}),
+        ...(agentBackend ? { agentBackend } : {}),
         selection: modelSelectChoiceToWire(selection),
       })
       .then((result) => modelSelectResultFromWire(result as WireModelSelectResult)) as Promise<ModelSelectResult>,
+  agentBackendsSnapshot: () => window.roderDesktop.agentBackendsSnapshot() as Promise<AgentBackendsSnapshot>,
+  selectAgentBackend: (backend: AgentBackendId) =>
+    window.roderDesktop.agentBackendsSelect(backend) as Promise<AgentBackendsSnapshot>,
+  connectAgentBackend: (backend: ExternalAgentBackendId, options?: { forceRefresh?: boolean }) =>
+    window.roderDesktop.agentBackendsConnect(backend, options) as Promise<AgentBackendsSnapshot>,
+  logoutAgentBackend: (backend: ExternalAgentBackendId) =>
+    window.roderDesktop.agentBackendsLogout(backend) as Promise<AgentBackendsSnapshot>,
   startTurn: (
     threadId: string,
     prompt: string,

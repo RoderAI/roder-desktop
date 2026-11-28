@@ -6,23 +6,27 @@ import { Button } from "@/components/ui/button";
 import { type AutoDetectedItem, groupProvidersForOnboarding } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 import { useRoderStore } from "@/stores/roder-store";
-import type { ClaudeCliStatus, EnvironmentProvider, ProviderDescriptor } from "@/types/roder";
+import type { AntigravityStatus, ClaudeCliStatus, EnvironmentProvider, ProviderDescriptor } from "@/types/roder";
 
 export function OnboardingProvidersStep({
   providers,
   claudeCli,
+  antigravityStatus = null,
   environment,
   autoDetected,
   readyProviderIds,
   onRecheckClaudeCli,
+  onRecheckAntigravity,
   onError,
 }: {
   providers: ProviderDescriptor[];
   claudeCli: ClaudeCliStatus | null;
+  antigravityStatus?: AntigravityStatus | null;
   environment: EnvironmentProvider[];
   autoDetected: AutoDetectedItem[];
   readyProviderIds: ReadonlySet<string>;
   onRecheckClaudeCli: () => Promise<void>;
+  onRecheckAntigravity?: () => Promise<AntigravityStatus>;
   onError: (message: string | null) => void;
 }): React.JSX.Element {
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
@@ -62,7 +66,9 @@ export function OnboardingProvidersStep({
                 ready={readyProviderIds.has(provider.id)}
                 environmentVar={environmentVars.get(provider.id)}
                 claudeCli={claudeCli}
+                antigravityStatus={antigravityStatus}
                 onRecheckClaudeCli={onRecheckClaudeCli}
+                onRecheckAntigravity={onRecheckAntigravity}
                 onError={onError}
               />
             ))}
@@ -88,7 +94,9 @@ export function OnboardingProvidersStep({
                       ready={readyProviderIds.has(provider.id)}
                       environmentVar={environmentVars.get(provider.id)}
                       claudeCli={claudeCli}
+                      antigravityStatus={antigravityStatus}
                       onRecheckClaudeCli={onRecheckClaudeCli}
+                      onRecheckAntigravity={onRecheckAntigravity}
                       onError={onError}
                     />
                   ))}

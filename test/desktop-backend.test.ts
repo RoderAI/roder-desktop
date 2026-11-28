@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { prepareAntigravityBackend } from "../electron/roder/desktop-backend";
+import { prepareAntigravityBackend, prepareCodexBackend } from "../electron/roder/desktop-backend";
 
 // oxlint-disable-next-line typescript/no-explicit-any -- loose signature for test doubles
 type AnyFn = (...args: any[]) => any;
@@ -35,5 +35,23 @@ describe("Antigravity backend selection", () => {
     await expect(prepareAntigravityBackend(candidate)).resolves.toBe(candidate);
     expect(candidate.request).toHaveBeenCalledWith("model/list", {});
     expect(candidate.stop).not.toHaveBeenCalled();
+  });
+
+  it("verifies the Codex agent backend and stops it if no Codex models are advertised", async () => {
+    const emptyCandidate = {
+      start: vi.fn<AnyFn>(),
+      request: vi.fn<AnyFn>().mockResolvedValue({ models: [] }),
+      stop: vi.fn<AnyFn>(),
+    };
+    await expect(prepareCodexBackend(emptyCandidate)).rejects.toThrow("No Codex models");
+    expect(emptyCandidate.stop).toHaveBeenCalledOnce();
+
+    const okCandidate = {
+      start: vi.fn<AnyFn>(),
+      request: vi.fn<AnyFn>().mockResolvedValue({ models: [{ id: "gpt-6.2-sol", modelProvider: "codex" }] }),
+      stop: vi.fn<AnyFn>(),
+    };
+    await expect(prepareCodexBackend(okCandidate)).resolves.toBe(okCandidate);
+    expect(okCandidate.stop).not.toHaveBeenCalled();
   });
 });

@@ -59,9 +59,11 @@ const requestTimeoutsMs = new Map<string, number>([
   ["settings/get", 60_000],
 ]);
 
+import type { ExternalAgentBackendId } from "./desktop-backend";
+
 export type RoderAppServerClientOptions = {
   getExtraEnv?: () => Record<string, string>;
-  backend?: "antigravity";
+  backend?: ExternalAgentBackendId;
 };
 
 export function resolveEmbeddedRoderBinary(): string {
@@ -82,7 +84,7 @@ export class RoderAppServerClient extends EventEmitter {
   #pending = new Map<number | string, PendingRequest>();
   #startPromise: Promise<RoderStatus> | null = null;
   #getExtraEnv?: () => Record<string, string>;
-  readonly backend?: "antigravity";
+  readonly backend?: ExternalAgentBackendId;
   #status: RoderStatus = {
     state: "stopped",
     binary: "unresolved",
