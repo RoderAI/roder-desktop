@@ -901,6 +901,7 @@ function getRoderAgentService(): ReturnType<typeof createRoderAgentService> {
     directory: join(app.getPath("userData"), "roders"),
     request: (method, params) => requestEngine(method, params, false),
     sprites: getSpriteManager(),
+    issues: getIssuesService(),
     notify: () => sendToRenderer("roder:notification", { method: "desktop/roders/changed", params: {} }),
   });
   return roderAgentService;
@@ -1081,7 +1082,16 @@ async function requestEngine(method: string, params: unknown, enrichRoderAgentCo
     return input.runner === undefined ? getDesktopWorktrees().startInCurrentFolder(start) : start();
   }
   if (method === "turn/start" && enrichRoderAgentContext && roderAgentService && params && typeof params === "object") {
-    params = await roderAgentService.turnStartParams(params);
+    const roderAgents = roderAgentService;
+    params = await roderAgents.turnStartParams(params);
+    try {
+      params = await applyDesktopTurnPolicy((rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams), params);
+      return await roder.request(method, params);
+    } catch (error) {
+      // The Roder's turn never started, so its next one carries the brief and the board again.
+      await roderAgents.turnStartFailed(params).catch(() => {});
+      throw error;
+    }
   }
   if (method === "turn/start") {
     params = await applyDesktopTurnPolicy((rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams), params);

@@ -24,6 +24,7 @@ test("inline editor exposes paused agent controls and files without navigating a
   const agent: RoderAgentDetail = {
     id: "agent-one",
     threadId: "thread-one",
+    previousThreadIds: [],
     workspaceId: "website",
     name: "Website guide",
     mission: "Keep the docs current",

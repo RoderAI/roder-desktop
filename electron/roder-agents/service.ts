@@ -2,23 +2,29 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { roderFilePaths, type RoderAgent, type RoderAgentDetail } from "../../src/types/roder-agents";
-import { roderAgentStrategy } from "./strategy";
+import { RODER_TURN_CONTEXT_START } from "../../src/lib/roder-turn-message";
+import { roderThreadInstructions } from "./brief";
 import {
-  RODER_FILE_MAX_BYTES,
   RODER_INSTRUCTIONS_FILE,
   RODER_NOTES_FILE,
   RODER_RULES_FILE,
   createRoderFileStore,
-  roderFilesPromptContext,
   roderInstructionsSummary,
 } from "./files";
+import { isRoderGuidePath, roderGuideFile, roderGuides, roderGuidePaths } from "./guide";
+import { composeRoderTurn, createRoderTurnLedgers } from "./turn-prompt";
 import type { createRoderAgentSpriteManager } from "./sprites";
+import { roderCommandDescription, roderCommandToolSchema } from "./actions";
+import { createRoderCommands } from "./commands";
+import type { IssuesService } from "../issues/service";
 
 type Options = {
   directory: string;
   request: (method: string, params: unknown) => Promise<unknown>;
   notify?: () => void;
   sprites?: ReturnType<typeof createRoderAgentSpriteManager>;
+  /** The issue service a Roder's issue commands go through. */
+  issues?: Pick<IssuesService, "request">;
 };
 type ObjectValue = Record<string, unknown>;
 /** The sprite manager's limit on persona name and mission text. */
@@ -60,11 +66,11 @@ export const roderAgentToolDefinitions = [
   {
     name: "roder_files",
     description:
-      "Read your Roder's versioned files: INSTRUCTIONS.md (your purpose), AGENTS.md (the user's rules; only the user edits it), NOTES.md (your notes), WORKERS.md (rules for workers) and DIGEST.md. With no path, list every file with its current version. With path, read that file, or an older version with version. With path and history: true, list its versions newest first.",
+      "Read your Roder's versioned files: INSTRUCTIONS.md (your purpose), AGENTS.md (the user's rules; only the user edits it), NOTES.md (your notes), WORKERS.md (rules for workers) and DIGEST.md, and the app's read-only guides under guide/. With no path, list every file with its current version and every guide. With path, read that file or guide, or an older version of a file with version. With path and history: true, list a file's versions newest first.",
     parameters: {
       type: "object",
       properties: {
-        path: { type: "string", enum: [...roderFilePaths] },
+        path: { type: "string", enum: [...roderFilePaths, ...roderGuidePaths] },
         version: { type: "integer", minimum: 1 },
         history: { type: "boolean" },
       },
@@ -77,16 +83,21 @@ export const roderAgentToolDefinitions = [
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
-    name: "roder_memory_write",
+    name: "roder_command",
+    description: roderCommandDescription(),
+    parameters: roderCommandToolSchema(),
+  },
+  {
+    name: "roder_issue",
     description:
-      "Replace your Roder's NOTES.md with concise decisions, facts and next steps, as a new version. Pass the version you last read as expectedVersion; a stale version is refused and the error names the current one. Preserve relevant user notes.",
+      "Read your Roder's issue board: supply roderId to get every issue (descriptions shortened, recent activity) and the current revision. Supply roderId and issueId (its id or number) to read one issue in full, including its whole description and activity.",
     parameters: {
       type: "object",
       properties: {
-        memory: { type: "string", maxLength: RODER_FILE_MAX_BYTES },
-        expectedVersion: { type: "integer", minimum: 1 },
+        roderId: { type: "string", description: "Your Roder id." },
+        issueId: { type: "string", description: "An issue id or number. Omit to read the whole board." },
       },
-      required: ["memory", "expectedVersion"],
+      required: ["roderId"],
       additionalProperties: false,
     },
   },
@@ -123,6 +134,15 @@ export const roderAgentToolDefinitions = [
   },
 ] as const;
 
+/** The thread an `item/completed` notification says was compacted, if that is what it reports. */
+function compactedThread(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const params = value as ObjectValue;
+  const event = params.event && typeof params.event === "object" ? (params.event as ObjectValue) : params;
+  const item = event.item && typeof event.item === "object" ? (event.item as ObjectValue) : null;
+  return item?.type === "compaction" && typeof params.threadId === "string" ? params.threadId : null;
+}
+
 export function createRoderAgentService(options: Options) {
   let roderAgents: RoderAgent[] = [];
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -150,6 +170,24 @@ export function createRoderAgentService(options: Options) {
     if (!c) throw new Error("Roder not found");
     return c;
   }
+  // What each Roder's thread was sent last (turn-prompt.ts).
+  const turns = createRoderTurnLedgers(join(options.directory, "turns"));
+  const commands = createRoderCommands({
+    directory: join(options.directory, "commands"),
+    files,
+    issues: options.issues,
+    async pause(c) {
+      c.enabled = false;
+      await persist();
+    },
+    async fileWritten(c, path) {
+      const mission = c.mission;
+      await syncMission(c, path);
+      if (c.mission !== mission) await persist();
+      else options.notify?.();
+    },
+    freshConversation,
+  });
   async function detail(c: RoderAgent): Promise<RoderAgentDetail> {
     return structuredClone({
       ...c,
@@ -157,15 +195,66 @@ export function createRoderAgentService(options: Options) {
       files: await files.list(c.id),
     });
   }
-  async function contextForThread(threadId: string): Promise<string | null> {
-    const c = roderAgents.find((entry) => entry.threadId === threadId);
-    if (!c) return null;
-    const context = roderFilesPromptContext({
-      instructions: await files.read(c.id, RODER_INSTRUCTIONS_FILE),
-      rules: await files.read(c.id, RODER_RULES_FILE),
-      notes: await files.read(c.id, RODER_NOTES_FILE),
+  /** The turn for `message`: the brief and the board first, afterwards only what changed. Records what was sent. */
+  async function composeTurn(c: RoderAgent, message: string, heading?: string): Promise<string> {
+    const turn = composeRoderTurn({
+      roder: c,
+      previous: await turns.read(c.id, c.threadId),
+      state: await commands.state(c),
+      files: {
+        rules: await files.read(c.id, RODER_RULES_FILE),
+        instructions: await files.read(c.id, RODER_INSTRUCTIONS_FILE),
+        notes: await files.read(c.id, RODER_NOTES_FILE),
+      },
+      message,
+      heading,
     });
-    return `${roderAgentStrategy}\n\n${context}`;
+    await turns.write(c.id, turn.ledger);
+    return turn.text;
+  }
+  /** One of the Roder's files, or one of the app's read-only guides. */
+  async function readFileOrGuide(c: RoderAgent, path: unknown, version: unknown) {
+    if (!isRoderGuidePath(path)) return files.read(c.id, path, version);
+    if (version !== undefined) throw new Error("Guides have no versions");
+    return roderGuideFile(path);
+  }
+  /**
+   * Moves the Roder to a new thread started with the current tool set. Its
+   * files, issues, budgets and wakes stay as they are; the old thread is kept
+   * in `previousThreadIds` and is never changed.
+   */
+  async function freshConversation(c: RoderAgent): Promise<string> {
+    const result = object(
+      await options.request("thread/start", {
+        workspaceId: c.workspaceId,
+        ...(c.modelProvider ? { modelProvider: c.modelProvider } : {}),
+        ...(c.model ? { model: c.model } : {}),
+        ...(c.reasoning ? { reasoning: c.reasoning } : {}),
+        ephemeral: false,
+        developerInstructions: roderThreadInstructions,
+      }),
+    );
+    const threadId = text(object(result.thread).id, "thread id", 500);
+    if (roderAgents.some((entry) => entry.threadId === threadId || entry.previousThreadIds.includes(threadId)))
+      throw new Error("The engine returned a thread a Roder already uses");
+    const previous = c.threadId;
+    // The Roder's board is the project linked to its thread, so the link moves with it.
+    if (options.issues) {
+      const { projects } = await options.issues.request("desktop/projects/list", {});
+      for (const project of projects.filter((entry) => entry.roderThreadId === previous))
+        await options.issues.request(
+          "desktop/projects/update",
+          { id: project.id, roderThreadId: threadId },
+          { type: "user" },
+        );
+    }
+    c.previousThreadIds.push(previous);
+    c.threadId = threadId;
+    // A run in the old thread no longer holds the Roder.
+    c.active = null;
+    await turns.forget(c.id);
+    await persist();
+    return threadId;
   }
   /**
    * Who the sprite is drawn from. The list `mission` can be empty (heading-only or cleared INSTRUCTIONS.md), but the
@@ -211,7 +300,6 @@ export function createRoderAgentService(options: Options) {
     const snapshot = await thread(c);
     const status = object(snapshot.status);
     if (status.type !== "idle") throw new Error("Roder thread is busy; waiting for its current turn");
-    const context = await contextForThread(c.threadId);
     let recall: unknown;
     try {
       recall = await options.request("memory/query", {
@@ -230,6 +318,11 @@ export function createRoderAgentService(options: Options) {
     c.wakes = c.wakes.filter((w) => !consumedWakes.has(w.id));
     await persist();
     try {
+      const turn = await composeTurn(
+        c,
+        `Roder wake: ${reason}\n\nNobody typed this: the app woke you. Review progress against your purpose and your board, do bounded useful work, record durable decisions in ${RODER_NOTES_FILE} with roder_command writeFile, and schedule a wake only when useful. Do not claim to run while the desktop is closed.`,
+        "Wake",
+      );
       const result = object(
         await options.request("turn/start", {
           threadId: c.threadId,
@@ -237,18 +330,15 @@ export function createRoderAgentService(options: Options) {
           ...(c.modelProvider ? { modelProvider: c.modelProvider } : {}),
           ...(c.model ? { model: c.model } : {}),
           ...(c.reasoning ? { reasoning: c.reasoning } : {}),
-          input: [
-            {
-              type: "text",
-              text: `Roder wake: ${reason}\n\nReview progress against ${RODER_INSTRUCTIONS_FILE}, do bounded useful work, record durable decisions in ${RODER_NOTES_FILE} with roder_memory_write, and schedule a wake only when useful. Do not claim to run while the desktop is closed.`,
-            },
-          ],
-          developerContext: `${context}\n\nNative memory recall:\n${JSON.stringify(recall ?? { unavailable: true })}`,
+          input: [{ type: "text", text: turn }],
+          developerContext: `Native memory recall:\n${JSON.stringify(recall ?? { unavailable: true })}`,
         }),
       );
       c.active.turnId = text(result.turnId, "turn id");
       await persist();
     } catch (error) {
+      // The turn may never have reached the thread, so its next one starts over.
+      await turns.forget(c.id).catch(() => {});
       c.lastError = `Run start is uncertain; paused for recovery: ${String(error)}`;
       c.enabled = false;
       await persist();
@@ -341,7 +431,7 @@ export function createRoderAgentService(options: Options) {
               workspaceId,
               ...choice,
               ephemeral: false,
-              developerInstructions: roderAgentStrategy,
+              developerInstructions: roderThreadInstructions,
             }),
           );
           snapshot = {
@@ -361,6 +451,7 @@ export function createRoderAgentService(options: Options) {
           mission: roderInstructionsSummary(mission),
           workspaceId,
           threadId: text(snapshot.id, "thread id"),
+          previousThreadIds: [],
           ...effectiveChoice,
           enabled: false,
           intervalMinutes: 0,
@@ -395,7 +486,7 @@ export function createRoderAgentService(options: Options) {
       }
       if (method === "desktop/roders/read") return detail(c);
       if (method === "desktop/roders/files/list") return { files: await files.list(c.id) };
-      if (method === "desktop/roders/files/read") return files.read(c.id, params.path, params.version);
+      if (method === "desktop/roders/files/read") return readFileOrGuide(c, params.path, params.version);
       if (method === "desktop/roders/files/history") return { versions: await files.history(c.id, params.path) };
       if (method === "desktop/roders/files/write" || method === "desktop/roders/files/restore") {
         const written =
@@ -449,33 +540,68 @@ export function createRoderAgentService(options: Options) {
       else if (method === "desktop/roders/compact") {
         if (c.active) throw new Error("Wait for the active run before compacting");
         const snapshot = await thread(c);
-        const turns = snapshot.turns as { id: string }[] | undefined;
-        const turnId = turns?.at(-1)?.id;
+        const turnId = (snapshot.turns as { id: string }[] | undefined)?.at(-1)?.id;
         if (!turnId) throw new Error("No turn available to compact");
-        return options.request("thread/compact", {
+        const result = await options.request("thread/compact", {
           threadId: c.threadId,
           turnId,
           ...(c.mission ? { preserveHint: c.mission } : {}),
         });
+        // The summary may have dropped the brief, so the next turn carries it again.
+        await turns.forget(c.id);
+        return result;
+      } else if (method === "desktop/roders/freshConversation") {
+        if (c.active) throw new Error("Wait for the active run, or pause it, before starting a fresh conversation");
+        // A missing thread is a reason to start a fresh one; a busy one is not.
+        const current = object(await options.request("thread/read", { threadId: c.threadId, includeTurns: false }));
+        if (current.thread && object(object(current.thread).status).type !== "idle")
+          throw new Error("Roder thread is busy; wait for its current turn before starting a fresh conversation");
+        await freshConversation(c);
       } else throw new Error(`Unknown Roder request: ${method}`);
       await persist();
       return detail(c);
     });
   }
   return {
-    contextForThread,
+    /**
+     * Wraps a turn the user starts in a Roder's thread: its text becomes the
+     * Roder turn (the brief and the board first, afterwards what changed, then
+     * the user's message). Other threads' params are returned as they are. Call
+     * `turnStartFailed` if the engine then refuses the turn.
+     */
     async turnStartParams(params: unknown): Promise<unknown> {
       if (!params || typeof params !== "object" || Array.isArray(params)) return params;
       const input = params as ObjectValue;
-      if (typeof input.threadId !== "string") return params;
-      const context = await contextForThread(input.threadId);
-      if (context === null) return params;
-      const existing = typeof input.developerContext === "string" ? input.developerContext : "";
-      return {
-        ...input,
-        policyMode: "bypass",
-        developerContext: existing ? `${context}\n\n${existing}` : context,
-      };
+      if (!roderAgents.some((entry) => entry.threadId === input.threadId)) return params;
+      return serial(async () => {
+        const c = roderAgents.find((entry) => entry.threadId === input.threadId);
+        if (!c) return params;
+        const items: unknown[] = Array.isArray(input.input) ? input.input : [];
+        const at = items.findIndex(
+          (item) => !!item && typeof item === "object" && (item as ObjectValue).type === "text",
+        );
+        const typed = at >= 0 ? (items[at] as ObjectValue).text : input.prompt;
+        const message = typeof typed === "string" ? typed : "";
+        if (message.startsWith(RODER_TURN_CONTEXT_START)) return { ...input, policyMode: "bypass" };
+        const turn = await composeTurn(c, message);
+        if (at >= 0)
+          return {
+            ...input,
+            policyMode: "bypass",
+            input: items.map((item, index) => (index === at ? { ...(item as ObjectValue), text: turn } : item)),
+          };
+        if (items.length) return { ...input, policyMode: "bypass", input: [{ type: "text", text: turn }, ...items] };
+        return { ...input, policyMode: "bypass", prompt: turn };
+      });
+    },
+    /** A turn prepared by `turnStartParams` never started: forget what it claimed to send. */
+    async turnStartFailed(params: unknown): Promise<void> {
+      const threadId = params && typeof params === "object" ? (params as ObjectValue).threadId : undefined;
+      if (!roderAgents.some((entry) => entry.threadId === threadId)) return;
+      await serial(async () => {
+        const c = roderAgents.find((entry) => entry.threadId === threadId);
+        if (c) await turns.forget(c.id);
+      });
     },
     handleRequest,
     tick,
@@ -496,8 +622,13 @@ export function createRoderAgentService(options: Options) {
             throw new Error("Invalid or duplicate Roder id");
           ids.add(c.id);
           const threadId = text(c.threadId, "thread id", 500);
-          if (threads.has(threadId)) throw new Error("Duplicate Roder thread");
-          threads.add(threadId);
+          // Roders saved before fresh conversations existed have no previous threads.
+          c.previousThreadIds ??= [];
+          if (!Array.isArray(c.previousThreadIds)) throw new Error("Invalid Roder previous threads");
+          for (const id of [threadId, ...c.previousThreadIds.map((v) => text(v, "previous thread id", 500))]) {
+            if (threads.has(id)) throw new Error("Duplicate Roder thread");
+            threads.add(id);
+          }
           text(c.name, "name", 120);
           // Empty while INSTRUCTIONS.md has no opening paragraph.
           if (typeof c.mission !== "string" || c.mission.length > 16000) throw new Error("Invalid mission");
@@ -557,6 +688,12 @@ export function createRoderAgentService(options: Options) {
       });
     },
     async onNotification(method: string, value: unknown) {
+      // The engine compacted a Roder's thread: the summary may have dropped the brief.
+      const compacted = method === "item/completed" ? compactedThread(value) : null;
+      if (compacted !== null) {
+        const c = roderAgents.find((entry) => entry.threadId === compacted);
+        if (c) await serial(() => turns.forget(c.id));
+      }
       if (method !== "turn/completed" && !roderAgents.some((c) => c.enabled && c.eventMethods.includes(method))) return;
       return serial(async () => {
         const params = object(value);
@@ -584,34 +721,37 @@ export function createRoderAgentService(options: Options) {
     async handleTool(name: string, value: unknown, context: { threadId: string }): Promise<unknown> {
       return serial(async () => {
         const c = roderAgents.find((entry) => entry.threadId === context.threadId);
-        if (!c) throw new Error("Tool requires an owning Roder thread");
+        if (!c) {
+          const moved = roderAgents.find((entry) => entry.previousThreadIds.includes(context.threadId));
+          if (moved)
+            throw new Error(
+              `This thread is a previous conversation of the Roder ${moved.name}. Its tools work only in its current thread; end your turn`,
+            );
+          throw new Error("Tool requires an owning Roder thread");
+        }
         const params = object(value);
         if (name === "roder_files") {
           if (params.path === undefined) {
             if (params.history !== undefined || params.version !== undefined)
               throw new Error("history and version need a path");
-            return { files: await files.list(c.id) };
+            return {
+              files: await files.list(c.id),
+              guides: roderGuides().map(({ path, when }) => ({ path, readOnly: true, when })),
+            };
           }
           if (params.history === true) {
+            if (isRoderGuidePath(params.path)) throw new Error("Guides have no versions");
             if (params.version !== undefined) throw new Error("Use either history or version, not both");
             return { path: params.path, versions: await files.history(c.id, params.path) };
           }
-          return files.read(c.id, params.path, params.version);
+          return readFileOrGuide(c, params.path, params.version);
         }
         if (name === "roder_memory_read") {
           const notes = await files.read(c.id, RODER_NOTES_FILE);
           return { memory: notes.content, path: notes.path, version: notes.version };
         }
-        if (name === "roder_memory_write") {
-          const written = await files.write(c.id, {
-            path: RODER_NOTES_FILE,
-            content: params.memory,
-            expectedVersion: params.expectedVersion,
-            author: "roder",
-          });
-          options.notify?.();
-          return { saved: true, path: written.path, version: written.version };
-        }
+        if (name === "roder_command") return commands.command(c, params);
+        if (name === "roder_issue") return commands.issue(c, params);
         if (name === "roder_wake_schedule") {
           schedule(c, params);
           await persist();

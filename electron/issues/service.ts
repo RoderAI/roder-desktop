@@ -27,6 +27,7 @@ export type IssuesResults = {
   "desktop/issues/update": { issue: Issue };
   "desktop/issues/comment": { issue: Issue };
   "desktop/issues/linkPullRequest": { issue: Issue };
+  "desktop/issues/unlinkPullRequest": { issue: Issue };
   "desktop/issues/askUser": { issue: Issue };
   "desktop/issues/close": { issue: Issue };
   "desktop/issues/delete": { deleted: true };
@@ -39,6 +40,13 @@ const readMethods = new Set([
   "desktop/issues/list",
   "desktop/issues/read",
 ]);
+
+/**
+ * Runs inside the service's queue, after the store is read and before the
+ * change applies, so a precondition can't be overtaken by another change.
+ * Throw to refuse; nothing is written.
+ */
+export type IssuesGuard = (issues: readonly Issue[]) => void;
 
 type Database = { version: 2; nextNumber: number; projects: IssueProject[]; issues: Issue[] };
 type Options = {
@@ -186,10 +194,15 @@ export class IssuesService {
    * Every change takes an actor: `{type: "user"}` for the person using the
    * app, `{type: "agent", threadId}` for an agent's tool call. Reads don't.
    */
-  request<M extends keyof IssuesResults>(method: M, params?: unknown, actor?: IssueActor): Promise<IssuesResults[M]>;
-  request(method: string, params?: unknown, actor?: IssueActor): Promise<unknown>;
-  request(method: string, params: unknown = {}, actor?: IssueActor): Promise<unknown> {
-    const result = this.queue.then(() => this.execute(method, params, actor));
+  request<M extends keyof IssuesResults>(
+    method: M,
+    params?: unknown,
+    actor?: IssueActor,
+    guard?: IssuesGuard,
+  ): Promise<IssuesResults[M]>;
+  request(method: string, params?: unknown, actor?: IssueActor, guard?: IssuesGuard): Promise<unknown>;
+  request(method: string, params: unknown = {}, actor?: IssueActor, guard?: IssuesGuard): Promise<unknown> {
+    const result = this.queue.then(() => this.execute(method, params, actor, guard));
     this.queue = result.catch(() => undefined);
     return result;
   }
@@ -249,12 +262,18 @@ export class IssuesService {
     }
   }
 
-  private async execute(method: string, params: unknown, rawActor: IssueActor | undefined): Promise<unknown> {
+  private async execute(
+    method: string,
+    params: unknown,
+    rawActor: IssueActor | undefined,
+    guard: IssuesGuard | undefined,
+  ): Promise<unknown> {
     if (!params || typeof params !== "object" || Array.isArray(params)) throw new Error("Expected an object");
     const p = params as Record<string, unknown>;
     const actor = readMethods.has(method) ? null : actorOf(rawActor);
     const agent = actor?.type === "agent";
     const db = await this.load();
+    guard?.(db.issues);
     const now = new Date().toISOString();
     const projectById = (id: unknown) => {
       const project = db.projects.find((item) => item.id === text(id, "project id", true));
@@ -495,6 +514,22 @@ export class IssuesService {
         kind: "pullRequest",
         text: `Linked pull request ${url}`,
         changes: [{ field: "pullRequest", before: null, after: url }],
+      });
+      return issueResult(issue);
+    }
+    if (method === "desktop/issues/unlinkPullRequest") {
+      const issue = issueById();
+      const url = pullRequestUrl(p.url);
+      if (!issue.pullRequests.some((pr) => pr.url === url)) return { issue };
+      if (agent && issue.status === "in_review" && issue.pullRequests.length === 1)
+        throw new Error(
+          "an issue in_review needs a linked pull request: move it out of in_review before unlinking its last one",
+        );
+      issue.pullRequests = issue.pullRequests.filter((pr) => pr.url !== url);
+      record(issue, {
+        kind: "pullRequest",
+        text: `Unlinked pull request ${url}`,
+        changes: [{ field: "pullRequest", before: url, after: null }],
       });
       return issueResult(issue);
     }

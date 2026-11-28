@@ -27,6 +27,20 @@ async function temporary() {
   directories.push(directory);
   return directory;
 }
+function writeNotes(roderId: string, content: string, expectedVersion: number) {
+  return {
+    commandId: randomUUID(),
+    roderId,
+    action: { type: "writeFile", path: "NOTES.md", content, expectedVersion },
+  };
+}
+/** The text of the turn the app would start for `message` in the Roder's thread. */
+async function turnText(service: ReturnType<typeof createRoderAgentService>, threadId: string, message = "Hello") {
+  const params = (await service.turnStartParams({ threadId, input: [{ type: "text", text: message }] })) as {
+    input: { text: string }[];
+  };
+  return params.input[0].text;
+}
 async function store() {
   const root = await temporary();
   return { root, files: createRoderFileStore(root), id: randomUUID() };
@@ -205,9 +219,10 @@ test("turn context reads INSTRUCTIONS.md, AGENTS.md and NOTES.md, capping rules 
     ["WORKERS.md", 1],
     ["DIGEST.md", 1],
   ]);
-  let context = (await roders.contextForThread(thread.threadId))!;
-  expect(context).toContain("## Instructions (INSTRUCTIONS.md, version 1)\nWatch releases");
-  expect(context).toContain("## Notes (NOTES.md, version 1)\nEmpty.");
+  let context = await turnText(roders, thread.threadId);
+  expect(context).toContain("## Purpose (INSTRUCTIONS.md, version 1)\nWatch releases");
+  // Empty notes and rules add nothing to a first turn.
+  expect(context).not.toContain("## Notes");
   expect(context).not.toContain("AGENTS.md, version");
 
   const write = (path: string, content: string, expectedVersion: number) =>
@@ -216,14 +231,13 @@ test("turn context reads INSTRUCTIONS.md, AGENTS.md and NOTES.md, capping rules 
   await write("NOTES.md", `${"n".repeat(RODER_NOTES_PROMPT_MAX_BYTES)}NOTES-TAIL`, 1);
   await write("WORKERS.md", "WORKERS-BODY", 1);
   await write("DIGEST.md", "DIGEST-BODY", 1);
-  context = (await roders.contextForThread(thread.threadId))!;
+  context = await turnText(roders, thread.threadId);
   expect(context).toContain("## The user's rules for you (AGENTS.md, version 2)");
   expect(context).not.toContain("RULES-TAIL");
   expect(context).toContain(
     `[AGENTS.md continues: this is its first ${RODER_RULES_PROMPT_MAX_BYTES} of ${RODER_RULES_PROMPT_MAX_BYTES + 10} bytes.`,
   );
   expect(context).toContain("## Notes (NOTES.md, version 2)");
-  expect(context).toContain("expectedVersion: 2");
   expect(context).not.toContain("NOTES-TAIL");
   expect(context).toContain(`[NOTES.md continues: this is its first ${RODER_NOTES_PROMPT_MAX_BYTES} of`);
   // WORKERS.md belongs to worker prompts and DIGEST.md to nobody's.
@@ -245,8 +259,8 @@ test("writing INSTRUCTIONS.md changes the turn context and the list summary", as
   expect(notify).toHaveBeenCalled();
   const detail = (await roders.handleRequest("desktop/roders/read", { id: roder.id })) as RoderAgentDetail;
   expect(detail.mission).toBe("Keep the docs current.");
-  const context = (await roders.contextForThread(thread.threadId))!;
-  expect(context).toContain("## Instructions (INSTRUCTIONS.md, version 2)\n# Purpose\n\nKeep the docs current.");
+  const context = await turnText(roders, thread.threadId);
+  expect(context).toContain("## Purpose (INSTRUCTIONS.md, version 2)\n# Purpose\n\nKeep the docs current.");
   expect(context).not.toContain("Watch releases");
   await expect(roders.handleRequest("desktop/roders/update", { id: roder.id, mission: "Something" })).rejects.toThrow(
     /Roder files now/,
@@ -258,9 +272,9 @@ test("writing INSTRUCTIONS.md changes the turn context and the list summary", as
 });
 
 test("roder_files lists, reads one path or a version, and reads history", async () => {
-  const { roders, thread } = await service();
+  const { roders, roder, thread } = await service();
   expect(roderAgentToolDefinitions.map((tool) => tool.name)).toContain("roder_files");
-  await roders.handleTool("roder_memory_write", { memory: "Decision: ship Friday", expectedVersion: 1 }, thread);
+  await roders.handleTool("roder_command", writeNotes(roder.id, "Decision: ship Friday", 1), thread);
   const list = (await roders.handleTool("roder_files", {}, thread)) as { files: RoderFileVersion[] };
   expect(list.files.find((f) => f.path === "NOTES.md")).toMatchObject({ version: 2, author: "roder" });
   expect(await roders.handleTool("roder_files", { path: "NOTES.md" }, thread)).toMatchObject({
@@ -283,18 +297,24 @@ test("roder_files lists, reads one path or a version, and reads history", async 
   await roders.stop();
 });
 
-test("roder_memory_write writes NOTES.md as the Roder and refuses a stale version", async () => {
+test("writeFile writes NOTES.md as the Roder and refuses a stale version", async () => {
   const { roders, roder, thread } = await service();
-  expect(await roders.handleTool("roder_memory_write", { memory: "first", expectedVersion: 1 }, thread)).toEqual({
-    saved: true,
-    path: "NOTES.md",
-    version: 2,
+  expect(await roders.handleTool("roder_command", writeNotes(roder.id, "first", 1), thread)).toMatchObject({
+    action: "writeFile",
+    file: { path: "NOTES.md", version: 2, author: "roder" },
   });
+  await expect(roders.handleTool("roder_command", writeNotes(roder.id, "stale", 1), thread)).rejects.toThrow(
+    "Roder file version conflict on NOTES.md: expected 1, current version is 2",
+  );
   await expect(
-    roders.handleTool("roder_memory_write", { memory: "stale", expectedVersion: 1 }, thread),
-  ).rejects.toThrow("Roder file version conflict on NOTES.md: expected 1, current version is 2");
-  await expect(roders.handleTool("roder_memory_write", { memory: "no version" }, thread)).rejects.toThrow(
-    /expected version/,
+    roders.handleTool(
+      "roder_command",
+      { commandId: "no-version", roderId: roder.id, action: { type: "writeFile", path: "NOTES.md", content: "x" } },
+      thread,
+    ),
+  ).rejects.toThrow(/Missing expectedVersion/);
+  await expect(roders.handleTool("roder_memory_write", { memory: "gone", expectedVersion: 2 }, thread)).rejects.toThrow(
+    /Unknown Roder tool/,
   );
   expect(await roders.handleTool("roder_memory_read", {}, thread)).toEqual({
     memory: "first",
@@ -373,11 +393,10 @@ test("a Roder saved before files existed gets empty files and its old memory fil
   await roders.start();
   const detail = (await roders.handleRequest("desktop/roders/read", { id })) as RoderAgentDetail;
   expect(detail.files.every((f) => f.version === 1 && f.bytes === 0)).toBe(true);
-  expect(await roders.contextForThread("thread-old")).toContain(
-    "## Instructions (INSTRUCTIONS.md, version 1)\nNot written yet.",
-  );
   expect(await readFile(join(directory, `${id}.md`), "utf8")).toBe("Old memory");
   expect((await readdir(directory)).sort()).toEqual([`${id}.md`, "files", "roders.json"].sort());
+  // With no INSTRUCTIONS.md the first turn starts the first-run interview.
+  expect(await turnText(roders, "thread-old")).toContain("## Purpose: not set yet");
   await roders.stop();
 });
 
@@ -389,8 +408,8 @@ test("INSTRUCTIONS.md is capped in the turn context with an honest truncation li
     content: `${"i".repeat(RODER_INSTRUCTIONS_PROMPT_MAX_BYTES)}INSTRUCTIONS-TAIL`,
     expectedVersion: 1,
   });
-  const context = (await roders.contextForThread(thread.threadId))!;
-  expect(context).toContain("## Instructions (INSTRUCTIONS.md, version 2)");
+  const context = await turnText(roders, thread.threadId);
+  expect(context).toContain("## Purpose (INSTRUCTIONS.md, version 2)");
   expect(context).not.toContain("INSTRUCTIONS-TAIL");
   expect(context).toContain(
     `[INSTRUCTIONS.md continues: this is its first ${RODER_INSTRUCTIONS_PROMPT_MAX_BYTES} of ${RODER_INSTRUCTIONS_PROMPT_MAX_BYTES + 17} bytes. Read the rest with roder_files {path: "INSTRUCTIONS.md"}.]`,
