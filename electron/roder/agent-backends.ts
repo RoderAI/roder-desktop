@@ -1044,25 +1044,21 @@ export class AgentBackendsManager {
     if (method === "thread/resolve_approval") {
       const input = isRecord(params) ? params : {};
       const approvalId = typeof input.approvalId === "string" ? input.approvalId : "";
-      try {
-        return await client.request("thread/resolve_approval", stripAgentBackendField(params));
-      } finally {
-        if (approvalId) {
-          this.#approvalRoutes.delete(approvalId);
-        }
+      const result = await client.request(method, stripAgentBackendField(params));
+      if (approvalId) {
+        this.#approvalRoutes.delete(approvalId);
       }
+      return result;
     }
 
     if (method === "thread/resolve_user_input") {
       const input = isRecord(params) ? params : {};
       const requestId = typeof input.requestId === "string" ? input.requestId : "";
-      try {
-        return await client.request("thread/resolve_user_input", stripAgentBackendField(params));
-      } finally {
-        if (requestId) {
-          this.#userInputRoutes.delete(requestId);
-        }
+      const result = await client.request(method, stripAgentBackendField(params));
+      if (requestId) {
+        this.#userInputRoutes.delete(requestId);
       }
+      return result;
     }
 
     return client.request(method, stripAgentBackendField(params));

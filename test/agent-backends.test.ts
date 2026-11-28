@@ -152,12 +152,16 @@ describe("AgentBackendsManager", () => {
     const usage = { prompt_tokens: 35, completion_tokens: 5, total_tokens: 40 };
     const thread = { id: "claude-thread", model: "haiku", turns: [{ id: "turn", usage }] };
     const history = { thread, hasMore: true, before: "turn" };
-    client.request.mockImplementation(async (method: string) => {
+    client.request.mockImplementation(async (method: string, params?: { answers?: Record<string, string> }) => {
       if (method === "model/list") return { models: [{ id: "haiku", modelProvider: "claude-code" }] };
       if (method === "thread/start") return { thread };
       if (method === "thread/history/read") return history;
       if (method === "thread/terminal/input") return { ok: true };
       if (method === "turn/start") return { turnId: "turn" };
+      if (method === "thread/resolve_user_input") {
+        if (!params?.answers?.["1"]) throw new Error("Answer every question");
+        return {};
+      }
       throw new Error(`Unexpected Claude method ${method}`);
     });
     const manager = new AgentBackendsManager({
@@ -175,6 +179,15 @@ describe("AgentBackendsManager", () => {
     expect(manager.backendForApproval("trust")).toBe("claude-code");
     client.emit("notification", { method: "thread/userInputRequested", params: { requestId: "question" } });
     expect(manager.backendForUserInput("question")).toBe("claude-code");
+    await expect(
+      manager.handleRequest("claude-code", "thread/resolve_user_input", { requestId: "question", answers: {} }),
+    ).rejects.toThrow("Answer every question");
+    expect(manager.backendForUserInput("question")).toBe("claude-code");
+    await manager.handleRequest("claude-code", "thread/resolve_user_input", {
+      requestId: "question",
+      answers: { "1": "Blue" },
+    });
+    expect(manager.backendForUserInput("question")).toBeNull();
     const page = await manager.handleRequest("claude-code", "thread/history/read", {
       threadId: thread.id,
       before: "later",
