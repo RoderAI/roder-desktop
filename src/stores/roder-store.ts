@@ -269,10 +269,22 @@ const initialAgentBackends: Record<AgentBackendId, AgentBackendStatus> = {
     models: [],
     error: null,
   },
+  "claude-code": {
+    id: "claude-code",
+    name: "Claude Code",
+    description: "Interactive Claude Code CLI with native workflows and subagents.",
+    state: "disconnected",
+    runtimeInstalled: false,
+    runtimePath: null,
+    connected: false,
+    modelCount: 0,
+    models: [],
+    error: null,
+  },
 };
 
 function threadBackendFor(thread: RoderThread | undefined): AgentBackendId {
-  if (thread?.agentBackend === "codex" || thread?.agentBackend === "antigravity" || thread?.agentBackend === "roder") {
+  if (thread?.agentBackend) {
     return thread.agentBackend;
   }
   if (thread?.modelProvider === "antigravity") {
@@ -481,10 +493,17 @@ function completeTurn(
       : turns[index];
   const nextTurn: RoderTurn = {
     ...existing,
+    workingStatus: undefined,
     status: nextStatus,
     error,
     completedAt,
     durationMs,
+    ...(isRecord(turnPatch.usage) &&
+    typeof turnPatch.usage.prompt_tokens === "number" &&
+    typeof turnPatch.usage.completion_tokens === "number" &&
+    typeof turnPatch.usage.total_tokens === "number"
+      ? { usage: turnPatch.usage as RoderTurn["usage"] }
+      : {}),
     items: existing.items.map((item) => (item.status === "inProgress" ? { ...item, status: nextStatus } : item)),
   };
   if (index === -1) {
@@ -2976,6 +2995,25 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
         ? { ...state.threadDetails, [threadId]: { ...nextThread, status } }
         : state.threadDetails,
       busy: threadId === state.activeThreadId ? true : state.busy,
+    };
+  }
+
+  if (notification.method === "turn/progress") {
+    const { threadId, turnId, workingStatus } = params;
+    if (typeof threadId !== "string" || typeof turnId !== "string" || typeof workingStatus !== "string") {
+      return waitPatch;
+    }
+    const thread = threadForState(state, threadId);
+    if (thread?.agentBackend !== "claude-code" || thread.status.activeTurnId !== turnId) return waitPatch;
+    return {
+      ...waitPatch,
+      threadDetails: {
+        ...state.threadDetails,
+        [threadId]: {
+          ...thread,
+          turns: thread.turns?.map((turn) => (turn.id === turnId ? { ...turn, workingStatus } : turn)),
+        },
+      },
     };
   }
 

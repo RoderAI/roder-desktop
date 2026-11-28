@@ -735,6 +735,7 @@ export function Composer({
               </Button>
               <AgentBackendPicker disabled={busy || persistentAgentThread} />
               <ModelPicker
+                disabled={Boolean(activeThreadId) && activeBackend === "claude-code"}
                 models={models}
                 routingOptions={routingOptions}
                 selectedModel={selectedModel}

@@ -147,6 +147,61 @@ describe("Setup commands", () => {
 });
 
 describe("AgentBackendsManager", () => {
+  it("keeps interactive Claude threads, history and terminal commands on the Claude sidecar", async () => {
+    const client = new FakeBackendClient();
+    const usage = { prompt_tokens: 35, completion_tokens: 5, total_tokens: 40 };
+    const thread = { id: "claude-thread", model: "haiku", turns: [{ id: "turn", usage }] };
+    const history = { thread, hasMore: true, before: "turn" };
+    client.request.mockImplementation(async (method: string) => {
+      if (method === "model/list") return { models: [{ id: "haiku", modelProvider: "claude-code" }] };
+      if (method === "thread/start") return { thread };
+      if (method === "thread/history/read") return history;
+      if (method === "thread/terminal/input") return { ok: true };
+      if (method === "turn/start") return { turnId: "turn" };
+      throw new Error(`Unexpected Claude method ${method}`);
+    });
+    const manager = new AgentBackendsManager({
+      createClient: () => client,
+      findRuntime: () => "/bin/claude",
+      checkClaudeAuth: async () => true,
+    });
+    await manager.selectBackend("claude-code");
+    expect(
+      manager.externalBackendForRequest("thread/start", { modelProvider: "claude-code", agentBackend: "roder" }),
+    ).toBeNull();
+    await manager.handleRequest("claude-code", "thread/start", { workspaceId: "local", cwd: "/project" });
+    expect(manager.backendForThread(thread.id)).toBe("claude-code");
+    client.emit("notification", { method: "thread/approvalRequested", params: { approvalId: "trust" } });
+    expect(manager.backendForApproval("trust")).toBe("claude-code");
+    client.emit("notification", { method: "thread/userInputRequested", params: { requestId: "question" } });
+    expect(manager.backendForUserInput("question")).toBe("claude-code");
+    const page = await manager.handleRequest("claude-code", "thread/history/read", {
+      threadId: thread.id,
+      before: "later",
+    });
+    expect(page).toMatchObject({ ...history, thread: { ...thread, agentBackend: "claude-code" } });
+    await manager.handleRequest("claude-code", "turn/start", {
+      threadId: thread.id,
+      prompt: "hi",
+      policyMode: "bypass",
+    });
+    expect(client.request).toHaveBeenCalledWith("turn/start", { threadId: thread.id, prompt: "hi" });
+    const menu = { threadId: thread.id, input: { kind: "command", command: "workflows" } };
+    await expect(manager.handleRequest("claude-code", "thread/terminal/input", menu)).resolves.toEqual({ ok: true });
+    expect(client.request).toHaveBeenCalledWith("thread/terminal/input", menu);
+  });
+
+  it("asks for Claude sign-in before starting a sidecar with a static model catalog", async () => {
+    const createClient = vi.fn<() => FakeBackendClient>(() => new FakeBackendClient());
+    const manager = new AgentBackendsManager({
+      createClient,
+      findRuntime: () => "/bin/claude",
+      checkClaudeAuth: async () => false,
+    });
+    await expect(manager.selectBackend("claude-code")).rejects.toThrow(/not signed in/);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
   it("supports selecting, persisting, and switching between Roder, Codex, and Antigravity backends", async () => {
     const storagePath = join(makeTempDir(), "agent-backends.json");
     const codexClient = new FakeBackendClient();

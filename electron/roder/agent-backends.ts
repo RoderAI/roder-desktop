@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import type { RoderModel, RoderThread } from "../../src/types/roder";
+import { isClaudeCliSignedIn, locateClaudeCli } from "../onboarding/claude-cli";
 import {
   prepareExternalBackendCatalog,
   type AgentBackendId,
@@ -99,6 +100,7 @@ export type FindRuntimeOptions = {
 export type AgentBackendsManagerOptions = {
   createClient: (backend: ExternalAgentBackendId) => ExternalBackendClient;
   findRuntime?: (backend: ExternalAgentBackendId) => string | null;
+  checkClaudeAuth?: (path: string) => Promise<boolean>;
   runLogoutCommand?: (backend: ExternalAgentBackendId) => Promise<void>;
   storagePath?: string;
   onNotification?: (payload: { method: string; params: unknown }) => void;
@@ -106,7 +108,7 @@ export type AgentBackendsManagerOptions = {
   onStderr?: (backend: ExternalAgentBackendId, message: string) => void;
 };
 
-const EXTERNAL_BACKENDS: readonly ExternalAgentBackendId[] = ["codex", "antigravity"];
+const EXTERNAL_BACKENDS: readonly ExternalAgentBackendId[] = ["codex", "antigravity", "claude-code"];
 const LOGOUT_TIMEOUT_MS = 45_000;
 
 const BACKEND_META: Record<AgentBackendId, { name: string; description: string }> = {
@@ -121,6 +123,10 @@ const BACKEND_META: Record<AgentBackendId, { name: string; description: string }
   antigravity: {
     name: "Antigravity",
     description: "Google Antigravity agent backend via the official agy CLI.",
+  },
+  "claude-code": {
+    name: "Claude Code",
+    description: "Interactive Claude Code CLI with its native tools, workflows, and subagents.",
   },
 };
 
@@ -259,6 +265,13 @@ export function findExternalBackendRuntime(
   backend: ExternalAgentBackendId,
   options: FindRuntimeOptions = {},
 ): string | null {
+  if (backend === "claude-code") {
+    const env = options.env ?? process.env;
+    const platform = options.platform ?? process.platform;
+    const override = env.RODER_CLAUDE_CODE_CLI_PATH?.trim();
+    if (override) return isRunnableFile(override, platform) ? override : null;
+    return locateClaudeCli({ env, platform, homeDir: options.homeDir ?? homedir() })?.path ?? null;
+  }
   return backend === "codex" ? findCodexRuntime(options) : findAntigravityRuntime(options);
 }
 
@@ -317,11 +330,9 @@ export function runExternalBackendLogoutCli(
   const env = options.env ?? process.env;
   const runtimePath = findExternalBackendRuntime(backend, { env });
   const command =
-    backend === "codex"
-      ? runtimePath
-        ? { executable: runtimePath, args: ["logout"] }
-        : null
-      : { executable: options.roderBinaryPath, args: ["auth", "logout", "antigravity"] };
+    backend === "antigravity"
+      ? { executable: options.roderBinaryPath, args: ["auth", "logout", "antigravity"] }
+      : runtimePath && { executable: runtimePath, args: backend === "claude-code" ? ["auth", "logout"] : ["logout"] };
   if (!command) {
     return Promise.resolve();
   }
@@ -381,6 +392,7 @@ function createEmptySlot(): SidecarSlot {
 export class AgentBackendsManager {
   readonly #createClient: (backend: ExternalAgentBackendId) => ExternalBackendClient;
   readonly #findRuntime: (backend: ExternalAgentBackendId) => string | null;
+  readonly #checkClaudeAuth: (path: string) => Promise<boolean>;
   readonly #runLogoutCommand?: (backend: ExternalAgentBackendId) => Promise<void>;
   readonly #storagePath?: string;
   readonly #onNotification?: (payload: { method: string; params: unknown }) => void;
@@ -391,6 +403,7 @@ export class AgentBackendsManager {
   #slots: Record<ExternalAgentBackendId, SidecarSlot> = {
     codex: createEmptySlot(),
     antigravity: createEmptySlot(),
+    "claude-code": createEmptySlot(),
   };
   #threads = new Map<string, SavedExternalThread>();
   #approvalRoutes = new Map<string, ExternalAgentBackendId>();
@@ -402,6 +415,7 @@ export class AgentBackendsManager {
   constructor(options: AgentBackendsManagerOptions) {
     this.#createClient = options.createClient;
     this.#findRuntime = options.findRuntime ?? ((backend) => findExternalBackendRuntime(backend));
+    this.#checkClaudeAuth = options.checkClaudeAuth ?? isClaudeCliSignedIn;
     this.#runLogoutCommand = options.runLogoutCommand;
     this.#storagePath = options.storagePath;
     this.#onNotification = options.onNotification;
@@ -428,13 +442,7 @@ export class AgentBackendsManager {
         return;
       }
       if (isRecord(parsed)) {
-        if (
-          parsed.activeBackend === "roder" ||
-          parsed.activeBackend === "codex" ||
-          parsed.activeBackend === "antigravity"
-        ) {
-          this.#activeBackend = parsed.activeBackend;
-        }
+        this.#activeBackend = parseExternalBackend(parsed.activeBackend) ?? "roder";
         if (Array.isArray(parsed.threads)) {
           for (const entry of parsed.threads) {
             this.#ingestSavedThread(entry);
@@ -511,6 +519,7 @@ export class AgentBackendsManager {
         roder: this.getBackendStatus("roder"),
         codex: this.getBackendStatus("codex"),
         antigravity: this.getBackendStatus("antigravity"),
+        "claude-code": this.getBackendStatus("claude-code"),
       },
     };
   }
@@ -607,6 +616,15 @@ export class AgentBackendsManager {
     }
 
     if (slot.client && slot.state === "connected" && !options.forceRefresh) {
+      return this.getBackendStatus(backend);
+    }
+
+    if (backend === "claude-code" && !(await this.#checkClaudeAuth(runtimePath))) {
+      await this.#detachClient(backend, true);
+      slot.models = [];
+      slot.state = "disconnected";
+      slot.lastError = "Run claude auth login in a terminal, then check the connection.";
+      if ((wasConnected || previousState !== slot.state) && options.notifyOnChange) this.#emitChanged();
       return this.getBackendStatus(backend);
     }
 
@@ -882,12 +900,25 @@ export class AgentBackendsManager {
       return result;
     }
 
+    if (backend === "claude-code" && (method === "thread/history/read" || method === "thread/resume")) {
+      const page = (await client.request(method, stripAgentBackendField(params))) as {
+        thread?: RoderThread | null;
+        [key: string]: unknown;
+      };
+      const thread = page.thread ? this.#enrichThread(backend, page.thread) : page.thread;
+      if (thread) await this.#rememberThread(backend, thread);
+      return { ...page, thread };
+    }
+
     if (method === "thread/read" || method === "thread/history/read") {
       const threadId = threadIdFromParams(params);
       if (!threadId) {
         throw new Error("A thread ID is required");
       }
-      const result = (await client.request("thread/read", { threadId })) as {
+      const result = (await client.request(
+        "thread/read",
+        backend === "claude-code" ? stripAgentBackendField(params) : { threadId },
+      )) as {
         thread?: RoderThread | null;
         [key: string]: unknown;
       };
@@ -912,9 +943,13 @@ export class AgentBackendsManager {
         threadId,
         ...(typeof input.prompt === "string" ? { prompt: input.prompt } : {}),
         ...(Array.isArray(input.input) ? { input: input.input } : {}),
-        ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
-        ...(typeof input.reasoning === "string" && input.reasoning ? { reasoning: input.reasoning } : {}),
-        policyMode: DESKTOP_POLICY_MODE,
+        ...(backend === "claude-code"
+          ? {}
+          : {
+              ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
+              ...(typeof input.reasoning === "string" && input.reasoning ? { reasoning: input.reasoning } : {}),
+              policyMode: DESKTOP_POLICY_MODE,
+            }),
       };
       if (threadId) {
         const existing = this.#threads.get(threadId);
@@ -924,8 +959,8 @@ export class AgentBackendsManager {
           if (!existing.preview && preview) {
             existing.preview = preview;
           }
-          if (typeof input.model === "string" && input.model) {
-            existing.model = input.model;
+          if (typeof turnParams.model === "string" && turnParams.model) {
+            existing.model = turnParams.model;
           }
           await this.#persist();
         }
@@ -1286,13 +1321,27 @@ export class AgentBackendsManager {
       return false;
     }
     const { method, params } = payload;
-    if (method === "thread/approval_requested" && typeof params.approvalId === "string" && params.approvalId) {
+    if (
+      (method === "thread/approvalRequested" || method === "thread/approval_requested") &&
+      typeof params.approvalId === "string" &&
+      params.approvalId
+    ) {
       this.#approvalRoutes.set(params.approvalId, backend);
-    } else if (method === "thread/approval_resolved" && typeof params.approvalId === "string") {
+    } else if (
+      (method === "thread/approvalResolved" || method === "thread/approval_resolved") &&
+      typeof params.approvalId === "string"
+    ) {
       this.#approvalRoutes.delete(params.approvalId);
-    } else if (method === "thread/user_input_requested" && typeof params.requestId === "string" && params.requestId) {
+    } else if (
+      (method === "thread/userInputRequested" || method === "thread/user_input_requested") &&
+      typeof params.requestId === "string" &&
+      params.requestId
+    ) {
       this.#userInputRoutes.set(params.requestId, backend);
-    } else if (method === "thread/user_input_resolved" && typeof params.requestId === "string") {
+    } else if (
+      (method === "thread/userInputResolved" || method === "thread/user_input_resolved") &&
+      typeof params.requestId === "string"
+    ) {
       this.#userInputRoutes.delete(params.requestId);
     }
 
@@ -1323,7 +1372,7 @@ export class AgentBackendsManager {
 }
 
 function parseExternalBackend(value: unknown): ExternalAgentBackendId | null {
-  if (value === "codex" || value === "antigravity") {
+  if (value === "codex" || value === "antigravity" || value === "claude-code") {
     return value;
   }
   return null;
