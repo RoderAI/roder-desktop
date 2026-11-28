@@ -113,6 +113,11 @@ import { TerminalManager, type TerminalStartOptions } from "../terminal/pty-mana
 import { runMarkdownShellCommand } from "../terminal/markdown-shell-command";
 import { createAutoUpdateController } from "./auto-update";
 import {
+  listProjectPickerDirectory,
+  ProjectPickerSearchRegistry,
+  type ProjectPickerSearchParams,
+} from "./project-picker";
+import {
   createApplicationMenuTemplate,
   installOpenFileSearchShortcut,
   installNewProjectShortcut,
@@ -435,6 +440,12 @@ ipcMain.handle("workspace:openFolders", async (_event, defaultPath?: string) => 
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths;
 });
+const projectPickerSearches = new ProjectPickerSearchRegistry();
+ipcMain.handle("projectPicker:list", (_event, path: string) => listProjectPickerDirectory(path));
+ipcMain.handle("projectPicker:search", (event, params: ProjectPickerSearchParams) =>
+  projectPickerSearches.search(event.sender.id, params),
+);
+ipcMain.handle("projectPicker:cancelSearch", (event) => projectPickerSearches.cancel(event.sender.id));
 ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
   terminal.start({ ...options, cwd: options?.cwd || process.cwd() }),
 );

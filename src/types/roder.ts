@@ -1,6 +1,11 @@
 import type { AppUpdateStatus } from "@/lib/app-update";
 import type { MarkdownShellCommand, MarkdownShellResult } from "@/lib/markdown-shell-command";
 import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
+import type {
+  ProjectPickerListing,
+  ProjectPickerSearchParams,
+  ProjectPickerSearchResult,
+} from "@/types/project-picker";
 
 export type RoderStatus = {
   state: "starting" | "ready" | "stopped" | "error";
@@ -1339,6 +1344,7 @@ declare global {
     roderDesktop: {
       platform: NodeJS.Platform;
       homeDir: string;
+      hostName: string;
       request: (method: string, params?: unknown) => Promise<unknown>;
       setMinWindowWidth: (width: number) => Promise<void>;
       start: () => Promise<RoderStatus>;
@@ -1364,6 +1370,9 @@ declare global {
       ) => Promise<Workspace[]>;
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       openWorkspaceFolders: (defaultPath?: string) => Promise<string[] | null>;
+      projectPickerList: (path: string) => Promise<ProjectPickerListing>;
+      projectPickerSearch: (params: ProjectPickerSearchParams) => Promise<ProjectPickerSearchResult>;
+      projectPickerCancelSearch: () => Promise<void>;
       terminalStart: (options?: {
         id?: string;
         cols?: number;

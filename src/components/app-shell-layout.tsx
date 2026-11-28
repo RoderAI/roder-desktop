@@ -17,6 +17,7 @@ import { AppSidebar, useSidebarPersistentAgents } from "@/components/app-sidebar
 import { PersistentAgentThreadContext } from "@/components/app-shell-context";
 import { FileSearchDialog } from "@/components/file-search-dialog";
 import { ProjectConfigDialog } from "@/components/project-config-dialog";
+import { ProjectPickerDialog } from "@/components/project-picker-dialog";
 import { ExtensionActivityRail } from "@/components/extensions/extension-activity-rail";
 import {
   renderRightWorkspacePanel,
@@ -86,6 +87,8 @@ export type AppShellLayoutProps = {
   selectedExtensionId: string | null;
   selectedExtensionPanelId: string | null;
   initialWorkspacePanelWidth: number;
+  projectPickerOpen: boolean;
+  projectPickerInitialPath: string;
   projectConfigOpen: boolean;
   projectCreating: boolean;
   projectCreationError?: string | null;
@@ -103,6 +106,8 @@ export type AppShellLayoutProps = {
   onFileSearchOpenChange: (open: boolean) => void;
   onFileSearchSelect: (indexedPath: FilePanelIndexedPath) => void;
   onProjectConfigOpenChange: (open: boolean) => void;
+  onProjectPickerOpenChange: (open: boolean) => void;
+  onPickProjectFolder: (path: string) => void;
   onCloseWorkspacePanel: (panel: RouteWorkspacePanel) => void;
   onCloseWorkspacePanelShell: () => void;
   onNewProject: () => void;
@@ -149,6 +154,8 @@ export function AppShellLayout({
   selectedExtensionId,
   selectedExtensionPanelId,
   initialWorkspacePanelWidth,
+  projectPickerOpen,
+  projectPickerInitialPath,
   projectConfigOpen,
   projectCreating,
   projectCreationError,
@@ -166,6 +173,8 @@ export function AppShellLayout({
   onFileSearchOpenChange,
   onFileSearchSelect,
   onProjectConfigOpenChange,
+  onProjectPickerOpenChange,
+  onPickProjectFolder,
   onCloseWorkspacePanel,
   onCloseWorkspacePanelShell,
   onNewProject,
@@ -639,6 +648,15 @@ export function AppShellLayout({
     />
   );
 
+  const projectPickerDialog = (
+    <ProjectPickerDialog
+      open={projectPickerOpen}
+      initialPath={projectPickerInitialPath}
+      onOpenChange={onProjectPickerOpenChange}
+      onPick={onPickProjectFolder}
+    />
+  );
+
   const fileSearchDialog = (
     <FileSearchDialog
       open={fileSearchOpen}
@@ -656,6 +674,7 @@ export function AppShellLayout({
   if (!useWindowTopBar) {
     return (
       <>
+        {projectPickerDialog}
         {projectDialog}
         {fileSearchDialog}
         <div className="relative flex h-screen w-screen overflow-hidden bg-background">
@@ -671,6 +690,7 @@ export function AppShellLayout({
 
   return (
     <>
+      {projectPickerDialog}
       {projectDialog}
       {fileSearchDialog}
       <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">

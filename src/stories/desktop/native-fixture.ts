@@ -42,6 +42,7 @@ export function installNativeFixture(): void {
   const fixtures = {
     platform: "darwin",
     homeDir: "/storybook",
+    hostName: "Storybook",
     async request(method) {
       switch (method) {
         case "desktop/persistent-agents/list":
@@ -88,6 +89,13 @@ export function installNativeFixture(): void {
     openExternal: noopAsync,
     openWorkspaceFolder: async () => workspace.roots[0].path,
     openWorkspaceFolders: async () => [workspace.roots[0].path],
+    projectPickerList: async (path) => ({
+      path,
+      entries: path === "/storybook" ? [{ name: "roder", path: "/storybook/roder", isGitRepo: true }] : [],
+      truncated: false,
+    }),
+    projectPickerSearch: async ({ root, query }) => ({ root, query, matches: [], truncated: false, canceled: false }),
+    projectPickerCancelSearch: noopAsync,
     canvasSavePng: async (imageUrl) => ({
       name: "sketch.png",
       path: "/storybook/sketch.png",

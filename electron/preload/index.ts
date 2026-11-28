@@ -11,6 +11,11 @@ import type { MacComputerUsePermission, MacComputerUsePermissions } from "../../
 import type { Workspace } from "../../src/types/roder";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
+import type {
+  ProjectPickerListing,
+  ProjectPickerSearchParams,
+  ProjectPickerSearchResult,
+} from "../main/project-picker";
 import type { ClaudeCliStatus } from "../onboarding/claude-cli";
 import type { EnvironmentProvider } from "../onboarding/environment";
 import type { OnboardingRecord } from "../onboarding/record";
@@ -114,13 +119,14 @@ export type AppCommand = {
 
 export type { AppUpdateStatus } from "../../src/lib/app-update";
 
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 
 let nextWorktreeRequestId = 0;
 
 const api = {
   platform: process.platform,
   homeDir: homedir(),
+  hostName: hostname(),
   request: (method: string, params?: unknown) => ipcRenderer.invoke("roder:request", method, params ?? {}),
   setMinWindowWidth: (width: number) => ipcRenderer.invoke("window:setMinWidth", width) as Promise<void>,
   start: () => ipcRenderer.invoke("roder:start") as Promise<RoderStatus>,
@@ -152,6 +158,10 @@ const api = {
     ipcRenderer.invoke("workspace:openFolder", defaultPath) as Promise<string | null>,
   openWorkspaceFolders: (defaultPath?: string) =>
     ipcRenderer.invoke("workspace:openFolders", defaultPath) as Promise<string[] | null>,
+  projectPickerList: (path: string) => ipcRenderer.invoke("projectPicker:list", path) as Promise<ProjectPickerListing>,
+  projectPickerSearch: (params: ProjectPickerSearchParams) =>
+    ipcRenderer.invoke("projectPicker:search", params) as Promise<ProjectPickerSearchResult>,
+  projectPickerCancelSearch: () => ipcRenderer.invoke("projectPicker:cancelSearch") as Promise<void>,
   terminalStart: (options?: {
     id?: string;
     cols?: number;
