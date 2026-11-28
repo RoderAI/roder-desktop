@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { roderFilePaths, type RoderAgent, type RoderAgentDetail } from "../../src/types/roder-agents";
 import { roderAgentStrategy } from "./strategy";
 import {
-  RODER_FILE_MAX_BYTES,
   RODER_INSTRUCTIONS_FILE,
   RODER_NOTES_FILE,
   RODER_RULES_FILE,
@@ -13,12 +12,17 @@ import {
   roderInstructionsSummary,
 } from "./files";
 import type { createRoderAgentSpriteManager } from "./sprites";
+import { roderCommandDescription, roderCommandToolSchema } from "./actions";
+import { createRoderCommands } from "./commands";
+import type { IssuesService } from "../issues/service";
 
 type Options = {
   directory: string;
   request: (method: string, params: unknown) => Promise<unknown>;
   notify?: () => void;
   sprites?: ReturnType<typeof createRoderAgentSpriteManager>;
+  /** The issue service a Roder's issue commands go through. */
+  issues?: Pick<IssuesService, "request">;
 };
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {
@@ -69,16 +73,21 @@ export const roderAgentToolDefinitions = [
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
-    name: "roder_memory_write",
+    name: "roder_command",
+    description: roderCommandDescription(),
+    parameters: roderCommandToolSchema(),
+  },
+  {
+    name: "roder_issue",
     description:
-      "Replace your Roder's NOTES.md with concise decisions, facts and next steps, as a new version. Pass the version you last read as expectedVersion; a stale version is refused and the error names the current one. Preserve relevant user notes.",
+      "Read your Roder's issue board: supply roderId to get every issue (descriptions shortened, recent activity) and the current revision. Supply roderId and issueId (its id or number) to read one issue in full, including its whole description and activity.",
     parameters: {
       type: "object",
       properties: {
-        memory: { type: "string", maxLength: RODER_FILE_MAX_BYTES },
-        expectedVersion: { type: "integer", minimum: 1 },
+        roderId: { type: "string", description: "Your Roder id." },
+        issueId: { type: "string", description: "An issue id or number. Omit to read the whole board." },
       },
-      required: ["memory", "expectedVersion"],
+      required: ["roderId"],
       additionalProperties: false,
     },
   },
@@ -142,6 +151,21 @@ export function createRoderAgentService(options: Options) {
     if (!c) throw new Error("Roder not found");
     return c;
   }
+  const commands = createRoderCommands({
+    directory: join(options.directory, "commands"),
+    files,
+    issues: options.issues,
+    async pause(c) {
+      c.enabled = false;
+      await persist();
+    },
+    async fileWritten(c, path) {
+      const mission = c.mission;
+      await syncMission(c, path);
+      if (c.mission !== mission) await persist();
+      else options.notify?.();
+    },
+  });
   async function detail(c: RoderAgent): Promise<RoderAgentDetail> {
     return structuredClone({
       ...c,
@@ -157,7 +181,7 @@ export function createRoderAgentService(options: Options) {
       rules: await files.read(c.id, RODER_RULES_FILE),
       notes: await files.read(c.id, RODER_NOTES_FILE),
     });
-    return `${roderAgentStrategy}\n\n${context}`;
+    return `${roderAgentStrategy}\n\nYour roderId is "${c.id}". Pass it to roder_command and roder_issue.\n\n${context}`;
   }
   /** Keeps the list summary in step with INSTRUCTIONS.md; an empty opening paragraph keeps the old one. */
   async function syncMission(c: RoderAgent, path: string) {
@@ -221,7 +245,7 @@ export function createRoderAgentService(options: Options) {
           input: [
             {
               type: "text",
-              text: `Roder wake: ${reason}\n\nReview progress against ${RODER_INSTRUCTIONS_FILE}, do bounded useful work, record durable decisions in ${RODER_NOTES_FILE} with roder_memory_write, and schedule a wake only when useful. Do not claim to run while the desktop is closed.`,
+              text: `Roder wake: ${reason}\n\nReview progress against ${RODER_INSTRUCTIONS_FILE}, do bounded useful work, record durable decisions in ${RODER_NOTES_FILE} with roder_command writeFile, and schedule a wake only when useful. Do not claim to run while the desktop is closed.`,
             },
           ],
           developerContext: `${context}\n\nNative memory recall:\n${JSON.stringify(recall ?? { unavailable: true })}`,
@@ -574,16 +598,8 @@ export function createRoderAgentService(options: Options) {
           const notes = await files.read(c.id, RODER_NOTES_FILE);
           return { memory: notes.content, path: notes.path, version: notes.version };
         }
-        if (name === "roder_memory_write") {
-          const written = await files.write(c.id, {
-            path: RODER_NOTES_FILE,
-            content: params.memory,
-            expectedVersion: params.expectedVersion,
-            author: "roder",
-          });
-          options.notify?.();
-          return { saved: true, path: written.path, version: written.version };
-        }
+        if (name === "roder_command") return commands.command(c, params);
+        if (name === "roder_issue") return commands.issue(c, params);
         if (name === "roder_wake_schedule") {
           schedule(c, params);
           await persist();

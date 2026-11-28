@@ -78,6 +78,8 @@ Operations for every actor:
   issue answers it: the newest linked thread takes the issue back (status
   `in_progress`), else the Roder (status `todo`).
 - `linkPullRequest {id, url, title?}` links a pull request once per URL.
+- `unlinkPullRequest {id, url}` removes a linked pull request; an unknown URL
+  changes nothing.
 - `askUser {id, question, recommendation?}` makes the user the owner and the
   status `needs_you`, recording the question with the thread that held the
   issue. Refused on a closed issue.
@@ -113,18 +115,19 @@ Agent tool calls go through `handleIssueToolCall`, which always acts as the
 calling thread; never forward agent input with the user actor. The UI only uses
 `window.roderDesktop.request` and existing notification/workspace/thread state.
 
-| Method suffix     | Project params                                                  | Issue params                                        | Result                        |
-| ----------------- | --------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- |
-| `list`            | optional `workspaceId`, `archived`                              | optional `projectId`, `status`, `threadId`, `query` | `{ projects }` / `{ issues }` |
-| `read`            | `id`                                                            | `id`                                                | `{ project }` / `{ issue }`   |
-| `create`          | `name`, optional `description`, `workspaceId`                   | `projectId`, `title`, optional issue fields¹        | `{ project }` / `{ issue }`   |
-| `update`          | `id`, optional `name`, `description`, `workspaceId`, `archived` | `id`, optional `projectId`, `title`, issue fields¹  | `{ project }` / `{ issue }`   |
-| `delete`          | `id` (must have no issues)                                      | `id` (children lose their `parent`)                 | `{ deleted: true }`           |
-| `launch`          | not supported                                                   | `id`                                                | `{ issue, threadId }`         |
-| `comment`         | not supported                                                   | `id`, `text`                                        | `{ issue }`                   |
-| `linkPullRequest` | not supported                                                   | `id`, `url`, optional `title`                       | `{ issue }`                   |
-| `askUser`         | not supported                                                   | `id`, `question`, optional `recommendation`         | `{ issue }`                   |
-| `close`           | not supported                                                   | `id`, `outcome` (`merged` \| `dropped`), `note`     | `{ issue }`                   |
+| Method suffix       | Project params                                                  | Issue params                                        | Result                        |
+| ------------------- | --------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- |
+| `list`              | optional `workspaceId`, `archived`                              | optional `projectId`, `status`, `threadId`, `query` | `{ projects }` / `{ issues }` |
+| `read`              | `id`                                                            | `id`                                                | `{ project }` / `{ issue }`   |
+| `create`            | `name`, optional `description`, `workspaceId`                   | `projectId`, `title`, optional issue fields¹        | `{ project }` / `{ issue }`   |
+| `update`            | `id`, optional `name`, `description`, `workspaceId`, `archived` | `id`, optional `projectId`, `title`, issue fields¹  | `{ project }` / `{ issue }`   |
+| `delete`            | `id` (must have no issues)                                      | `id` (children lose their `parent`)                 | `{ deleted: true }`           |
+| `launch`            | not supported                                                   | `id`                                                | `{ issue, threadId }`         |
+| `comment`           | not supported                                                   | `id`, `text`                                        | `{ issue }`                   |
+| `linkPullRequest`   | not supported                                                   | `id`, `url`, optional `title`                       | `{ issue }`                   |
+| `unlinkPullRequest` | not supported                                                   | `id`, `url`                                         | `{ issue }`                   |
+| `askUser`           | not supported                                                   | `id`, `question`, optional `recommendation`         | `{ issue }`                   |
+| `close`             | not supported                                                   | `id`, `outcome` (`merged` \| `dropped`), `note`     | `{ issue }`                   |
 
 ¹ `description`, `status`, `priority`, `owner`, `doneCriteria`, `outOfScope`,
 `parent`. Threads link through a thread `owner` or `launch`; pull requests and

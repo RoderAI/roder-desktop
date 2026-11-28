@@ -25,6 +25,13 @@ async function temporary() {
   directories.push(directory);
   return directory;
 }
+function writeNotes(roderId: string, content: string, expectedVersion: number) {
+  return {
+    commandId: randomUUID(),
+    roderId,
+    action: { type: "writeFile", path: "NOTES.md", content, expectedVersion },
+  };
+}
 async function store() {
   const root = await temporary();
   return { root, files: createRoderFileStore(root), id: randomUUID() };
@@ -256,9 +263,9 @@ test("writing INSTRUCTIONS.md changes the turn context and the list summary", as
 });
 
 test("roder_files lists, reads one path or a version, and reads history", async () => {
-  const { roders, thread } = await service();
+  const { roders, roder, thread } = await service();
   expect(roderAgentToolDefinitions.map((tool) => tool.name)).toContain("roder_files");
-  await roders.handleTool("roder_memory_write", { memory: "Decision: ship Friday", expectedVersion: 1 }, thread);
+  await roders.handleTool("roder_command", writeNotes(roder.id, "Decision: ship Friday", 1), thread);
   const list = (await roders.handleTool("roder_files", {}, thread)) as { files: RoderFileVersion[] };
   expect(list.files.find((f) => f.path === "NOTES.md")).toMatchObject({ version: 2, author: "roder" });
   expect(await roders.handleTool("roder_files", { path: "NOTES.md" }, thread)).toMatchObject({
@@ -281,18 +288,24 @@ test("roder_files lists, reads one path or a version, and reads history", async 
   await roders.stop();
 });
 
-test("roder_memory_write writes NOTES.md as the Roder and refuses a stale version", async () => {
+test("writeFile writes NOTES.md as the Roder and refuses a stale version", async () => {
   const { roders, roder, thread } = await service();
-  expect(await roders.handleTool("roder_memory_write", { memory: "first", expectedVersion: 1 }, thread)).toEqual({
-    saved: true,
-    path: "NOTES.md",
-    version: 2,
+  expect(await roders.handleTool("roder_command", writeNotes(roder.id, "first", 1), thread)).toMatchObject({
+    action: "writeFile",
+    file: { path: "NOTES.md", version: 2, author: "roder" },
   });
+  await expect(roders.handleTool("roder_command", writeNotes(roder.id, "stale", 1), thread)).rejects.toThrow(
+    "Roder file version conflict on NOTES.md: expected 1, current version is 2",
+  );
   await expect(
-    roders.handleTool("roder_memory_write", { memory: "stale", expectedVersion: 1 }, thread),
-  ).rejects.toThrow("Roder file version conflict on NOTES.md: expected 1, current version is 2");
-  await expect(roders.handleTool("roder_memory_write", { memory: "no version" }, thread)).rejects.toThrow(
-    /expected version/,
+    roders.handleTool(
+      "roder_command",
+      { commandId: "no-version", roderId: roder.id, action: { type: "writeFile", path: "NOTES.md", content: "x" } },
+      thread,
+    ),
+  ).rejects.toThrow(/Missing expectedVersion/);
+  await expect(roders.handleTool("roder_memory_write", { memory: "gone", expectedVersion: 2 }, thread)).rejects.toThrow(
+    /Unknown Roder tool/,
   );
   expect(await roders.handleTool("roder_memory_read", {}, thread)).toEqual({
     memory: "first",

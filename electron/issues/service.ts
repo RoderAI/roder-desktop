@@ -27,6 +27,7 @@ export type IssuesResults = {
   "desktop/issues/update": { issue: Issue };
   "desktop/issues/comment": { issue: Issue };
   "desktop/issues/linkPullRequest": { issue: Issue };
+  "desktop/issues/unlinkPullRequest": { issue: Issue };
   "desktop/issues/askUser": { issue: Issue };
   "desktop/issues/close": { issue: Issue };
   "desktop/issues/delete": { deleted: true };
@@ -490,6 +491,18 @@ export class IssuesService {
         kind: "pullRequest",
         text: `Linked pull request ${url}`,
         changes: [{ field: "pullRequest", before: null, after: url }],
+      });
+      return issueResult(issue);
+    }
+    if (method === "desktop/issues/unlinkPullRequest") {
+      const issue = issueById();
+      const url = pullRequestUrl(p.url);
+      if (!issue.pullRequests.some((pr) => pr.url === url)) return { issue };
+      issue.pullRequests = issue.pullRequests.filter((pr) => pr.url !== url);
+      record(issue, {
+        kind: "pullRequest",
+        text: `Unlinked pull request ${url}`,
+        changes: [{ field: "pullRequest", before: url, after: null }],
       });
       return issueResult(issue);
     }
