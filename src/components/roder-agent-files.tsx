@@ -26,6 +26,21 @@ export function roderFileConflictVersion(error: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
+type Drafts = Partial<Record<RoderFilePath, string>>;
+
+/** Drafts after `saved` was written to `path`: the draft clears only if nothing was typed while the save was in flight. */
+export function draftsAfterSave(drafts: Drafts, path: RoderFilePath, saved: string): Drafts {
+  if (drafts[path] !== saved) return drafts;
+  const next = { ...drafts };
+  delete next[path];
+  return next;
+}
+
+/** History or a preview fetched for one file, shown only while that file is selected, so a late response never lands on another. */
+export function forSelectedFile<T extends { path: RoderFilePath }>(state: T | null, selected: RoderFilePath): T | null {
+  return state?.path === selected ? state : null;
+}
+
 export function RoderAgentFiles({
   roderId,
   initialFiles,
@@ -36,14 +51,16 @@ export function RoderAgentFiles({
   const [files, setFiles] = useState(initialFiles);
   const [selected, setSelected] = useState<RoderFilePath>(initialFiles[0]?.path ?? "INSTRUCTIONS.md");
   const [loaded, setLoaded] = useState<Partial<Record<RoderFilePath, RoderFile>>>({});
-  const [drafts, setDrafts] = useState<Partial<Record<RoderFilePath, string>>>({});
-  const [history, setHistory] = useState<RoderFileVersion[] | null>(null);
-  const [preview, setPreview] = useState<RoderFile | null>(null);
+  const [drafts, setDrafts] = useState<Drafts>({});
+  const [historyState, setHistory] = useState<{ path: RoderFilePath; versions: RoderFileVersion[] } | null>(null);
+  const [previewState, setPreview] = useState<RoderFile | null>(null);
   const [conflict, setConflict] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
+  const history = forSelectedFile(historyState, selected)?.versions ?? null;
+  const preview = forSelectedFile(previewState, selected);
   const file = loaded[selected];
   const draft = drafts[selected] ?? file?.content ?? "";
   const dirty = !!file && draft !== file.content;
@@ -77,7 +94,7 @@ export function RoderAgentFiles({
     setFiles((previous) => previous.map((entry) => (entry.path === path ? stripContent(latest) : entry)));
   }
   async function refreshHistory(path: RoderFilePath) {
-    setHistory((await roderAgentsIpc.fileHistory(roderId, path)).versions);
+    setHistory({ path, versions: (await roderAgentsIpc.fileHistory(roderId, path)).versions });
   }
   function open(path: RoderFilePath) {
     setSelected(path);
@@ -224,11 +241,7 @@ export function RoderAgentFiles({
                     expectedVersion: file.version,
                   });
                   setLoaded((previous) => ({ ...previous, [selected]: { ...written, content: draft } }));
-                  setDrafts((previous) => {
-                    const next = { ...previous };
-                    delete next[selected];
-                    return next;
-                  });
+                  setDrafts((previous) => draftsAfterSave(previous, selected, draft));
                   setFiles((previous) => previous.map((entry) => (entry.path === selected ? written : entry)));
                   setConflict(null);
                   setMessage(`Saved ${selected} as version ${written.version}.`);

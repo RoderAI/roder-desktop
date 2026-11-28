@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { RODER_BRIEF_MAX_BYTES, roderBrief } from "../electron/roder-agents/brief";
-import { RODER_RULES_PROMPT_MAX_BYTES } from "../electron/roder-agents/files";
+import { RODER_INSTRUCTIONS_PROMPT_MAX_BYTES, RODER_RULES_PROMPT_MAX_BYTES } from "../electron/roder-agents/files";
 import { roderGuidePaths } from "../electron/roder-agents/guide";
 import type { RoderFile, RoderFilePath } from "../src/types/roder-agents";
 
@@ -64,12 +64,14 @@ test("an empty INSTRUCTIONS.md starts the first-run interview", () => {
 test("the brief stays within its budget however long the files are", () => {
   const text = brief(`${"r".repeat(RODER_RULES_PROMPT_MAX_BYTES)}RULES-TAIL`, `${"é".repeat(40_000)}PURPOSE-TAIL`);
   expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(RODER_BRIEF_MAX_BYTES);
+  // The fixed text fits its 8 KiB share with room to spare.
+  expect(Buffer.byteLength(brief("", "x"), "utf8")).toBeLessThan(6 * 1024);
   expect(text).not.toContain("RULES-TAIL");
   expect(text).not.toContain("PURPOSE-TAIL");
   expect(text).toContain("[AGENTS.md continues: this is its first");
-  expect(text).toMatch(
-    /\[INSTRUCTIONS\.md continues: this is its first \d+ of 80012 bytes\. Read the rest with roder_files/,
+  // INSTRUCTIONS.md keeps its own 16 KiB cap beside full-length rules.
+  expect(text).toContain(
+    `[INSTRUCTIONS.md continues: this is its first ${RODER_INSTRUCTIONS_PROMPT_MAX_BYTES} of 80012 bytes. Read the rest with roder_files`,
   );
-  // A purpose that fits is carried whole.
-  expect(brief("", "p".repeat(8_000))).toContain("p".repeat(8_000));
+  expect(brief("r".repeat(RODER_RULES_PROMPT_MAX_BYTES), "p".repeat(16_000))).toContain("p".repeat(16_000));
 });

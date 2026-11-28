@@ -27,6 +27,14 @@ type Options = {
   issues?: Pick<IssuesService, "request">;
 };
 type ObjectValue = Record<string, unknown>;
+/** The sprite manager's limit on persona name and mission text. */
+const SPRITE_TEXT_MAX = 16000;
+/** `value` cut to at most `max` UTF-16 units without splitting a surrogate pair. */
+function clip(value: string, max: number): string {
+  if (value.length <= max) return value;
+  const cut = value.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
 function object(value: unknown): ObjectValue {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected an object");
   return value as ObjectValue;
@@ -248,11 +256,22 @@ export function createRoderAgentService(options: Options) {
     await persist();
     return threadId;
   }
-  /** Keeps the list summary in step with INSTRUCTIONS.md; an empty opening paragraph keeps the old one. */
+  /**
+   * Who the sprite is drawn from. The list `mission` can be empty (heading-only or cleared INSTRUCTIONS.md), but the
+   * sprite manager needs non-empty text: use the full INSTRUCTIONS.md, else the name. Names are validated non-empty
+   * on create and load, so a generic fallback can't be reached; null (skip generation) guards an unusable name.
+   */
+  async function spritePersona(c: RoderAgent) {
+    const name = c.name.trim();
+    if (!name || name.length > SPRITE_TEXT_MAX) return null;
+    const instructions = (await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content.trim();
+    const mission = instructions ? clip(instructions, SPRITE_TEXT_MAX) : name;
+    return { id: c.id, name, mission };
+  }
+  /** Keeps the list summary in step with INSTRUCTIONS.md; it is empty while that has no opening paragraph. */
   async function syncMission(c: RoderAgent, path: string) {
     if (path !== RODER_INSTRUCTIONS_FILE) return;
-    const summary = roderInstructionsSummary((await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content);
-    if (summary) c.mission = summary;
+    c.mission = roderInstructionsSummary((await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content);
   }
   function schedule(c: RoderAgent, params: ObjectValue) {
     if (c.wakes.length >= 50) throw new Error("At most 50 pending wakes per Roder");
@@ -285,7 +304,7 @@ export function createRoderAgentService(options: Options) {
     try {
       recall = await options.request("memory/query", {
         scope: { Thread: c.threadId },
-        text: `${c.mission}\n${reason}`,
+        text: c.mission ? `${c.mission}\n${reason}` : reason,
         limit: 5,
         includeGlobal: false,
       });
@@ -428,7 +447,8 @@ export function createRoderAgentService(options: Options) {
         const c: RoderAgent = {
           id: randomUUID(),
           name,
-          mission,
+          // The list summary, the same one later INSTRUCTIONS.md writes produce.
+          mission: roderInstructionsSummary(mission),
           workspaceId,
           threadId: text(snapshot.id, "thread id"),
           previousThreadIds: [],
@@ -449,7 +469,8 @@ export function createRoderAgentService(options: Options) {
         await files.ensure(c.id, { [RODER_INSTRUCTIONS_FILE]: mission });
         roderAgents.push(c);
         await persist();
-        await options.sprites?.enqueue(c);
+        const persona = options.sprites ? await spritePersona(c) : null;
+        if (persona) await options.sprites?.enqueue(persona);
         return detail(c);
       }
       const c = find(params.id);
@@ -459,7 +480,9 @@ export function createRoderAgentService(options: Options) {
         if (!options.sprites) throw Error("Character generation is unavailable");
         if (params.provider !== undefined && params.provider !== "codex" && params.provider !== "openai")
           throw Error("Invalid character generation provider");
-        return options.sprites.retry(c, params.provider === "openai" ? "openai" : "codex");
+        const persona = await spritePersona(c);
+        if (!persona) return options.sprites.get(c.id) ?? null;
+        return options.sprites.retry(persona, params.provider === "openai" ? "openai" : "codex");
       }
       if (method === "desktop/roders/read") return detail(c);
       if (method === "desktop/roders/files/list") return { files: await files.list(c.id) };
@@ -522,7 +545,7 @@ export function createRoderAgentService(options: Options) {
         const result = await options.request("thread/compact", {
           threadId: c.threadId,
           turnId,
-          preserveHint: c.mission,
+          ...(c.mission ? { preserveHint: c.mission } : {}),
         });
         // The summary may have dropped the brief, so the next turn carries it again.
         await turns.forget(c.id);
@@ -607,7 +630,8 @@ export function createRoderAgentService(options: Options) {
             threads.add(id);
           }
           text(c.name, "name", 120);
-          text(c.mission, "mission");
+          // Empty while INSTRUCTIONS.md has no opening paragraph.
+          if (typeof c.mission !== "string" || c.mission.length > 16000) throw new Error("Invalid mission");
           text(c.workspaceId, "workspace id", 500);
           modelChoice(c);
           if (typeof c.enabled !== "boolean") throw new Error("Invalid Roder enabled state");

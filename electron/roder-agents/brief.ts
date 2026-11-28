@@ -8,6 +8,7 @@
 import type { RoderAgent, RoderFile } from "../../src/types/roder-agents";
 import {
   RODER_INSTRUCTIONS_FILE,
+  RODER_INSTRUCTIONS_PROMPT_MAX_BYTES,
   RODER_NOTES_FILE,
   RODER_RULES_FILE,
   RODER_RULES_PROMPT_MAX_BYTES,
@@ -16,13 +17,13 @@ import {
 import { roderGuideIndex } from "./guide";
 
 /**
- * Largest brief a turn carries, in UTF-8 bytes (Zuse `SYSTEM_PROMPT_MAX`).
- * AGENTS.md gets its first 16 KiB; INSTRUCTIONS.md gets what is left, and the
- * excerpt says where to read the rest.
+ * An upper bound on the brief, in UTF-8 bytes. Zuse's `SYSTEM_PROMPT_MAX` only
+ * chooses between its system prompt and a turn; a Roder's brief always rides
+ * in a turn, so its size is bounded by the two file caps instead: the fixed
+ * text, 16 KiB of AGENTS.md and 16 KiB of INSTRUCTIONS.md, each cut with a
+ * line that says where to read the rest.
  */
-export const RODER_BRIEF_MAX_BYTES = 24 * 1024;
-/** Room kept for the line an excerpt adds when it cuts a file. */
-const EXCERPT_NOTE_BYTES = 256;
+export const RODER_BRIEF_MAX_BYTES = 8 * 1024 + RODER_RULES_PROMPT_MAX_BYTES + RODER_INSTRUCTIONS_PROMPT_MAX_BYTES;
 
 /**
  * Thread-level instructions for a Roder's conversation. The brief itself rides
@@ -39,9 +40,9 @@ function rulesSection(rules: RoderFile): string {
 }
 
 /** What the Roder is for. An empty INSTRUCTIONS.md starts the first-run interview. */
-function purposeSection(instructions: RoderFile, maxBytes: number): string {
+function purposeSection(instructions: RoderFile): string {
   if (instructions.content.trim())
-    return `## Purpose (${RODER_INSTRUCTIONS_FILE}, version ${instructions.version})\n${roderFileExcerpt(RODER_INSTRUCTIONS_FILE, instructions.content, maxBytes)}`;
+    return `## Purpose (${RODER_INSTRUCTIONS_FILE}, version ${instructions.version})\n${roderFileExcerpt(RODER_INSTRUCTIONS_FILE, instructions.content, RODER_INSTRUCTIONS_PROMPT_MAX_BYTES)}`;
   return `## Purpose: not set yet
 Nobody has told you what you are for, so this turn starts a short getting-to-know-you conversation before any work. Answer anything the user's message asks first, briefly, then ask about what the message hasn't already answered:
 1. What should you be doing for them? The job in a sentence or two.
@@ -79,7 +80,5 @@ Each turn starts with what changed since your last one. roder_issue {roderId} re
 You run only while the desktop app is open, and the user's pause, run budget and time limit always apply. Schedule a wake with roder_wake_schedule only for a concrete follow-up. roder_memory_save and roder_memory_query keep and search extra facts for this conversation; never store secrets.
 
 `;
-  const rules = rulesSection(files.rules);
-  const fixed = Buffer.byteLength(head, "utf8") + Buffer.byteLength(rules, "utf8");
-  return `${head}${rules}${purposeSection(files.instructions, Math.max(0, RODER_BRIEF_MAX_BYTES - fixed - EXCERPT_NOTE_BYTES))}`;
+  return `${head}${rulesSection(files.rules)}${purposeSection(files.instructions)}`;
 }

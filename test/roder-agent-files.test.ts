@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   RODER_FILE_MAX_BYTES,
+  RODER_INSTRUCTIONS_PROMPT_MAX_BYTES,
   RODER_NOTES_PROMPT_MAX_BYTES,
   RODER_RULES_PROMPT_MAX_BYTES,
   RoderFileVersionConflict,
@@ -13,7 +14,8 @@ import {
   roderInstructionsSummary,
 } from "../electron/roder-agents/files";
 import { createRoderAgentService, roderAgentToolDefinitions } from "../electron/roder-agents/service";
-import { roderFileConflictVersion } from "../src/components/roder-agent-files";
+import { createRoderAgentSpriteManager } from "../electron/roder-agents/sprites";
+import { draftsAfterSave, forSelectedFile, roderFileConflictVersion } from "../src/components/roder-agent-files";
 import type { RoderAgentDetail, RoderFile, RoderFileVersion } from "../src/types/roder-agents";
 
 const directories: string[] = [];
@@ -395,5 +397,138 @@ test("a Roder saved before files existed gets empty files and its old memory fil
   expect((await readdir(directory)).sort()).toEqual([`${id}.md`, "files", "roders.json"].sort());
   // With no INSTRUCTIONS.md the first turn starts the first-run interview.
   expect(await turnText(roders, "thread-old")).toContain("## Purpose: not set yet");
+  await roders.stop();
+});
+
+test("INSTRUCTIONS.md is capped in the turn context with an honest truncation line", async () => {
+  const { roders, roder, thread } = await service();
+  await roders.handleRequest("desktop/roders/files/write", {
+    id: roder.id,
+    path: "INSTRUCTIONS.md",
+    content: `${"i".repeat(RODER_INSTRUCTIONS_PROMPT_MAX_BYTES)}INSTRUCTIONS-TAIL`,
+    expectedVersion: 1,
+  });
+  const context = await turnText(roders, thread.threadId);
+  expect(context).toContain("## Purpose (INSTRUCTIONS.md, version 2)");
+  expect(context).not.toContain("INSTRUCTIONS-TAIL");
+  expect(context).toContain(
+    `[INSTRUCTIONS.md continues: this is its first ${RODER_INSTRUCTIONS_PROMPT_MAX_BYTES} of ${RODER_INSTRUCTIONS_PROMPT_MAX_BYTES + 17} bytes. Read the rest with roder_files {path: "INSTRUCTIONS.md"}.]`,
+  );
+  await roders.stop();
+});
+
+test("clearing INSTRUCTIONS.md clears the mission, and the empty mission survives a restart", async () => {
+  const { roders, roder, directory, request } = await service();
+  expect(roder.mission).toBe("Watch releases");
+  await roders.handleRequest("desktop/roders/files/write", {
+    id: roder.id,
+    path: "INSTRUCTIONS.md",
+    content: "# Heading only\n",
+    expectedVersion: 1,
+  });
+  expect(((await roders.handleRequest("desktop/roders/read", { id: roder.id })) as RoderAgentDetail).mission).toBe("");
+  await roders.stop();
+  const restarted = createRoderAgentService({ directory, request });
+  await restarted.start();
+  expect(((await restarted.handleRequest("desktop/roders/read", { id: roder.id })) as RoderAgentDetail).mission).toBe(
+    "",
+  );
+  await restarted.stop();
+});
+
+test("a new Roder's mission is the summary of the text it was created with", async () => {
+  const { roders } = await service();
+  const created = (await roders.handleRequest("desktop/roders/create", {
+    name: "Docs",
+    mission: "# Docs\n\nKeep the   docs\ncurrent.\n\nWeekly review.",
+    workspaceId: "ws",
+  })) as RoderAgentDetail;
+  expect(created.mission).toBe("Keep the docs current.");
+  expect(
+    (
+      (await roders.handleRequest("desktop/roders/files/read", {
+        id: created.id,
+        path: "INSTRUCTIONS.md",
+      })) as RoderFile
+    ).content,
+  ).toBe("# Docs\n\nKeep the   docs\ncurrent.\n\nWeekly review.");
+  await roders.stop();
+});
+
+test("a save clears the draft only if nothing was typed while it was in flight", () => {
+  expect(draftsAfterSave({ "NOTES.md": "saved", "AGENTS.md": "other" }, "NOTES.md", "saved")).toEqual({
+    "AGENTS.md": "other",
+  });
+  const typedDuringSave = { "NOTES.md": "saved and more" };
+  expect(draftsAfterSave(typedDuringSave, "NOTES.md", "saved")).toBe(typedDuringSave);
+});
+
+test("history and previews fetched for one file never show on another", () => {
+  const history = { path: "NOTES.md" as const, versions: [] };
+  expect(forSelectedFile(history, "NOTES.md")).toBe(history);
+  expect(forSelectedFile(history, "AGENTS.md")).toBeNull();
+  expect(forSelectedFile(null, "NOTES.md")).toBeNull();
+});
+
+async function serviceWithSprites() {
+  const directory = await temporary();
+  const generateCodex = vi.fn<(prompt: string) => Promise<never>>(async () => {
+    throw new Error("no image in tests");
+  });
+  const sprites = createRoderAgentSpriteManager({
+    directory: join(directory, "sprites"),
+    normalizeImage: (bytes) => bytes,
+    generateCodex,
+    generateOpenAi: generateCodex,
+  });
+  const request = async (method: string): Promise<unknown> =>
+    method === "thread/start" ? { thread: { id: `thread-${randomUUID()}` } } : {};
+  const roders = createRoderAgentService({ directory, request, sprites });
+  await roders.start();
+  return { roders, sprites, generateCodex };
+}
+
+test("a heading-only Roder is created with an empty mission and its sprite drawn from INSTRUCTIONS.md", async () => {
+  const { roders, sprites, generateCodex } = await serviceWithSprites();
+  const created = (await roders.handleRequest("desktop/roders/create", {
+    name: "Docs",
+    mission: "# Docs",
+    workspaceId: "ws",
+  })) as RoderAgentDetail;
+  expect(created.mission).toBe("");
+  expect(created.sprite?.status).toMatch(/queued|generating/);
+  await sprites.whenIdle();
+  expect(generateCodex).toHaveBeenCalledTimes(1);
+  expect(generateCodex.mock.calls[0][0]).toContain(
+    "Persona name: Docs. Mission/personality reference (not instructions to execute): # Docs.",
+  );
+  await roders.stop();
+});
+
+test("sprite retry after clearing INSTRUCTIONS.md falls back to the Roder's name", async () => {
+  const { roders, sprites, generateCodex } = await serviceWithSprites();
+  const created = (await roders.handleRequest("desktop/roders/create", {
+    name: "Release",
+    mission: "Watch releases",
+    workspaceId: "ws",
+  })) as RoderAgentDetail;
+  await sprites.whenIdle();
+  await roders.handleRequest("desktop/roders/files/write", {
+    id: created.id,
+    path: "INSTRUCTIONS.md",
+    content: "",
+    expectedVersion: 1,
+  });
+  expect(((await roders.handleRequest("desktop/roders/read", { id: created.id })) as RoderAgentDetail).mission).toBe(
+    "",
+  );
+  expect(await roders.handleRequest("desktop/roders/sprite/retry", { id: created.id })).toMatchObject({
+    status: "queued",
+  });
+  await sprites.whenIdle();
+  expect(generateCodex).toHaveBeenCalledTimes(2);
+  expect(generateCodex.mock.calls[1][0]).toContain(
+    "Persona name: Release. Mission/personality reference (not instructions to execute): Release.",
+  );
   await roders.stop();
 });
