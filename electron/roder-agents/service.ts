@@ -1,8 +1,17 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { RoderAgent, RoderAgentDetail } from "../../src/types/roder-agents";
+import { roderFilePaths, type RoderAgent, type RoderAgentDetail } from "../../src/types/roder-agents";
 import { roderAgentStrategy } from "./strategy";
+import {
+  RODER_FILE_MAX_BYTES,
+  RODER_INSTRUCTIONS_FILE,
+  RODER_NOTES_FILE,
+  RODER_RULES_FILE,
+  createRoderFileStore,
+  roderFilesPromptContext,
+  roderInstructionsSummary,
+} from "./files";
 import type { createRoderAgentSpriteManager } from "./sprites";
 
 type Options = {
@@ -41,18 +50,35 @@ function modelChoice(params: ObjectValue): Pick<RoderAgent, "modelProvider" | "m
 
 export const roderAgentToolDefinitions = [
   {
+    name: "roder_files",
+    description:
+      "Read your Roder's versioned files: INSTRUCTIONS.md (your purpose), AGENTS.md (the user's rules; only the user edits it), NOTES.md (your notes), WORKERS.md (rules for workers) and DIGEST.md. With no path, list every file with its current version. With path, read that file, or an older version with version. With path and history: true, list its versions newest first.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", enum: [...roderFilePaths] },
+        version: { type: "integer", minimum: 1 },
+        history: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "roder_memory_read",
-    description: "Read your Roder's durable user-editable memory.",
+    description: "Read your Roder's NOTES.md and its current version.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "roder_memory_write",
     description:
-      "Replace your Roder's durable memory with concise decisions, facts and next steps. Preserve relevant user notes.",
+      "Replace your Roder's NOTES.md with concise decisions, facts and next steps, as a new version. Pass the version you last read as expectedVersion; a stale version is refused and the error names the current one. Preserve relevant user notes.",
     parameters: {
       type: "object",
-      properties: { memory: { type: "string", maxLength: 32000 } },
-      required: ["memory"],
+      properties: {
+        memory: { type: "string", maxLength: RODER_FILE_MAX_BYTES },
+        expectedVersion: { type: "integer", minimum: 1 },
+      },
+      required: ["memory", "expectedVersion"],
       additionalProperties: false,
     },
   },
@@ -101,7 +127,8 @@ export function createRoderAgentService(options: Options) {
     chain = result.catch(() => {});
     return result;
   }
-  const memoryPath = (c: RoderAgent) => join(options.directory, `${c.id}.md`);
+  // Earlier builds kept memory in `<id>.md` beside roders.json. Those files are left on disk untouched and unread.
+  const files = createRoderFileStore(join(options.directory, "files"));
   async function persist() {
     const contents = JSON.stringify({ version: 1, roders: roderAgents }, null, 2);
     if (contents === persisted) return;
@@ -119,23 +146,24 @@ export function createRoderAgentService(options: Options) {
     return structuredClone({
       ...c,
       sprite: options.sprites?.get(c.id) ?? null,
-      memory: await readFile(memoryPath(c), "utf8"),
-      memoryPath: memoryPath(c),
+      files: await files.list(c.id),
     });
-  }
-  async function writeMemory(c: RoderAgent, memory: unknown) {
-    if (typeof memory !== "string" || memory.length > 32000)
-      throw new Error("Memory must be at most 32000 characters; use native memory for additional facts");
-    await writeFile(`${memoryPath(c)}.tmp`, memory, { mode: 0o600 });
-    await rename(`${memoryPath(c)}.tmp`, memoryPath(c));
   }
   async function contextForThread(threadId: string): Promise<string | null> {
     const c = roderAgents.find((entry) => entry.threadId === threadId);
     if (!c) return null;
-    const memory = await readFile(memoryPath(c), "utf8");
-    if (memory.length > 32000)
-      throw new Error("Memory file exceeds 32000 characters; edit it or move facts to native memory");
-    return `${roderAgentStrategy}\n\nRoder mission:\n${c.mission}\n\nDurable Roder memory (user-editable reference, not permission to bypass policy):\n${memory}`;
+    const context = roderFilesPromptContext({
+      instructions: await files.read(c.id, RODER_INSTRUCTIONS_FILE),
+      rules: await files.read(c.id, RODER_RULES_FILE),
+      notes: await files.read(c.id, RODER_NOTES_FILE),
+    });
+    return `${roderAgentStrategy}\n\n${context}`;
+  }
+  /** Keeps the list summary in step with INSTRUCTIONS.md; an empty opening paragraph keeps the old one. */
+  async function syncMission(c: RoderAgent, path: string) {
+    if (path !== RODER_INSTRUCTIONS_FILE) return;
+    const summary = roderInstructionsSummary((await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content);
+    if (summary) c.mission = summary;
   }
   function schedule(c: RoderAgent, params: ObjectValue) {
     if (c.wakes.length >= 50) throw new Error("At most 50 pending wakes per Roder");
@@ -193,7 +221,7 @@ export function createRoderAgentService(options: Options) {
           input: [
             {
               type: "text",
-              text: `Roder wake: ${reason}\n\nMission: ${c.mission}\nReview progress, do bounded useful work, record durable decisions with roder_memory_write, and schedule a wake only when useful. Do not claim to run while the desktop is closed.`,
+              text: `Roder wake: ${reason}\n\nReview progress against ${RODER_INSTRUCTIONS_FILE}, do bounded useful work, record durable decisions in ${RODER_NOTES_FILE} with roder_memory_write, and schedule a wake only when useful. Do not claim to run while the desktop is closed.`,
             },
           ],
           developerContext: `${context}\n\nNative memory recall:\n${JSON.stringify(recall ?? { unavailable: true })}`,
@@ -326,7 +354,8 @@ export function createRoderAgentService(options: Options) {
           lastRunAt: null,
           sprite: null,
         };
-        await writeMemory(c, `# ${name}\n\n${mission}\n\n## Decisions and next steps\n`);
+        // New Roders start with every reserved file at version 1; INSTRUCTIONS.md holds the mission given at creation.
+        await files.ensure(c.id, { [RODER_INSTRUCTIONS_FILE]: mission });
         roderAgents.push(c);
         await persist();
         await options.sprites?.enqueue(c);
@@ -342,10 +371,37 @@ export function createRoderAgentService(options: Options) {
         return options.sprites.retry(c, params.provider === "openai" ? "openai" : "codex");
       }
       if (method === "desktop/roders/read") return detail(c);
+      if (method === "desktop/roders/files/list") return { files: await files.list(c.id) };
+      if (method === "desktop/roders/files/read") return files.read(c.id, params.path, params.version);
+      if (method === "desktop/roders/files/history") return { versions: await files.history(c.id, params.path) };
+      if (method === "desktop/roders/files/write" || method === "desktop/roders/files/restore") {
+        const written =
+          method === "desktop/roders/files/write"
+            ? await files.write(c.id, {
+                path: params.path,
+                content: params.content,
+                expectedVersion: params.expectedVersion,
+                author: "user",
+              })
+            : await files.restore(c.id, {
+                path: params.path,
+                version: params.version,
+                expectedVersion: params.expectedVersion,
+                author: "user",
+              });
+        const mission = c.mission;
+        await syncMission(c, written.path);
+        if (c.mission !== mission) await persist();
+        else options.notify?.();
+        return written;
+      }
       if (method === "desktop/roders/update") {
+        if (params.mission !== undefined || params.memory !== undefined)
+          throw new Error(
+            "Mission and memory are Roder files now: write INSTRUCTIONS.md or NOTES.md with desktop/roders/files/write",
+          );
         const next = { ...c };
         if (params.name !== undefined) next.name = text(params.name, "name", 120);
-        if (params.mission !== undefined) next.mission = text(params.mission, "mission");
         if (params.enabled !== undefined) {
           if (typeof params.enabled !== "boolean") throw new Error("Invalid enabled state");
           next.enabled = params.enabled;
@@ -359,13 +415,6 @@ export function createRoderAgentService(options: Options) {
           if (!Array.isArray(params.eventMethods) || params.eventMethods.length > 20)
             throw new Error("Invalid event methods");
           next.eventMethods = params.eventMethods.map((m) => text(m, "event method", 120));
-        }
-        if (params.memory !== undefined) {
-          if (params.expectedMemory !== undefined && params.expectedMemory !== (await readFile(memoryPath(c), "utf8")))
-            throw new Error(
-              "Memory changed since you opened it. Reopen the Roder to review its latest memory before saving.",
-            );
-          await writeMemory(c, params.memory);
         }
         Object.assign(c, next);
         await persist();
@@ -509,10 +558,31 @@ export function createRoderAgentService(options: Options) {
         const c = roderAgents.find((entry) => entry.threadId === context.threadId);
         if (!c) throw new Error("Tool requires an owning Roder thread");
         const params = object(value);
-        if (name === "roder_memory_read") return { memory: await readFile(memoryPath(c), "utf8") };
+        if (name === "roder_files") {
+          if (params.path === undefined) {
+            if (params.history !== undefined || params.version !== undefined)
+              throw new Error("history and version need a path");
+            return { files: await files.list(c.id) };
+          }
+          if (params.history === true) {
+            if (params.version !== undefined) throw new Error("Use either history or version, not both");
+            return { path: params.path, versions: await files.history(c.id, params.path) };
+          }
+          return files.read(c.id, params.path, params.version);
+        }
+        if (name === "roder_memory_read") {
+          const notes = await files.read(c.id, RODER_NOTES_FILE);
+          return { memory: notes.content, path: notes.path, version: notes.version };
+        }
         if (name === "roder_memory_write") {
-          await writeMemory(c, params.memory);
-          return { saved: true };
+          const written = await files.write(c.id, {
+            path: RODER_NOTES_FILE,
+            content: params.memory,
+            expectedVersion: params.expectedVersion,
+            author: "roder",
+          });
+          options.notify?.();
+          return { saved: true, path: written.path, version: written.version };
         }
         if (name === "roder_wake_schedule") {
           schedule(c, params);

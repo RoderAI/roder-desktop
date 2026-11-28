@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { roderAgentToolDefinitions, createRoderAgentService } from "../electron/roder-agents/service";
-import type { RoderAgentDetail } from "../src/types/roder-agents";
+import type { RoderAgentDetail, RoderFile } from "../src/types/roder-agents";
 import type { createRoderAgentSpriteManager } from "../electron/roder-agents/sprites";
 
 const directories: string[] = [];
@@ -30,6 +30,9 @@ async function setup(sprites?: ReturnType<typeof createRoderAgentSpriteManager>)
     workspaceId: "ws",
   })) as RoderAgentDetail;
   return { service, roderAgent, request, directory };
+}
+async function notes(service: ReturnType<typeof createRoderAgentService>, id: string) {
+  return ((await service.handleRequest("desktop/roders/files/read", { id, path: "NOTES.md" })) as RoderFile).content;
 }
 
 test("creates paused with a background sprite job and scopes image reads and retries to existing agents", async () => {
@@ -70,12 +73,14 @@ test("creates paused with a background sprite job and scopes image reads and ret
   await service.stop();
 });
 
-test("creates a real thread, starts paused and preserves editable memory across restart", async () => {
+test("creates a real thread, starts paused and preserves editable notes across restart", async () => {
   const { service, roderAgent, directory, request } = await setup();
   expect(roderAgent.enabled).toBe(false);
-  await service.handleRequest("desktop/roders/update", {
+  await service.handleRequest("desktop/roders/files/write", {
     id: roderAgent.id,
-    memory: "Keep the release checklist.",
+    path: "NOTES.md",
+    content: "Keep the release checklist.",
+    expectedVersion: 1,
   });
   await service.tick();
   expect(request.mock.calls.filter(([m]) => m === "turn/start")).toHaveLength(0);
@@ -86,8 +91,8 @@ test("creates a real thread, starts paused and preserves editable memory across 
     id: roderAgent.id,
   })) as RoderAgentDetail;
   expect(detail.threadId).toBe(roderAgent.threadId);
-  expect(detail.memory).toBe("Keep the release checklist.");
-  expect(await readFile(detail.memoryPath, "utf8")).toBe(detail.memory);
+  expect(detail.files.find((f) => f.path === "NOTES.md")?.version).toBe(2);
+  expect(await notes(recovered, roderAgent.id)).toBe("Keep the release checklist.");
   await recovered.stop();
 });
 
@@ -197,16 +202,10 @@ test("tools cannot enable Roders or access another thread's memory", async () =>
   await expect(service.handleTool("roder_enable", {}, { threadId: roderAgent.threadId })).rejects.toThrow(/Unknown/);
   await service.handleTool(
     "roder_memory_write",
-    { memory: "Decision: ship Friday" },
+    { memory: "Decision: ship Friday", expectedVersion: 1 },
     { threadId: roderAgent.threadId },
   );
-  expect(
-    (
-      (await service.handleRequest("desktop/roders/read", {
-        id: roderAgent.id,
-      })) as RoderAgentDetail
-    ).memory,
-  ).toContain("Friday");
+  expect(await notes(service, roderAgent.id)).toContain("Friday");
   await service.stop();
 });
 
@@ -226,7 +225,7 @@ test("native memory uses the released engine's externally tagged scope and per-t
     "turn/start",
     expect.objectContaining({
       threadId: "thread-1",
-      developerContext: expect.stringContaining("Durable Roder memory"),
+      developerContext: expect.stringContaining("## Notes (NOTES.md, version 1)"),
     }),
   );
   await service.stop();
@@ -320,23 +319,22 @@ test("configured events coalesce, exclude the Roder's own thread, and never enab
   await service.stop();
 });
 
-test("memory saves reject stale editor content rather than losing agent updates", async () => {
+test("notes saves reject stale editor content rather than losing agent updates", async () => {
   const { service, roderAgent } = await setup();
-  await service.handleTool("roder_memory_write", { memory: "Agent's new decision" }, { threadId: roderAgent.threadId });
+  await service.handleTool(
+    "roder_memory_write",
+    { memory: "Agent's new decision", expectedVersion: 1 },
+    { threadId: roderAgent.threadId },
+  );
   await expect(
-    service.handleRequest("desktop/roders/update", {
+    service.handleRequest("desktop/roders/files/write", {
       id: roderAgent.id,
-      memory: "Old user draft",
-      expectedMemory: roderAgent.memory,
+      path: "NOTES.md",
+      content: "Old user draft",
+      expectedVersion: roderAgent.files.find((f) => f.path === "NOTES.md")!.version,
     }),
-  ).rejects.toThrow(/Memory changed/);
-  expect(
-    (
-      (await service.handleRequest("desktop/roders/read", {
-        id: roderAgent.id,
-      })) as RoderAgentDetail
-    ).memory,
-  ).toBe("Agent's new decision");
+  ).rejects.toThrow(/current version is 2/);
+  expect(await notes(service, roderAgent.id)).toBe("Agent's new decision");
   await service.stop();
 });
 
@@ -378,18 +376,21 @@ test("a missing persisted thread is never silently replaced", async () => {
   await service.stop();
 });
 
-test("interactive context belongs to the Roder thread and rereads external memory edits", async () => {
+test("interactive context belongs to the Roder thread and rereads notes edits", async () => {
   const { service, roderAgent, request } = await setup();
   request.mockClear();
   expect(await service.contextForThread("unrelated-thread")).toBeNull();
   expect(await service.contextForThread(roderAgent.threadId)).toContain(roderAgent.mission);
-  await writeFile(roderAgent.memoryPath, "External edit: release is now Monday.");
+  await service.handleRequest("desktop/roders/files/write", {
+    id: roderAgent.id,
+    path: "NOTES.md",
+    content: "User edit: release is now Monday.",
+    expectedVersion: 1,
+  });
   const context = await service.contextForThread(roderAgent.threadId);
-  expect(context).toContain("External edit: release is now Monday.");
+  expect(context).toContain("User edit: release is now Monday.");
   expect(context).toContain(roderAgent.mission);
   expect(request).not.toHaveBeenCalled();
-  await writeFile(roderAgent.memoryPath, "x".repeat(32001));
-  await expect(service.contextForThread(roderAgent.threadId)).rejects.toThrow(/exceeds 32000/);
   await service.stop();
 });
 
@@ -440,10 +441,14 @@ test("promotion retains the existing idle thread and is idempotent without repla
   request.mockClear();
   const params = { threadId: "existing", workspaceId: "ws", name: "Project", mission: "Maintain the project" };
   const c = (await service.handleRequest("desktop/roders/promote", params)) as RoderAgentDetail;
-  await service.handleTool("roder_memory_write", { memory: "Existing decision" }, { threadId: "existing" });
+  await service.handleTool(
+    "roder_memory_write",
+    { memory: "Existing decision", expectedVersion: 1 },
+    { threadId: "existing" },
+  );
   const again = (await service.handleRequest("desktop/roders/promote", params)) as RoderAgentDetail;
   expect(again.id).toBe(c.id);
-  expect(again.memory).toBe("Existing decision");
+  expect(await notes(service, c.id)).toBe("Existing decision");
   expect(c).toMatchObject({ threadId: "existing", model: "existing-model", enabled: false });
   expect(request).not.toHaveBeenCalledWith("thread/start", expect.anything());
   await expect(service.handleRequest("desktop/roders/promote", { ...params, workspaceId: "wrong" })).rejects.toThrow(
