@@ -132,12 +132,33 @@ test("releases pinned intent when the user scrolls away from the end", () => {
   ).toBe(false);
 });
 
-test("restores pinned intent when scrolling reaches the end", () => {
+test("stays detached when a layout change makes the viewport appear to be at the end", () => {
   expect(
     nextTranscriptPinnedToEnd({
       observedCanScrollToBottom: false,
       pinnedToEnd: false,
       userScrollIntent: false,
+    }),
+  ).toBe(false);
+});
+
+test("does not re-pin on a small upward scroll still within the end threshold", () => {
+  expect(
+    nextTranscriptPinnedToEnd({
+      observedCanScrollToBottom: false,
+      pinnedToEnd: false,
+      userScrollIntent: true,
+      movingUp: true,
+    }),
+  ).toBe(false);
+});
+
+test("resumes following when the user scrolls back to the end", () => {
+  expect(
+    nextTranscriptPinnedToEnd({
+      observedCanScrollToBottom: false,
+      pinnedToEnd: false,
+      userScrollIntent: true,
     }),
   ).toBe(true);
 });
@@ -256,6 +277,12 @@ test("captures a viewport near the end as pinned", () => {
     pinnedToEnd: true,
     scrollOffset: 1_398,
   });
+});
+
+test("remembers manual scroll intent even when a resize clamps the saved offset to the end", () => {
+  expect(
+    transcriptScrollRestorationStateFromViewport({ clientHeight: 600, scrollHeight: 2_000, scrollTop: 1_400 }, false),
+  ).toEqual({ pinnedToEnd: false, scrollOffset: 1_400 });
 });
 
 test("clamps captured viewport scroll offsets to the scroll start", () => {

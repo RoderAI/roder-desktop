@@ -97,6 +97,124 @@ test("composer permission and reasoning survive a renderer reload for the thread
   }
 });
 
+test("selecting a thread restores its saved model and permissions before the transcript loads", async () => {
+  const thread: RoderThread = {
+    id: "thread-2",
+    model: "old-model",
+    modelProvider: "old-provider",
+    preview: "Thread",
+    cwd: "/workspace",
+    createdAt: 1,
+    updatedAt: 1,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  };
+  let finish!: (result: { thread: RoderThread }) => void;
+  const pending = new Promise<{ thread: RoderThread }>((resolve) => {
+    finish = resolve;
+  });
+  const request = vi.fn<(method: string) => Promise<unknown>>(async (method) =>
+    method === "thread/history/read" ? pending : {},
+  );
+  const store = await loadRoderStore(request);
+  const selectionMode = { type: "manual" as const, provider: "my-provider", model: "my-model", reasoning: "high" };
+  store.setState({
+    threads: [thread],
+    selectedModel: "other-model",
+    threadControlsByThread: {
+      [thread.id]: {
+        model: "my-model",
+        modelProvider: "my-provider",
+        reasoning: "high",
+        policyMode: "bypass",
+        agentSwarmMode: true,
+        selectionMode,
+      },
+    },
+  });
+
+  const selected = store.getState().selectThread(thread.id);
+  const expected = {
+    selectedModel: "my-model",
+    selectedModelProvider: "my-provider",
+    selectedReasoning: "high",
+    selectedPolicyMode: "bypass",
+    agentSwarmMode: true,
+    selectedSelectionMode: selectionMode,
+  };
+  expect(store.getState()).toMatchObject(expected);
+  finish({ thread });
+  await selected;
+  expect(store.getState()).toMatchObject(expected);
+});
+
+test("a model selection response updates its originating thread, not the thread now open", async () => {
+  const thread: RoderThread = {
+    id: "thread-2",
+    model: "other-model",
+    modelProvider: "other-provider",
+    preview: "Other thread",
+    cwd: "/workspace",
+    createdAt: 1,
+    updatedAt: 1,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  };
+  let finish!: (result: unknown) => void;
+  const pending = new Promise<unknown>((resolve) => {
+    finish = resolve;
+  });
+  const request = vi.fn<(method: string) => Promise<unknown>>(async (method) => {
+    if (method === "model/select") return pending;
+    if (method === "thread/history/read") return { thread };
+    return {};
+  });
+  const store = await loadRoderStore(request);
+  const modelChange = store.getState().setSelectedModel("my-model", "my-provider");
+  await store.getState().selectThread(thread.id);
+  finish({
+    model: "canonical-model",
+    provider: "my-provider",
+    reasoning: "low",
+    selectionMode: { type: "manual", provider: "my-provider", model: "canonical-model", reasoning: "low" },
+  });
+  await modelChange;
+
+  expect(store.getState()).toMatchObject({ activeThreadId: thread.id, selectedModel: thread.model });
+  expect(store.getState().threadControlsByThread["thread-1"]).toMatchObject({
+    model: "canonical-model",
+    modelProvider: "my-provider",
+  });
+  expect(store.getState().threadControlsByThread[thread.id]).toBeUndefined();
+});
+
+test("Full access can be saved as the app default without a model or changing an explicit thread override", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method, params) => {
+    if (method === "settings/set_default_mode") return { default_mode: (params as { mode: string }).mode };
+    if (method === "thread/set_mode") return params;
+    return {};
+  });
+  const store = await loadRoderStore(request);
+  await store.getState().setSelectedPolicyMode("plan");
+  store.getState().setDefaultPolicyMode("bypass");
+  expect(store.getState().defaultPolicyMode).not.toBe("bypass");
+
+  await store.getState().saveDefaults();
+
+  expect(request).toHaveBeenCalledWith("settings/set_default_mode", { mode: "bypass" });
+  expect(request.mock.calls.map(([method]) => method)).not.toContain("model/select");
+  expect(store.getState()).toMatchObject({ defaultPolicyMode: "bypass", selectedPolicyMode: "plan" });
+
+  await store.getState().setSelectedPolicyMode(null);
+  expect(request).toHaveBeenLastCalledWith(
+    "thread/set_mode",
+    expect.objectContaining({ threadId: "thread-1", mode: "bypass" }),
+  );
+  expect(store.getState().threadControlsByThread["thread-1"]?.policyMode).toBeUndefined();
+  expect(store.getState().selectedPolicyMode).toBe("bypass");
+
+  store.getState().stageNewThread("/workspace");
+  expect(store.getState().selectedPolicyMode).toBe("bypass");
+});
+
 test("external persistentAgent promotion refreshes cached model controls without losing the active transcript", async () => {
   const cached: RoderThread = {
     id: "thread-1",
@@ -1930,6 +2048,83 @@ test("switching chats derives composer busy from the selected thread", async () 
   expect(store.getState().busy).toBe(true);
 });
 
+test("first send creates the opted-in worktree and reuses it when retrying thread startup", async () => {
+  const workspace = {
+    id: "ws-1",
+    name: "workspace",
+    roots: [{ id: "root-1", path: "/workspace", name: "workspace" }],
+    defaultRootId: "root-1",
+    updatedAt: 1770000000,
+  };
+  const path = "/checkouts/isolated";
+  let shouldFail = true;
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async (method) => {
+    if (method === "thread/start") {
+      if (shouldFail) throw new Error("Thread startup failed");
+      return {
+        thread: {
+          ...runningThread(),
+          id: "thread-created",
+          workspaceId: workspace.id,
+          rootId: "checkout-root",
+          cwd: path,
+          status: { type: "idle", activeTurnId: null, activeFlags: [] },
+        },
+      };
+    }
+    if (method === "turn/start") return { turnId: "turn-created" };
+    return {};
+  });
+  const createThreadWorktree = vi.fn<Window["roderDesktop"]["createThreadWorktree"]>(async (_context, progress) => {
+    progress("checking-out");
+    return {
+      path,
+      branch: "roder-thread-test",
+      head: "abc",
+      primary: false,
+      managed: true,
+      locked: false,
+      missing: false,
+    };
+  });
+  const store = await loadRoderStore(request, { createThreadWorktree });
+  store.setState({
+    status: { state: "ready", binary: "test", cwd: "/workspace" },
+    workspaces: [workspace],
+    selectedWorkspaceId: workspace.id,
+    selectedRootId: workspace.defaultRootId,
+    selectedWorkspaceCwd: "/workspace",
+  });
+  store.getState().stageNewThread("/workspace");
+  const draft = { workspaceId: workspace.id, rootId: workspace.defaultRootId };
+  store.getState().setDraftWorktree(draft);
+  expect(createThreadWorktree).not.toHaveBeenCalled();
+  const steps: (string | null)[] = [];
+  const unsubscribe = store.subscribe((state, previous) => {
+    if (state.worktreeSetupStep !== previous.worktreeSetupStep) steps.push(state.worktreeSetupStep);
+  });
+
+  try {
+    await expect(store.getState().sendPrompt("first prompt")).rejects.toThrow("Thread startup failed");
+    expect(store.getState().draftWorktree).toEqual({ ...draft, path });
+    expect(store.getState().activeThreadId).toBe("");
+    expect(steps).toEqual(["preparing", "checking-out", "starting-thread", null]);
+    shouldFail = false;
+
+    await store.getState().sendPrompt("first prompt");
+    expect(createThreadWorktree).toHaveBeenCalledExactlyOnceWith(draft, expect.any(Function));
+    expect(request).toHaveBeenCalledWith(
+      "thread/start",
+      expect.objectContaining({ ...draft, desktopWorktreePath: path }),
+    );
+    expect(request).toHaveBeenCalledWith("turn/start", expect.objectContaining({ threadId: "thread-created" }));
+    expect(store.getState().activeThreadId).toBe("thread-created");
+    expect(store.getState().draftWorktree).toBeNull();
+  } finally {
+    unsubscribe();
+  }
+});
+
 test("queued prompts staged on the new-thread route move to the created thread", async () => {
   const workspace = {
     id: "ws-1",
@@ -1986,6 +2181,10 @@ test("queued prompts staged on the new-thread route move to the created thread",
   await useRoderStore.getState().sendPrompt("first prompt");
 
   expect(useRoderStore.getState().activeThreadId).toBe("thread-created");
+  expect(request).toHaveBeenCalledWith(
+    "thread/start",
+    expect.not.objectContaining({ desktopWorktreePath: expect.anything() }),
+  );
   expect(request).toHaveBeenCalledWith("turn/start", expect.objectContaining({ threadId: "thread-created" }));
   expect(useRoderStore.getState().threadDetails["thread-1"].status.type).toBe("running");
   expect(useRoderStore.getState().queuedPromptsByThread).toEqual({

@@ -151,6 +151,10 @@ function selectAgentState(state: RoderStoreState) {
     selectedSelectionMode: state.selectedSelectionMode,
     selectedReasoning: state.selectedReasoning,
     selectedPolicyMode: state.selectedPolicyMode,
+    usesDefaultPolicyMode:
+      (state.activeThreadId
+        ? state.threadControlsByThread[state.activeThreadId]?.policyMode
+        : state.draftComposerPreferences.policyMode) === undefined,
     agentSwarmMode: state.agentSwarmMode,
     agentSwarmModeAvailable: state.agentSwarmModeAvailable,
     workspaces: state.workspaces,

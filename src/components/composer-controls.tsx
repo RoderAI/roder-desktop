@@ -51,10 +51,12 @@ export const pickerMenuSurfaceClassName = "bg-card text-card-foreground ring-bor
 export function PolicyModePicker({
   selectedMode,
   onChange,
+  usesDefault,
   locked = false,
 }: {
   selectedMode: PolicyMode;
-  onChange: (mode: PolicyMode) => void;
+  onChange: (mode: PolicyMode | null) => void;
+  usesDefault?: boolean;
   locked?: boolean;
 }): React.JSX.Element {
   const selected = policyModeOptions.find((option) => option.mode === selectedMode) ?? policyModeOptions[0];
@@ -86,10 +88,16 @@ export function PolicyModePicker({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-64">
         <DropdownMenuGroup>
+          {usesDefault !== undefined && (
+            <DropdownMenuItem selected={usesDefault} onSelect={() => onChange(null)}>
+              <span className="flex-1">Use app default</span>
+              {usesDefault && <Check className="size-3.5 shrink-0 text-primary" />}
+            </DropdownMenuItem>
+          )}
           {policyModeOptions.map((option) => (
             <DropdownMenuItem
               key={option.mode}
-              selected={option.mode === selected.mode}
+              selected={!usesDefault && option.mode === selected.mode}
               className="items-start gap-2 py-2"
               onSelect={() => onChange(option.mode)}
             >
@@ -97,7 +105,9 @@ export function PolicyModePicker({
                 <div className="truncate text-foreground">{option.label}</div>
                 <div className="mt-0.5 text-sm leading-5 text-muted-foreground">{option.description}</div>
               </div>
-              {option.mode === selected.mode && <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />}
+              {!usesDefault && option.mode === selected.mode && (
+                <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              )}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>

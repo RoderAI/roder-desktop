@@ -1,3 +1,4 @@
+import type { MarkdownShellResult } from "@/lib/markdown-shell-command";
 import type { ConversationMessage, RoderModel, RoderThread, Workspace } from "@/types/roder";
 
 export const noop = () => {};
@@ -11,6 +12,15 @@ export const workspace: Workspace = {
   updatedAt: 1760000000,
 };
 export const workspacePath = workspace.roots[0].path;
+
+export const storybookShellTarget = {
+  cwd: workspacePath,
+  run: async (): Promise<MarkdownShellResult> => ({
+    stdout: "Storybook preview: no commands were executed.\n",
+    stderr: "",
+    exitCode: 0,
+  }),
+};
 
 export const models: RoderModel[] = [
   {

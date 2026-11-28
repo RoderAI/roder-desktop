@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import roderAppIcon from "@/assets/roder-app-icon.png";
+import { OnboardingComputerUseStep } from "@/components/onboarding/onboarding-computer-use";
+import { OnboardingFullDiskAccessStep } from "@/components/onboarding/onboarding-full-disk-access";
 import { OnboardingModelsStep } from "@/components/onboarding/onboarding-models";
 import { OnboardingProjectStep } from "@/components/onboarding/onboarding-project";
 import { OnboardingProvidersStep } from "@/components/onboarding/onboarding-providers";
@@ -15,8 +17,7 @@ import {
   isProviderReady,
   nextOnboardingStep,
   onboardingMinWindowWidth,
-  onboardingStepIndex,
-  onboardingSteps,
+  onboardingStepsForPlatform,
   pickDefaultModel,
   previousOnboardingStep,
   type OnboardingStep,
@@ -49,6 +50,8 @@ export function OnboardingFlow(): React.JSX.Element {
     defaultModel ? { id: defaultModel, provider: defaultModelProvider } : null,
   );
   const [project, setProject] = useState<Workspace | null>(null);
+  const [computerUseReady, setComputerUseReady] = useState(false);
+  const [diskSettingsOpened, setDiskSettingsOpened] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,11 +75,14 @@ export function OnboardingFlow(): React.JSX.Element {
   const visibleKeys = new Set(visibleModelIdsFor(models, hiddenModelIds));
   const readyProviderCount = readyProviderIds.size;
 
-  const stepIndex = onboardingStepIndex(step);
+  const steps = onboardingStepsForPlatform(typeof window === "undefined" ? undefined : window.roderDesktop?.platform);
+  const stepIndex = steps.indexOf(step);
   const isLastStep = step === "ready";
 
   function goTo(next: OnboardingStep): void {
     setError(null);
+    if (next === "computer-use") setComputerUseReady(false);
+    if (next === "full-disk-access") setDiskSettingsOpened(false);
     setStep(next);
   }
 
@@ -105,7 +111,7 @@ export function OnboardingFlow(): React.JSX.Element {
         setBusy(false);
       }
     }
-    goTo(nextOnboardingStep(step));
+    goTo(nextOnboardingStep(step, steps));
   }
 
   async function chooseProject(): Promise<void> {
@@ -132,7 +138,7 @@ export function OnboardingFlow(): React.JSX.Element {
       finish();
       return;
     }
-    goTo(nextOnboardingStep(step));
+    goTo(nextOnboardingStep(step, steps));
   }
 
   const canContinue =
@@ -146,7 +152,16 @@ export function OnboardingFlow(): React.JSX.Element {
             ? project !== null && !busy
             : true;
 
-  const continueLabel = step === "welcome" ? "Get started" : step === "ready" ? "Start your first agent" : "Continue";
+  const canSkipPermissionStep =
+    (step === "computer-use" && !computerUseReady) || (step === "full-disk-access" && !diskSettingsOpened);
+  const continueLabel =
+    step === "welcome"
+      ? "Get started"
+      : step === "ready"
+        ? "Start your first agent"
+        : canSkipPermissionStep
+          ? "Skip for now"
+          : "Continue";
 
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-background text-foreground">
@@ -157,7 +172,7 @@ export function OnboardingFlow(): React.JSX.Element {
         </div>
         {/* Pinned here, not in the scrolling content, so the user always sees where they are. */}
         <div className="min-w-0 max-w-md flex-1">
-          <OnboardingProgress currentIndex={stepIndex} />
+          <OnboardingProgress currentIndex={stepIndex} steps={steps} />
         </div>
         {!isLastStep && (
           <Button variant="ghost" size="sm" className="no-drag" onClick={finish}>
@@ -194,6 +209,10 @@ export function OnboardingFlow(): React.JSX.Element {
             {step === "project" && (
               <OnboardingProjectStep project={project} busy={busy} onChooseFolder={() => void chooseProject()} />
             )}
+            {step === "computer-use" && <OnboardingComputerUseStep onReadyChange={setComputerUseReady} />}
+            {step === "full-disk-access" && (
+              <OnboardingFullDiskAccessStep onSettingsOpened={() => setDiskSettingsOpened(true)} />
+            )}
             {step === "ready" && (
               <OnboardingReadyStep
                 providers={providers}
@@ -214,13 +233,13 @@ export function OnboardingFlow(): React.JSX.Element {
           </div>
           <div className="flex items-center gap-2">
             {stepIndex > 0 && (
-              <Button variant="ghost" onClick={() => goTo(previousOnboardingStep(step))} disabled={busy}>
+              <Button variant="ghost" onClick={() => goTo(previousOnboardingStep(step, steps))} disabled={busy}>
                 <ArrowLeft className="size-4" />
                 Back
               </Button>
             )}
             {step === "project" && (
-              <Button variant="ghost" onClick={() => goTo(nextOnboardingStep(step))} disabled={busy}>
+              <Button variant="ghost" onClick={() => goTo(nextOnboardingStep(step, steps))} disabled={busy}>
                 Skip for now
               </Button>
             )}
@@ -239,18 +258,24 @@ export function OnboardingFlow(): React.JSX.Element {
   );
 }
 
-function OnboardingProgress({ currentIndex }: { currentIndex: number }): React.JSX.Element {
+function OnboardingProgress({
+  currentIndex,
+  steps,
+}: {
+  currentIndex: number;
+  steps: readonly OnboardingStep[];
+}): React.JSX.Element {
   return (
     <div
       className="flex items-center gap-3"
       role="progressbar"
       aria-label="Setup progress"
       aria-valuemin={1}
-      aria-valuemax={onboardingSteps.length}
+      aria-valuemax={steps.length}
       aria-valuenow={currentIndex + 1}
     >
       <div className="flex flex-1 gap-1.5">
-        {onboardingSteps.map((step, index) => (
+        {steps.map((step, index) => (
           <span
             key={step}
             className={cn(
@@ -261,7 +286,7 @@ function OnboardingProgress({ currentIndex }: { currentIndex: number }): React.J
         ))}
       </div>
       <span className="shrink-0 text-sm text-muted-foreground">
-        {currentIndex + 1} / {onboardingSteps.length}
+        {currentIndex + 1} / {steps.length}
       </span>
     </div>
   );

@@ -44,6 +44,7 @@ const policyOptions: Array<{ mode: PolicyMode; label: string; description: strin
 ];
 
 export function GeneralSettingsPanel(): React.JSX.Element {
+  const hydrated = useRoderStore((state) => state.hydrated);
   const allModels = useRoderStore((state) => state.models);
   const routingOptions = useRoderStore((state) => state.routingOptions);
   const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
@@ -51,7 +52,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
   const defaultModelProvider = useRoderStore((state) => state.defaultModelProvider);
   const defaultSelectionMode = useRoderStore((state) => state.defaultSelectionMode);
   const defaultReasoning = useRoderStore((state) => state.defaultReasoning);
-  const defaultPolicyMode = useRoderStore((state) => state.defaultPolicyMode);
+  const defaultPolicyMode = useRoderStore((state) => state.pendingDefaultPolicyMode ?? state.defaultPolicyMode);
   const setDefaultModel = useRoderStore((state) => state.setDefaultModel);
   const setDefaultAutoModel = useRoderStore((state) => state.setDefaultAutoModel);
   const setDefaultReasoning = useRoderStore((state) => state.setDefaultReasoning);
@@ -83,7 +84,6 @@ export function GeneralSettingsPanel(): React.JSX.Element {
     : selectedModelRecord
       ? modelValue(selectedModelRecord)
       : "";
-  const canSave = Boolean(selectedAutoOption || selectedModelRecord) && !saving;
 
   async function saveDefaultControls(): Promise<void> {
     setSaving(true);
@@ -104,9 +104,9 @@ export function GeneralSettingsPanel(): React.JSX.Element {
       <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
         <div>
           <h1 className="text-base font-medium">General</h1>
-          <p className="mt-1 text-base text-muted-foreground">Defaults for new work</p>
+          <p className="mt-1 text-base text-muted-foreground">Defaults for threads without their own settings</p>
         </div>
-        <Button variant="accent" size="sm" disabled={!canSave} onClick={() => void saveDefaultControls()}>
+        <Button variant="accent" size="sm" disabled={!hydrated || saving} onClick={() => void saveDefaultControls()}>
           {saved ? <Check className="size-3.5" /> : <Save className="size-3.5" />}
           {saving ? "Saving" : saved ? "Saved" : "Save defaults"}
         </Button>
@@ -170,7 +170,7 @@ export function GeneralSettingsPanel(): React.JSX.Element {
         </SettingsRow>
 
         <SettingsRow
-          label="Policy mode"
+          label="Default permissions"
           description={policyOptions.find((option) => option.mode === defaultPolicyMode)?.description ?? ""}
         >
           <Select

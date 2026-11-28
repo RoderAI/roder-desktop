@@ -2,6 +2,7 @@ import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import { AppSidebar } from "../src/components/app-sidebar";
+import { readSidebarThreadNames, renameSidebarThread } from "../src/lib/sidebar-thread-names";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ to, search: _search, ...props }: ComponentProps<"a"> & { to: string; search?: unknown }) =>
@@ -89,4 +90,50 @@ test("archived folder groups stay hidden after reload, including newly loaded co
   expect(html).toContain("Visible conversation");
   expect(html).toContain('aria-label="Archive project visible"');
   expect(html).toContain('aria-label="New agent in visible"');
+});
+
+test("renaming a conversation saves its sidebar label by ID without changing other conversations", () => {
+  const storage = new Map<string, string>();
+  vi.stubGlobal("window", {
+    localStorage: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    },
+  });
+  const names = renameSidebarThread(readSidebarThreadNames(), "one", "  New display name  ");
+  renameSidebarThread(names, "one", "  ");
+  const action = vi.fn<() => void>();
+  const html = renderToStaticMarkup(
+    createElement(AppSidebar, {
+      persistentAgentsState: { persistentAgents: [], error: null, loading: false, refresh: async () => undefined },
+      threads: [
+        { id: "one", name: "Old name" },
+        { id: "two", name: "Other name" },
+      ].map((thread) => ({
+        ...thread,
+        cwd: "/workspace/project",
+        preview: "",
+        updatedAt: 100,
+        turns: [],
+        status: { type: "idle" as const, activeTurnId: null, activeFlags: [] },
+      })),
+      activeThreadId: "one",
+      activeView: "chat",
+      hasMoreThreads: false,
+      loadingMoreThreads: false,
+      reserveTitlebarSpace: false,
+      onSelectThread: action,
+      onArchiveThread: action,
+      onLoadMoreThreads: action,
+      onNewProject: action,
+      onNewThread: action,
+      onNewThreadInFolder: action,
+      onOpenPlugins: action,
+      onOpenSettings: action,
+    }),
+  );
+
+  expect(html).toContain(">New display name</span>");
+  expect(html).toContain(">Other name</span>");
+  expect(html).not.toContain("Old name");
 });

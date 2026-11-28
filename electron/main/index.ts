@@ -14,7 +14,7 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { existsSync, watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { savePngDataUrl } from "../attachment-images";
@@ -64,11 +64,17 @@ import { cloudMachineThreadParams } from "../cloud-machines/thread-routing";
 import { effectiveRunnerProviderId } from "../../src/lib/cloud-machines";
 import { findClaudeCli } from "../onboarding/claude-cli";
 import { detectEnvironmentProviders } from "../onboarding/environment";
+import {
+  openMacComputerUseSettings,
+  openMacFullDiskAccessSettings,
+  readMacComputerUsePermissions,
+} from "../onboarding/macos-computer-use";
 import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } from "../onboarding/record";
 import { ExtensionHost } from "../extensions/extension-host";
 import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient } from "../roder/app-server-client";
+import { applyDesktopTurnPolicy } from "../roder/desktop-turn-policy";
 import { DesktopAgentTools } from "../agents/desktop-agent-tools";
 import { IssuesService } from "../issues/service";
 import { handleIssueToolCall, issueToolDefinitions } from "../issues/tools";
@@ -94,6 +100,7 @@ import type { LocalWorktreeContext } from "../../src/lib/local-worktrees";
 import { DesktopWorktrees } from "../worktrees/desktop-worktrees";
 import { GitWorktrees } from "../worktrees/git-worktrees";
 import { TerminalManager, type TerminalStartOptions } from "../terminal/pty-manager";
+import { runMarkdownShellCommand } from "../terminal/markdown-shell-command";
 import { createAutoUpdateController } from "./auto-update";
 import {
   createApplicationMenuTemplate,
@@ -369,6 +376,11 @@ ipcMain.handle("worktrees:list", (_event, context: LocalWorktreeContext) => getD
 ipcMain.handle("worktrees:create", (_event, context: LocalWorktreeContext, branch: string) =>
   getDesktopWorktrees().create(context, branch),
 );
+ipcMain.handle("worktrees:createForThread", (event, context: LocalWorktreeContext, requestId: number) =>
+  getDesktopWorktrees().createForThread(context, (step) => {
+    if (!event.sender.isDestroyed()) event.sender.send("worktrees:checkoutStep", requestId, step);
+  }),
+);
 ipcMain.handle("worktrees:remove", (_event, context: LocalWorktreeContext, path: string) =>
   getDesktopWorktrees().remove(context, path),
 );
@@ -404,6 +416,24 @@ ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
   terminal.start({ ...options, cwd: options?.cwd || process.cwd() }),
 );
 ipcMain.handle("terminal:write", (_event, data: string, id?: string) => terminal.write(data, id));
+ipcMain.handle("terminal:runMarkdownCommand", (event, command: unknown) => {
+  const contents = mainWindow?.webContents;
+  const frame = event.senderFrame;
+  if (!contents || event.sender !== contents || !frame || frame.parent) {
+    throw new Error("Only the desktop window can run a Markdown command.");
+  }
+  const actual = new URL(frame.url);
+  const renderer = new URL(
+    MAIN_WINDOW_VITE_DEV_SERVER_URL ??
+      pathToFileURL(join(mainDir, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)).href,
+  );
+  actual.hash = renderer.hash = "";
+  actual.search = renderer.search = "";
+  if (actual.href !== renderer.href) {
+    throw new Error("Only the desktop window can run a Markdown command.");
+  }
+  return runMarkdownShellCommand(command);
+});
 ipcMain.handle("terminal:resize", (_event, cols: number, rows: number, id?: string) => terminal.resize(cols, rows, id));
 ipcMain.handle("terminal:stop", (_event, id?: string) => terminal.stop(id));
 ipcMain.handle("browser:toggle", (_event, bounds?: Rectangle) => browser.toggle(scaleRendererBounds(bounds)));
@@ -441,6 +471,13 @@ ipcMain.handle("onboarding:complete", () =>
   writeOnboardingRecord(onboardingRecordPath(process.env, homedir()), new Date().toISOString()),
 );
 ipcMain.handle("onboarding:environment", () => detectEnvironmentProviders(process.env));
+ipcMain.handle("computerUse:macPermissions", () => readMacComputerUsePermissions(process.platform));
+ipcMain.handle("computerUse:openMacSettings", (_event, permission: unknown) =>
+  openMacComputerUseSettings(process.platform, permission, (url) => shell.openExternal(url)),
+);
+ipcMain.handle("computerUse:openFullDiskAccessSettings", () =>
+  openMacFullDiskAccessSettings(process.platform, process.getSystemVersion(), (url) => shell.openExternal(url)),
+);
 ipcMain.handle("extensions:list", () => getExtensionCatalog().list());
 ipcMain.handle("extensions:installFromFolder", async (_event, folderPath: string) => {
   await getExtensionCatalog().installFromFolder(folderPath);
@@ -969,6 +1006,9 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
     typeof params === "object"
   ) {
     params = await persistentAgentService.turnStartParams(params);
+  }
+  if (method === "turn/start") {
+    params = await applyDesktopTurnPolicy((rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams), params);
   }
   return roder.request(method, params);
 }

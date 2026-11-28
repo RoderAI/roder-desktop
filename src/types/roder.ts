@@ -1,4 +1,5 @@
 import type { AppUpdateStatus } from "@/lib/app-update";
+import type { MarkdownShellCommand, MarkdownShellResult } from "@/lib/markdown-shell-command";
 import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
 
 export type RoderStatus = {
@@ -1298,6 +1299,10 @@ declare global {
         context: import("../lib/local-worktrees").LocalWorktreeContext,
         branch: string,
       ) => Promise<import("../lib/local-worktrees").LocalWorktree>;
+      createThreadWorktree: (
+        context: import("../lib/local-worktrees").LocalWorktreeContext,
+        onProgress: (step: import("../lib/local-worktrees").WorktreeCheckoutStep) => void,
+      ) => Promise<import("../lib/local-worktrees").LocalWorktree>;
       removeWorktree: (
         context: import("../lib/local-worktrees").LocalWorktreeContext,
         path: string,
@@ -1313,6 +1318,7 @@ declare global {
         forceRestart?: boolean;
       }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string, id?: string) => Promise<void>;
+      runMarkdownShellCommand: (command: MarkdownShellCommand) => Promise<MarkdownShellResult>;
       terminalResize: (cols: number, rows: number, id?: string) => Promise<void>;
       terminalStop: (id?: string) => Promise<void>;
       browserToggle: (bounds?: BrowserBounds) => Promise<BrowserSnapshot>;
@@ -1341,6 +1347,11 @@ declare global {
       onboardingState: () => Promise<OnboardingRecord>;
       onboardingComplete: () => Promise<void>;
       onboardingEnvironment: () => Promise<EnvironmentProvider[]>;
+      macComputerUsePermissions: () => Promise<import("../lib/macos-computer-use").MacComputerUsePermissions>;
+      openMacFullDiskAccessSettings: () => Promise<void>;
+      openMacComputerUseSettings: (
+        permission: import("../lib/macos-computer-use").MacComputerUsePermission,
+      ) => Promise<void>;
       codexOpenRateLimitHelp: () => Promise<void>;
       extensionsList: () => Promise<ExtensionCatalogSnapshot>;
       extensionsInstallFromFolder: (folderPath: string) => Promise<ExtensionCatalogSnapshot>;

@@ -1,6 +1,14 @@
 import { Children, isValidElement, useMemo, type ReactNode } from "react";
 import { harden } from "rehype-harden";
-import { defaultRehypePlugins, Streamdown, type Components, type StreamdownProps } from "streamdown";
+import {
+  defaultRehypePlugins,
+  defaultRemarkPlugins,
+  Streamdown,
+  type Components,
+  type StreamdownProps,
+} from "streamdown";
+import { MarkdownShellBlock } from "@/components/markdown-shell-block";
+import { markUnclosedShellFences, previewShellPrefix } from "@/lib/markdown-shell-fences";
 import { createSkillTokenRehypePlugin, SkillTokenPill, skillNameFromExactToken } from "@/components/skill-token-pill";
 import { cn } from "@/lib/utils";
 import type { SkillDescriptor } from "@/types/roder";
@@ -12,6 +20,15 @@ type MessageContentProps = {
 };
 
 const emptySkills: SkillDescriptor[] = [];
+const shellBlockPlugins: StreamdownProps["plugins"] = {
+  renderers: [
+    {
+      language: ["sh", "bash", `${previewShellPrefix}sh`, `${previewShellPrefix}bash`],
+      component: MarkdownShellBlock,
+    },
+  ],
+};
+const shellBlockRemarkPlugins = [...Object.values(defaultRemarkPlugins), markUnclosedShellFences];
 
 const safeRehypePlugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
   defaultRehypePlugins.sanitize,
@@ -167,7 +184,9 @@ export function MessageContent({
       isAnimating={isStreaming}
       lineNumbers={false}
       mode={isStreaming ? "streaming" : "static"}
+      plugins={isStreaming ? undefined : shellBlockPlugins}
       rehypePlugins={rehypePlugins}
+      remarkPlugins={isStreaming ? undefined : shellBlockRemarkPlugins}
     >
       {text}
     </Streamdown>

@@ -4,12 +4,13 @@ import { useShallow } from "zustand/react/shallow";
 import { Check, ChevronDown, Cloud, Folder, FolderPlus, MessageSquare } from "lucide-react";
 import { AgentWaitCards } from "@/components/agent-wait-card";
 import { McpAuthWaitCards } from "@/components/mcp-auth-wait-card";
+import { MarkdownShellProvider } from "@/components/markdown-shell-block";
 import { useAppShell } from "@/components/app-shell-context";
 import { Composer } from "@/components/composer";
 import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
 import { IndexedTranscript as Transcript } from "@/components/indexed-transcript";
-import { isRemoteRunner, remoteRunnerLabel, type CloudMachine } from "@/lib/cloud-machines";
+import { isRemoteRunner, isRemoteWorkspaceId, remoteRunnerLabel, type CloudMachine } from "@/lib/cloud-machines";
 import { finishedFolderTurnSummaries, finishedReviewTurnKey } from "@/lib/review-changes";
 import { emptyThreadHistoryState } from "@/lib/thread-history-state";
 import { loadTranscriptNavigationMessage } from "@/lib/transcript-navigation-loading";
@@ -90,11 +91,21 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
         workspaceId: thread?.workspaceId,
         rootId: thread?.rootId,
         cwd: thread?.cwd,
+        remote: isRemoteRunner(thread?.runner) || isRemoteWorkspaceId(thread?.workspaceId),
         activeTurnId: thread?.status.activeTurnId,
         finishedTurnIds: finishedReviewTurnKey(thread?.turns),
       };
     }),
   );
+  const desktop = window.roderDesktop;
+  const shellTarget =
+    routeActiveThreadId &&
+    reviewThread.cwd?.startsWith("/") &&
+    !reviewThread.remote &&
+    (desktop?.platform === "darwin" || desktop?.platform === "linux") &&
+    desktop.runMarkdownShellCommand
+      ? { cwd: reviewThread.cwd, run: desktop.runMarkdownShellCommand }
+      : null;
   const reviewWorkspace = agent.workspaces.find((workspace) => workspace.id === reviewThread.workspaceId);
   const reviewRoot = reviewWorkspace?.roots.find(
     (root) => root.id === (reviewThread.rootId ?? reviewWorkspace.defaultRootId),
@@ -249,29 +260,31 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
           }}
         />
       ) : (
-        <Transcript
-          activeTurnId={agent.activeTurnId}
-          messages={transcriptMessages}
-          followSignal={followSignal}
-          bottomInsetPx={transcriptBottomInsetPx}
-          scrollStateKey={`${routeActiveThreadId || "new-thread"}:${history.requestId}`}
-          historyCursor={history.before}
-          historyLoading={history.loading}
-          hasOlderHistory={history.hasMore}
-          loadingOlderHistory={history.loadingOlder}
-          historyError={history.error}
-          navigationThreadId={routeActiveThreadId}
-          onLoadNavigationMessage={(id, isCancelled, signal) =>
-            loadTranscriptNavigationMessage(routeActiveThreadId, id, isCancelled, signal)
-          }
-          onLoadOlderHistory={() => loadOlderHistory(routeActiveThreadId)}
-          onRetryHistory={() => selectThread(routeActiveThreadId, { pushHistory: false, refreshHistory: true })}
-          showWorkingIndicator={showWorkingIndicator}
-          subagentLifecycleEvents={subagentLifecycleEvents}
-          turnChangeSummaries={reviewSummaries}
-          onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
-          onReviewTurnChanges={openTurnChanges}
-        />
+        <MarkdownShellProvider target={shellTarget}>
+          <Transcript
+            activeTurnId={agent.activeTurnId}
+            messages={transcriptMessages}
+            followSignal={followSignal}
+            bottomInsetPx={transcriptBottomInsetPx}
+            scrollStateKey={`${routeActiveThreadId || "new-thread"}:${history.requestId}`}
+            historyCursor={history.before}
+            historyLoading={history.loading}
+            hasOlderHistory={history.hasMore}
+            loadingOlderHistory={history.loadingOlder}
+            historyError={history.error}
+            navigationThreadId={routeActiveThreadId}
+            onLoadNavigationMessage={(id, isCancelled, signal) =>
+              loadTranscriptNavigationMessage(routeActiveThreadId, id, isCancelled, signal)
+            }
+            onLoadOlderHistory={() => loadOlderHistory(routeActiveThreadId)}
+            onRetryHistory={() => selectThread(routeActiveThreadId, { pushHistory: false, refreshHistory: true })}
+            showWorkingIndicator={showWorkingIndicator}
+            subagentLifecycleEvents={subagentLifecycleEvents}
+            turnChangeSummaries={reviewSummaries}
+            onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
+            onReviewTurnChanges={openTurnChanges}
+          />
+        </MarkdownShellProvider>
       )}
       <div className="pointer-events-none absolute bottom-0 left-0 right-2 z-10">
         <div
@@ -320,6 +333,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             selectedModelProvider={agent.selectedModelProvider}
             selectedSelectionMode={agent.selectedSelectionMode}
             selectedPolicyMode={agent.selectedPolicyMode}
+            usesDefaultPolicyMode={agent.usesDefaultPolicyMode}
             agentSwarmMode={agent.agentSwarmMode}
             agentSwarmModeAvailable={agent.agentSwarmModeAvailable}
             selectedReasoning={agent.selectedReasoning}
@@ -330,6 +344,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onSelectedModelChange={(model, provider) => void agent.setSelectedModel(model, provider)}
             onSelectedAutoModelChange={(optionId) => void agent.setSelectedAutoModel(optionId)}
             onSelectedPolicyModeChange={(mode) => void agent.setSelectedPolicyMode(mode)}
+            onUseDefaultPolicyMode={() => void agent.setSelectedPolicyMode(null)}
             onAgentSwarmModeChange={(enabled) => void agent.setAgentSwarmMode(enabled)}
             onSelectedReasoningChange={agent.setSelectedReasoning}
             onScrollToBottom={followBottom}
