@@ -159,11 +159,10 @@ export function createRoderAgentService(options: Options) {
     });
     return `${roderAgentStrategy}\n\n${context}`;
   }
-  /** Keeps the list summary in step with INSTRUCTIONS.md; an empty opening paragraph keeps the old one. */
+  /** Keeps the list summary in step with INSTRUCTIONS.md; it is empty while that has no opening paragraph. */
   async function syncMission(c: RoderAgent, path: string) {
     if (path !== RODER_INSTRUCTIONS_FILE) return;
-    const summary = roderInstructionsSummary((await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content);
-    if (summary) c.mission = summary;
+    c.mission = roderInstructionsSummary((await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content);
   }
   function schedule(c: RoderAgent, params: ObjectValue) {
     if (c.wakes.length >= 50) throw new Error("At most 50 pending wakes per Roder");
@@ -197,7 +196,7 @@ export function createRoderAgentService(options: Options) {
     try {
       recall = await options.request("memory/query", {
         scope: { Thread: c.threadId },
-        text: `${c.mission}\n${reason}`,
+        text: c.mission ? `${c.mission}\n${reason}` : reason,
         limit: 5,
         includeGlobal: false,
       });
@@ -338,7 +337,8 @@ export function createRoderAgentService(options: Options) {
         const c: RoderAgent = {
           id: randomUUID(),
           name,
-          mission,
+          // The list summary, the same one later INSTRUCTIONS.md writes produce.
+          mission: roderInstructionsSummary(mission),
           workspaceId,
           threadId: text(snapshot.id, "thread id"),
           ...effectiveChoice,
@@ -429,7 +429,11 @@ export function createRoderAgentService(options: Options) {
         const turns = snapshot.turns as { id: string }[] | undefined;
         const turnId = turns?.at(-1)?.id;
         if (!turnId) throw new Error("No turn available to compact");
-        return options.request("thread/compact", { threadId: c.threadId, turnId, preserveHint: c.mission });
+        return options.request("thread/compact", {
+          threadId: c.threadId,
+          turnId,
+          ...(c.mission ? { preserveHint: c.mission } : {}),
+        });
       } else throw new Error(`Unknown Roder request: ${method}`);
       await persist();
       return detail(c);
@@ -472,7 +476,8 @@ export function createRoderAgentService(options: Options) {
           if (threads.has(threadId)) throw new Error("Duplicate Roder thread");
           threads.add(threadId);
           text(c.name, "name", 120);
-          text(c.mission, "mission");
+          // Empty while INSTRUCTIONS.md has no opening paragraph.
+          if (typeof c.mission !== "string" || c.mission.length > 16000) throw new Error("Invalid mission");
           text(c.workspaceId, "workspace id", 500);
           modelChoice(c);
           if (typeof c.enabled !== "boolean") throw new Error("Invalid Roder enabled state");
