@@ -73,8 +73,24 @@ import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } fro
 import { ExtensionHost } from "../extensions/extension-host";
 import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
-import { RoderAppServerClient } from "../roder/app-server-client";
+import { RoderAppServerClient, resolveEmbeddedRoderBinary } from "../roder/app-server-client";
 import { applyDesktopTurnPolicy } from "../roder/desktop-turn-policy";
+import {
+  AgentBackendsManager,
+  findAntigravityRuntime,
+  findCodexRuntime,
+  findExternalBackendRuntime,
+  resolveAntigravitySetupCommand,
+  resolveCodexSetupCommand,
+  runExternalBackendLogoutCli,
+  runtimePathExtraEnv,
+} from "../roder/agent-backends";
+import {
+  antigravitySetupSession,
+  codexSetupSession,
+  type AgentBackendId,
+  type ExternalAgentBackendId,
+} from "../roder/desktop-backend";
 import { DesktopAgentTools } from "../agents/desktop-agent-tools";
 import { IssuesService } from "../issues/service";
 import { handleIssueToolCall, issueToolDefinitions } from "../issues/tools";
@@ -113,12 +129,14 @@ import {
 import { rendererZoomFactor, scaleRendererBounds } from "./renderer-scale";
 import { mainPanelMinWidth, mainWindowMinHeight, mainWindowMinWidth } from "./window-options";
 
+function getRoderExtraEnv(): Record<string, string> {
+  const cloudEnv = getCloudCredentialsService().getCachedRunnerEnv(process.env);
+  const gatewayEnv = tailscaleRunnerGateway?.getRunnerEnv({ ...process.env, ...cloudEnv }) ?? {};
+  return { ...cloudEnv, ...gatewayEnv };
+}
+
 const roder = new RoderAppServerClient({
-  getExtraEnv: () => {
-    const cloudEnv = getCloudCredentialsService().getCachedRunnerEnv(process.env);
-    const gatewayEnv = tailscaleRunnerGateway?.getRunnerEnv({ ...process.env, ...cloudEnv }) ?? {};
-    return { ...cloudEnv, ...gatewayEnv };
-  },
+  getExtraEnv: getRoderExtraEnv,
 });
 const threadHistory = createThreadHistoryService({
   request: (method, params) => roder.request(method, params) as Promise<ThreadHistoryPage>,
@@ -349,8 +367,10 @@ async function restartRoderEngine() {
   spriteManager = null;
   blaxelClient?.clearCache();
   remoteWorkspaceService?.closeAll();
+  await agentBackends?.stopAll();
   await getCloudCredentialsService().hydrate();
   const status = await roder.restart();
+  agentBackends?.probeInBackground();
   persistentAgentStartPromise = null;
   await startPersistentAgents().catch(reportPersistentAgentStartupError);
   return status;
@@ -412,9 +432,31 @@ ipcMain.handle("workspace:openFolders", async (_event, defaultPath?: string) => 
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths;
 });
-ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
-  terminal.start({ ...options, cwd: options?.cwd || process.cwd() }),
-);
+ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) => {
+  if (options?.id === antigravitySetupSession) {
+    const runtimePath = findAntigravityRuntime();
+    const setup = resolveAntigravitySetupCommand({
+      binaryPath: resolveEmbeddedRoderBinary(),
+      runtimePath,
+      mode: options.antigravitySetupMode,
+    });
+    const extraEnv = runtimePathExtraEnv(process.env, runtimePath);
+    return terminal.start(
+      { ...options, cwd: options?.cwd || homedir(), forceRestart: true },
+      { executable: setup.executable, args: setup.args, env: extraEnv },
+    );
+  }
+  if (options?.id === codexSetupSession) {
+    const runtimePath = findCodexRuntime();
+    const setup = resolveCodexSetupCommand({ runtimePath });
+    const extraEnv = runtimePathExtraEnv(process.env, runtimePath);
+    return terminal.start(
+      { ...options, cwd: options?.cwd || homedir(), forceRestart: true },
+      { executable: setup.executable, args: setup.args, env: extraEnv },
+    );
+  }
+  return terminal.start({ ...options, cwd: options?.cwd || process.cwd() });
+});
 ipcMain.handle("terminal:write", (_event, data: string, id?: string) => terminal.write(data, id));
 ipcMain.handle("terminal:runMarkdownCommand", (event, command: unknown) => {
   const contents = mainWindow?.webContents;
@@ -463,6 +505,38 @@ ipcMain.handle("codex:login", () => startCodexLogin());
 ipcMain.handle("codex:logout", () => logoutCodex());
 ipcMain.handle("codex:cancelLogin", () => cancelCodexLogin());
 ipcMain.handle("codex:openRateLimitHelp", () => openRateLimitHelp());
+ipcMain.handle("agentBackends:snapshot", async () => {
+  const manager = getAgentBackends();
+  await manager.hydrate();
+  return manager.getSnapshot();
+});
+ipcMain.handle("agentBackends:select", (_event, backend: AgentBackendId) => getAgentBackends().selectBackend(backend));
+ipcMain.handle(
+  "agentBackends:connect",
+  async (_event, backend: ExternalAgentBackendId, options?: { forceRefresh?: boolean }) => {
+    const manager = getAgentBackends();
+    await manager.connectBackend(backend, { forceRefresh: Boolean(options?.forceRefresh), notifyOnChange: true });
+    return manager.getSnapshot();
+  },
+);
+ipcMain.handle("agentBackends:logout", (_event, backend: ExternalAgentBackendId) =>
+  getAgentBackends().logoutBackend(backend),
+);
+ipcMain.handle("antigravity:status", async () => {
+  const manager = getAgentBackends();
+  await manager.hydrate();
+  return manager.getAntigravityStatus();
+});
+ipcMain.handle("antigravity:connect", async (_event, options?: { forceRefresh?: boolean }) => {
+  const manager = getAgentBackends();
+  await manager.connectBackend("antigravity", { forceRefresh: Boolean(options?.forceRefresh), notifyOnChange: true });
+  return manager.getAntigravityStatus();
+});
+ipcMain.handle("antigravity:logout", async () => {
+  const manager = getAgentBackends();
+  await manager.logoutBackend("antigravity");
+  return manager.getAntigravityStatus();
+});
 ipcMain.handle("claude:cliStatus", () =>
   findClaudeCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
 );
@@ -713,12 +787,14 @@ app.whenReady().then(async () => {
   }, 4_000);
   try {
     await getCloudCredentialsService().hydrate();
+    await getAgentBackends().hydrate();
     if (process.platform !== "win32") {
       await getTailscaleRunnerGateway()
         .start()
         .catch(() => undefined);
     }
     await roder.start();
+    getAgentBackends().probeInBackground();
     await startPersistentAgents().catch(reportPersistentAgentStartupError);
   } catch (error) {
     sendToRenderer("roder:status", {
@@ -751,6 +827,7 @@ app.on("before-quit", (event) => {
       await Promise.allSettled([
         tailscaleRunnerGateway?.stop(),
         extensionHost?.stopAll(),
+        agentBackends?.stopAll(),
         roder.stop(),
         chromeBridge.stop(),
       ]);
@@ -1019,6 +1096,36 @@ let blaxelClient: BlaxelClient | undefined;
 let tailscaleSshClient: TailscaleSshClient | undefined;
 let tailscaleRunnerGateway: TailscaleRunnerGateway | undefined;
 let remoteWorkspaceService: RemoteWorkspaceService | undefined;
+let agentBackends: AgentBackendsManager | undefined;
+
+function getAgentBackends(): AgentBackendsManager {
+  agentBackends ??= new AgentBackendsManager({
+    createClient: (backend) =>
+      new RoderAppServerClient({
+        backend,
+        getExtraEnv: () => ({
+          ...getRoderExtraEnv(),
+          ...runtimePathExtraEnv(process.env, findExternalBackendRuntime(backend)),
+        }),
+      }),
+    storagePath: join(app.getPath("userData"), "agent-backends.json"),
+    runLogoutCommand: (backend) =>
+      runExternalBackendLogoutCli(backend, { roderBinaryPath: resolveEmbeddedRoderBinary(), env: process.env }),
+    onNotification: (payload) => {
+      recordAppServerEvent("notification", payload.method, payload.params);
+      sendToRenderer("roder:notification", payload);
+    },
+    onChanged: (snapshot) => {
+      sendToRenderer("roder:notification", { method: "desktop/backends/changed", params: snapshot });
+      sendToRenderer("roder:notification", { method: "desktop/providers/changed", params: {} });
+    },
+    onStderr: (backend, payload) => {
+      recordAppServerEvent("stderr", backend, payload);
+      sendToRenderer("roder:stderr", payload);
+    },
+  });
+  return agentBackends;
+}
 
 function cloudEncryptionAvailable(): boolean {
   return (
@@ -1114,6 +1221,8 @@ function maybeNotifyRemoteFilesChanged(method: string, params: unknown): void {
 }
 
 async function handleRoderRequest(method: string, params: unknown): Promise<unknown> {
+  const backends = getAgentBackends();
+  await backends.hydrate();
   if (method === "desktop/thread/history/index" || method === "desktop/thread/history/range") {
     const input = params as Record<string, unknown> | null;
     if (!input || typeof input.threadId !== "string" || !input.threadId) throw new Error("A thread ID is required");
@@ -1140,12 +1249,15 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     if (input.limit !== undefined && typeof input.limit !== "number") throw new Error("Invalid history page size");
     if (input.maxBytes !== undefined && typeof input.maxBytes !== "number")
       throw new Error("Invalid history byte budget");
-    const page = await threadHistory.read({
-      threadId: input.threadId,
-      before: input.before as string | undefined,
-      limit: input.limit as number | undefined,
-      maxBytes: input.maxBytes as number | undefined,
-    });
+    const threadBackend = backends.backendForThread(input.threadId);
+    const page = threadBackend
+      ? ((await backends.handleRequest(threadBackend, "thread/history/read", input)) as ThreadHistoryPage)
+      : await threadHistory.read({
+          threadId: input.threadId,
+          before: input.before as string | undefined,
+          limit: input.limit as number | undefined,
+          maxBytes: input.maxBytes as number | undefined,
+        });
     getRemoteWorkspaceService().observeResponse(method, page);
     recordAppServerEvent("response", method, {
       threadId: input.threadId,
@@ -1502,7 +1614,104 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     }
   }
   try {
-    const result = await requestEngine(method, params);
+    const requestedExternalBackend = backends.externalBackendForRequest(method, params);
+    if (requestedExternalBackend) {
+      let result: unknown;
+      if (method === "thread/start" && isRecord(params) && params.desktopWorktreePath !== undefined) {
+        const { desktopWorktreePath, ...threadParams } = params;
+        if (
+          params.desktopCloudMachineId !== undefined ||
+          params.cloudMachineId !== undefined ||
+          params.runner !== undefined ||
+          typeof desktopWorktreePath !== "string" ||
+          typeof params.workspaceId !== "string" ||
+          typeof params.rootId !== "string"
+        ) {
+          throw new Error("A worktree checkout requires a local workspace folder.");
+        }
+        result = await getDesktopWorktrees().startThread(
+          { workspaceId: params.workspaceId, rootId: params.rootId },
+          desktopWorktreePath,
+          (root) =>
+            backends.handleRequest(requestedExternalBackend, "thread/start", {
+              ...threadParams,
+              rootId: root.id,
+              cwd: root.path,
+            }),
+        );
+      } else if (method === "thread/start") {
+        const start = () => backends.handleRequest(requestedExternalBackend, "thread/start", params);
+        result =
+          isRecord(params) && params.runner === undefined
+            ? await getDesktopWorktrees().startInCurrentFolder(start)
+            : await start();
+      } else {
+        result = await backends.handleRequest(requestedExternalBackend, method, params);
+      }
+      recordAppServerEvent("response", method, result);
+      return result;
+    }
+
+    const targetThreadId = browserThreadIdFromParams(params);
+    const owningExternalBackend = backends.backendForThread(targetThreadId);
+    if (
+      owningExternalBackend &&
+      (method === "thread/read" ||
+        method === "turn/start" ||
+        method === "turn/steer" ||
+        method === "turn/interrupt" ||
+        method === "thread/archive" ||
+        method === "thread/set_mode" ||
+        method === "thread/goal/get" ||
+        method === "turn/subagentTraces/list" ||
+        method === "hunk/list" ||
+        method === "workspace/changes/list")
+    ) {
+      const result = await backends.handleRequest(owningExternalBackend, method, params);
+      recordAppServerEvent("response", method, result);
+      return result;
+    }
+
+    if (method === "thread/resolve_approval" && isRecord(params) && typeof params.approvalId === "string") {
+      const approvalBackend = backends.backendForApproval(params.approvalId);
+      if (approvalBackend) {
+        const result = await backends.handleRequest(approvalBackend, method, params);
+        recordAppServerEvent("response", method, result);
+        return result;
+      }
+    }
+
+    if (method === "thread/resolve_user_input" && isRecord(params) && typeof params.requestId === "string") {
+      const userInputBackend = backends.backendForUserInput(params.requestId);
+      if (userInputBackend) {
+        const result = await backends.handleRequest(userInputBackend, method, params);
+        recordAppServerEvent("response", method, result);
+        return result;
+      }
+    }
+
+    let engineParams = params;
+    if (isRecord(params) && "agentBackend" in params) {
+      const { agentBackend: _ignoredBackend, ...rest } = params;
+      engineParams = rest;
+    }
+    if (
+      (method === "model/select" || method === "providers/select") &&
+      owningExternalBackend &&
+      isRecord(engineParams)
+    ) {
+      const { threadId: _ignoredThreadId, thread_id: _ignoredSnakeThreadId, ...rest } = engineParams;
+      engineParams = rest;
+    }
+
+    let result = await requestEngine(method, engineParams);
+    if (method === "providers/list" && isRecord(result)) {
+      result = backends.mergeProvidersList(result);
+    } else if (method === "model/list" && isRecord(result)) {
+      result = backends.mergeModelsList(result);
+    } else if (method === "thread/list" && isRecord(result)) {
+      result = backends.mergeThreadList(result, params);
+    }
     getRemoteWorkspaceService().observeResponse(method, result);
     if (method === "thread/start") {
       rememberStartedThreadBrowserProvider(result, requestedBrowserProvider);

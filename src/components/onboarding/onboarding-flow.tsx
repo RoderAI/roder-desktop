@@ -45,7 +45,7 @@ export function OnboardingFlow(): React.JSX.Element {
 
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const contentRef = useRef<HTMLDivElement>(null);
-  const { claudeCli, environment, recheckClaudeCli } = useProviderSetupState();
+  const { claudeCli, antigravityStatus, environment, recheckClaudeCli, recheckAntigravity } = useProviderSetupState();
   const [defaultChoice, setDefaultChoice] = useState<ModelChoice | null>(
     defaultModel ? { id: defaultModel, provider: defaultModelProvider } : null,
   );
@@ -189,10 +189,12 @@ export function OnboardingFlow(): React.JSX.Element {
               <OnboardingProvidersStep
                 providers={providers}
                 claudeCli={claudeCli}
+                antigravityStatus={antigravityStatus}
                 environment={environment}
                 autoDetected={describeAutoDetected({ environment, claudeCli, providers })}
                 readyProviderIds={readyProviderIds}
                 onRecheckClaudeCli={recheckClaudeCli}
+                onRecheckAntigravity={recheckAntigravity}
                 onError={setError}
               />
             )}

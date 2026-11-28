@@ -11,6 +11,7 @@ import {
 } from "@/lib/roder-models";
 import { useRoderStore } from "@/stores/roder-store";
 import type {
+  AgentBackendId,
   InferenceRoutingOptionDescriptor,
   ModelSelectionMode,
   PolicyMode,
@@ -53,14 +54,41 @@ export function GeneralSettingsPanel(): React.JSX.Element {
   const defaultSelectionMode = useRoderStore((state) => state.defaultSelectionMode);
   const defaultReasoning = useRoderStore((state) => state.defaultReasoning);
   const defaultPolicyMode = useRoderStore((state) => state.pendingDefaultPolicyMode ?? state.defaultPolicyMode);
+  const activeBackend = useRoderStore((state) => state.activeBackend);
+  const agentBackends = useRoderStore((state) => state.agentBackends);
+  const selectAgentBackend = useRoderStore((state) => state.selectAgentBackend);
   const setDefaultModel = useRoderStore((state) => state.setDefaultModel);
   const setDefaultAutoModel = useRoderStore((state) => state.setDefaultAutoModel);
   const setDefaultReasoning = useRoderStore((state) => state.setDefaultReasoning);
   const setDefaultPolicyMode = useRoderStore((state) => state.setDefaultPolicyMode);
   const saveDefaults = useRoderStore((state) => state.saveDefaults);
   const [saving, setSaving] = useState(false);
+  const [switchingBackend, setSwitchingBackend] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const backendOrder: AgentBackendId[] = ["roder", "codex", "antigravity"];
+  const backendItems = Object.fromEntries(
+    backendOrder.map((id) => [
+      id,
+      agentBackends[id]?.name ?? (id === "codex" ? "Codex" : id === "antigravity" ? "Antigravity" : "Roder"),
+    ]),
+  );
+
+  async function handleSelectBackend(next: AgentBackendId): Promise<void> {
+    if (next === activeBackend || switchingBackend) {
+      return;
+    }
+    setSwitchingBackend(true);
+    setError(null);
+    try {
+      await selectAgentBackend(next);
+    } catch (backendError) {
+      setError((backendError as Error).message);
+    } finally {
+      setSwitchingBackend(false);
+    }
+  }
 
   const models = useMemo(() => visibleModelsFor(allModels, hiddenModelIds), [allModels, hiddenModelIds]);
   const selectedModelRecord = useMemo(
@@ -113,6 +141,49 @@ export function GeneralSettingsPanel(): React.JSX.Element {
       </header>
 
       <div className="divide-y divide-border px-4">
+        <SettingsRow
+          label="Agent backend"
+          description={
+            agentBackends[activeBackend]?.description ?? "Choose which agent runtime executes your sessions."
+          }
+        >
+          <Select
+            items={backendItems}
+            value={activeBackend}
+            disabled={switchingBackend}
+            onValueChange={(value) => {
+              if (value === "roder" || value === "codex" || value === "antigravity") {
+                void handleSelectBackend(value);
+              }
+            }}
+          >
+            <SelectTrigger className="w-[220px] max-w-full border border-border bg-card">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {backendOrder.map((id) => {
+                  const info = agentBackends[id];
+                  const suffix =
+                    id === "roder"
+                      ? ""
+                      : info?.connected
+                        ? ` (${info.modelCount} ${info.modelCount === 1 ? "model" : "models"})`
+                        : info?.runtimeInstalled
+                          ? " (connect)"
+                          : " (not installed)";
+                  return (
+                    <SelectItem key={id} value={id}>
+                      {backendItems[id]}
+                      {suffix}
+                    </SelectItem>
+                  );
+                })}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </SettingsRow>
+
         <SettingsRow label="Model" description={selectedModelDescription(defaultSelectionMode, selectedModelRecord)}>
           <Select
             items={modelItems}

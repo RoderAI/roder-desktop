@@ -8,25 +8,35 @@ import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
-import type { ConversationMessage, QueuedPrompt } from "@/types/roder";
+import type {
+  AgentBackendsSnapshot,
+  ConversationMessage,
+  InferenceRoutingOptionDescriptor,
+  QueuedPrompt,
+} from "@/types/roder";
 
 const emptyQueuedPrompts: QueuedPrompt[] = [];
+const emptyRoutingOptions: InferenceRoutingOptionDescriptor[] = [];
 
 export function useRoderAgent() {
   useRoderStoreBootstrap();
   useProviderCatalogRefresh();
   const state = useRoderStore(useShallow(selectAgentState));
-  const models = useMemo(
-    () => visibleModelsFor(state.allModels, state.hiddenModelIds),
-    [state.allModels, state.hiddenModelIds],
-  );
+  const models = useMemo(() => {
+    if (state.activeBackend !== "roder") {
+      return state.agentBackends[state.activeBackend]?.models ?? [];
+    }
+    return visibleModelsFor(state.allModels, state.hiddenModelIds);
+  }, [state.activeBackend, state.agentBackends, state.allModels, state.hiddenModelIds]);
+  const routingOptions = state.activeBackend === "roder" ? state.routingOptions : emptyRoutingOptions;
 
   return useMemo(
     () => ({
       ...state,
       models,
+      routingOptions,
     }),
-    [models, state],
+    [models, routingOptions, state],
   );
 }
 
@@ -109,6 +119,19 @@ function useRoderStoreBootstrap(): void {
           .catch(() => undefined);
         return;
       }
+      if (notification.method === "desktop/backends/changed") {
+        if (notification.params && typeof notification.params === "object") {
+          useRoderStore.getState().applyAgentBackends(notification.params as AgentBackendsSnapshot);
+        }
+        return;
+      }
+      if (notification.method === "desktop/providers/changed") {
+        void useRoderStore
+          .getState()
+          .refreshProviders()
+          .catch(() => undefined);
+        return;
+      }
       applyNotification(notification);
     });
     const offMcpAuthRequested = window.roderDesktop.onMcpAuthRequested(mcpAuthRequested);
@@ -146,6 +169,11 @@ function selectAgentState(state: RoderStoreState) {
     allModels: state.models,
     routingOptions: state.routingOptions,
     hiddenModelIds: state.hiddenModelIds,
+    activeBackend: state.activeBackend,
+    agentBackends: state.agentBackends,
+    selectAgentBackend: state.selectAgentBackend,
+    connectAgentBackend: state.connectAgentBackend,
+    logoutAgentBackend: state.logoutAgentBackend,
     selectedModel: state.selectedModel,
     selectedModelProvider: state.selectedModelProvider,
     selectedSelectionMode: state.selectedSelectionMode,

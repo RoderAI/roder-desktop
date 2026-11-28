@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import type { ClaudeCliStatus, EnvironmentProvider } from "@/types/roder";
+import type { AntigravityStatus, ClaudeCliStatus, EnvironmentProvider } from "@/types/roder";
+
+const emptyAntigravityStatus: AntigravityStatus = {
+  state: "disconnected",
+  runtimeInstalled: false,
+  runtimePath: null,
+  connected: false,
+  modelCount: 0,
+  error: null,
+};
 
 /** A failed read counts as "not found", so the card offers Check again instead of waiting forever. */
 async function readClaudeCliStatus(): Promise<ClaudeCliStatus> {
@@ -19,16 +28,30 @@ async function readEnvironmentProviders(): Promise<EnvironmentProvider[]> {
   }
 }
 
+async function readAntigravityStatus(): Promise<AntigravityStatus> {
+  try {
+    if (typeof window.roderDesktop?.antigravityStatus !== "function") {
+      return emptyAntigravityStatus;
+    }
+    return await window.roderDesktop.antigravityStatus();
+  } catch {
+    return emptyAntigravityStatus;
+  }
+}
+
 /**
- * What the desktop found on this machine: the Claude Code CLI and API keys already set in the environment.
+ * What the desktop found on this machine: the Claude Code CLI, Antigravity CLI, and API keys already set in the environment.
  * Shared by onboarding and Settings > Providers so both show the same picture.
  */
 export function useProviderSetupState(): {
   claudeCli: ClaudeCliStatus | null;
+  antigravityStatus: AntigravityStatus | null;
   environment: EnvironmentProvider[];
   recheckClaudeCli: () => Promise<void>;
+  recheckAntigravity: () => Promise<AntigravityStatus>;
 } {
   const [claudeCli, setClaudeCli] = useState<ClaudeCliStatus | null>(null);
+  const [antigravityStatus, setAntigravityStatus] = useState<AntigravityStatus | null>(null);
   const [environment, setEnvironment] = useState<EnvironmentProvider[]>([]);
 
   useEffect(() => {
@@ -36,6 +59,11 @@ export function useProviderSetupState(): {
     void readClaudeCliStatus().then((status) => {
       if (!cancelled) {
         setClaudeCli(status);
+      }
+    });
+    void readAntigravityStatus().then((status) => {
+      if (!cancelled) {
+        setAntigravityStatus(status);
       }
     });
     void readEnvironmentProviders().then((found) => {
@@ -52,5 +80,11 @@ export function useProviderSetupState(): {
     setClaudeCli(await readClaudeCliStatus());
   }
 
-  return { claudeCli, environment, recheckClaudeCli };
+  async function recheckAntigravity(): Promise<AntigravityStatus> {
+    const status = await readAntigravityStatus();
+    setAntigravityStatus(status);
+    return status;
+  }
+
+  return { claudeCli, antigravityStatus, environment, recheckClaudeCli, recheckAntigravity };
 }

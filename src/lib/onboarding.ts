@@ -72,7 +72,14 @@ export function hasExistingSetup(input: { threadCount: number }): boolean {
   return input.threadCount > 0;
 }
 
-export type ProviderSetupKind = "hidden" | "claude-cli" | "codex-login" | "oauth-rpc" | "api-key" | "settings";
+export type ProviderSetupKind =
+  | "hidden"
+  | "claude-cli"
+  | "codex-login"
+  | "antigravity-login"
+  | "oauth-rpc"
+  | "api-key"
+  | "settings";
 
 /** Auth flows the desktop can start itself, keyed by provider id. The backend persists these tokens. */
 export const oauthLoginMethods: Readonly<Record<string, string>> = {
@@ -89,6 +96,9 @@ export function providerSetupKind(provider: Pick<ProviderDescriptor, "id" | "aut
   }
   if (provider.id === "codex") {
     return "codex-login";
+  }
+  if (provider.id === "antigravity") {
+    return "antigravity-login";
   }
   if (provider.authType === "oauth" && oauthLoginMethods[provider.id]) {
     return "oauth-rpc";
@@ -116,7 +126,7 @@ export function isProviderReady(provider: ProviderDescriptor, claudeCli: ClaudeC
   return provider.authenticated === true;
 }
 
-export const featuredProviderIds = ["claude-code", "codex", "supergrok", "opencode"] as const;
+export const featuredProviderIds = ["claude-code", "codex", "antigravity", "supergrok", "opencode"] as const;
 
 export function groupProvidersForOnboarding(providers: ProviderDescriptor[]): {
   featured: ProviderDescriptor[];
@@ -173,6 +183,7 @@ export type AutoDetectedItem = {
 
 const signedInProviderTitles: Readonly<Record<string, string>> = {
   codex: "ChatGPT",
+  antigravity: "Antigravity",
   supergrok: "xAI",
   "kimi-code": "Kimi Code",
 };

@@ -115,6 +115,7 @@ export const providerCopy: Readonly<Record<string, ProviderCopy>> = {
     title: "Antigravity",
     description: "Google Antigravity models through your Google subscription.",
     method: "Google sign-in",
+    signInLabel: "Sign in with Google",
   },
 };
 

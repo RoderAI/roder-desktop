@@ -1,5 +1,6 @@
 import { ClipboardCopy, ExternalLink, KeyRound, LoaderCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BackendSetupTerminal } from "@/components/providers/backend-setup-terminal";
 import { ProviderLogo } from "@/components/provider-logo";
 import {
   errorMessage,
@@ -14,7 +15,7 @@ import { providerName } from "@/lib/roder-models";
 import { cn } from "@/lib/utils";
 import { roderIpc } from "@/lib/roder-ipc";
 import { useRoderStore } from "@/stores/roder-store";
-import type { ClaudeCliStatus, ProviderDescriptor } from "@/types/roder";
+import type { AntigravityStatus, ClaudeCliStatus, ProviderDescriptor } from "@/types/roder";
 
 const CODEX_POLL_INTERVAL_MS = 1500;
 const CODEX_SIGN_IN_TIMEOUT_MS = 3 * 60 * 1000;
@@ -26,14 +27,18 @@ export function ProviderConnectCard({
   ready,
   environmentVar,
   claudeCli,
+  antigravityStatus = null,
   onRecheckClaudeCli,
+  onRecheckAntigravity,
   onError,
 }: {
   provider: ProviderDescriptor;
   ready: boolean;
   environmentVar?: string;
   claudeCli: ClaudeCliStatus | null;
+  antigravityStatus?: AntigravityStatus | null;
   onRecheckClaudeCli: () => Promise<void>;
+  onRecheckAntigravity?: () => Promise<AntigravityStatus>;
   onError: (message: string | null) => void;
 }): React.JSX.Element {
   const kind = providerSetupKind(provider);
@@ -47,7 +52,8 @@ export function ProviderConnectCard({
   const configureProvider = useRoderStore((state) => state.configureProvider);
   const restart = useRoderStore((state) => state.restart);
 
-  const [pending, setPending] = useState<"codex" | "oauth" | "sign-out" | null>(null);
+  const [pending, setPending] = useState<"codex" | "oauth" | "antigravity" | "sign-out" | null>(null);
+  const [antigravityTerminalMode, setAntigravityTerminalMode] = useState<"login" | "install" | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
@@ -119,6 +125,45 @@ export function ProviderConnectCard({
     setPending("sign-out");
     try {
       await window.roderDesktop.codexLogout();
+      await refreshProviders();
+    } catch (logoutError) {
+      reportError(errorMessage(logoutError));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function connectAntigravity(options: { closeTerminalOnSuccess?: boolean } = {}): Promise<void> {
+    reportError(null);
+    setPending("antigravity");
+    try {
+      const status = await window.roderDesktop.antigravityConnect({ forceRefresh: true });
+      await onRecheckAntigravity?.();
+      await refreshProviders();
+      if (status.connected && options.closeTerminalOnSuccess) {
+        setAntigravityTerminalMode(null);
+      } else if (!status.connected) {
+        reportError(
+          status.runtimeInstalled
+            ? "Antigravity is not signed in yet. Complete Google sign-in and try again."
+            : "Antigravity CLI is not installed yet. Click Install & sign in to set it up.",
+        );
+      }
+    } catch (connectError) {
+      await onRecheckAntigravity?.().catch(() => undefined);
+      reportError(errorMessage(connectError));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function signOutAntigravity(): Promise<void> {
+    reportError(null);
+    setPending("sign-out");
+    try {
+      await window.roderDesktop.antigravityLogout();
+      setAntigravityTerminalMode(null);
+      await onRecheckAntigravity?.();
       await refreshProviders();
     } catch (logoutError) {
       reportError(errorMessage(logoutError));
@@ -233,6 +278,84 @@ export function ProviderConnectCard({
             <Button className={cn("self-start", primaryActionClassName)} onClick={() => void signInWithCodex()}>
               {copy?.signInLabel ?? "Sign in"}
             </Button>
+          )}
+        </div>
+      )}
+
+      {kind === "antigravity-login" && (
+        <div className="flex flex-col gap-3">
+          {ready ? (
+            <>
+              <p className="text-base text-muted-foreground">
+                Signed in with Google. Models from your Antigravity subscription are ready in the composer.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="ghost" disabled={pending !== null} onClick={() => void connectAntigravity()}>
+                  <RefreshCw
+                    className={cn("size-4", pending === "antigravity" && "animate-spin motion-reduce:animate-none")}
+                  />
+                  {pending === "antigravity" ? "Checking..." : "Check again"}
+                </Button>
+                <Button variant="outline" disabled={pending !== null} onClick={() => void signOutAntigravity()}>
+                  {pending === "sign-out" ? "Signing out..." : "Sign out"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-base text-muted-foreground">
+                {antigravityStatus?.runtimeInstalled === false
+                  ? "Install the official Antigravity CLI and sign in with your Google subscription to unlock Antigravity models."
+                  : "Sign in through the official Antigravity CLI with your Google subscription, or check an existing sign-in on this machine."}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  className={primaryActionClassName}
+                  disabled={pending !== null}
+                  onClick={() => {
+                    reportError(null);
+                    setAntigravityTerminalMode(antigravityStatus?.runtimeInstalled === false ? "install" : "login");
+                  }}
+                >
+                  {antigravityStatus?.runtimeInstalled === false
+                    ? "Install & sign in"
+                    : (copy?.signInLabel ?? "Sign in with Google")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={pending !== null}
+                  onClick={() => void connectAntigravity({ closeTerminalOnSuccess: true })}
+                >
+                  <RefreshCw
+                    className={cn("size-4", pending === "antigravity" && "animate-spin motion-reduce:animate-none")}
+                  />
+                  {pending === "antigravity" ? "Checking..." : "Check connection"}
+                </Button>
+                {antigravityStatus?.runtimeInstalled && antigravityTerminalMode !== "install" && (
+                  <Button
+                    variant="ghost"
+                    disabled={pending !== null}
+                    onClick={() => {
+                      reportError(null);
+                      setAntigravityTerminalMode("install");
+                    }}
+                  >
+                    Repair CLI
+                  </Button>
+                )}
+              </div>
+              {antigravityTerminalMode && (
+                <BackendSetupTerminal
+                  key={antigravityTerminalMode}
+                  backend="antigravity"
+                  antigravityMode={antigravityTerminalMode}
+                  checking={pending === "antigravity"}
+                  onCheckConnection={() => connectAntigravity({ closeTerminalOnSuccess: true })}
+                  onAutoComplete={() => connectAntigravity({ closeTerminalOnSuccess: true })}
+                  onClose={() => setAntigravityTerminalMode(null)}
+                />
+              )}
+            </>
           )}
         </div>
       )}
