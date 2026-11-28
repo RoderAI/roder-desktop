@@ -7,6 +7,7 @@ import { McpAuthWaitCards } from "@/components/mcp-auth-wait-card";
 import { MarkdownShellProvider } from "@/components/markdown-shell-block";
 import { useAppShell } from "@/components/app-shell-context";
 import { Composer } from "@/components/composer";
+import { ClaudeCodeMenu } from "@/components/claude-code-menu";
 import { NativeCommandOutput } from "@/components/native-command-output";
 import { NativeModelPicker } from "@/components/native-model-picker";
 import { IndexedTranscript as Transcript } from "@/components/indexed-transcript";
@@ -27,6 +28,8 @@ import { threadSelectionForRoute } from "@/lib/route-selection";
 import { threadTitle } from "@/lib/roder-thread";
 import { normalizeWorkspacePath, normalizedTimestamp, type FolderOption } from "@/lib/workspace-thread-options";
 import { mergedCommandDescriptors } from "@/lib/native-commands";
+import { claudeCommandCatalog, claudeMenuInvocation, type ClaudeMenuInvocation } from "@/lib/claude-code-menu";
+import type { CommandInvocation } from "@/lib/roder-commands";
 import { useActiveThreadMessages, useShowWorkingIndicator } from "@/hooks/use-roder-agent";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useCommandsStore } from "@/stores/commands-store";
@@ -70,7 +73,8 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const selectedCloudMachineId = useCloudMachinesStore((state) => state.selectedMachineId);
   const selectCloudMachine = useCloudMachinesStore((state) => state.select);
   const commands = useCommandsStore((state) => state.commands);
-  const mergedCommands = useMemo(() => mergedCommandDescriptors(commands), [commands]);
+  const baseCommands = mergedCommandDescriptors(commands);
+  const mergedCommands = agent.activeBackend === "claude-code" ? claudeCommandCatalog(baseCommands) : baseCommands;
   const commandsLoaded = useCommandsStore((state) => state.loaded);
   const commandsLoading = useCommandsStore((state) => state.loading);
   const loadCommands = useCommandsStore((state) => state.load);
@@ -81,6 +85,37 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
   const loadSkills = useSkillsStore((state) => state.load);
   const { activeThreadId, selectThread } = agent;
   const routeActiveThreadId = threadId || (route === "new" ? "" : activeThreadId);
+  const [claudeMenu, setClaudeMenu] = useState<{ threadId: string; invocation: ClaudeMenuInvocation } | null>(null);
+  const [claudeMenuError, setClaudeMenuError] = useState<string | null>(null);
+  const [menuThreadId, setMenuThreadId] = useState(routeActiveThreadId);
+  if (menuThreadId !== routeActiveThreadId) {
+    setMenuThreadId(routeActiveThreadId);
+    setClaudeMenu(null);
+    setClaudeMenuError(null);
+  }
+  const claudeActivity = useRoderStore(
+    useShallow((state) => {
+      const thread = state.threadDetails[routeActiveThreadId];
+      const turns = thread?.agentBackend === "claude-code" ? thread.turns : undefined;
+      return {
+        caption: turns?.findLast((turn) => turn.id === thread?.status.activeTurnId)?.workingStatus,
+        usage: turns?.findLast((turn) => turn.status !== "inProgress" && turn.usage)?.usage,
+        isClaudeThread: thread?.agentBackend === "claude-code",
+      };
+    }),
+  );
+  async function submitCommand(invocation: CommandInvocation) {
+    setClaudeMenuError(null);
+    const nativeMenu = agent.activeBackend === "claude-code" ? claudeMenuInvocation(invocation) : null;
+    if (!nativeMenu) return sendCommandInvocation(invocation);
+    if (!routeActiveThreadId || !claudeActivity.isClaudeThread) {
+      setClaudeMenuError("Start a Claude Code conversation to open its menu.");
+    } else if (activeThreadBusy) {
+      setClaudeMenuError("Finish the current Claude Code turn to open its menu.");
+    } else {
+      setClaudeMenu({ threadId: routeActiveThreadId, invocation: nativeMenu });
+    }
+  }
   const history = useRoderStore((state) => state.threadHistoryByThread[routeActiveThreadId] ?? emptyThreadHistoryState);
   const loadOlderHistory = useRoderStore((state) => state.loadOlderThreadHistory);
   const reviewThread = useRoderStore(
@@ -279,6 +314,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onLoadOlderHistory={() => loadOlderHistory(routeActiveThreadId)}
             onRetryHistory={() => selectThread(routeActiveThreadId, { pushHistory: false, refreshHistory: true })}
             showWorkingIndicator={showWorkingIndicator}
+            workingStatus={claudeActivity.caption}
             subagentLifecycleEvents={subagentLifecycleEvents}
             turnChangeSummaries={reviewSummaries}
             onCanScrollToBottomChange={setCanScrollTranscriptToBottom}
@@ -317,6 +353,27 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             />
           )}
           <NativeCommandOutput output={nativeCommandOutput} />
+          {claudeMenu?.threadId === routeActiveThreadId && (
+            <ClaudeCodeMenu
+              threadId={claudeMenu.threadId}
+              invocation={claudeMenu.invocation}
+              onClose={() => setClaudeMenu(null)}
+            />
+          )}
+          {claudeMenuError && (
+            <p role="alert" className="mx-auto mb-3 w-full max-w-3xl px-5 text-sm text-destructive">
+              {claudeMenuError}
+            </p>
+          )}
+          {!activeThreadBusy && claudeActivity.usage && (
+            <p
+              className="mx-auto mb-1 max-w-3xl px-5 text-right text-xs tabular-nums text-muted-foreground"
+              title={`${(claudeActivity.usage.cached_prompt_tokens ?? 0).toLocaleString()} cached input · ${(claudeActivity.usage.cache_creation_prompt_tokens ?? 0).toLocaleString()} cache writes`}
+            >
+              Last turn · {claudeActivity.usage.prompt_tokens.toLocaleString()} input ·{" "}
+              {claudeActivity.usage.completion_tokens.toLocaleString()} output
+            </p>
+          )}
           {agent.error && (
             <div className="mx-auto mb-3 w-full max-w-3xl px-5 text-base text-destructive">{agent.error}</div>
           )}
@@ -347,7 +404,7 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             onAttachmentsChange={setComposerAttachments}
             onQueuePrompt={agent.addQueuedPrompt}
             onRemoveQueuedPrompt={agent.removeQueuedPrompt}
-            onCommandSubmit={sendCommandInvocation}
+            onCommandSubmit={submitCommand}
             onSend={sendPrompt}
             onSteer={steerPrompt}
             onStop={agent.stopTurn}

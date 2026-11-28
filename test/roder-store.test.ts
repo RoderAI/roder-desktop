@@ -59,6 +59,66 @@ async function loadRoderStore(
   return module.useRoderStore;
 }
 
+test("renders a Claude prompt once when its canonical item follows the start response", async () => {
+  const request = vi.fn<(method: string) => Promise<unknown>>(async (method) =>
+    method === "turn/start" ? { turnId: "claude-turn" } : {},
+  );
+  const store = await loadRoderStore(request);
+  const thread: RoderThread = {
+    ...runningThread(),
+    turns: [],
+    model: "haiku",
+    modelProvider: "claude-code",
+    agentBackend: "claude-code",
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  };
+  store.setState({ activeBackend: "claude-code", threads: [thread], threadDetails: { [thread.id]: thread } });
+  await store.getState().sendPrompt("Read sample.txt");
+  store.getState().applyNotification({
+    method: "item/completed",
+    params: {
+      threadId: thread.id,
+      turnId: "claude-turn",
+      seq: 1,
+      eventId: "user-item-event",
+      timestamp: "2026-11-28T17:00:00Z",
+      event: { type: "itemCompleted", item: { id: "server-user", type: "userMessage", text: "Read sample.txt" } },
+    },
+  });
+  expect(store.getState().threadDetails[thread.id]?.turns?.[0]?.items.map((item) => item.id)).toEqual(["server-user"]);
+});
+
+test("shows progress only for the matching Claude turn and keeps its native token usage", async () => {
+  const store = await loadRoderStore();
+  const thread: RoderThread = {
+    id: "thread-1",
+    model: "haiku",
+    modelProvider: "claude-code",
+    agentBackend: "claude-code",
+    preview: "Claude",
+    cwd: "/workspace",
+    createdAt: 1,
+    updatedAt: 1,
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  };
+  store.setState({ threads: [thread] });
+  const notify = store.getState().applyNotification;
+  notify({ method: "turn/started", params: { threadId: thread.id, turn: { id: "current" } } });
+  notify({
+    method: "turn/progress",
+    params: { threadId: thread.id, turnId: "current", workingStatus: "Germinating…" },
+  });
+  notify({ method: "turn/progress", params: { threadId: thread.id, turnId: "old", workingStatus: "Old…" } });
+  expect(store.getState().threadDetails[thread.id]?.turns?.[0]?.workingStatus).toBe("Germinating…");
+  const usage = { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, cached_prompt_tokens: 40 };
+  notify({
+    method: "turn/completed",
+    params: { threadId: thread.id, turn: { id: "current", status: "completed", usage } },
+  });
+  expect(store.getState().threadDetails[thread.id]?.turns?.[0]).toMatchObject({ usage });
+  expect(store.getState().threadDetails[thread.id]?.turns?.[0]?.workingStatus).toBeUndefined();
+});
+
 test("composer permission and reasoning survive a renderer reload for the thread and the new-chat draft", async () => {
   vi.useFakeTimers();
   try {
