@@ -27,3 +27,11 @@ test("leaves a turn with no policy alone and propagates a failed policy change",
     "Could not set policy",
   );
 });
+
+test("blocks a turn when the engine reports a different effective policy", async () => {
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async () => ({ mode: "default" }));
+
+  await expect(
+    applyDesktopTurnPolicy(request, { threadId: "thread-1", policyMode: "bypass", prompt: "Continue" }),
+  ).rejects.toThrow("requested bypass, engine applied default");
+});

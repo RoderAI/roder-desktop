@@ -391,6 +391,25 @@ test("changing selected policy mode applies it to the running thread immediately
   ]);
 });
 
+test("reselecting Full access reapplies it to the engine for a waiting thread", async () => {
+  const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(async () => ({ mode: "bypass" }));
+  const store = await loadRoderStore(request);
+  store.setState({
+    activeThreadId: "thread-1",
+    selectedPolicyMode: "bypass",
+    threadControlsByThread: { "thread-1": { policyMode: "bypass" } },
+    busy: true,
+  });
+
+  await store.getState().setSelectedPolicyMode("bypass");
+
+  expect(request).toHaveBeenCalledWith("thread/set_mode", {
+    threadId: "thread-1",
+    mode: "bypass",
+    reason: "desktop permission selector",
+  });
+});
+
 test("a late permission response cannot replace the settings of a newly selected thread", async () => {
   let finish!: (result: { mode: string }) => void;
   const pending = new Promise<{ mode: string }>((resolve) => {
