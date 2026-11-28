@@ -12,21 +12,24 @@ import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 
 const verifiedPackagingNodeMajors = new Set([24, 25]);
-const shouldSignMac = process.env.RODER_DESKTOP_MACOS_SIGN === "1";
+const devBuild = process.env.RODER_DESKTOP_DEV_BUILD === "1";
+const appName = devBuild ? "Roder Dev" : "Roder";
+const icon = devBuild ? "resources/icon-dev" : "resources/icon";
+const shouldSignMac = !devBuild && process.env.RODER_DESKTOP_MACOS_SIGN === "1";
 const macSigningIdentity =
   process.env.APPLE_SIGNING_IDENTITY ?? "Developer ID Application: Pandelis Zembashis (7UNZ734ZYN)";
 
 const config: ForgeConfig = {
   packagerConfig: {
-    name: "Roder",
-    executableName: "Roder",
-    appBundleId: "sc.roder.desktop",
+    name: appName,
+    executableName: appName,
+    appBundleId: devBuild ? "sc.roder.desktop.dev" : "sc.roder.desktop",
     appCategoryType: "public.app-category.developer-tools",
-    icon: "resources/icon",
+    icon,
     asar: {
       unpack: "**/node_modules/node-pty/**",
     },
-    extraResource: ["resources/bin", "resources/icon.png", "resources/wordmark.png"],
+    extraResource: ["resources/bin", `${icon}.png`, "resources/wordmark.png"],
     ...(shouldSignMac
       ? {
           osxSign: {
@@ -40,7 +43,10 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   hooks: {
-    async prePackage() {
+    async prePackage(_config, platform) {
+      if (devBuild && platform !== "darwin") {
+        throw new Error("The local Roder Dev package currently targets macOS.");
+      }
       // On Node 26 electron-forge's package step ends with exit code 0 and writes nothing, so a broken
       // build looks like a successful one. Fail here instead. CI packages on Node 24.
       const nodeMajor = Number(process.versions.node.split(".")[0]);
@@ -51,7 +57,8 @@ const config: ForgeConfig = {
         );
       }
 
-      const result = spawnSync(process.execPath, ["scripts/install-roder-for-build.mjs"], {
+      const script = devBuild ? "scripts/bundle-roder.mjs" : "scripts/install-roder-for-build.mjs";
+      const result = spawnSync(process.execPath, [script], {
         stdio: "inherit",
         env: process.env,
       });
@@ -60,7 +67,7 @@ const config: ForgeConfig = {
         throw result.error;
       }
       if (result.status !== 0) {
-        throw new Error(`install-roder-for-build failed with status ${result.status ?? "unknown"}`);
+        throw new Error(`${script} failed with status ${result.status ?? "unknown"}`);
       }
     },
     async packageAfterPrune(_config, buildPath, _electronVersion, platform, arch) {
