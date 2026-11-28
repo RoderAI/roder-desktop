@@ -29,12 +29,14 @@ export async function cloudMachineThreadParams(
   }
   if (platform === "win32") throw new Error(WINDOWS_CLOUD_MACHINES_NOTICE);
   const runner = await runnerFor(desktopCloudMachineId);
-  if (runner.providerId === "tailscale" || runner.providerId === "ssh") {
+  if (runner.providerId === "tailscale" || runner.providerId === "ssh" || runner.providerId === "boat") {
     if (!resolveTailscaleRunner) {
       throw new Error(
         runner.providerId === "ssh"
           ? "SSH runner gateway is unavailable. Restart Roder Desktop and try again."
-          : "Tailscale runner gateway is unavailable. Restart Roder Desktop and try again.",
+          : runner.providerId === "boat"
+            ? "Boat runner gateway is unavailable. Restart Roder Desktop and try again."
+            : "Tailscale runner gateway is unavailable. Restart Roder Desktop and try again.",
       );
     }
     return { ...input, runner: await resolveTailscaleRunner(desktopCloudMachineId, runner) };

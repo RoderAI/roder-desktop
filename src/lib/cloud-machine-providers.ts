@@ -14,6 +14,14 @@ const gatewayEnvironment: Record<string, string> = {
 };
 
 export function machineProviderHelp(providerId: string): CloudMachineProviderHelp {
+  if (providerId === "boat") {
+    return {
+      description:
+        "Provision and connect to Ubuntu cloud sandboxes on Boat with Sign in with Boat (OAuth), automatic remote-roder tunneling, SSH terminal, hosted preview ports, and Linux desktop streaming.",
+      environment: ["BOAT_API_KEY"],
+      config: { sandbox_id: "bx_23456789", sandbox_name: "my-boat-sandbox" },
+    };
+  }
   if (providerId === "ssh") {
     return {
       description:

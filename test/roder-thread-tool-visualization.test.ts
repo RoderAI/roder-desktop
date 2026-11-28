@@ -257,9 +257,14 @@ test("file edit tools expose inline timeline previews", () => {
     "thread-1",
     turn(
       [
-        tool("tool-patch-1", "apply_patch", {
-          patch: "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
-        }, "inProgress"),
+        tool(
+          "tool-patch-1",
+          "apply_patch",
+          {
+            patch: "*** Begin Patch\n*** Update File: src/app.ts\n@@\n-old\n+new\n*** End Patch",
+          },
+          "inProgress",
+        ),
         tool("tool-write-1", "write_file", { path: "src/app.ts", content: "export const value = 1;\n" }),
         tool("tool-edit-1", "edit", { path: "src/app.ts", old_string: "value = 1", new_string: "value = 2" }),
         tool("tool-multi-edit-1", "multi_edit", {
@@ -485,6 +490,83 @@ test("failed turns surface the turn error as a failed system message", () => {
       status: "failed",
     },
   ]);
+});
+
+test("Antigravity descriptive tool calls render clean titles, strip harness timestamps, and never collapse to file extensions", () => {
+  const messages = messagesFromTurn(
+    "thread-ag",
+    turn(
+      [
+        tool("ag-1", "Read /Users/pz/w/roder-desktop/src/components/provider-logo.tsx", undefined, "completed", ""),
+        tool(
+          "ag-2",
+          "package.json",
+          undefined,
+          "completed",
+          'Created At: 2026-11-27T20:51:36-08:00\nCompleted At: 2026-11-27T20:51:37-08:00\n{\n  "name": "roder"\n}',
+        ),
+        tool(
+          "ag-3",
+          'git grep -n "antigravity" src',
+          undefined,
+          "completed",
+          "Created At: 2026-11-27T20:52:46-08:00\nCompleted At: 2026-11-27T20:53:00-08:00\nCommand exited with code 0\n\nCommand output:\nsrc/components/provider-logo.tsx:42",
+        ),
+        tool(
+          "ag-4",
+          "node -e 'console.log(\"lobe path bbox:\", { minX: 0 })'",
+          undefined,
+          "completed",
+          "Created At: 2026-11-27T20:52:59-08:00\nCompleted At: 2026-11-27T20:53:01-08:00\nCommand exited with code 0\n\nCommand output:\nlobe path bbox: { minX: 0 }",
+        ),
+        tool(
+          "ag-5",
+          "Edit /Users/pz/w/roder-desktop/src/components/provider-logo.tsx",
+          undefined,
+          "completed",
+          "The tool's output was truncated due to being too long. You can find the full output in a file at file:///Users/pz/.gemini/out.txt",
+        ),
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages.map((message) => message.toolSummary)).toEqual([
+    "Read provider-logo.tsx",
+    "Read package.json",
+    'Ran git grep -n "antigravity" src',
+    "Ran node -e 'console.log(\"lobe path bbox:\", { minX: 0 })'",
+    "Edited provider-logo.tsx",
+  ]);
+  expect(messages[1].toolOutput).toBe('{\n  "name": "roder"\n}');
+  expect(messages[2].toolInput).toBe('git grep -n "antigravity" src');
+  expect(messages[2].toolOutput).toBe("src/components/provider-logo.tsx:42");
+  expect(messages[3].toolInput).toBe("node -e 'console.log(\"lobe path bbox:\", { minX: 0 })'");
+  expect(messages[3].toolOutput).toBe("lobe path bbox: { minX: 0 }");
+  expect(messages[4].toolOutput).toContain("truncated");
+});
+
+test("Antigravity completion fallback name preserves the original descriptive tool title", () => {
+  const messages = messagesFromTurn(
+    "thread-ag",
+    turn(
+      [
+        tool("ag-1", "Read /Users/pz/w/roder-desktop/src/lib/roder-thread.ts", undefined, "inProgress"),
+        tool(
+          "ag-1",
+          "Antigravity tool",
+          undefined,
+          "completed",
+          "Created At: 2026-11-27T20:51:36-08:00\nCompleted At: 2026-11-27T20:51:37-08:00\nexport const ok = true;",
+        ),
+      ],
+      "completed",
+    ),
+  );
+
+  expect(messages).toHaveLength(1);
+  expect(messages[0].toolSummary).toBe("Read roder-thread.ts");
+  expect(messages[0].toolOutput).toBe("export const ok = true;");
 });
 
 function turn(items, status = "completed") {

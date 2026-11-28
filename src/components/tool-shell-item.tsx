@@ -26,7 +26,7 @@ export function ToolShellItem({ message, onOpenChange, open, status, summary }: 
         <DisclosureChevron groupName="shell-tool" />
       </Collapsible.Trigger>
       <Collapsible.Panel keepMounted className="tool-disclosure-panel pl-5 text-base leading-7 text-muted-foreground">
-        <div className="tool-shell-output py-1 font-mono text-base leading-7">
+        <div className="tool-shell-output max-h-80 overflow-auto py-1 font-mono text-sm leading-5">
           {message.toolInput ? (
             <pre className="m-0 whitespace-pre-wrap break-words text-foreground">{`$ ${message.toolInput}`}</pre>
           ) : null}

@@ -2,6 +2,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type {
+  BoatCredentialStatus,
+  BoatOAuthState,
+  BoatSandboxSummary,
   CloudMachine,
   CloudMachineInput,
   CloudRunnerProvider,
@@ -15,6 +18,9 @@ import { machineProviderHelp } from "../src/lib/cloud-machine-providers";
 const snapshot = vi.hoisted(() => ({
   machines: [] as CloudMachine[],
   providers: [] as CloudRunnerProvider[],
+  boatCredentials: null as BoatCredentialStatus | null,
+  boatAuthState: null as BoatOAuthState | null,
+  boatSandboxes: [] as BoatSandboxSummary[],
   localTailscale: null as LocalTailscaleStatus | null,
   tailscaleCredentials: null as TailscaleCredentialStatus | null,
   localSsh: null as LocalSshEnvironment | null,
@@ -22,6 +28,7 @@ const snapshot = vi.hoisted(() => ({
   error: "",
   busy: false,
   refresh: vi.fn<() => Promise<void>>(),
+  startBoatOAuth: vi.fn<() => Promise<BoatOAuthState>>(),
   save: vi.fn<(input: CloudMachineInput) => Promise<void>>(),
   remove: vi.fn<(id: string) => Promise<void>>(),
   select: vi.fn<(id: string) => void>(),
@@ -37,6 +44,9 @@ import { SettingsCloudMachinesPanel } from "../src/components/settings-cloud-mac
 beforeEach(() => {
   snapshot.machines = [];
   snapshot.providers = [];
+  snapshot.boatCredentials = null;
+  snapshot.boatAuthState = null;
+  snapshot.boatSandboxes = [];
   snapshot.localTailscale = null;
   snapshot.tailscaleCredentials = null;
   snapshot.localSsh = null;
@@ -261,4 +271,63 @@ test("renders first-party SSH servers card with discovered ~/.ssh/config hosts a
   expect(html).toContain("Quick paste (optional)");
   expect(html).toContain("ProxyJump / bastion");
   expect(html).not.toContain('type="password"');
+});
+
+test("renders first-party Boat OAuth card, connected account, sandboxes, and preserves Boat provider identity", () => {
+  snapshot.providers = [{ provider_id: "boat", capabilities: {} }];
+  const signedOutHtml = renderToStaticMarkup(React.createElement(SettingsCloudMachinesPanel));
+  expect(signedOutHtml).toContain("Sign in with Boat");
+  expect(signedOutHtml).toContain("Use API key");
+  expect(signedOutHtml).not.toContain('type="password"');
+
+  snapshot.boatCredentials = {
+    configured: true,
+    mode: "oauth",
+    source: "oauth",
+    preview: "boat…9999",
+    userLogin: "captain",
+    userDisplayName: "Captain Boat",
+    userEmail: "captain@boat.dev",
+    scope: "account.read sandbox.read",
+    expiresAt: Date.now() + 3600_000,
+  };
+  snapshot.boatSandboxes = [
+    {
+      id: "bx_23456789",
+      name: "alpha-dev",
+      state: "idle",
+      url: "https://bx_23456789.boat.dev",
+      ip: "10.0.0.5",
+      desktopAvailable: true,
+      desktopUrl: "https://boat.dev/desktop/bx_23456789",
+      snapshotAvailable: false,
+      createdAt: null,
+      updatedAt: null,
+      archiveAfter: null,
+    },
+  ];
+  snapshot.machines = [{ id: "boat-1", name: "alpha-dev", providerId: "boat", workspace: "/home/user" }];
+
+  const connectedHtml = renderToStaticMarkup(React.createElement(SettingsCloudMachinesPanel));
+  expect(connectedHtml).toContain("Connected · @captain");
+  expect(connectedHtml).toContain("Sign in with Boat (OAuth · encrypted)");
+  expect(connectedHtml).toContain("1 sandbox available");
+  expect(connectedHtml).toContain("alpha-dev (bx_23456789) · idle");
+  expect(connectedHtml).toContain("Sign out");
+  expect(connectedHtml).not.toContain('type="password"');
+
+  expect(
+    effectiveRunnerProviderId({
+      providerId: "runloop",
+      config: { roder_transport: "boat", sandbox_id: "bx_23456789", sandbox_name: "alpha-dev" },
+    }),
+  ).toBe("boat");
+  expect(
+    remoteRunnerTargetName({
+      providerId: "runloop",
+      workspace: "/home/user",
+      config: { roder_transport: "boat", sandbox_id: "bx_23456789", sandbox_name: "alpha-dev" },
+    }),
+  ).toBe("alpha-dev");
+  expect(machineProviderHelp("boat").description).toContain("Boat");
 });

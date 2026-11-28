@@ -30,7 +30,68 @@ const shellBlockPlugins: StreamdownProps["plugins"] = {
 };
 const shellBlockRemarkPlugins = [...Object.values(defaultRemarkPlugins), markUnclosedShellFences];
 
+type HastNode = {
+  type: string;
+  tagName?: string;
+  value?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+};
+
+function decodeFileHrefTitle(href: string): string | null {
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol !== "file:") {
+      return null;
+    }
+    const path = decodeURIComponent(parsed.pathname);
+    const hash = parsed.hash.replace(/^#/u, "");
+    return hash ? `${path}#${hash}` : path;
+  } catch {
+    return null;
+  }
+}
+
+function rewriteFileLinks(node: HastNode): void {
+  if (!node.children) {
+    return;
+  }
+  for (let index = 0; index < node.children.length; index += 1) {
+    const child = node.children[index];
+    if (child.type === "element" && child.tagName === "a") {
+      const href = typeof child.properties?.href === "string" ? child.properties.href : "";
+      const fileTitle = href.toLowerCase().startsWith("file:") ? decodeFileHrefTitle(href) : null;
+      if (fileTitle !== null) {
+        const inner = child.children ?? [];
+        const singleChild = inner.length === 1 ? inner[0] : null;
+        if (singleChild && singleChild.type === "element" && singleChild.tagName === "code") {
+          node.children[index] = {
+            ...singleChild,
+            properties: { ...singleChild.properties, title: fileTitle },
+          };
+        } else {
+          node.children[index] = {
+            type: "element",
+            tagName: "code",
+            properties: { title: fileTitle },
+            children: inner,
+          };
+        }
+        continue;
+      }
+    }
+    rewriteFileLinks(child);
+  }
+}
+
+function fileLinksToCodeRehypePlugin() {
+  return function transform(tree: HastNode): void {
+    rewriteFileLinks(tree);
+  };
+}
+
 const safeRehypePlugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
+  fileLinksToCodeRehypePlugin,
   defaultRehypePlugins.sanitize,
   [
     harden,
@@ -40,6 +101,7 @@ const safeRehypePlugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
       allowedLinkPrefixes: ["*"],
       allowedImagePrefixes: [],
       allowDataImages: false,
+      linkBlockPolicy: "text-only",
     },
   ],
 ];

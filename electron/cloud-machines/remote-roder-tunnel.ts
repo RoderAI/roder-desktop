@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { BlaxelClient } from "./blaxel-client";
+import type { BoatClient } from "./boat-client";
 import type { BlaxelAuth, ResolvedTailscaleAuth } from "./credentials";
 import {
   buildTailscaledLaunchCommand,
@@ -189,7 +190,7 @@ export class RemoteRoderTunnelConnection extends EventEmitter {
       clientInfo: {
         name: "roder-desktop-bridge",
         title: "Roder Desktop",
-        version: this.options.clientVersion ?? "0.1.19",
+        version: this.options.clientVersion ?? "0.1.21",
       },
       capabilities: {
         experimentalApi: true,
@@ -309,7 +310,7 @@ export class RemoteRoderTunnelConnection extends EventEmitter {
   }
 }
 
-export type RemoteTunnelTransport = "tailscale" | "ssh-forward" | "blaxel-preview";
+export type RemoteTunnelTransport = "tailscale" | "ssh-forward" | "blaxel-preview" | "boat-host";
 
 export type ActiveRemoteTunnel = {
   key: string;
@@ -327,6 +328,7 @@ export type ActiveRemoteTunnel = {
 
 export type RemoteRoderTunnelManagerOptions = {
   blaxelClient: BlaxelClient;
+  boatClient?: BoatClient;
   sshClient?: TailscaleSshClient;
   createWebSocket?: RemoteWebSocketFactory;
   downloadBaseUrl?: string;
@@ -557,6 +559,348 @@ export class RemoteRoderTunnelManager extends EventEmitter {
     });
     this.connecting.set(key, connectPromise);
     return connectPromise;
+  }
+
+  async ensureBoatTunnel(input: {
+    desktopWorkspaceId: string;
+    desktopRootName: string;
+    sandboxId: string;
+    sandboxName: string;
+    workingDir: string;
+    tailscaleAuth?: ResolvedTailscaleAuth | null;
+    preferTailscale?: boolean;
+    requireTailscale?: boolean;
+  }): Promise<ActiveRemoteTunnel> {
+    const key = tunnelKey("boat", "", input.sandboxId, input.workingDir);
+    const unsupportedReason = this.unsupportedKeys.get(key);
+    if (unsupportedReason) {
+      throw new RemoteRoderUnsupportedRuntimeError(unsupportedReason);
+    }
+
+    const existing = this.tunnels.get(key);
+    if (existing && existing.connection.isOpen()) {
+      if (!input.requireTailscale || existing.transport === "tailscale") {
+        existing.desktopWorkspaceIds.add(input.desktopWorkspaceId);
+        return existing;
+      }
+      this.closeTunnel(key);
+    }
+
+    const inflight = this.connecting.get(key);
+    if (inflight) {
+      const tunnel = await inflight;
+      tunnel.desktopWorkspaceIds.add(input.desktopWorkspaceId);
+      return tunnel;
+    }
+
+    const connectPromise = this.bootstrapAndConnectBoat(key, input).finally(() => {
+      if (this.connecting.get(key) === connectPromise) {
+        this.connecting.delete(key);
+      }
+    });
+    this.connecting.set(key, connectPromise);
+    return connectPromise;
+  }
+
+  private async bootstrapAndConnectBoat(
+    key: string,
+    input: {
+      desktopWorkspaceId: string;
+      desktopRootName: string;
+      sandboxId: string;
+      sandboxName: string;
+      workingDir: string;
+      tailscaleAuth?: ResolvedTailscaleAuth | null;
+      preferTailscale?: boolean;
+      requireTailscale?: boolean;
+    },
+  ): Promise<ActiveRemoteTunnel> {
+    const boatClient = this.options.boatClient;
+    if (!boatClient) {
+      throw new Error("Boat client is unavailable.");
+    }
+    const { sandboxId, sandboxName, workingDir } = input;
+    const shouldAttemptTailscale =
+      Boolean(input.tailscaleAuth) && (input.preferTailscale !== false || Boolean(input.requireTailscale));
+
+    const cachedEndpoint = this.cachedEndpoints.get(key);
+    if (cachedEndpoint && (!input.requireTailscale || cachedEndpoint.transport === "tailscale")) {
+      try {
+        const fastConnection = new RemoteRoderTunnelConnection({
+          wsUrl: cachedEndpoint.wsUrl,
+          remoteToken: cachedEndpoint.remoteToken,
+          createWebSocket: this.options.createWebSocket,
+        });
+        await fastConnection.connect();
+        const { remoteWorkspaceId, remoteRootId } = await ensureRemoteServerWorkspace(
+          fastConnection,
+          workingDir,
+          input.desktopRootName,
+        );
+        return this.registerActiveTunnel(key, {
+          sandboxName,
+          workingDir,
+          wsUrl: cachedEndpoint.wsUrl,
+          transport: cachedEndpoint.transport,
+          tailscaleIp: cachedEndpoint.tailscaleIp,
+          tailscaleDnsName: cachedEndpoint.tailscaleDnsName,
+          remoteToken: cachedEndpoint.remoteToken,
+          remoteWorkspaceId,
+          remoteRootId,
+          connection: fastConnection,
+          desktopWorkspaceId: input.desktopWorkspaceId,
+        });
+      } catch {
+        this.cachedEndpoints.delete(key);
+      }
+    }
+
+    // 1. Ensure Boat sandbox is running (auto-resumes if stopped).
+    await boatClient.ensureRunning(sandboxId);
+
+    // 2. Install/verify remote-roder in $HOME/.roder/bin/remote-roder.
+    const installScript = buildPeerRemoteRoderInstallScript(workingDir, this.options.downloadBaseUrl);
+    const installResult = await boatClient.execCommand(sandboxId, {
+      command: `sh -c ${shellQuotePosixTunnel(installScript)}`,
+      timeoutSeconds: 90,
+    });
+    const combinedInstall = `${installResult.stdout}\n${installResult.stderr}`;
+    if (installResult.exitCode === 42 || combinedInstall.includes("RODER_UNSUPPORTED_MUSL")) {
+      const reason = "Boat sandbox runtime is not compatible with remote-roder.";
+      this.unsupportedKeys.set(key, reason);
+      throw new RemoteRoderUnsupportedRuntimeError(reason);
+    }
+    if (installResult.exitCode !== 0) {
+      throw new Error(
+        `Could not install remote-roder in Boat sandbox "${sandboxName}": ${combinedInstall.trim().slice(-240)}`,
+      );
+    }
+
+    // 3. Probe or launch remote-roder app-server on port 17373.
+    const probeScript = [
+      'token_path="$HOME/.roder/bridge.token"',
+      `if [ -r "$token_path" ] && (`,
+      `  (command -v curl >/dev/null 2>&1 && curl -fsS http://127.0.0.1:${REMOTE_RODER_PORT}/readyz >/dev/null 2>&1) ||`,
+      `  (command -v python3 >/dev/null 2>&1 && python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${REMOTE_RODER_PORT}/readyz', timeout=2)" >/dev/null 2>&1)`,
+      `); then`,
+      `  printf 'REUSE:'`,
+      `  cat "$token_path"`,
+      `else`,
+      `  echo 'NEED_START'`,
+      `fi`,
+    ].join("\n");
+    const probe = await boatClient.execCommand(sandboxId, {
+      command: `sh -c ${shellQuotePosixTunnel(probeScript)}`,
+      timeoutSeconds: 15,
+    });
+    const probeOut = probe.stdout.trim();
+    let remoteToken = "";
+    if (probeOut.startsWith("REUSE:") && probeOut.slice("REUSE:".length).trim().length >= 16) {
+      remoteToken = probeOut.slice("REUSE:".length).trim();
+    } else {
+      remoteToken = randomBytes(32).toString("base64url");
+      const tokenSetupScript = [
+        "set -eu",
+        "umask 077",
+        'mkdir -p "$HOME/.roder"',
+        `printf '%s' ${shellQuotePosixTunnel(remoteToken)} > "$HOME/.roder/bridge.token"`,
+      ].join("\n");
+      await boatClient.execCommand(sandboxId, {
+        command: `sh -c ${shellQuotePosixTunnel(tokenSetupScript)}`,
+        timeoutSeconds: 15,
+      });
+
+      const launchCmd = [
+        `export RODER_REMOTE_APP_SERVER_TOKEN=${shellQuotePosixTunnel(remoteToken)}`,
+        'bin="$HOME/.roder/bin/remote-roder"',
+        '[ -x "$bin" ] || bin="$(command -v remote-roder || command -v roder)"',
+        `exec "$bin" app-server --remote --listen ws://0.0.0.0:${REMOTE_RODER_PORT} --auth-token env:RODER_REMOTE_APP_SERVER_TOKEN --print-qr=false`,
+      ].join("; ");
+      await boatClient.execCommand(sandboxId, {
+        command: `sh -c ${shellQuotePosixTunnel(launchCmd)}`,
+        detached: true,
+        timeoutSeconds: 15,
+      });
+
+      const waitReadyScript = [
+        "for i in $(seq 1 40); do",
+        `  if (command -v curl >/dev/null 2>&1 && curl -fsS http://127.0.0.1:${REMOTE_RODER_PORT}/readyz >/dev/null 2>&1) ||`,
+        `     (command -v python3 >/dev/null 2>&1 && python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${REMOTE_RODER_PORT}/readyz', timeout=2)" >/dev/null 2>&1); then`,
+        '    echo "READY"',
+        "    exit 0",
+        "  fi",
+        "  sleep 0.25",
+        "done",
+        "exit 1",
+      ].join("\n");
+      const ready = await boatClient.execCommand(sandboxId, {
+        command: `sh -c ${shellQuotePosixTunnel(waitReadyScript)}`,
+        timeoutSeconds: 20,
+      });
+      if (ready.exitCode !== 0) {
+        throw new Error(
+          `Remote Roder app-server did not become ready on port ${REMOTE_RODER_PORT} in Boat sandbox "${sandboxName}".`,
+        );
+      }
+    }
+
+    // 4a. Optional Tailscale WireGuard tunnel injection.
+    if (shouldAttemptTailscale && input.tailscaleAuth) {
+      try {
+        const tsIdentity = await this.bootstrapTailscaleInBoat({
+          boatClient,
+          sandboxId,
+          sandboxName,
+          tailscaleAuth: input.tailscaleAuth,
+        });
+        const tsWsUrl = `ws://${tsIdentity.tailscaleIp}:${REMOTE_RODER_PORT}`;
+        const tsConnection = new RemoteRoderTunnelConnection({
+          wsUrl: tsWsUrl,
+          remoteToken,
+          createWebSocket: this.options.createWebSocket,
+        });
+        await tsConnection.connect();
+        this.tailscaleErrors.delete(key);
+        const { remoteWorkspaceId, remoteRootId } = await ensureRemoteServerWorkspace(
+          tsConnection,
+          workingDir,
+          input.desktopRootName,
+        );
+        return this.registerActiveTunnel(key, {
+          sandboxName,
+          workingDir,
+          wsUrl: tsWsUrl,
+          transport: "tailscale",
+          tailscaleIp: tsIdentity.tailscaleIp,
+          tailscaleDnsName: tsIdentity.dnsName ?? undefined,
+          remoteToken,
+          remoteWorkspaceId,
+          remoteRootId,
+          connection: tsConnection,
+          desktopWorkspaceId: input.desktopWorkspaceId,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.tailscaleErrors.set(key, message);
+        if (input.requireTailscale) {
+          throw error;
+        }
+        console.warn(`[roder-tailscale-tunnel] Falling back to Boat hosted WSS for "${sandboxName}": ${message}`);
+      }
+    }
+
+    // 4b. Expose port 17373 via Boat's native HTTPS/WSS hosting (authenticated by remoteToken).
+    const hosted = await boatClient.hostPort(sandboxId, REMOTE_RODER_PORT, {
+      public: true,
+      localhost: false,
+      title: "Roder App Server",
+    });
+    const wsUrl = previewHttpUrlToWsUrl(hosted.url);
+    const connection = new RemoteRoderTunnelConnection({
+      wsUrl,
+      remoteToken,
+      createWebSocket: this.options.createWebSocket,
+    });
+    await connection.connect();
+    const { remoteWorkspaceId, remoteRootId } = await ensureRemoteServerWorkspace(
+      connection,
+      workingDir,
+      input.desktopRootName,
+    );
+    return this.registerActiveTunnel(key, {
+      sandboxName,
+      workingDir,
+      wsUrl,
+      transport: "boat-host",
+      remoteToken,
+      remoteWorkspaceId,
+      remoteRootId,
+      connection,
+      desktopWorkspaceId: input.desktopWorkspaceId,
+    });
+  }
+
+  private async bootstrapTailscaleInBoat(input: {
+    boatClient: BoatClient;
+    sandboxId: string;
+    sandboxName: string;
+    tailscaleAuth: ResolvedTailscaleAuth;
+  }): Promise<{ tailscaleIp: string; dnsName: string | null }> {
+    const { boatClient, sandboxId, sandboxName, tailscaleAuth } = input;
+    const baseDir = "/home/user/.roder";
+    const statusScript = buildTailscaleStatusProbeScript(baseDir);
+    const probe = await boatClient.execCommand(sandboxId, {
+      command: `sh -c ${shellQuotePosixTunnel(statusScript)}`,
+      timeoutSeconds: 15,
+    });
+    const existing = parseRemoteTailscaleIdentity(probe.stdout);
+    if (existing.running && existing.tailscaleIp) {
+      return { tailscaleIp: existing.tailscaleIp, dnsName: existing.dnsName };
+    }
+
+    const installScript = buildTailscaleInstallScript(baseDir);
+    const installRes = await boatClient.execCommand(sandboxId, {
+      command: `sh -c ${shellQuotePosixTunnel(installScript)}`,
+      timeoutSeconds: 90,
+    });
+    if (installRes.exitCode !== 0) {
+      throw new Error(
+        `Could not install Tailscale in Boat sandbox "${sandboxName}": ${(installRes.stderr || installRes.stdout).trim().slice(-200)}`,
+      );
+    }
+
+    if (existing.backendState === "NotRunning") {
+      const daemonCmd = buildTailscaledLaunchCommand(baseDir);
+      await boatClient.execCommand(sandboxId, {
+        command: `sh -c ${shellQuotePosixTunnel(daemonCmd)}`,
+        detached: true,
+        timeoutSeconds: 15,
+      });
+
+      const waitScript = buildTailscaleWaitSocketScript(baseDir);
+      const waitRes = await boatClient.execCommand(sandboxId, {
+        command: `sh -c ${shellQuotePosixTunnel(waitScript)}`,
+        timeoutSeconds: 20,
+      });
+      if (waitRes.exitCode !== 0) {
+        throw new Error(`tailscaled did not start in Boat sandbox "${sandboxName}".`);
+      }
+    }
+
+    let authKey: string;
+    if (tailscaleAuth.mode === "oauth") {
+      const minted = await mintTailscaleEphemeralAuthKey({
+        oauthClientId: tailscaleAuth.oauthClientId,
+        oauthClientSecret: tailscaleAuth.oauthClientSecret,
+        tags: tailscaleAuth.tags,
+        tailnet: tailscaleAuth.tailnet,
+        description: `roder-boat-${sandboxName}`,
+        fetchImpl: this.options.fetchImpl,
+      });
+      authKey = minted.key;
+    } else {
+      authKey = tailscaleAuth.authKey;
+    }
+
+    const upScript = buildTailscaleUpScript(`roder-${sandboxName}`, authKey, baseDir);
+    const upRes = await boatClient.execCommand(sandboxId, {
+      command: `sh -c ${shellQuotePosixTunnel(upScript)}`,
+      timeoutSeconds: 45,
+    });
+    if (upRes.exitCode !== 0) {
+      throw new Error(
+        `tailscale up failed in Boat sandbox "${sandboxName}": ${(upRes.stderr || upRes.stdout).trim().slice(-200)}`,
+      );
+    }
+    const afterProbe = await boatClient.execCommand(sandboxId, {
+      command: `sh -c ${shellQuotePosixTunnel(statusScript)}`,
+      timeoutSeconds: 15,
+    });
+    const identity = parseRemoteTailscaleIdentity(afterProbe.stdout);
+    if (!identity.running || !identity.tailscaleIp) {
+      throw new Error(`Tailscale joined in Boat sandbox "${sandboxName}" but no 100.x IP was assigned yet.`);
+    }
+    return { tailscaleIp: identity.tailscaleIp, dnsName: identity.dnsName };
   }
 
   private async bootstrapAndConnectBlaxel(

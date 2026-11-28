@@ -8,7 +8,7 @@ import type {
   RoderThreadItemEventKind,
   RoderTurn,
 } from "@/types/roder";
-import { canonicalToolName, isShellToolName } from "@/lib/tool-display";
+import { canonicalToolName, classifyDescriptiveTool, isDescriptiveToolName, isShellToolName } from "@/lib/tool-display";
 import { normalizedToolPreview, summarizeApplyPatch } from "@/lib/tool-preview";
 
 const emptyMessages: ConversationMessage[] = [];
@@ -76,6 +76,45 @@ export function shouldShowThreadWorkingIndicator(
 
 export function activeTurnIdForThread(thread: RoderThread | undefined): string {
   return thread?.status.activeTurnId ?? "";
+}
+
+export function ensureTurnUserMessage(
+  thread: RoderThread | undefined,
+  turnId: string,
+  text: string,
+  images: Array<{ imageUrl: string }> = [],
+): RoderThread | undefined {
+  if (!thread || !turnId || (!text && images.length === 0)) {
+    return thread;
+  }
+  const turns = thread.turns ? [...thread.turns] : [];
+  const turnIndex = turns.findIndex((turn) => turn.id === turnId);
+  const userItem: RoderItem = {
+    id: `user-${turnId}`,
+    type: "userMessage",
+    text,
+    ...(images.length > 0 ? { images } : {}),
+    status: "completed",
+  };
+  if (turnIndex === -1) {
+    turns.push({
+      id: turnId,
+      items: [userItem],
+      itemsView: "default",
+      status: "inProgress",
+      error: null,
+    });
+    return { ...thread, turns };
+  }
+  const existingTurn = turns[turnIndex];
+  if (existingTurn.items.some((item) => item.type === "userMessage")) {
+    return thread;
+  }
+  turns[turnIndex] = {
+    ...existingTurn,
+    items: [userItem, ...existingTurn.items],
+  };
+  return { ...thread, turns };
 }
 
 export function applyThreadItemEvent(
@@ -234,13 +273,16 @@ function mergeCompletedItem(existing: RoderItem, incoming: RoderItem): RoderItem
     };
   }
   if (existing.type === "toolExecution" && incoming.type === "toolExecution") {
+    const resolvedToolName = isGenericPlaceholderToolName(incoming.toolName)
+      ? existing.toolName || incoming.toolName
+      : incoming.toolName || existing.toolName;
     return {
       ...existing,
       status: incoming.status,
       input: incoming.input ?? existing.input,
       output: incoming.output ?? existing.output,
       error: incoming.error ?? existing.error,
-      toolName: incoming.toolName || existing.toolName,
+      toolName: resolvedToolName,
       toolCallId: incoming.toolCallId || existing.toolCallId,
     };
   }
@@ -657,12 +699,18 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
   const output = item.error ?? item.output ?? "";
   const detailOutput = rawString(item.output, item.error) ?? "";
   const preview = normalizedToolPreview(toolName, toolPreview(toolName, input, payload));
+  const descriptive = isDescriptiveToolName(toolName) && Object.keys(input).length === 0;
+  const descriptiveCommand =
+    descriptive && classifyDescriptiveTool(toolName, detailOutput) === "command"
+      ? extractDescriptiveCommand(toolName)
+      : undefined;
   const summary = summarizeTool(toolName, toolStatus, input, output, payload);
-  const command = shellCommand(input, payload);
+  const command = shellCommand(input, payload) ?? descriptiveCommand;
   if (isShellToolName(toolName) && toolStatus === "running" && !command) {
     return null;
   }
   const status = toolStatus === "running" ? "streaming" : toolStatus;
+  const cleanedDetailOutput = toolDetailOutput(toolName, detailOutput, descriptive || Boolean(descriptiveCommand));
 
   return {
     id: toolCallId ? `tool:${toolCallId}` : item.id,
@@ -674,11 +722,11 @@ function toolMessageFromItem(threadId: string, turnId: string, item: RoderItem):
     toolName,
     toolCallId,
     toolStatus,
-    toolInput: isShellToolName(toolName) ? command : undefined,
-    toolOutput: toolDetailOutput(toolName, detailOutput) ?? (detailOutput || undefined),
+    toolInput: isShellToolName(toolName) || descriptiveCommand ? command : undefined,
+    toolOutput: cleanedDetailOutput ?? (detailOutput || undefined),
     toolPreview: preview?.text,
     toolPreviewKind: preview?.kind,
-    toolSubject: toolSubject(toolName, input, payload),
+    toolSubject: toolSubject(toolName, input, payload, detailOutput),
     toolSummary: summary,
   };
 }
@@ -764,11 +812,18 @@ function selectionLabel(selection: { provider: string; model: string }): string 
   return `${selection.provider} / ${selection.model}`;
 }
 
-function toolDetailOutput(toolName: string, detailOutput: string): string | undefined {
-  if (!detailOutput || (!isShellToolName(toolName) && canonicalToolName(toolName) !== "tool")) {
+function toolDetailOutput(toolName: string, detailOutput: string, descriptive = false): string | undefined {
+  if (!detailOutput) {
     return undefined;
   }
-  return isShellToolName(toolName) ? stripShellHarnessMetadata(detailOutput) : detailOutput;
+  if (isShellToolName(toolName) || descriptive) {
+    const cleaned = stripShellHarnessMetadata(detailOutput);
+    return cleaned || undefined;
+  }
+  if (canonicalToolName(toolName) !== "tool") {
+    return undefined;
+  }
+  return detailOutput;
 }
 
 function toolStatusFromItem(item: Extract<RoderItem, { type: "toolExecution" }>): "running" | "complete" | "failed" {
@@ -856,6 +911,10 @@ function summarizeTool(
     return command ? toolActionSummary(status, "Ran", "Running", "Failed to run", command) : "";
   }
 
+  if (isDescriptiveToolName(toolName) && Object.keys(input).length === 0) {
+    return summarizeDescriptiveTool(toolName, status, output);
+  }
+
   if (status === "failed") {
     return compactLine(`failed: ${firstString(payload.error, output) ?? "error"}`);
   }
@@ -887,22 +946,29 @@ function mergeMessage(existing: ConversationMessage, incoming: ConversationMessa
   };
 }
 
+function isGenericPlaceholderToolName(name: string | undefined): boolean {
+  return !name || name === "tool" || name === "Antigravity tool";
+}
+
 function mergedToolName(existing: ConversationMessage, incoming: ConversationMessage): string | undefined {
-  return incoming.toolName === "tool" ? existing.toolName : incoming.toolName || existing.toolName;
+  return isGenericPlaceholderToolName(incoming.toolName)
+    ? existing.toolName || incoming.toolName
+    : incoming.toolName || existing.toolName;
 }
 
 function mergedToolOutput(existing: ConversationMessage, incoming: ConversationMessage): string | undefined {
   const output = incoming.toolOutput || existing.toolOutput;
-  if (!output || !isShellToolName(mergedToolName(existing, incoming))) {
+  const name = mergedToolName(existing, incoming);
+  if (!output || (!isShellToolName(name) && !isDescriptiveToolName(name))) {
     return output;
   }
-  return stripShellHarnessMetadata(output);
+  return stripShellHarnessMetadata(output) || undefined;
 }
 
 function preferredToolSummary(existing: ConversationMessage, incoming: ConversationMessage): string {
   const incomingSummary = incoming.toolSummary || incoming.text;
   const existingSummary = existing.toolSummary || existing.text;
-  if (incoming.status === "complete" && incoming.toolName === "tool" && existingSummary) {
+  if (incoming.status === "complete" && isGenericPlaceholderToolName(incoming.toolName) && existingSummary) {
     return completedToolSummary(existingSummary, incoming.status);
   }
   if (!incomingSummary) {
@@ -986,6 +1052,7 @@ function toolSubject(
   toolName: string,
   input: Record<string, unknown>,
   payload: Record<string, unknown>,
+  output = "",
 ): string | undefined {
   const canonicalName = canonicalToolName(toolName);
   if (canonicalName === "read_file") {
@@ -1034,6 +1101,9 @@ function toolSubject(
   }
   if (isShellToolName(toolName)) {
     return shellCommand(input, payload);
+  }
+  if (isDescriptiveToolName(toolName) && Object.keys(input).length === 0) {
+    return descriptiveToolSubject(toolName, output);
   }
   return undefined;
 }
@@ -1123,9 +1193,175 @@ function stripShellHarnessMetadata(output: string): string {
     return runnerMatch[1];
   }
 
-  return output.replace(/(?:\r?\n)?Status:\s*\w+\s*\r?\nWall time:\s*[^\r\n]+\s*$/i, (match) => {
+  let cleaned = output;
+  // Antigravity ACP wraps tool/command outputs with ISO timestamp headers and exit banners.
+  const timestampHeaderPattern = /^(?:Created At|Completed At):\s*[^\r\n]*(?:\r?\n|$)/i;
+  let strippedTimestamp = false;
+  while (timestampHeaderPattern.test(cleaned)) {
+    cleaned = cleaned.replace(timestampHeaderPattern, "");
+    strippedTimestamp = true;
+  }
+  const exitedMatch = /^\s*Command exited with code\s+(-?\d+)\.?\s*(?:\r?\n|$)/i.exec(cleaned);
+  if (exitedMatch) {
+    const exitCode = Number(exitedMatch[1]);
+    let rest = cleaned.slice(exitedMatch[0].length);
+    rest = rest.replace(/^\s*Command output:\s*(?:\r?\n|$)/i, "");
+    rest = rest.replace(/^(?:\r?\n)+/, "");
+    cleaned = exitCode === 0 ? rest : rest ? `Exit code ${exitCode}\n${rest}` : `Exit code ${exitCode}`;
+  } else if (strippedTimestamp) {
+    cleaned = cleaned.replace(/^\s*Command output:\s*(?:\r?\n|$)/i, "").replace(/^(?:\r?\n)+/, "");
+  }
+
+  return cleaned.replace(/(?:\r?\n)?Status:\s*\w+\s*\r?\nWall time:\s*[^\r\n]+\s*$/i, (match) => {
     return match.startsWith("\n") || match.startsWith("\r\n") ? "\n" : "";
   });
+}
+
+function extractDescriptiveCommand(toolName: string): string {
+  let command = toolName.trim();
+  command = command.replace(/^(?:run|running|ran|execute|executing|executed|shell)\s+/iu, "");
+  command = command.replace(/^\$\s+/u, "");
+  if (command.startsWith("`") && command.endsWith("`") && command.length >= 2) {
+    command = command.slice(1, -1).trim();
+  }
+  return command;
+}
+
+function compactCommandLabel(command: string): string {
+  const lines = command
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const firstLine = lines[0] ?? "";
+  const compact = compactLine(firstLine);
+  if (!compact) {
+    return "command";
+  }
+  return lines.length > 1 ? `${compact} …` : compact;
+}
+
+function shortenAbsolutePathsInText(value: string): string {
+  return value.replace(/(?:\/[A-Za-z0-9._@+-]+){3,}(?::\d+(?:-\d+)?)?/gu, (match) => {
+    const lineRangeMatch = /:\d+(?:-\d+)?$/u.exec(match);
+    const suffix = lineRangeMatch ? lineRangeMatch[0] : "";
+    const pathOnly = suffix ? match.slice(0, -suffix.length) : match;
+    return `${basename(pathOnly)}${suffix}`;
+  });
+}
+
+function stripWrappingQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith("`") && trimmed.endsWith("`")) ||
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function descriptivePathTarget(rawTarget: string): string {
+  const unwrapped = stripWrappingQuotes(rawTarget);
+  const lineRangeMatch = /\s*\((?:lines?\s+)?\d+(?:\s*[-–]\s*\d+)?\)\s*$/iu.exec(unwrapped);
+  const rangeSuffix = lineRangeMatch ? ` ${lineRangeMatch[0].trim()}` : "";
+  const withoutRange = lineRangeMatch ? unwrapped.slice(0, lineRangeMatch.index).trim() : unwrapped;
+  const colonRangeMatch = /:\d+(?:-\d+)?$/u.exec(withoutRange);
+  const colonSuffix = colonRangeMatch ? colonRangeMatch[0] : "";
+  const pathPart = colonSuffix ? withoutRange.slice(0, -colonSuffix.length) : withoutRange;
+  if (/[\\/]/u.test(pathPart)) {
+    return `${basename(pathPart)}${colonSuffix}${rangeSuffix}`;
+  }
+  return `${shortenAbsolutePathsInText(withoutRange)}${rangeSuffix}`;
+}
+
+function summarizeDescriptiveTool(toolName: string, status: "running" | "complete" | "failed", output: string): string {
+  const kind = classifyDescriptiveTool(toolName, output);
+  const trimmed = toolName.trim();
+
+  if (kind === "command") {
+    const command = compactCommandLabel(extractDescriptiveCommand(trimmed));
+    return toolActionSummary(status, "Ran", "Running", "Failed to run", command);
+  }
+
+  if (kind === "read_file") {
+    const target = trimmed.replace(
+      /^(?:read|reading|view|viewing|viewed|open|opening|opened|inspect|inspecting|inspected)\s+/iu,
+      "",
+    );
+    const label = descriptivePathTarget(target || trimmed);
+    return toolActionSummary(status, "Read", "Reading", "Failed to read", label);
+  }
+
+  if (kind === "edit_file") {
+    const verbMatch =
+      /^(edit|editing|edited|write|writing|wrote|create|creating|created|update|updating|updated|patch|patching|patched|delete|deleting|deleted|remove|removing|removed|move|moving|moved|replace|replacing|replaced|modify|modifying|modified)\s+([\s\S]+)$/iu.exec(
+        trimmed,
+      );
+    if (verbMatch) {
+      const verb = verbMatch[1].toLowerCase();
+      const target = descriptivePathTarget(verbMatch[2]);
+      if (verb.startsWith("writ") || verb === "wrote") {
+        return toolActionSummary(status, "Wrote", "Writing", "Failed to write", target);
+      }
+      if (verb.startsWith("creat")) {
+        return toolActionSummary(status, "Created", "Creating", "Failed to create", target);
+      }
+      if (verb.startsWith("delet") || verb.startsWith("remov")) {
+        return toolActionSummary(status, "Deleted", "Deleting", "Failed to delete", target);
+      }
+      if (verb.startsWith("mov")) {
+        return toolActionSummary(status, "Moved", "Moving", "Failed to move", target);
+      }
+      return toolActionSummary(status, "Edited", "Editing", "Failed to edit", target);
+    }
+  }
+
+  if (kind === "search") {
+    const cleaned = compactLine(shortenAbsolutePathsInText(trimmed));
+    if (status === "complete") {
+      return cleaned
+        .replace(/^(?:Search|Searching)\b/i, "Searched")
+        .replace(/^(?:Grep|Grepping)\b/i, "Searched")
+        .replace(/^(?:Find|Finding)\b/i, "Found")
+        .replace(/^(?:List|Listing)\b/i, "Listed");
+    }
+    if (status === "running") {
+      return cleaned
+        .replace(/^Search\b/i, "Searching")
+        .replace(/^Grep\b/i, "Searching")
+        .replace(/^Find\b/i, "Finding")
+        .replace(/^List\b/i, "Listing");
+    }
+    return cleaned;
+  }
+
+  return compactLine(shortenAbsolutePathsInText(trimmed));
+}
+
+function descriptiveToolSubject(toolName: string, output: string): string | undefined {
+  const kind = classifyDescriptiveTool(toolName, output);
+  const trimmed = toolName.trim();
+  if (kind === "command") {
+    return compactCommandLabel(extractDescriptiveCommand(trimmed));
+  }
+  if (kind === "read_file") {
+    const target = trimmed.replace(
+      /^(?:read|reading|view|viewing|viewed|open|opening|opened|inspect|inspecting|inspected)\s+/iu,
+      "",
+    );
+    return descriptivePathTarget(target || trimmed);
+  }
+  if (kind === "edit_file") {
+    const target = trimmed.replace(
+      /^(?:edit|editing|edited|write|writing|wrote|create|creating|created|update|updating|updated|patch|patching|patched|delete|deleting|deleted|remove|removing|removed|move|moving|moved|replace|replacing|replaced|modify|modifying|modified)\s+/iu,
+      "",
+    );
+    return descriptivePathTarget(target || trimmed);
+  }
+  return compactLine(shortenAbsolutePathsInText(trimmed)) || undefined;
 }
 
 function basename(path: string): string {

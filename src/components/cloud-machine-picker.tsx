@@ -1,4 +1,4 @@
-import { Cloud, Network, Server } from "lucide-react";
+import { Cloud, Network, Server, Ship } from "lucide-react";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import {
   effectiveRunnerProviderId,
@@ -34,6 +34,8 @@ export function ThreadExecutionMachine({ threadId }: { threadId: string }): Reac
           <Network className="size-3.5 shrink-0" />
         ) : providerId === "ssh" ? (
           <Server className="size-3.5 shrink-0" />
+        ) : providerId === "boat" ? (
+          <Ship className="size-3.5 shrink-0" />
         ) : (
           <Cloud className="size-3.5 shrink-0" />
         ))}

@@ -2,7 +2,7 @@ import { Check, ChevronRight, ClipboardCopy, LoaderCircle, RefreshCw, Search } f
 import { useState } from "react";
 import { useSearch } from "@tanstack/react-router";
 import { BackendIcon } from "@/components/agent-backend-picker";
-import { BackendSetupTerminal } from "@/components/providers/backend-setup-terminal";
+import { BackendSetupPanel } from "@/components/providers/backend-setup-panel";
 import { ProviderConnectCard } from "@/components/providers/provider-connect-card";
 import { ProviderLogo } from "@/components/provider-logo";
 import { errorMessage, primaryActionClassName, StatusPill } from "@/components/onboarding/onboarding-primitives";
@@ -161,18 +161,24 @@ function AgentBackendsSection({
 }): React.JSX.Element {
   const activeBackend = useRoderStore((state) => state.activeBackend);
   const agentBackends = useRoderStore((state) => state.agentBackends);
+  const backendSetup = useRoderStore((state) => state.backendSetup);
   const selectAgentBackend = useRoderStore((state) => state.selectAgentBackend);
   const connectAgentBackend = useRoderStore((state) => state.connectAgentBackend);
   const logoutAgentBackend = useRoderStore((state) => state.logoutAgentBackend);
   const applyAgentBackends = useRoderStore((state) => state.applyAgentBackends);
+  const startBackendSetup = useRoderStore((state) => state.startBackendSetup);
+  const cancelBackendSetup = useRoderStore((state) => state.cancelBackendSetup);
 
   const [busyBackend, setBusyBackend] = useState<AgentBackendId | null>(null);
-  const [setupTerminal, setSetupTerminal] = useState<{
+  const [lastSetupOptions, setLastSetupOptions] = useState<{
     backend: ExternalAgentBackendId;
-    antigravityMode?: "login" | "install";
+    forceInstall: boolean;
   } | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [copiedCodexCmd, setCopiedCodexCmd] = useState(false);
+
+  const setupInFlight =
+    backendSetup.phase !== "idle" && backendSetup.phase !== "completed" && backendSetup.phase !== "error";
 
   async function refreshAllBackends(): Promise<void> {
     setBackendError(null);
@@ -201,7 +207,9 @@ function AgentBackendsSection({
       if (id === "antigravity") {
         await onRecheckAntigravity();
       }
-      setSetupTerminal(null);
+      if (backendSetup.phase !== "idle") {
+        await cancelBackendSetup().catch(() => undefined);
+      }
     } catch (err) {
       setBackendError(errorMessage(err));
     } finally {
@@ -209,10 +217,7 @@ function AgentBackendsSection({
     }
   }
 
-  async function checkBackend(
-    id: ExternalAgentBackendId,
-    options: { activateOnSuccess?: boolean; closeTerminalOnSuccess?: boolean } = {},
-  ): Promise<void> {
+  async function checkBackend(id: ExternalAgentBackendId): Promise<void> {
     setBackendError(null);
     setBusyBackend(id);
     try {
@@ -221,14 +226,7 @@ function AgentBackendsSection({
         await onRecheckAntigravity();
       }
       const status = snapshot.backends[id];
-      if (status?.connected) {
-        if (options.activateOnSuccess) {
-          await selectAgentBackend(id);
-        }
-        if (options.closeTerminalOnSuccess) {
-          setSetupTerminal(null);
-        }
-      } else {
+      if (!status?.connected) {
         setBackendError(
           status?.runtimeInstalled
             ? `${status.name} is not signed in yet. Complete sign-in and try again.`
@@ -246,15 +244,28 @@ function AgentBackendsSection({
     setBackendError(null);
     setBusyBackend(id);
     try {
+      if (backendSetup.backend === id && backendSetup.phase !== "idle") {
+        await cancelBackendSetup().catch(() => undefined);
+      }
       await logoutAgentBackend(id);
       if (id === "antigravity") {
         await onRecheckAntigravity();
       }
-      setSetupTerminal(null);
     } catch (err) {
       setBackendError(errorMessage(err));
     } finally {
       setBusyBackend(null);
+    }
+  }
+
+  async function startNativeSetup(backend: ExternalAgentBackendId, mode?: "login" | "install"): Promise<void> {
+    setBackendError(null);
+    const forceInstall = backend === "antigravity" && mode === "install";
+    setLastSetupOptions({ backend, forceInstall });
+    try {
+      await startBackendSetup(backend, { forceInstall });
+    } catch (err) {
+      setBackendError(errorMessage(err));
     }
   }
 
@@ -268,7 +279,12 @@ function AgentBackendsSection({
             also switch directly from the composer.
           </p>
         </div>
-        <Button variant="ghost" size="sm" disabled={busyBackend !== null} onClick={() => void refreshAllBackends()}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={busyBackend !== null || setupInFlight}
+          onClick={() => void refreshAllBackends()}
+        >
           <RefreshCw className={cn("size-3.5", busyBackend === "roder" && "animate-spin")} />
           Check backends
         </Button>
@@ -279,7 +295,7 @@ function AgentBackendsSection({
           {AGENT_BACKEND_ORDER.map((id) => {
             const info = agentBackends[id];
             const isActive = activeBackend === id;
-            const isBusy = busyBackend === id;
+            const isBusy = busyBackend === id || (setupInFlight && backendSetup.backend === id);
             const highlighted = highlightedBackend === id;
             return (
               <AgentBackendCard
@@ -288,19 +304,12 @@ function AgentBackendsSection({
                 info={info}
                 active={isActive}
                 busy={isBusy}
-                anyBusy={busyBackend !== null}
+                anyBusy={busyBackend !== null || setupInFlight}
                 highlighted={highlighted}
                 copiedCodexCmd={copiedCodexCmd}
                 onUse={() => void useBackend(id)}
                 onCheck={id === "roder" ? undefined : () => void checkBackend(id)}
-                onOpenSetup={
-                  id === "roder"
-                    ? undefined
-                    : (mode) => {
-                        setBackendError(null);
-                        setSetupTerminal({ backend: id, antigravityMode: mode });
-                      }
-                }
+                onOpenSetup={id === "roder" ? undefined : (mode) => void startNativeSetup(id, mode)}
                 onSignOut={id === "roder" ? undefined : () => void signOutBackend(id)}
                 onCopyCodexInstall={() => {
                   void navigator.clipboard?.writeText("npm i -g @openai/codex");
@@ -312,19 +321,22 @@ function AgentBackendsSection({
           })}
         </div>
 
-        {setupTerminal && (
-          <BackendSetupTerminal
-            key={`${setupTerminal.backend}:${setupTerminal.antigravityMode ?? "login"}`}
-            backend={setupTerminal.backend}
-            antigravityMode={setupTerminal.antigravityMode}
-            checking={busyBackend === setupTerminal.backend}
-            onCheckConnection={() =>
-              checkBackend(setupTerminal.backend, { activateOnSuccess: true, closeTerminalOnSuccess: true })
-            }
-            onAutoComplete={() =>
-              checkBackend(setupTerminal.backend, { activateOnSuccess: true, closeTerminalOnSuccess: true })
-            }
-            onClose={() => setSetupTerminal(null)}
+        {backendSetup.backend && backendSetup.phase !== "idle" && (
+          <BackendSetupPanel
+            backend={backendSetup.backend}
+            state={backendSetup}
+            onRetry={() => {
+              const target = lastSetupOptions?.backend ?? backendSetup.backend;
+              if (!target) {
+                return;
+              }
+              void startNativeSetup(target, lastSetupOptions?.forceInstall ? "install" : "login");
+            }}
+            onDismiss={() => {
+              if (backendSetup.backend === "antigravity") {
+                void onRecheckAntigravity();
+              }
+            }}
           />
         )}
 
@@ -395,11 +407,6 @@ function AgentBackendCard({
             </span>
             <div className="min-w-0">
               <h3 className="truncate text-base font-medium text-foreground">{info?.name ?? id}</h3>
-              {id !== "roder" && connected && (
-                <p className="truncate text-sm text-muted-foreground">
-                  {modelCount} {modelCount === 1 ? "model" : "models"} available
-                </p>
-              )}
             </div>
           </div>
           <StatusPill ready={active || connected} readyLabel={statusLabel} idleLabel={statusLabel} />

@@ -22,7 +22,6 @@ export type TerminalStartOptions = {
   rows?: number;
   remoteWorkspaceId?: string;
   forceRestart?: boolean;
-  antigravitySetupMode?: "login" | "install";
 };
 
 export type RemoteTerminalHandle = EventEmitter & {

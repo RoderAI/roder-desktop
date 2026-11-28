@@ -7,9 +7,11 @@ import { activeTurnIdForThread, messagesFromThread, shouldShowThreadWorkingIndic
 import { visibleModelsFor } from "@/lib/roder-models";
 import { waitRequestsForThread } from "@/lib/roder-wait-requests";
 import { useRoderStore } from "@/stores/roder-store";
+import type { BoatOAuthState } from "@/lib/cloud-machines";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import type {
   AgentBackendsSnapshot,
+  BackendSetupState,
   ConversationMessage,
   InferenceRoutingOptionDescriptor,
   QueuedPrompt,
@@ -119,9 +121,21 @@ function useRoderStoreBootstrap(): void {
           .catch(() => undefined);
         return;
       }
+      if (notification.method === "desktop/cloud-machines/boatAuthChanged") {
+        if (notification.params && typeof notification.params === "object") {
+          useCloudMachinesStore.getState().applyBoatAuthState(notification.params as BoatOAuthState);
+        }
+        return;
+      }
       if (notification.method === "desktop/backends/changed") {
         if (notification.params && typeof notification.params === "object") {
           useRoderStore.getState().applyAgentBackends(notification.params as AgentBackendsSnapshot);
+        }
+        return;
+      }
+      if (notification.method === "desktop/backends/setupChanged") {
+        if (notification.params && typeof notification.params === "object") {
+          useRoderStore.getState().applyBackendSetup(notification.params as BackendSetupState);
         }
         return;
       }

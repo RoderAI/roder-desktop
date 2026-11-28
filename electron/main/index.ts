@@ -43,6 +43,8 @@ import { redactSecrets } from "../app-server-redaction";
 import { BlaxelClient } from "../cloud-machines/blaxel-client";
 import { detectBlaxelCli, readBlaxelCliCredentials } from "../cloud-machines/blaxel-cli";
 import { BlaxelTerminalSession } from "../cloud-machines/blaxel-terminal";
+import { BoatClient, parseBoatMachineConfig, type BoatSandboxSize } from "../cloud-machines/boat-client";
+import { BoatOAuthController, fetchBoatUserProfile, revokeBoatToken } from "../cloud-machines/boat-oauth";
 import { CloudCredentialsService } from "../cloud-machines/credentials";
 import {
   isRemoteWorkspaceId,
@@ -77,20 +79,12 @@ import { RoderAppServerClient, resolveEmbeddedRoderBinary } from "../roder/app-s
 import { applyDesktopTurnPolicy } from "../roder/desktop-turn-policy";
 import {
   AgentBackendsManager,
-  findAntigravityRuntime,
-  findCodexRuntime,
   findExternalBackendRuntime,
-  resolveAntigravitySetupCommand,
-  resolveCodexSetupCommand,
   runExternalBackendLogoutCli,
   runtimePathExtraEnv,
 } from "../roder/agent-backends";
-import {
-  antigravitySetupSession,
-  codexSetupSession,
-  type AgentBackendId,
-  type ExternalAgentBackendId,
-} from "../roder/desktop-backend";
+import { BackendSetupController } from "../roder/backend-setup";
+import type { AgentBackendId, ExternalAgentBackendId } from "../roder/desktop-backend";
 import { DesktopAgentTools } from "../agents/desktop-agent-tools";
 import { IssuesService } from "../issues/service";
 import { handleIssueToolCall, issueToolDefinitions } from "../issues/tools";
@@ -152,6 +146,15 @@ const terminal = new TerminalManager({
     const provider = effectiveRunnerProviderId(target);
     if (provider === "tailscale" || provider === "ssh") {
       const peer = await remoteService.resolveSshConnectionTarget(target);
+      return new TailscaleSshTerminalSession({
+        peer,
+        workingDir: target.workspace,
+        cols,
+        rows,
+      });
+    }
+    if (provider === "boat") {
+      const peer = await remoteService.resolveBoatSshConnectionTarget(target);
       return new TailscaleSshTerminalSession({
         peer,
         workingDir: target.workspace,
@@ -432,31 +435,9 @@ ipcMain.handle("workspace:openFolders", async (_event, defaultPath?: string) => 
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths;
 });
-ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) => {
-  if (options?.id === antigravitySetupSession) {
-    const runtimePath = findAntigravityRuntime();
-    const setup = resolveAntigravitySetupCommand({
-      binaryPath: resolveEmbeddedRoderBinary(),
-      runtimePath,
-      mode: options.antigravitySetupMode,
-    });
-    const extraEnv = runtimePathExtraEnv(process.env, runtimePath);
-    return terminal.start(
-      { ...options, cwd: options?.cwd || homedir(), forceRestart: true },
-      { executable: setup.executable, args: setup.args, env: extraEnv },
-    );
-  }
-  if (options?.id === codexSetupSession) {
-    const runtimePath = findCodexRuntime();
-    const setup = resolveCodexSetupCommand({ runtimePath });
-    const extraEnv = runtimePathExtraEnv(process.env, runtimePath);
-    return terminal.start(
-      { ...options, cwd: options?.cwd || homedir(), forceRestart: true },
-      { executable: setup.executable, args: setup.args, env: extraEnv },
-    );
-  }
-  return terminal.start({ ...options, cwd: options?.cwd || process.cwd() });
-});
+ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
+  terminal.start({ ...options, cwd: options?.cwd || process.cwd() }),
+);
 ipcMain.handle("terminal:write", (_event, data: string, id?: string) => terminal.write(data, id));
 ipcMain.handle("terminal:runMarkdownCommand", (event, command: unknown) => {
   const contents = mainWindow?.webContents;
@@ -522,6 +503,14 @@ ipcMain.handle(
 ipcMain.handle("agentBackends:logout", (_event, backend: ExternalAgentBackendId) =>
   getAgentBackends().logoutBackend(backend),
 );
+ipcMain.handle("agentBackends:setupState", () => getBackendSetup().getState());
+ipcMain.handle(
+  "agentBackends:startSetup",
+  (_event, backend: ExternalAgentBackendId, options?: { forceInstall?: boolean }) =>
+    getBackendSetup().start(backend, options ?? {}),
+);
+ipcMain.handle("agentBackends:submitSetupCode", (_event, code: string) => getBackendSetup().submitCode(code));
+ipcMain.handle("agentBackends:cancelSetup", () => getBackendSetup().cancel());
 ipcMain.handle("antigravity:status", async () => {
   const manager = getAgentBackends();
   await manager.hydrate();
@@ -816,6 +805,8 @@ app.on("before-quit", (event) => {
   if (shuttingDown) return;
   event.preventDefault();
   shuttingDown = true;
+  backendSetup?.stop();
+  boatOAuthController?.stop();
   terminal.stop();
   remoteWorkspaceService?.closeAll();
   browser.destroy();
@@ -1029,9 +1020,11 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
         const gateway = getTailscaleRunnerGateway();
         const { baseUrl } = await gateway.start();
         const profile = await getCloudMachinesService().getProfile(machineId);
-        const transport = runner.providerId === "ssh" ? "ssh" : "tailscale";
+        const transport = runner.providerId === "ssh" ? "ssh" : runner.providerId === "boat" ? "boat" : "tailscale";
         if (transport === "ssh") {
           parseSshMachineConfig(runner.config);
+        } else if (transport === "boat") {
+          parseBoatMachineConfig(runner.config ?? {});
         } else {
           parseTailscalePeerConfig(runner.config);
         }
@@ -1093,10 +1086,39 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
 let cloudMachinesService: CloudMachinesService | undefined;
 let cloudCredentialsService: CloudCredentialsService | undefined;
 let blaxelClient: BlaxelClient | undefined;
+let boatClient: BoatClient | undefined;
+let boatOAuthController: BoatOAuthController | undefined;
 let tailscaleSshClient: TailscaleSshClient | undefined;
 let tailscaleRunnerGateway: TailscaleRunnerGateway | undefined;
 let remoteWorkspaceService: RemoteWorkspaceService | undefined;
 let agentBackends: AgentBackendsManager | undefined;
+let backendSetup: BackendSetupController | undefined;
+
+function getBackendSetup(): BackendSetupController {
+  backendSetup ??= new BackendSetupController({
+    resolveRoderBinary: resolveEmbeddedRoderBinary,
+    openExternal: openExternalTarget,
+    probeExistingConnection: async (backend) => {
+      const status = await getAgentBackends().connectBackend(backend, {
+        forceRefresh: true,
+        notifyOnChange: true,
+        silentFailure: true,
+      });
+      return { connected: status.connected, modelCount: status.modelCount };
+    },
+    connectAndActivate: async (backend) => {
+      const manager = getAgentBackends();
+      await manager.connectBackend(backend, { forceRefresh: true, notifyOnChange: true });
+      const snapshot = await manager.selectBackend(backend);
+      const status = snapshot.backends[backend];
+      return { connected: status.connected, modelCount: status.modelCount };
+    },
+    onStateChanged: (state) => {
+      sendToRenderer("roder:notification", { method: "desktop/backends/setupChanged", params: state });
+    },
+  });
+  return backendSetup;
+}
 
 function getAgentBackends(): AgentBackendsManager {
   agentBackends ??= new AgentBackendsManager({
@@ -1156,6 +1178,39 @@ function getBlaxelClient(): BlaxelClient {
   return (blaxelClient ??= new BlaxelClient());
 }
 
+function getBoatClient(): BoatClient {
+  return (boatClient ??= new BoatClient({
+    getAccessToken: (options) =>
+      getCloudCredentialsService().resolveBoatAccessToken({
+        forceRefresh: options?.forceRefresh,
+        baseEnv: process.env,
+      }),
+    sshKeyDir: join(app.getPath("userData"), "boat-ssh"),
+  }));
+}
+
+function getBoatOAuthController(): BoatOAuthController {
+  boatOAuthController ??= new BoatOAuthController({
+    openExternal: openExternalTarget,
+    onAuthenticated: async ({ tokens, user }) => {
+      await getCloudCredentialsService().saveBoatOAuth({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+        scope: tokens.scope,
+        userLogin: user.login,
+        userDisplayName: user.displayName,
+        userEmail: user.email,
+      });
+      boatClient?.clearCache();
+    },
+    onStateChanged: (state) => {
+      sendToRenderer("roder:notification", { method: "desktop/cloud-machines/boatAuthChanged", params: state });
+    },
+  });
+  return boatOAuthController;
+}
+
 function getTailscaleSshClient(): TailscaleSshClient {
   return (tailscaleSshClient ??= new TailscaleSshClient());
 }
@@ -1163,6 +1218,7 @@ function getTailscaleSshClient(): TailscaleSshClient {
 function getTailscaleRunnerGateway(): TailscaleRunnerGateway {
   return (tailscaleRunnerGateway ??= new TailscaleRunnerGateway({
     sshClient: getTailscaleSshClient(),
+    boatClient: getBoatClient(),
   }));
 }
 
@@ -1170,6 +1226,7 @@ function getRemoteWorkspaceService(): RemoteWorkspaceService {
   if (!remoteWorkspaceService) {
     const service = new RemoteWorkspaceService({
       blaxelClient: getBlaxelClient(),
+      boatClient: getBoatClient(),
       credentialsService: getCloudCredentialsService(),
       machinesService: getCloudMachinesService(),
       sshClient: getTailscaleSshClient(),
@@ -1270,7 +1327,8 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
   const redactRequestPayload =
     method === "desktop/cloud-machines/save" ||
     method.startsWith("desktop/cloud-machines/credentials/") ||
-    method.startsWith("desktop/cloud-machines/tailscale/");
+    method.startsWith("desktop/cloud-machines/tailscale/") ||
+    method.startsWith("desktop/cloud-machines/boat/");
   recordAppServerEvent("request", method, redactRequestPayload ? "[redacted]" : redactSecrets(params ?? {}));
 
   // Route remote workspace requests through the tunneled remote-roder app-server inside the sandbox.
@@ -1304,15 +1362,17 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       return { machine: await service.getProfile(input.id) };
     }
     if (method === "desktop/cloud-machines/save") {
-      if (input.providerId === "tailscale" || input.providerId === "ssh") {
+      if (input.providerId === "tailscale" || input.providerId === "ssh" || input.providerId === "boat") {
         if (process.platform === "win32") {
-          throw new Error("Remote SSH and Tailscale machines are not supported on Windows yet.");
+          throw new Error("Remote Boat, SSH, and Tailscale machines are not supported on Windows yet.");
         }
         if (!isRecord(input.config)) {
           throw new Error("Machine configuration must be a JSON object.");
         }
         if (input.providerId === "ssh") {
           parseSshMachineConfig(input.config);
+        } else if (input.providerId === "boat") {
+          parseBoatMachineConfig(input.config);
         } else {
           parseTailscalePeerConfig(input.config);
         }
@@ -1340,14 +1400,82 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       throw new Error("Invalid cloud machine test request.");
     }
     if (method === "desktop/cloud-machines/credentials/status") {
-      const [{ statuses }, blaxelCli, tailscaleCredentials, localTailscale, localSsh] = await Promise.all([
-        credentials.listStatuses(process.env),
-        detectBlaxelCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
-        credentials.getTailscaleStatus(process.env),
-        detectLocalTailscale({ env: process.env, platform: process.platform }),
-        detectLocalSshEnvironment({ env: process.env, platform: process.platform, homeDir: homedir() }),
-      ]);
-      return { statuses, blaxelCli, tailscaleCredentials, localTailscale, localSsh };
+      const [{ statuses }, blaxelCli, boatCredentials, tailscaleCredentials, localTailscale, localSsh] =
+        await Promise.all([
+          credentials.listStatuses(process.env),
+          detectBlaxelCli({ env: process.env, platform: process.platform, homeDir: homedir() }),
+          credentials.getBoatStatus(process.env),
+          credentials.getTailscaleStatus(process.env),
+          detectLocalTailscale({ env: process.env, platform: process.platform }),
+          detectLocalSshEnvironment({ env: process.env, platform: process.platform, homeDir: homedir() }),
+        ]);
+      return {
+        statuses,
+        blaxelCli,
+        boatCredentials,
+        boatAuthState: getBoatOAuthController().getState(),
+        tailscaleCredentials,
+        localTailscale,
+        localSsh,
+      };
+    }
+    if (method === "desktop/cloud-machines/boat/status") {
+      const boatCredentials = await credentials.getBoatStatus(process.env);
+      return {
+        credentials: boatCredentials,
+        authState: getBoatOAuthController().getState(),
+      };
+    }
+    if (method === "desktop/cloud-machines/boat/startOAuth") {
+      return { authState: await getBoatOAuthController().start() };
+    }
+    if (method === "desktop/cloud-machines/boat/cancelOAuth") {
+      return { authState: await getBoatOAuthController().cancel() };
+    }
+    if (method === "desktop/cloud-machines/boat/saveApiKey") {
+      const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
+      if (!apiKey) throw new Error("Enter a Boat API key.");
+      const user = await fetchBoatUserProfile({ accessToken: apiKey });
+      const status = await credentials.saveBoatApiKey({
+        apiKey,
+        userLogin: user.login,
+        userDisplayName: user.displayName,
+        userEmail: user.email,
+      });
+      boatClient?.clearCache();
+      return { status };
+    }
+    if (method === "desktop/cloud-machines/boat/sandboxes") {
+      const boatStatus = await credentials.getBoatStatus(process.env);
+      if (!boatStatus.configured) {
+        return { sandboxes: [] };
+      }
+      return { sandboxes: await getBoatClient().listSandboxes() };
+    }
+    if (method === "desktop/cloud-machines/boat/createSandbox") {
+      const boatStatus = await credentials.getBoatStatus(process.env);
+      if (!boatStatus.configured) {
+        throw new Error("Sign in with Boat in Settings > Cloud Machines before creating a sandbox.");
+      }
+      const size =
+        input.type === "small" || input.type === "default" || input.type === "large" || input.type === "xlarge"
+          ? (input.type as BoatSandboxSize)
+          : "default";
+      const sandbox = await getBoatClient().createSandbox({
+        name: typeof input.name === "string" ? input.name : undefined,
+        type: size,
+        environment: typeof input.environment === "string" ? input.environment : undefined,
+        workingDir: typeof input.workingDir === "string" ? input.workingDir : "/home/user",
+      });
+      return { sandbox };
+    }
+    if (method === "desktop/cloud-machines/boat/stopSandbox" && typeof input.sandboxId === "string") {
+      await getBoatClient().stopSandbox(input.sandboxId);
+      return { stopped: true };
+    }
+    if (method === "desktop/cloud-machines/boat/resumeSandbox" && typeof input.sandboxId === "string") {
+      const sandbox = await getBoatClient().resumeSandbox(input.sandboxId);
+      return { sandbox };
     }
     if (method === "desktop/cloud-machines/ssh/status") {
       const local = await detectLocalSshEnvironment({
@@ -1433,8 +1561,17 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
       return { status };
     }
     if (method === "desktop/cloud-machines/credentials/clear" && typeof input.providerId === "string") {
+      if (input.providerId === "boat") {
+        await getBoatOAuthController().cancel();
+        const refreshToken = await credentials.getBoatRefreshToken();
+        if (refreshToken) {
+          await revokeBoatToken({ token: refreshToken });
+        }
+        boatClient?.clearCache();
+        remoteWorkspaceService?.closeAll();
+      }
       const result = await credentials.clearProvider(input.providerId);
-      if (input.providerId === "tailscale") {
+      if (input.providerId === "tailscale" || input.providerId === "boat") {
         remoteWorkspaceService?.closeAll();
       } else {
         await restartRoderEngine();
@@ -1474,6 +1611,9 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     }
     if (method === "desktop/cloud-machines/remote/wake" && typeof input.workspaceId === "string") {
       return { status: await remoteService.wake(input.workspaceId) };
+    }
+    if (method === "desktop/cloud-machines/remote/stop" && typeof input.workspaceId === "string") {
+      return { status: await remoteService.stopBoatSandbox(input.workspaceId) };
     }
     if (method === "desktop/cloud-machines/remote/setupTailscale" && typeof input.workspaceId === "string") {
       return { status: await remoteService.setupTailscaleTunnel(input.workspaceId) };
@@ -1577,6 +1717,19 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
         setup_hint?: string | null;
       }> = [];
       if (process.platform !== "win32") {
+        if (!existingProviders.some((provider) => provider.provider_id === "boat")) {
+          extraProviders.push({
+            provider_id: "boat",
+            capabilities: {
+              command_exec: true,
+              file_read: true,
+              file_write: true,
+              port_preview: true,
+              cancellation: true,
+            },
+            setup_hint: null,
+          });
+        }
         if (!existingProviders.some((provider) => provider.provider_id === "ssh")) {
           extraProviders.push({
             provider_id: "ssh",
