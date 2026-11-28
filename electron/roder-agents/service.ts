@@ -21,6 +21,14 @@ type Options = {
   sprites?: ReturnType<typeof createRoderAgentSpriteManager>;
 };
 type ObjectValue = Record<string, unknown>;
+/** The sprite manager's limit on persona name and mission text. */
+const SPRITE_TEXT_MAX = 16000;
+/** `value` cut to at most `max` UTF-16 units without splitting a surrogate pair. */
+function clip(value: string, max: number): string {
+  if (value.length <= max) return value;
+  const cut = value.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
 function object(value: unknown): ObjectValue {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected an object");
   return value as ObjectValue;
@@ -158,6 +166,18 @@ export function createRoderAgentService(options: Options) {
       notes: await files.read(c.id, RODER_NOTES_FILE),
     });
     return `${roderAgentStrategy}\n\n${context}`;
+  }
+  /**
+   * Who the sprite is drawn from. The list `mission` can be empty (heading-only or cleared INSTRUCTIONS.md), but the
+   * sprite manager needs non-empty text: use the full INSTRUCTIONS.md, else the name. Names are validated non-empty
+   * on create and load, so a generic fallback can't be reached; null (skip generation) guards an unusable name.
+   */
+  async function spritePersona(c: RoderAgent) {
+    const name = c.name.trim();
+    if (!name || name.length > SPRITE_TEXT_MAX) return null;
+    const instructions = (await files.read(c.id, RODER_INSTRUCTIONS_FILE)).content.trim();
+    const mission = instructions ? clip(instructions, SPRITE_TEXT_MAX) : name;
+    return { id: c.id, name, mission };
   }
   /** Keeps the list summary in step with INSTRUCTIONS.md; it is empty while that has no opening paragraph. */
   async function syncMission(c: RoderAgent, path: string) {
@@ -358,7 +378,8 @@ export function createRoderAgentService(options: Options) {
         await files.ensure(c.id, { [RODER_INSTRUCTIONS_FILE]: mission });
         roderAgents.push(c);
         await persist();
-        await options.sprites?.enqueue(c);
+        const persona = options.sprites ? await spritePersona(c) : null;
+        if (persona) await options.sprites?.enqueue(persona);
         return detail(c);
       }
       const c = find(params.id);
@@ -368,7 +389,9 @@ export function createRoderAgentService(options: Options) {
         if (!options.sprites) throw Error("Character generation is unavailable");
         if (params.provider !== undefined && params.provider !== "codex" && params.provider !== "openai")
           throw Error("Invalid character generation provider");
-        return options.sprites.retry(c, params.provider === "openai" ? "openai" : "codex");
+        const persona = await spritePersona(c);
+        if (!persona) return options.sprites.get(c.id) ?? null;
+        return options.sprites.retry(persona, params.provider === "openai" ? "openai" : "codex");
       }
       if (method === "desktop/roders/read") return detail(c);
       if (method === "desktop/roders/files/list") return { files: await files.list(c.id) };
