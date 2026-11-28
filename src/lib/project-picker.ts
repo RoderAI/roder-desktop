@@ -278,8 +278,12 @@ export function trimTrailingSeparators(path: string): string {
 export function parentPath(path: string): string | null {
   const normalized = trimTrailingSeparators(path);
   const separator = pathSeparator(normalized);
-  const index = normalized.lastIndexOf(separator);
-  if (index === -1 || normalized === separator || normalized === windowsRoot(normalized)) {
+  const root = windowsRoot(normalized);
+  // Windows accepts both slashes, so a path under a Windows root may mix them.
+  const index = root
+    ? Math.max(normalized.lastIndexOf("\\"), normalized.lastIndexOf("/"))
+    : normalized.lastIndexOf(separator);
+  if (index === -1 || normalized === separator || normalized === root) {
     return null;
   }
   if (index === 0) {
@@ -361,7 +365,7 @@ export function deviceDisplayName(hostName: string | undefined): string {
 
 /** The Windows root a path sits under: a drive ("C:\") or a UNC share ("\\server\share"). */
 function windowsRoot(path: string): string | null {
-  return /^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+\\[^\\/]+)/.exec(path)?.[0] ?? null;
+  return /^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/]+[\\/][^\\/]+)/.exec(path)?.[0] ?? null;
 }
 
 function localRow(entry: ProjectPickerEntry, match: ProjectPickerMatch | null): ProjectPickerRow {

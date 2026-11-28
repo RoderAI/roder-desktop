@@ -245,6 +245,17 @@ describe("paths and breadcrumbs", () => {
     ]);
   });
 
+  test("stops at a UNC share root written with forward or mixed slashes", () => {
+    expect(parentPath("//server/share/team")).toBe("//server/share");
+    expect(parentPath("//server/share")).toBeNull();
+    expect(parentPath("\\\\server/share")).toBeNull();
+    expect(parentPath("\\\\server/share\\team")).toBe("\\\\server/share");
+    expect(projectPickerBreadcrumbs("//server/share/team", "", "Mdizzy").map((crumb) => crumb.path)).toEqual([
+      "//server/share",
+      "//server/share/team",
+    ]);
+  });
+
   test("breadcrumbs show device, Home, then each folder under home", () => {
     expect(projectPickerBreadcrumbs("/Users/pz/w", home, "Mdizzy")).toEqual([
       { key: "device", label: "Mdizzy", path: "/", kind: "device" },

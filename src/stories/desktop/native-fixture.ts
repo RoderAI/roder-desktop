@@ -97,7 +97,9 @@ export function installNativeFixture(): void {
     projectPickerSearch: async ({ query }) => ({
       root: "/storybook",
       query,
-      matches: [{ name: "roder-desktop", path: "/storybook/roder/roder-desktop", isGitRepo: true }],
+      matches: "roder-desktop".includes(query.toLowerCase())
+        ? [{ name: "roder-desktop", path: "/storybook/roder/roder-desktop", isGitRepo: true }]
+        : [],
       truncated: false,
       canceled: false,
     }),
