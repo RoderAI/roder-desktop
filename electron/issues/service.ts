@@ -71,7 +71,7 @@ function oneOf<T extends string>(value: unknown, values: readonly T[], field: st
 function owner(value: unknown): IssueOwner {
   const input = value as Record<string, unknown> | null;
   if (input && typeof input === "object" && !Array.isArray(input)) {
-    if (input.type === "roder" || input.type === "user") return { type: input.type };
+    if ((input.type === "roder" || input.type === "user") && input.threadId === undefined) return { type: input.type };
     if (input.type === "thread") return { type: "thread", threadId: text(input.threadId, "owner threadId", true) };
   }
   throw new Error('owner must be {type: "roder"}, {type: "user"} or {type: "thread", threadId}');
@@ -129,6 +129,9 @@ function transition(before: Issue, next: Issue, childInProgress: boolean): void 
         `an issue is in_progress only while a thread works on it: launch it with issues_launch, set its owner to the working thread, or, for a parent issue, start work on one of its child issues (parent: "${before.id}") first`,
       );
     if (next.status === "needs_you") throw new Error("hand the issue to the user with issues_ask_user");
+    // Creating outside backlog needs doneCriteria; so does moving out of it.
+    if (next.status !== "backlog" && !next.doneCriteria.trim())
+      throw new Error("add doneCriteria: what must be true for this issue to be done");
   }
   if (!sameOwner(next.owner, before.owner) && next.owner.type === "user")
     throw new Error("hand the issue to the user with issues_ask_user");
@@ -449,6 +452,8 @@ export class IssuesService {
         else if (issue.owner.type === "user") next.owner = handBack(next);
       }
       validParent(next);
+      if (next.projectId !== issue.projectId && db.issues.some((child) => child.parent === issue.id))
+        throw new Error("move or detach this issue's child issues before moving it to another project");
       normalize(next);
       const changes = lifecycleChanges(issue, next);
       if (issue.priority !== next.priority)
@@ -537,8 +542,8 @@ export class IssuesService {
     }
     if (method === "desktop/issues/launch") {
       const issue = issueById();
-      if (issue.owner.type === "thread") return { issue, threadId: issue.owner.threadId };
       if (agent && terminal(issue.status)) throw new Error("reopen the issue before starting work");
+      if (issue.owner.type === "thread") return { issue, threadId: issue.owner.threadId };
       const project = projectById(issue.projectId);
       if (project.archived) throw new Error("Unarchive the project before launching work");
       if (!project.workspaceId) throw new Error("Link the project to a workspace before launching work");

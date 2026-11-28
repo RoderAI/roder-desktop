@@ -1,4 +1,11 @@
-import { issueStatuses, type Issue, type IssueProject, type IssueStatus } from "@/types/issues";
+import {
+  issueStatuses,
+  type Issue,
+  type IssueOwner,
+  type IssuePriority,
+  type IssueProject,
+  type IssueStatus,
+} from "@/types/issues";
 import { create } from "zustand";
 
 export function groupIssues(
@@ -35,6 +42,43 @@ export type IssueEdit = Partial<
     "projectId" | "title" | "description" | "status" | "priority" | "owner" | "doneCriteria" | "outOfScope" | "parent"
   >
 >;
+
+/** The issue editor's owner select value: `roder`, `user`, or `thread:<id>`. */
+export const ownerKey = (owner: IssueOwner) => (owner.type === "thread" ? `thread:${owner.threadId}` : owner.type);
+export const ownerFromKey = (key: string): IssueOwner =>
+  key.startsWith("thread:") ? { type: "thread", threadId: key.slice(7) } : { type: key === "user" ? "user" : "roder" };
+
+/** What the issue editor saves from its form. */
+export function issueSaveFields(
+  form: {
+    title: string;
+    description: string;
+    projectId: string;
+    status: IssueStatus;
+    priority: IssuePriority;
+    owner: string;
+    doneCriteria: string;
+    outOfScope: string;
+    parent: string;
+  },
+  { isNew, issues }: { isNew: boolean; issues: Issue[] },
+): IssueEdit & { projectId: string; title: string } {
+  const parent = issues.find((item) => item.id === form.parent);
+  return {
+    title: form.title,
+    description: form.description,
+    projectId: form.projectId,
+    status: form.status,
+    priority: form.priority,
+    // A new issue created waiting on you is yours; otherwise the service would
+    // hand a needs_you issue owned by the Roder straight back to todo.
+    owner: ownerFromKey(isNew && form.status === "needs_you" ? "user" : form.owner),
+    doneCriteria: form.doneCriteria,
+    outOfScope: form.outOfScope,
+    // Parents live in the same project: a parent left over from another one is dropped.
+    parent: parent && parent.projectId !== form.projectId ? null : form.parent || null,
+  };
+}
 
 export const issuesIpc = {
   listProjects: () => window.roderDesktop.request("desktop/projects/list", {}) as Promise<{ projects: IssueProject[] }>,

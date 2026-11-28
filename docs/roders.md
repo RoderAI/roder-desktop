@@ -172,17 +172,19 @@ need the same host tool dispatcher available after restart.
 
 Requests:
 
-| Suffix       | Parameters                                                                                                                     | Result                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
-| `list`       | `{}`                                                                                                                           | `{ roders: RoderAgent[] }`     |
-| `create`     | `{ name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                           | `RoderAgentDetail`             |
-| `promote`    | `{ threadId, name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                 | `RoderAgentDetail`             |
-| `read`       | `{ id }`                                                                                                                       | `RoderAgentDetail`             |
-| `update`     | `{ id, name?, mission?, memory?, expectedMemory?, enabled?, intervalMinutes?, eventMethods?, maxRunsPerDay?, maxRunMinutes? }` | `RoderAgentDetail`             |
-| `schedule`   | `{ id, at, reason }` (`at` is Unix milliseconds)                                                                               | `RoderAgentDetail`             |
-| `cancelWake` | `{ id, wakeId }`                                                                                                               | `RoderAgentDetail`             |
-| `run`        | `{ id, reason? }`                                                                                                              | `RoderAgentDetail`             |
-| `compact`    | `{ id }`                                                                                                                       | Native `thread/compact` result |
+| Suffix         | Parameters                                                                                                                     | Result                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `list`         | `{}`                                                                                                                           | `{ roders: RoderAgent[] }`                                                   |
+| `create`       | `{ name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                           | `RoderAgentDetail`                                                           |
+| `promote`      | `{ threadId, name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                 | `RoderAgentDetail`                                                           |
+| `read`         | `{ id }`                                                                                                                       | `RoderAgentDetail`                                                           |
+| `update`       | `{ id, name?, mission?, memory?, expectedMemory?, enabled?, intervalMinutes?, eventMethods?, maxRunsPerDay?, maxRunMinutes? }` | `RoderAgentDetail`                                                           |
+| `schedule`     | `{ id, at, reason }` (`at` is Unix milliseconds)                                                                               | `RoderAgentDetail`                                                           |
+| `cancelWake`   | `{ id, wakeId }`                                                                                                               | `RoderAgentDetail`                                                           |
+| `run`          | `{ id, reason? }`                                                                                                              | `RoderAgentDetail`                                                           |
+| `compact`      | `{ id }`                                                                                                                       | Native `thread/compact` result                                               |
+| `sprite/read`  | `{ id }`                                                                                                                       | `{ sprite: RoderAgentSprite \| null, image: RoderAgentSpriteImage \| null }` |
+| `sprite/retry` | `{ id, provider? }` (`codex` default, or `openai`)                                                                             | `RoderAgentSprite`                                                           |
 
 `start`, `tick`, `stop`, request handlers, and notification handlers return
 promises. The service serializes state mutations, persists only changed state,

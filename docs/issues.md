@@ -27,17 +27,19 @@ Statuses, in board order: `backlog`, `todo`, `in_progress`, `needs_you`,
 `blocked`, `in_review`, `done`, and `cancelled`. Each has its own group on the
 Issues page.
 
-| Field          | Meaning                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------- |
-| `owner`        | Exactly one: `{type: "roder"}`, `{type: "user"}`, or `{type: "thread", threadId}`. Default Roder. |
-| `priority`     | `urgent`, `high`, `normal` (default), or `low`.                                                   |
-| `doneCriteria` | What must be true for the issue to be done.                                                       |
-| `outOfScope`   | What the issue deliberately leaves alone.                                                         |
-| `parent`       | ID of another issue in the same project that this one is part of, or `null`. No cycles.           |
-| `threadIds`    | Threads that worked on the issue, oldest first. A thread owner is always linked.                  |
-| `pullRequests` | `{url, title}` entries. URLs must be `https://github.com/<owner>/<repo>/pull/<n>`.                |
-| `activity`     | Entries for creation, status and owner changes, comments, questions, linked PRs, launch, close.   |
+| Field          | Meaning                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `owner`        | Exactly one: `{type: "roder"}`, `{type: "user"}`, or `{type: "thread", threadId}`. Default Roder.                                             |
+| `priority`     | `urgent`, `high`, `normal` (default), or `low`.                                                                                               |
+| `doneCriteria` | What must be true for the issue to be done.                                                                                                   |
+| `outOfScope`   | What the issue deliberately leaves alone.                                                                                                     |
+| `parent`       | ID of another issue in the same project that this one is part of, or `null`. No cycles. An issue with children can't move to another project. |
+| `threadIds`    | Threads that worked on the issue, oldest first. A thread owner is always linked.                                                              |
+| `pullRequests` | `{url, title}` entries. URLs must be `https://github.com/<owner>/<repo>/pull/<n>`.                                                            |
+| `activity`     | Entries for creation, status and owner changes, comments, questions, linked PRs, launch, close.                                               |
 
+An owner is exactly `{type: "roder"}`, `{type: "user"}`, or
+`{type: "thread", threadId}`; `threadId` is refused on the other two.
 `roder` means the project's Roder; in a project without one it means nobody in
 particular. The owner and status stay in step for every actor: a user owner on
 an open issue makes it `needs_you`, and an issue that leaves the user goes to
@@ -68,9 +70,10 @@ change.
   can't be the user.
 - Update: `done` and `cancelled` only through `close`; `in_review` needs a
   linked pull request; `in_progress` needs a linked thread, or a child issue in
-  progress; `needs_you` and a user owner only through `askUser`; a non-empty
-  `doneCriteria` can be edited but not cleared.
-- Launch: refused on a closed issue.
+  progress; `needs_you` and a user owner only through `askUser`; moving out of
+  `backlog` needs `doneCriteria`; a non-empty `doneCriteria` can be edited but
+  not cleared.
+- Launch: refused on a closed issue, even one a thread still owns.
 
 Operations for every actor:
 
@@ -113,18 +116,18 @@ Agent tool calls go through `handleIssueToolCall`, which always acts as the
 calling thread; never forward agent input with the user actor. The UI only uses
 `window.roderDesktop.request` and existing notification/workspace/thread state.
 
-| Method suffix     | Project params                                                  | Issue params                                        | Result                        |
-| ----------------- | --------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- |
-| `list`            | optional `workspaceId`, `archived`                              | optional `projectId`, `status`, `threadId`, `query` | `{ projects }` / `{ issues }` |
-| `read`            | `id`                                                            | `id`                                                | `{ project }` / `{ issue }`   |
-| `create`          | `name`, optional `description`, `workspaceId`                   | `projectId`, `title`, optional issue fields¹        | `{ project }` / `{ issue }`   |
-| `update`          | `id`, optional `name`, `description`, `workspaceId`, `archived` | `id`, optional `projectId`, `title`, issue fields¹  | `{ project }` / `{ issue }`   |
-| `delete`          | `id` (must have no issues)                                      | `id` (children lose their `parent`)                 | `{ deleted: true }`           |
-| `launch`          | not supported                                                   | `id`                                                | `{ issue, threadId }`         |
-| `comment`         | not supported                                                   | `id`, `text`                                        | `{ issue }`                   |
-| `linkPullRequest` | not supported                                                   | `id`, `url`, optional `title`                       | `{ issue }`                   |
-| `askUser`         | not supported                                                   | `id`, `question`, optional `recommendation`         | `{ issue }`                   |
-| `close`           | not supported                                                   | `id`, `outcome` (`merged` \| `dropped`), `note`     | `{ issue }`                   |
+| Method suffix     | Project params                                                                   | Issue params                                        | Result                        |
+| ----------------- | -------------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- |
+| `list`            | optional `workspaceId`, `archived`                                               | optional `projectId`, `status`, `threadId`, `query` | `{ projects }` / `{ issues }` |
+| `read`            | `id`                                                                             | `id`                                                | `{ project }` / `{ issue }`   |
+| `create`          | `name`, optional `description`, `workspaceId`                                    | `projectId`, `title`, optional issue fields¹        | `{ project }` / `{ issue }`   |
+| `update`          | `id`, optional `name`, `description`, `workspaceId`, `roderThreadId`, `archived` | `id`, optional `projectId`, `title`, issue fields¹  | `{ project }` / `{ issue }`   |
+| `delete`          | `id` (must have no issues)                                                       | `id` (children lose their `parent`)                 | `{ deleted: true }`           |
+| `launch`          | not supported                                                                    | `id`                                                | `{ issue, threadId }`         |
+| `comment`         | not supported                                                                    | `id`, `text`                                        | `{ issue }`                   |
+| `linkPullRequest` | not supported                                                                    | `id`, `url`, optional `title`                       | `{ issue }`                   |
+| `askUser`         | not supported                                                                    | `id`, `question`, optional `recommendation`         | `{ issue }`                   |
+| `close`           | not supported                                                                    | `id`, `outcome` (`merged` \| `dropped`), `note`     | `{ issue }`                   |
 
 ¹ `description`, `status`, `priority`, `owner`, `doneCriteria`, `outOfScope`,
 `parent`. Threads link through a thread `owner` or `launch`; pull requests and
