@@ -1,4 +1,5 @@
 import type { AppUpdateStatus } from "@/lib/app-update";
+import type { MarkdownShellCommand, MarkdownShellResult } from "@/lib/markdown-shell-command";
 import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
 
 export type RoderStatus = {
@@ -1313,6 +1314,7 @@ declare global {
         forceRestart?: boolean;
       }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string, id?: string) => Promise<void>;
+      runMarkdownShellCommand: (command: MarkdownShellCommand) => Promise<MarkdownShellResult>;
       terminalResize: (cols: number, rows: number, id?: string) => Promise<void>;
       terminalStop: (id?: string) => Promise<void>;
       browserToggle: (bounds?: BrowserBounds) => Promise<BrowserSnapshot>;

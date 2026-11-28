@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Composer } from "@/components/composer";
+import { MarkdownShellProvider } from "@/components/markdown-shell-block";
 import { Transcript } from "@/components/transcript";
 import type { DesktopAttachment, ModelSelectionMode, PolicyMode, QueuedPrompt, ReasoningEffort } from "@/types/roder";
-import { messages, models, noop, noopAsync, threads } from "./fixtures";
+import { messages, models, noop, noopAsync, storybookShellTarget, threads } from "./fixtures";
 
 const meta = { title: "Desktop/Conversation" } satisfies Meta;
 export default meta;
@@ -82,7 +83,9 @@ export const BusyComposer: Story = { render: () => <ComposerExample busy /> };
 export const ThreadTranscript: Story = {
   render: () => (
     <div className="mx-auto h-[32rem] max-w-4xl overflow-hidden rounded-xl border border-border">
-      <Transcript messages={messages} followSignal={0} scrollStateKey="storybook-transcript" />
+      <MarkdownShellProvider target={storybookShellTarget}>
+        <Transcript messages={messages} followSignal={0} scrollStateKey="storybook-transcript" />
+      </MarkdownShellProvider>
     </div>
   ),
 };

@@ -14,7 +14,7 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { JsonObject } from "@roderai/extension-api";
 import { BrowserManager } from "../browser/browser-manager";
 import { savePngDataUrl } from "../attachment-images";
@@ -94,6 +94,7 @@ import type { LocalWorktreeContext } from "../../src/lib/local-worktrees";
 import { DesktopWorktrees } from "../worktrees/desktop-worktrees";
 import { GitWorktrees } from "../worktrees/git-worktrees";
 import { TerminalManager, type TerminalStartOptions } from "../terminal/pty-manager";
+import { runMarkdownShellCommand } from "../terminal/markdown-shell-command";
 import { createAutoUpdateController } from "./auto-update";
 import {
   createApplicationMenuTemplate,
@@ -403,6 +404,24 @@ ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
   terminal.start({ ...options, cwd: options?.cwd || process.cwd() }),
 );
 ipcMain.handle("terminal:write", (_event, data: string, id?: string) => terminal.write(data, id));
+ipcMain.handle("terminal:runMarkdownCommand", (event, command: unknown) => {
+  const contents = mainWindow?.webContents;
+  const frame = event.senderFrame;
+  if (!contents || event.sender !== contents || !frame || frame.parent) {
+    throw new Error("Only the desktop window can run a Markdown command.");
+  }
+  const actual = new URL(frame.url);
+  const renderer = new URL(
+    MAIN_WINDOW_VITE_DEV_SERVER_URL ??
+      pathToFileURL(join(mainDir, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)).href,
+  );
+  actual.hash = renderer.hash = "";
+  actual.search = renderer.search = "";
+  if (actual.href !== renderer.href) {
+    throw new Error("Only the desktop window can run a Markdown command.");
+  }
+  return runMarkdownShellCommand(command);
+});
 ipcMain.handle("terminal:resize", (_event, cols: number, rows: number, id?: string) => terminal.resize(cols, rows, id));
 ipcMain.handle("terminal:stop", (_event, id?: string) => terminal.stop(id));
 ipcMain.handle("browser:toggle", (_event, bounds?: Rectangle) => browser.toggle(scaleRendererBounds(bounds)));
