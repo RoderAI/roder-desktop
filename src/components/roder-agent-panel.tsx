@@ -62,7 +62,7 @@ export function RoderAgentPanel({ agentId }: { agentId: string }) {
         <header className="space-y-1">
           <h1 className="font-semibold">Agent settings</h1>
           <p className="text-sm font-normal text-muted-foreground">
-            Memory, schedules, and run controls. Proactive work requires Roder Desktop to stay open.
+            Files, schedules, and run controls. Proactive work requires Roder Desktop to stay open.
           </p>
         </header>
         {error ? (

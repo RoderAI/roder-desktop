@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { Button } from "@/components/ui/button";
 import { RoderAgentCreateDialog } from "@/components/roder-agent-create-dialog";
 import { RoderAgentAvatar } from "@/components/roder-agent-avatar";
+import { RoderAgentFiles } from "@/components/roder-agent-files";
 import { RoderAgentImageSetup } from "@/components/roder-agent-image-setup";
 import { roderAgentsIpc } from "@/lib/roder-agents-ipc";
 import { roderAgentCharacterPresentation } from "@/lib/roder-agent-character";
@@ -116,7 +117,9 @@ export function RoderAgentsPage({
                       <RoderAgentAvatar id={c.id} sprite={c.sprite} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{c.name}</span>
-                        <span className="block truncate text-sm font-normal text-muted-foreground">{c.mission}</span>
+                        <span className="block truncate text-sm font-normal text-muted-foreground">
+                          {c.mission || "No instructions yet"}
+                        </span>
                       </span>
                       <span className="shrink-0 text-sm text-muted-foreground">
                         {c.active ? "Running" : c.enabled ? "Enabled" : "Paused"}
@@ -147,7 +150,7 @@ export function RoderAgentsPage({
           <section className="lg:col-span-2">
             {selected ? (
               <RoderAgentEditor
-                key={`${selected.id}:${selected.memory}`}
+                key={selected.id}
                 initial={selected}
                 status={roderAgents.find((c) => c.id === selected.id) ?? selected}
                 busy={busy}
@@ -156,7 +159,7 @@ export function RoderAgentsPage({
               />
             ) : (
               <p className="rounded-xl border border-dashed border-border p-4 text-muted-foreground font-normal">
-                Select a Roder to edit its memory and opt in to proactive work.
+                Select a Roder to edit its files and opt in to proactive work.
               </p>
             )}
           </section>
@@ -182,7 +185,6 @@ export function RoderAgentEditor({
   showThreadLink?: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
-  const memoryVersion = useRef(initial.memory);
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -267,6 +269,7 @@ export function RoderAgentEditor({
           </p>
         ) : null}
       </div>
+      <RoderAgentFiles key={status.id} roderId={status.id} initialFiles={initial.files} />
       <form
         className="space-y-3"
         onSubmit={async (event) => {
@@ -276,9 +279,6 @@ export function RoderAgentEditor({
             roderAgentsIpc.update({
               id: status.id,
               name: String(data.get("name")),
-              mission: String(data.get("mission")),
-              memory: String(data.get("memory")),
-              expectedMemory: memoryVersion.current,
               intervalMinutes: Number(data.get("interval")),
               maxRunsPerDay: Number(data.get("runs")),
               maxRunMinutes: Number(data.get("minutes")),
@@ -288,42 +288,13 @@ export function RoderAgentEditor({
                 .filter(Boolean),
             }),
           );
-          if (saved) {
-            memoryVersion.current = saved.memory;
-            setMessage("Memory and controls saved.");
-          }
+          if (saved) setMessage("Controls saved.");
         }}
       >
         <label className="block space-y-1">
           <span>Name</span>
           <input name="name" defaultValue={initial.name} required maxLength={120} className={fieldClass} />
         </label>
-        <label className="block space-y-1">
-          <span>Mission</span>
-          <textarea
-            name="mission"
-            defaultValue={initial.mission}
-            required
-            rows={3}
-            maxLength={16000}
-            className={fieldClass}
-          />
-        </label>
-        <label className="block space-y-1">
-          <span>Durable memory</span>
-          <textarea
-            name="memory"
-            defaultValue={initial.memory}
-            rows={9}
-            maxLength={32000}
-            className={`${fieldClass} font-normal`}
-          />
-          <span className="block break-all text-sm text-muted-foreground">{initial.memoryPath}</span>
-        </label>
-        <p className="text-sm text-muted-foreground font-normal">
-          This editable file is loaded on every wake. Reopen the Roder before editing if its agent has updated memory.
-          It is a compact reference, not a replacement for thread history.
-        </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="space-y-1">
             <span>Check-in minutes (0 = off)</span>
@@ -375,7 +346,7 @@ export function RoderAgentEditor({
           </span>
         </label>
         <Button type="submit" disabled={busy}>
-          Save memory and controls
+          Save controls
         </Button>
       </form>
       <section className="space-y-3">

@@ -13,8 +13,8 @@ create a new Roder instead. Existing engine threads are never rewritten.
 
 A Roder owns one real, persisted Roder thread. It keeps that thread across
 check-ins and desktop restarts; it never starts a replacement thread to hide
-context limits. Its mission and concise, user-editable memory accompany each
-new turn. Roder's native memory search retrieves additional facts, and its
+context limits. Its versioned files (see [Roder files](#roder-files)) accompany
+each new turn. Roder's native memory search retrieves additional facts, and its
 native compaction summarizes the working transcript when necessary. This is
 durable context, not infinite model context.
 
@@ -26,7 +26,7 @@ durable context, not infinite model context.
    Creation makes a real thread without starting a proactive conversation turn.
    New Roders are paused; their separate character-generation job
    uses Codex quota immediately.
-2. Edit the mission and memory. Set a daily run allowance and run time limit.
+2. Edit the Roder's files. Set a daily run allowance and run time limit.
    The defaults are five runs per rolling 24 hours and ten minutes per run.
 3. Choose a check-in interval, schedule a specific wake, or subscribe to engine
    event methods such as `turn/completed`. A zero interval means no recurring
@@ -44,9 +44,11 @@ it is not an instantaneous process kill. User-input waits remain subject to the
 same run time limit. All Roder turns use the engine's `bypass`
 permission mode: manual chat, **Run once**, and scheduled or event-triggered
 runs do not require tool approval prompts. This applies to existing agents after
-restart as well as newly created or promoted agents. Ordinary threads retain
-their selected permission mode. Bypass does not enable paused agents, remove
-run budgets, grant missing OS permissions, or override tool-specific restrictions.
+restart as well as newly created or promoted agents. This is not specific to
+Roders: the desktop applies `bypass` (Full access) to every thread it starts a
+turn on, through `thread/set_mode` (`electron/roder/desktop-turn-policy.ts`).
+Bypass does not enable paused agents, remove run budgets, grant missing OS
+permissions, or override tool-specific restrictions.
 
 ## Persona characters
 
@@ -102,24 +104,56 @@ threads without these tool definitions are rejected with an explanation; the
 released engine has no update-tools RPC, so the desktop cannot silently add
 them to an old thread. The existing thread and its history remain unchanged.
 Repeated promotion of the same registered thread returns the existing Roder
-without resetting memory or enabling proactive work. Explicit model choices
+without resetting its files or enabling proactive work. Explicit model choices
 are applied through native `model/select` and saved with the Roder.
+
+## Roder files
+
+Each Roder has five reserved files, modelled on Zuse Zapper files. New Roders
+start with every file at version 1: `INSTRUCTIONS.md` holds the mission given
+at creation and the others are empty.
+
+| File              | Written by                              | Reaches                                        |
+| ----------------- | --------------------------------------- | ---------------------------------------------- |
+| `INSTRUCTIONS.md` | The user                                | Every Roder turn, first 16 KiB                 |
+| `AGENTS.md`       | The user only; Roder writes are refused | Every Roder turn, first 16 KiB, when not empty |
+| `NOTES.md`        | The Roder and the user                  | Every Roder turn, first 8 KiB                  |
+| `WORKERS.md`      | The user                                | Nobody yet; worker prompts come later          |
+| `DIGEST.md`       | The user                                | Nobody's prompt; the user reads it             |
+
+Every write is a new version. A write names the version it read as
+`expectedVersion`; a stale one is refused with an error that names the current
+version (`Roder file version conflict on NOTES.md: expected 1, current version
+is 2. ...`). Restore copies an old version's content into a new version, so
+history only grows. A version holds at most 1 MiB of UTF-8. A turn carries at
+most 16 KiB of `INSTRUCTIONS.md`, 16 KiB of `AGENTS.md` and 8 KiB of
+`NOTES.md`. When a file is longer than its prompt cap, the turn gets the first bytes,
+cut on a character boundary, then a line saying how many bytes were left out
+and that `roder_files` reads the rest.
+
+The opening paragraph of `INSTRUCTIONS.md` becomes the Roder's one-line
+`mission` shown in lists, from creation on. It is empty while `INSTRUCTIONS.md`
+has no opening paragraph, and the list then says "No instructions yet". The Roders page and the agent settings panel show
+the file list, an editor, and each file's history with view and restore. A
+save from a stale editor is refused and keeps the draft.
+
+Roders saved before files existed get empty files on first use. Their old
+`<roder-id>.md` memory and mission are not migrated; the memory file is left on
+disk untouched.
 
 ## Persistence and recovery
 
 The host chooses a private application-data directory. It contains
 `roders.json` (versioned records, enabled state, rolling budget ledger,
-pending wakes, and active leases) and `<roder-id>.md` memory files. Writes
-use a same-directory temporary file followed by rename. State files are created
-with mode 0600 and the directory with mode 0700. Only one service instance may
-own a directory. This is local plaintext, not encrypted secret storage; never
-put credentials in Roder memory.
-
-Memory can be edited in the UI or directly on disk. Every run rereads it. The
-memory file is bounded to 32,000 characters and is never silently truncated;
-put additional retrievable facts in native memory. UI saves check the previous
-memory value so an agent or external editor's concurrent update isn't silently
-overwritten. Reopen the Roder after a conflict to review the latest text.
+pending wakes, and active leases) and `files/<roder-id>/`: `index.json` lists
+every version of every file and `<FILE>/<version>.md` holds each version's
+content. Writes use a same-directory temporary file followed by rename; a file
+version's content is written before the index that names it. State files are
+created with mode 0600 and directories with mode 0700. The host must run only
+one service instance per directory; nothing locks the directory, so two
+instances could overwrite each other's state or file versions. This is local plaintext, not encrypted secret
+storage; never put credentials in Roder files. A corrupt file index fails
+closed and is not replaced.
 
 Startup validates every persisted record before allowing autonomous work.
 Corrupt or unknown-version state fails closed and is not replaced. An active
@@ -153,13 +187,16 @@ await roderAgents.start();
 Route requests with a `desktop/roders/` prefix to
 `roderAgents.handleRequest(method, params)`. Forward engine notifications with
 `roderAgents.onNotification(method, params)`. Await `roderAgents.stop()` before stopping
-the engine. For ordinary composer `turn/start` requests, merge
-`await roderAgents.contextForThread(threadId)` into `developerContext` unless the
-caller already supplied the Roder context. This unlocked accessor returns
-`null` for unrelated threads and rereads the bounded memory file on every call;
-it does not call the engine or take the service mutation lock, so it is safe to
-invoke from the injected engine request path. Scheduled Roder turns already
-include this context and native recall, and should not receive it twice.
+the engine. The host owns context injection for every `turn/start` it sends
+for the renderer: pass the params through `await roderAgents.turnStartParams(params)`,
+which prepends `contextForThread(threadId)` to any `developerContext` for a
+Roder thread and returns other params unchanged. It always prepends, so call it
+once per turn. The service's own scheduled and manual runs build the same
+context plus native recall themselves, so the `request` function given to the
+service must skip this step (the desktop passes `requestEngine(method, params,
+false)`). `contextForThread` returns `null` for unrelated threads and rereads
+the Roder's files on every call; it does not call the engine or take the
+service mutation lock, so it is safe to invoke from the engine request path.
 The injected request function must make real engine requests and
 register the exported native ToolSpec descriptors as `externalTools` when
 creating Roder threads. The host resolves `thread/toolExecutionRequested`
@@ -172,19 +209,24 @@ need the same host tool dispatcher available after restart.
 
 Requests:
 
-| Suffix         | Parameters                                                                                                                     | Result                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| `list`         | `{}`                                                                                                                           | `{ roders: RoderAgent[] }`                                                   |
-| `create`       | `{ name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                           | `RoderAgentDetail`                                                           |
-| `promote`      | `{ threadId, name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                 | `RoderAgentDetail`                                                           |
-| `read`         | `{ id }`                                                                                                                       | `RoderAgentDetail`                                                           |
-| `update`       | `{ id, name?, mission?, memory?, expectedMemory?, enabled?, intervalMinutes?, eventMethods?, maxRunsPerDay?, maxRunMinutes? }` | `RoderAgentDetail`                                                           |
-| `schedule`     | `{ id, at, reason }` (`at` is Unix milliseconds)                                                                               | `RoderAgentDetail`                                                           |
-| `cancelWake`   | `{ id, wakeId }`                                                                                                               | `RoderAgentDetail`                                                           |
-| `run`          | `{ id, reason? }`                                                                                                              | `RoderAgentDetail`                                                           |
-| `compact`      | `{ id }`                                                                                                                       | Native `thread/compact` result                                               |
-| `sprite/read`  | `{ id }`                                                                                                                       | `{ sprite: RoderAgentSprite \| null, image: RoderAgentSpriteImage \| null }` |
-| `sprite/retry` | `{ id, provider? }` (`codex` default, or `openai`)                                                                             | `RoderAgentSprite`                                                           |
+| Suffix          | Parameters                                                                                 | Result                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `list`          | `{}`                                                                                       | `{ roders: RoderAgent[] }`                                                   |
+| `create`        | `{ name, mission, workspaceId, modelProvider?, model?, reasoning? }`                       | `RoderAgentDetail`                                                           |
+| `promote`       | `{ threadId, name, mission, workspaceId, modelProvider?, model?, reasoning? }`             | `RoderAgentDetail`                                                           |
+| `read`          | `{ id }`                                                                                   | `RoderAgentDetail`                                                           |
+| `update`        | `{ id, name?, enabled?, intervalMinutes?, eventMethods?, maxRunsPerDay?, maxRunMinutes? }` | `RoderAgentDetail`                                                           |
+| `files/list`    | `{ id }`                                                                                   | `{ files: RoderFileVersion[] }`                                              |
+| `files/read`    | `{ id, path, version? }`                                                                   | `RoderFile`                                                                  |
+| `files/history` | `{ id, path }` (newest first)                                                              | `{ versions: RoderFileVersion[] }`                                           |
+| `files/write`   | `{ id, path, content, expectedVersion }`                                                   | `RoderFileVersion`                                                           |
+| `files/restore` | `{ id, path, version, expectedVersion }`                                                   | `RoderFileVersion`                                                           |
+| `schedule`      | `{ id, at, reason }` (`at` is Unix milliseconds)                                           | `RoderAgentDetail`                                                           |
+| `cancelWake`    | `{ id, wakeId }`                                                                           | `RoderAgentDetail`                                                           |
+| `run`           | `{ id, reason? }`                                                                          | `RoderAgentDetail`                                                           |
+| `compact`       | `{ id }`                                                                                   | Native `thread/compact` result                                               |
+| `sprite/read`   | `{ id }`                                                                                   | `{ sprite: RoderAgentSprite \| null, image: RoderAgentSpriteImage \| null }` |
+| `sprite/retry`  | `{ id, provider? }` (`codex` default, or `openai`)                                         | `RoderAgentSprite`                                                           |
 
 `start`, `tick`, `stop`, request handlers, and notification handlers return
 promises. The service serializes state mutations, persists only changed state,
@@ -192,12 +234,23 @@ and ignores irrelevant streaming notifications. At most 50 pending wakes,
 20 event methods, 100 runs per rolling day, and 60 minutes per run are allowed.
 These hard ceilings cannot be increased through agent tools.
 
-Agent tools are `roder_memory_read`, `roder_memory_write`,
+Agent tools are `roder_files`, `roder_memory_read`, `roder_memory_write`,
 `roder_memory_save`, `roder_memory_query`, and `roder_wake_schedule`.
-The last three use native `memory/save`, `memory/query`, and the durable wake
-queue respectively. All tools resolve ownership from the caller's thread.
-Agents cannot create or enable Roders, change controls, or access another
-Roder's memory through this API. User approval through the desktop controls
+`roder_files` lists the files with no `path`, reads one file (or `version`)
+with `path`, and lists its versions with `path` and `history: true`.
+`roder_memory_read` and `roder_memory_write` read and write `NOTES.md`;
+`roder_memory_write` takes `{ memory, expectedVersion }`. The last three use
+native `memory/save`, `memory/query`, and the durable wake queue
+respectively. All tools resolve ownership from the caller's thread.
+Through these tools a Roder cannot create or enable Roders, change controls, or
+access another Roder's files.
+
+Every desktop thread, Roders included, also gets two creation tools
+(`electron/roder-agents/creation-tool.ts`). `roder_workspaces` lists existing
+workspaces. `roder_create` creates a new Roder, paused, for the calling
+thread's workspace or a named one; its description tells the model to use it
+only when the user asks. It cannot enable a Roder or change another Roder's
+controls or files. User approval through the desktop controls
 is the only way to enable proactive behavior. This API boundary is not an OS
 sandbox against a local process that already has filesystem access.
 
@@ -207,7 +260,7 @@ and `memory/save`. The released protocol's Rust `MemoryScope` uses externally
 tagged serialization, e.g. `{ "Thread": "thread-id" }`; older examples in
 `docs/api.md` use a different shape. Native memory requires a registered store;
 if unavailable, the UI records the recall error and the Roder still has its
-local memory file and original engine thread. Explicit memory tools surface
+files and original engine thread. Explicit memory tools surface
 native errors instead of pretending retrieval succeeded. Automatic compaction
 remains owned by the engine; the UI exposes a native manual compaction action
 on an idle thread and never deletes or slices thread messages itself.
