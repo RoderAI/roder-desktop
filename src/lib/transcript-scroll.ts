@@ -35,6 +35,7 @@ export type TranscriptPinnedIntentInput = {
   observedCanScrollToBottom: boolean;
   pinnedToEnd: boolean;
   userScrollIntent: boolean;
+  movingUp?: boolean;
 };
 
 export type TranscriptScrollAffordanceVisibilityInput = {
@@ -119,12 +120,10 @@ export function nextTranscriptPinnedToEnd({
   observedCanScrollToBottom,
   pinnedToEnd,
   userScrollIntent,
+  movingUp,
 }: TranscriptPinnedIntentInput): boolean {
   if (userScrollIntent) {
-    return !observedCanScrollToBottom;
-  }
-  if (!observedCanScrollToBottom) {
-    return true;
+    return !movingUp && !observedCanScrollToBottom;
   }
   return pinnedToEnd;
 }
@@ -146,9 +145,10 @@ export function canScrollTranscriptViewportToBottom(
 
 export function transcriptScrollRestorationStateFromViewport(
   metrics: TranscriptViewportScrollMetrics,
+  pinnedToEnd = !canScrollTranscriptViewportToBottom(metrics),
 ): TranscriptScrollRestorationState {
   return {
-    pinnedToEnd: !canScrollTranscriptViewportToBottom(metrics),
+    pinnedToEnd,
     scrollOffset: Math.max(0, metrics.scrollTop),
   };
 }

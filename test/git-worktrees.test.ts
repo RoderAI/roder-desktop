@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -54,6 +54,24 @@ describe("local Git worktrees", () => {
     await worktrees.remove(repo, path, async () => {});
     expect((await worktrees.list(repo)).worktrees).toHaveLength(1);
     expect(git(repo, "branch", "--list", "feature/test")).toBe("feature/test");
+  });
+
+  it("prepares a new thread checkout from HEAD and reports when Git starts checking out files", async () => {
+    const tracked = "project.txt";
+    await writeFile(join(repo, tracked), "committed");
+    git(repo, "add", tracked);
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "Track project");
+    await writeFile(join(repo, tracked), "local edits");
+    const steps: string[] = [];
+
+    const checkout = await worktrees.createForThread(repo, (step) => steps.push(step));
+
+    expect(steps).toEqual(["checking-out"]);
+    expect(checkout.branch).toMatch(/^roder-thread-/);
+    expect(checkout.managed).toBe(true);
+    expect(await readFile(join(checkout.path, tracked), "utf8")).toBe("committed");
+    expect(await readFile(join(repo, tracked), "utf8")).toBe("local edits");
+    expect(git(repo, "branch", "--show-current")).toBe("main");
   });
 
   it("refuses dirty and ignored files, unmerged commits, locked worktrees and a checkout in use", async () => {

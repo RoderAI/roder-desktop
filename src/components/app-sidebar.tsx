@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CirclePlus,
   Cloud,
+  Pencil,
   Plus,
   Search,
   Settings,
@@ -16,6 +17,17 @@ import {
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { PersistentAgentAvatar } from "@/components/persistent-agent-avatar";
 import { SidebarUpdateButton } from "@/components/sidebar-update-button";
+import { Button } from "@/components/ui/button";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { persistentAgentsIpc } from "@/lib/persistent-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
@@ -33,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { groupThreadsByFolder, moveSidebarProject, sidebarProjectOrder } from "@/lib/sidebar-thread-groups";
 import { visibleThreadsForGroup } from "@/lib/sidebar-thread-visibility";
 import { readArchivedSidebarProjects, setSidebarProjectArchived } from "@/lib/sidebar-project-archive";
+import { readSidebarThreadNames, renameSidebarThread } from "@/lib/sidebar-thread-names";
 
 export function filterPersistentAgents<T extends Pick<PersistentAgent, "name" | "mission" | "workspaceId">>(
   agents: T[],
@@ -155,6 +168,7 @@ export function AppSidebar({
 }: AppSidebarProps): React.JSX.Element {
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(() => new Set());
   const [archivedProjectKeys, setArchivedProjectKeys] = useState(readArchivedSidebarProjects);
+  const [threadNames, setThreadNames] = useState(readSidebarThreadNames);
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [threadSearch, dispatchThreadSearch] = useReducer(sidebarSearchReducer, { open: false, query: "" });
   const {
@@ -167,7 +181,7 @@ export function AppSidebar({
   const cloudMachines = useCloudMachinesStore((state) => state.machines);
   const ordinaryThreads = ordinarySidebarThreads(threads, persistentAgents, subagentTracesByThread);
   const matchingThreads = ordinaryThreads.filter((thread) =>
-    `${thread.name ?? ""}\n${thread.preview}\n${thread.cwd}\n${thread.runner?.providerId ?? ""}\n${thread.runner?.workspace ?? ""}`
+    `${threadNames.get(thread.id) ?? thread.name ?? ""}\n${thread.preview}\n${thread.cwd}\n${thread.runner?.providerId ?? ""}\n${thread.runner?.workspace ?? ""}`
       .toLowerCase()
       .includes(threadSearch.query.trim().toLowerCase()),
   );
@@ -188,6 +202,10 @@ export function AppSidebar({
 
   function handleProjectArchive(key: string, archived: boolean): void {
     setArchivedProjectKeys(setSidebarProjectArchived(archivedProjectKeys, key, archived));
+  }
+
+  function handleThreadRename(threadId: string, name: string): void {
+    setThreadNames(renameSidebarThread(threadNames, threadId, name));
   }
 
   function handleProjectDrop(event: React.DragEvent<HTMLElement>, target: string): void {
@@ -424,9 +442,11 @@ export function AppSidebar({
                         <ThreadRow
                           key={thread.id}
                           thread={thread}
+                          name={threadNames.get(thread.id)}
                           active={activeView === "chat" && thread.id === activeThreadId}
                           running={isThreadRunning(thread)}
                           onSelectThread={onSelectThread}
+                          onRenameThread={handleThreadRename}
                           onArchiveThread={onArchiveThread}
                         />
                       ))}
@@ -450,9 +470,11 @@ export function AppSidebar({
                               <ThreadRow
                                 key={thread.id}
                                 thread={thread}
+                                name={threadNames.get(thread.id)}
                                 active={activeView === "chat" && thread.id === activeThreadId}
                                 running={isThreadRunning(thread)}
                                 onSelectThread={onSelectThread}
+                                onRenameThread={handleThreadRename}
                                 onArchiveThread={onArchiveThread}
                                 disabled={!expanded}
                               />
@@ -511,57 +533,158 @@ export function AppSidebar({
 
 function ThreadRow({
   thread,
+  name,
   active,
   running,
   onSelectThread,
+  onRenameThread,
   onArchiveThread,
   disabled = false,
 }: {
   thread: RoderThread;
+  name?: string;
   active: boolean;
   running: boolean;
   onSelectThread: (threadId: string) => void;
+  onRenameThread: (threadId: string, name: string) => void;
   onArchiveThread: (threadId: string) => void;
   disabled?: boolean;
 }): React.JSX.Element {
+  const label = name ?? (thread.name || thread.preview || "Untitled agent");
+  const [renaming, setRenaming] = useState(false);
+  const renameRequested = useRef(false);
+  const rowButton = useRef<HTMLButtonElement>(null);
+  const archive = () => onArchiveThread(thread.id);
+
   return (
-    <div
-      className={cn(
-        "thread-row squircle-corners relative flex h-8 w-full items-center rounded-xl text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20",
-        active && "bg-sidebar-active/20 text-sidebar-active-foreground",
-        disabled && "pointer-events-none opacity-50",
-      )}
-    >
-      <button
-        type="button"
-        className="flex h-full min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 pr-12 text-left outline-none"
+    <>
+      <ContextMenu
         disabled={disabled}
-        onClick={() => onSelectThread(thread.id)}
+        onOpenChangeComplete={(open) => {
+          if (!open && renameRequested.current) {
+            renameRequested.current = false;
+            setRenaming(true);
+          }
+        }}
       >
-        <span className="min-w-0 flex-1 truncate">{thread.name ?? (thread.preview || "Untitled agent")}</span>
-        <span
+        <ContextMenuTrigger
           className={cn(
-            "thread-row-age absolute right-2.5 text-sm text-sidebar-muted",
-            running && "flex h-6 w-6 -translate-x-px items-center justify-end",
+            "thread-row squircle-corners relative flex h-8 w-full items-center rounded-xl text-left text-base font-medium text-sidebar-foreground outline-none hover:bg-sidebar-active/20",
+            active && "bg-sidebar-active/20 text-sidebar-active-foreground",
+            disabled && "pointer-events-none opacity-50",
           )}
-          aria-label={running ? "Turn running" : undefined}
         >
-          {running ? <DotMatrixSpinner /> : relativeAge(thread.updatedAt)}
-        </span>
-      </button>
-      <Tooltip>
-        <TooltipTrigger
-          type="button"
-          className="thread-row-archive absolute right-2 flex size-6 items-center justify-center rounded-md text-sidebar-muted outline-none hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
-          disabled={disabled}
-          aria-label={`Archive ${(thread.name ?? thread.preview) || "thread"}`}
-          onClick={() => onArchiveThread(thread.id)}
+          <button
+            ref={rowButton}
+            type="button"
+            className="flex h-full min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 pr-12 text-left outline-none"
+            disabled={disabled}
+            onClick={() => onSelectThread(thread.id)}
+          >
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            <span
+              className={cn(
+                "thread-row-age absolute right-2.5 text-sm text-sidebar-muted",
+                running && "flex h-6 w-6 -translate-x-px items-center justify-end",
+              )}
+              aria-label={running ? "Turn running" : undefined}
+            >
+              {running ? <DotMatrixSpinner /> : relativeAge(thread.updatedAt)}
+            </span>
+          </button>
+          <Tooltip>
+            <TooltipTrigger
+              type="button"
+              className="thread-row-archive absolute right-2 flex size-6 items-center justify-center rounded-md text-sidebar-muted outline-none hover:bg-sidebar-active/25 hover:text-sidebar-foreground focus-visible:bg-sidebar-active/25 focus-visible:text-sidebar-foreground"
+              disabled={disabled}
+              aria-label={`Archive ${label}`}
+              onClick={archive}
+            >
+              <Archive className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent side="right">Archive</TooltipContent>
+          </Tooltip>
+        </ContextMenuTrigger>
+        <ContextMenuContent aria-label="Conversation actions">
+          <ContextMenuItem
+            onSelect={() => {
+              renameRequested.current = true;
+            }}
+          >
+            <Pencil className="size-3.5 text-muted-foreground" />
+            Rename…
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={archive}>
+            <Archive className="size-3.5 text-muted-foreground" />
+            Archive
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+      {renaming && (
+        <RenameSidebarThreadDialog
+          name={label}
+          returnFocus={rowButton}
+          onClose={() => setRenaming(false)}
+          onRename={(nextName) => onRenameThread(thread.id, nextName)}
+        />
+      )}
+    </>
+  );
+}
+
+function RenameSidebarThreadDialog({
+  name,
+  returnFocus,
+  onClose,
+  onRename,
+}: {
+  name: string;
+  returnFocus: React.RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+  onRename: (name: string) => void;
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(name);
+  const [open, setOpen] = useState(true);
+  const nameInput = useRef<HTMLInputElement>(null);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+      onOpenChangeComplete={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
+    >
+      <DialogContent className="max-w-sm" initialFocus={nameInput} finalFocus={returnFocus}>
+        <DialogHeader>
+          <DialogTitle>Rename conversation</DialogTitle>
+          <DialogDescription>The new name appears in the sidebar on this device.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const nextName = draft.trim();
+            if (!nextName) return;
+            setOpen(false);
+            onRename(nextName);
+          }}
         >
-          <Archive className="size-3.5" />
-        </TooltipTrigger>
-        <TooltipContent side="right">Archive</TooltipContent>
-      </Tooltip>
-    </div>
+          <input
+            ref={nameInput}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            aria-label="Conversation name"
+            className="h-8 w-full rounded-md border border-input bg-background px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button type="submit" disabled={!draft.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

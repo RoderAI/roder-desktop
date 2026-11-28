@@ -11,7 +11,7 @@ import {
   type Rectangle,
 } from "electron";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { watch as fsWatch } from "node:fs";
+import { existsSync, watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -64,11 +64,17 @@ import { cloudMachineThreadParams } from "../cloud-machines/thread-routing";
 import { effectiveRunnerProviderId } from "../../src/lib/cloud-machines";
 import { findClaudeCli } from "../onboarding/claude-cli";
 import { detectEnvironmentProviders } from "../onboarding/environment";
+import {
+  openMacComputerUseSettings,
+  openMacFullDiskAccessSettings,
+  readMacComputerUsePermissions,
+} from "../onboarding/macos-computer-use";
 import { onboardingRecordPath, readOnboardingRecord, writeOnboardingRecord } from "../onboarding/record";
 import { ExtensionHost } from "../extensions/extension-host";
 import { readExtensionTheme } from "../extensions/theme";
 import { callExtensionTool, extensionToolName, mergeExtensionTools } from "../extensions/tool-proxy";
 import { RoderAppServerClient, resolveEmbeddedRoderBinary } from "../roder/app-server-client";
+import { applyDesktopTurnPolicy } from "../roder/desktop-turn-policy";
 import {
   AgentBackendsManager,
   findAntigravityRuntime,
@@ -166,7 +172,9 @@ const terminal = new TerminalManager({
     });
   },
 });
-const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || "9334";
+const packagedDev = app.isPackaged && existsSync(join(process.resourcesPath, "icon-dev.png"));
+const devApp = packagedDev || !app.isPackaged;
+const cdpPort = process.env.RODER_DESKTOP_CDP_PORT || (packagedDev ? "9341" : devApp ? "9340" : "9334");
 const browser = new BrowserManager(cdpPort, () => sendAppCommand("newThread"));
 const chromeBridge = new ChromeBridgeManager();
 const browserProviderByThread = new Map<string, BrowserToolProvider>();
@@ -181,7 +189,7 @@ let imageCredentials: ReturnType<typeof createImageGenerationCredentials> | null
 let persistentAgentStartPromise: Promise<void> | null = null;
 let desktopAgentTools: DesktopAgentTools | null = null;
 const appServerEvents: AppServerEvent[] = [];
-const appName = "Roder";
+const appName = devApp ? "Roder Dev" : "Roder";
 const mainDir = __dirname;
 
 type AppServerEvent = {
@@ -193,11 +201,9 @@ type AppServerEvent = {
 };
 
 app.setName(appName);
-// Dev runs and installed builds would otherwise share one Chromium profile. A second instance then
-// waits on the profile the first one holds, which stalled a packaged launch for about 4 seconds
-// while a dev window was open.
-if (!app.isPackaged) {
-  app.setPath("userData", join(app.getPath("appData"), `${appName} Dev`));
+// Keep the live-reload, packaged dev, and release Chromium profiles separate.
+if (devApp) {
+  app.setPath("userData", join(app.getPath("appData"), packagedDev ? "Roder Dev Build" : "Roder Dev"));
 }
 app.setAboutPanelOptions({ applicationName: appName });
 if (!app.commandLine.hasSwitch("remote-debugging-port")) {
@@ -236,7 +242,8 @@ async function openExternalTarget(value: string): Promise<void> {
 }
 
 function appIconPath(): string {
-  return app.isPackaged ? join(process.resourcesPath, "icon.png") : join(app.getAppPath(), "resources/icon.png");
+  const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "resources");
+  return join(resources, devApp ? "icon-dev.png" : "icon.png");
 }
 
 function createWindow(): void {
@@ -301,7 +308,7 @@ function sendToRenderer(channel: string, payload: unknown): void {
 
 const autoUpdate = createAutoUpdateController({
   getMainWindow: () => mainWindow,
-  isPackaged: app.isPackaged,
+  isPackaged: app.isPackaged && !packagedDev,
 });
 autoUpdate.onStatus((status) => {
   sendToRenderer("appUpdate:status", status);
@@ -388,6 +395,11 @@ ipcMain.handle("roder:request", async (_event, method: string, params: unknown) 
 ipcMain.handle("worktrees:list", (_event, context: LocalWorktreeContext) => getDesktopWorktrees().list(context));
 ipcMain.handle("worktrees:create", (_event, context: LocalWorktreeContext, branch: string) =>
   getDesktopWorktrees().create(context, branch),
+);
+ipcMain.handle("worktrees:createForThread", (event, context: LocalWorktreeContext, requestId: number) =>
+  getDesktopWorktrees().createForThread(context, (step) => {
+    if (!event.sender.isDestroyed()) event.sender.send("worktrees:checkoutStep", requestId, step);
+  }),
 );
 ipcMain.handle("worktrees:remove", (_event, context: LocalWorktreeContext, path: string) =>
   getDesktopWorktrees().remove(context, path),
@@ -533,6 +545,13 @@ ipcMain.handle("onboarding:complete", () =>
   writeOnboardingRecord(onboardingRecordPath(process.env, homedir()), new Date().toISOString()),
 );
 ipcMain.handle("onboarding:environment", () => detectEnvironmentProviders(process.env));
+ipcMain.handle("computerUse:macPermissions", () => readMacComputerUsePermissions(process.platform));
+ipcMain.handle("computerUse:openMacSettings", (_event, permission: unknown) =>
+  openMacComputerUseSettings(process.platform, permission, (url) => shell.openExternal(url)),
+);
+ipcMain.handle("computerUse:openFullDiskAccessSettings", () =>
+  openMacFullDiskAccessSettings(process.platform, process.getSystemVersion(), (url) => shell.openExternal(url)),
+);
 ipcMain.handle("extensions:list", () => getExtensionCatalog().list());
 ipcMain.handle("extensions:installFromFolder", async (_event, folderPath: string) => {
   await getExtensionCatalog().installFromFolder(folderPath);
@@ -717,11 +736,8 @@ nativeTheme.on("updated", () => {
   sendToRenderer("roder:appearance", currentAppearance());
 });
 
-// Register deep-link scheme for MCP OAuth callbacks (must be before app is ready on some platforms)
-if (!app.isPackaged) {
-  // In dev mode we can't reliably use setAsDefaultProtocolClient, but register anyway
-  app.setAsDefaultProtocolClient("roder");
-} else {
+// Do not let a local package take over the installed app's OAuth callback scheme.
+if (!packagedDev) {
   app.setAsDefaultProtocolClient("roder");
 }
 
@@ -1067,6 +1083,9 @@ async function requestEngine(method: string, params: unknown, enrichPersistentAg
     typeof params === "object"
   ) {
     params = await persistentAgentService.turnStartParams(params);
+  }
+  if (method === "turn/start") {
+    params = await applyDesktopTurnPolicy((rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams), params);
   }
   return roder.request(method, params);
 }

@@ -1,6 +1,6 @@
 import { realpath } from "node:fs/promises";
 import { isRemoteRunner } from "../../src/lib/cloud-machines";
-import type { LocalWorktreeContext } from "../../src/lib/local-worktrees";
+import type { LocalWorktreeContext, WorktreeCheckoutStep } from "../../src/lib/local-worktrees";
 import type { RoderThread, Workspace, WorkspaceRoot } from "../../src/types/roder";
 import { GitWorktrees, pathIsWithin } from "./git-worktrees";
 
@@ -23,6 +23,13 @@ export class DesktopWorktrees {
     return this.serial(async () => {
       const { root } = await this.selection(context);
       return this.git.create(root.path, branch);
+    });
+  }
+
+  createForThread(context: LocalWorktreeContext, onProgress: (step: WorktreeCheckoutStep) => void) {
+    return this.serial(async () => {
+      const { root } = await this.selection(context);
+      return this.git.createForThread(root.path, onProgress);
     });
   }
 

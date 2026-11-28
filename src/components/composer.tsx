@@ -2,7 +2,7 @@ import { createEmptyHistoryState, registerHistory } from "@lexical/history";
 import { ArrowDown, ArrowUp, Loader2, Mic, Network, Pencil, Plus, Square, Trash2 } from "lucide-react";
 import { AgentBackendPicker } from "@/components/agent-backend-picker";
 import { CloudMachinePicker, ThreadExecutionMachine } from "@/components/cloud-machine-picker";
-import { WorktreePicker } from "@/components/worktree-picker";
+import { NewWorktreeCheckbox, WorktreeSetupProgress } from "@/components/new-worktree-controls";
 import { useRoderStore } from "@/stores/roder-store";
 import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
 import {
@@ -100,6 +100,7 @@ type ComposerProps = {
   selectedModelProvider: string;
   selectedSelectionMode: ModelSelectionMode;
   selectedPolicyMode: PolicyMode;
+  usesDefaultPolicyMode?: boolean;
   agentSwarmMode: boolean;
   agentSwarmModeAvailable: boolean;
   selectedReasoning: ReasoningEffort;
@@ -110,6 +111,7 @@ type ComposerProps = {
   onSelectedModelChange: (model: string, provider?: string) => void;
   onSelectedAutoModelChange: (optionId: string) => void;
   onSelectedPolicyModeChange: (mode: PolicyMode) => void;
+  onUseDefaultPolicyMode?: () => void;
   onAgentSwarmModeChange: (enabled: boolean) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
@@ -153,6 +155,7 @@ export function Composer({
   selectedModelProvider,
   selectedSelectionMode,
   selectedPolicyMode: requestedPolicyMode,
+  usesDefaultPolicyMode,
   agentSwarmMode,
   agentSwarmModeAvailable,
   selectedReasoning,
@@ -163,6 +166,7 @@ export function Composer({
   onSelectedModelChange,
   onSelectedAutoModelChange,
   onSelectedPolicyModeChange,
+  onUseDefaultPolicyMode,
   onAgentSwarmModeChange,
   onSelectedReasoningChange,
   onScrollToBottom,
@@ -588,6 +592,7 @@ export function Composer({
         )}
       >
         <ScrollToBottomButton visible={showScrollToBottom} onClick={onScrollToBottom} />
+        {!activeThreadId && <WorktreeSetupProgress />}
         {hasQueuedPrompts && (
           <QueuedPromptList
             busy={busy}
@@ -721,7 +726,8 @@ export function Composer({
               )}
               <PolicyModePicker
                 selectedMode={selectedPolicyMode}
-                onChange={onSelectedPolicyModeChange}
+                usesDefault={usesDefaultPolicyMode}
+                onChange={(mode) => (mode === null ? onUseDefaultPolicyMode?.() : onSelectedPolicyModeChange(mode))}
                 locked={persistentAgentThread}
               />
               {activeThreadId ? (
@@ -729,7 +735,7 @@ export function Composer({
               ) : (
                 <>
                   <CloudMachinePicker disabled={busy || activeBackend !== "roder"} />
-                  <WorktreePicker disabled={busy || queueBusy} />
+                  <NewWorktreeCheckbox disabled={busy || queueBusy || activeBackend !== "roder"} />
                 </>
               )}
             </div>

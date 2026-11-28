@@ -6,6 +6,7 @@ import {
   isProviderReady,
   nextOnboardingStep,
   onboardingGate,
+  onboardingStepsForPlatform,
   onboardingSteps,
   pickDefaultModel,
   previousOnboardingStep,
@@ -36,6 +37,17 @@ describe("onboarding steps", () => {
     expect(nextOnboardingStep("ready")).toBe("ready");
     expect(previousOnboardingStep("providers")).toBe("welcome");
     expect(previousOnboardingStep("welcome")).toBe("welcome");
+  });
+
+  it("offers computer-use setup only on macOS and supports going back after skipping it", () => {
+    const mac = onboardingStepsForPlatform("darwin");
+    expect(nextOnboardingStep("project", mac)).toBe("computer-use");
+    expect(nextOnboardingStep("computer-use", mac)).toBe("full-disk-access");
+    expect(nextOnboardingStep("full-disk-access", mac)).toBe("ready");
+    expect(previousOnboardingStep("ready", mac)).toBe("full-disk-access");
+    expect(previousOnboardingStep("full-disk-access", mac)).toBe("computer-use");
+    expect(onboardingStepsForPlatform("win32")).toEqual(onboardingSteps);
+    expect(onboardingStepsForPlatform("linux")).toEqual(onboardingSteps);
   });
 });
 

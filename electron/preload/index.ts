@@ -1,7 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppUpdateStatus } from "../../src/lib/app-update";
-import type { LocalWorktree, LocalWorktreeContext, LocalWorktreeList } from "../../src/lib/local-worktrees";
+import type {
+  LocalWorktree,
+  LocalWorktreeContext,
+  LocalWorktreeList,
+  WorktreeCheckoutStep,
+} from "../../src/lib/local-worktrees";
 import type { MarkdownShellCommand, MarkdownShellResult } from "../../src/lib/markdown-shell-command";
+import type { MacComputerUsePermission, MacComputerUsePermissions } from "../../src/lib/macos-computer-use";
 import type { Workspace } from "../../src/types/roder";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
@@ -109,6 +115,8 @@ export type { AppUpdateStatus } from "../../src/lib/app-update";
 
 import { homedir } from "node:os";
 
+let nextWorktreeRequestId = 0;
+
 const api = {
   platform: process.platform,
   homeDir: homedir(),
@@ -125,6 +133,18 @@ const api = {
     ipcRenderer.invoke("worktrees:list", context) as Promise<LocalWorktreeList>,
   createWorktree: (context: LocalWorktreeContext, branch: string) =>
     ipcRenderer.invoke("worktrees:create", context, branch) as Promise<LocalWorktree>,
+  createThreadWorktree: async (context: LocalWorktreeContext, onProgress: (step: WorktreeCheckoutStep) => void) => {
+    const requestId = ++nextWorktreeRequestId;
+    const listener = (_event: Electron.IpcRendererEvent, id: number, step: WorktreeCheckoutStep) => {
+      if (id === requestId) onProgress(step);
+    };
+    ipcRenderer.on("worktrees:checkoutStep", listener);
+    try {
+      return (await ipcRenderer.invoke("worktrees:createForThread", context, requestId)) as LocalWorktree;
+    } finally {
+      ipcRenderer.removeListener("worktrees:checkoutStep", listener);
+    }
+  },
   removeWorktree: (context: LocalWorktreeContext, path: string) =>
     ipcRenderer.invoke("worktrees:remove", context, path) as Promise<Workspace[]>,
   openWorkspaceFolder: (defaultPath?: string) =>
@@ -184,6 +204,11 @@ const api = {
   onboardingState: () => ipcRenderer.invoke("onboarding:state") as Promise<OnboardingRecord>,
   onboardingComplete: () => ipcRenderer.invoke("onboarding:complete") as Promise<void>,
   onboardingEnvironment: () => ipcRenderer.invoke("onboarding:environment") as Promise<EnvironmentProvider[]>,
+  macComputerUsePermissions: () =>
+    ipcRenderer.invoke("computerUse:macPermissions") as Promise<MacComputerUsePermissions>,
+  openMacComputerUseSettings: (permission: MacComputerUsePermission) =>
+    ipcRenderer.invoke("computerUse:openMacSettings", permission) as Promise<void>,
+  openMacFullDiskAccessSettings: () => ipcRenderer.invoke("computerUse:openFullDiskAccessSettings") as Promise<void>,
   codexOpenRateLimitHelp: () => ipcRenderer.invoke("codex:openRateLimitHelp") as Promise<void>,
   extensionsList: () => ipcRenderer.invoke("extensions:list") as Promise<ExtensionCatalogSnapshot>,
   extensionsInstallFromFolder: (folderPath: string) =>

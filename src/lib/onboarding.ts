@@ -1,22 +1,37 @@
 import type { ClaudeCliStatus, EnvironmentProvider, ProviderDescriptor, RoderModel, RoderStatus } from "@/types/roder";
 
 export const onboardingSteps = ["welcome", "providers", "models", "project", "ready"] as const;
+const macOnboardingSteps = [
+  "welcome",
+  "providers",
+  "models",
+  "project",
+  "computer-use",
+  "full-disk-access",
+  "ready",
+] as const;
 
 /** Matches the renderer's `min-width` on html/body, so the flow never clips at the window edge. */
 export const onboardingMinWindowWidth = 960;
 
-export type OnboardingStep = (typeof onboardingSteps)[number];
+export type OnboardingStep = (typeof macOnboardingSteps)[number];
 
-export function onboardingStepIndex(step: OnboardingStep): number {
-  return onboardingSteps.indexOf(step);
+export function onboardingStepsForPlatform(platform?: string): readonly OnboardingStep[] {
+  return platform === "darwin" ? macOnboardingSteps : onboardingSteps;
 }
 
-export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
-  return onboardingSteps[Math.min(onboardingStepIndex(step) + 1, onboardingSteps.length - 1)];
+export function nextOnboardingStep(
+  step: OnboardingStep,
+  steps: readonly OnboardingStep[] = onboardingSteps,
+): OnboardingStep {
+  return steps[Math.min(steps.indexOf(step) + 1, steps.length - 1)];
 }
 
-export function previousOnboardingStep(step: OnboardingStep): OnboardingStep {
-  return onboardingSteps[Math.max(onboardingStepIndex(step) - 1, 0)];
+export function previousOnboardingStep(
+  step: OnboardingStep,
+  steps: readonly OnboardingStep[] = onboardingSteps,
+): OnboardingStep {
+  return steps[Math.max(steps.indexOf(step) - 1, 0)];
 }
 
 export type OnboardingGate = "wait" | "onboarding" | "app";

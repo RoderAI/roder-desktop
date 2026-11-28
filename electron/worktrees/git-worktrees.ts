@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, normalize, relative, sep } from "node:path";
 import { promisify } from "node:util";
-import type { LocalWorktree, LocalWorktreeList } from "../../src/lib/local-worktrees";
+import type { LocalWorktree, LocalWorktreeList, WorktreeCheckoutStep } from "../../src/lib/local-worktrees";
 
 const exec = promisify(execFile);
 
@@ -82,7 +82,11 @@ export class GitWorktrees {
     };
   }
 
-  async create(cwd: string, branch: string): Promise<LocalWorktree> {
+  createForThread(cwd: string, onProgress: (step: WorktreeCheckoutStep) => void): Promise<LocalWorktree> {
+    return this.create(cwd, `roder-thread-${randomUUID()}`, onProgress);
+  }
+
+  async create(cwd: string, branch: string, onProgress?: (step: WorktreeCheckoutStep) => void): Promise<LocalWorktree> {
     if (typeof branch !== "string" || !branch || branch.startsWith("-") || branch.length > 200) {
       throw new Error("Enter a valid new Git branch name.");
     }
@@ -97,6 +101,7 @@ export class GitWorktrees {
     const directory = this.managedDirectory(primary.path);
     await mkdir(directory, { recursive: true });
     const path = join(directory, `worktree-${randomUUID()}`);
+    onProgress?.("checking-out");
     await git(currentPath, "worktree", "add", "-b", branch, "--", path, "HEAD");
     return this.resolve(cwd, path);
   }

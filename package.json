@@ -1,7 +1,7 @@
 {
   "name": "roder-desktop",
   "private": true,
-  "version": "0.1.19",
+  "version": "0.1.20",
   "type": "module",
   "main": ".vite/build/index.cjs",
   "scripts": {
@@ -14,6 +14,7 @@
     "storybook": "storybook dev --host 127.0.0.1 --port 6006 --exact-port --disable-telemetry",
     "build-storybook": "storybook build --disable-telemetry",
     "build": "pnpm typecheck && electron-forge package",
+    "build:dev": "RODER_DESKTOP_DEV_BUILD=1 pnpm build --platform=darwin",
     "dist": "pnpm make",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

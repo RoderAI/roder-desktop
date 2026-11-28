@@ -1,5 +1,7 @@
 import { ChevronLeft, Globe, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FullDiskAccessCard } from "@/components/full-disk-access-card";
+import { MacComputerUsePermissionCard } from "@/components/macos-computer-use-permissions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -187,6 +189,14 @@ function ComputerUseOverviewScreen({
         <h1 className="text-lg font-medium">Computer use</h1>
         <p className="mt-1 text-base text-muted-foreground">Manage how Roder uses your browser and apps.</p>
       </header>
+
+      {typeof window !== "undefined" && window.roderDesktop?.platform === "darwin" && (
+        <section className="space-y-3">
+          <h2 className="text-base font-medium">Local macOS permissions</h2>
+          <MacComputerUsePermissionCard />
+          <FullDiskAccessCard />
+        </section>
+      )}
 
       <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
         <header className="border-b border-border px-5 py-3">

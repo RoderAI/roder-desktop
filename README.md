@@ -110,9 +110,14 @@ pnpm dev
 
 `pnpm dev` builds the pinned `roder` debug binary into `resources/bin/`, then starts Electron Forge with Vite.
 
+On macOS, `pnpm build:dev` builds a standalone **Roder Dev.app** with a black icon and a separate Electron profile.
+Open it from `out/Roder Dev-darwin-<arch>/`. It does not take over the release app's update channel or OAuth callback
+scheme. The embedded harness still uses your normal Roder state unless you set `RODER_CONFIG_DIR` before launching.
+
 | Command                | What it does                                             |
 | ---------------------- | -------------------------------------------------------- |
 | `pnpm dev`             | Build the debug harness and launch the app               |
+| `pnpm build:dev`       | Build a standalone macOS dev app                         |
 | `pnpm storybook`       | Open the desktop UI catalog in your browser              |
 | `pnpm build-storybook` | Build the catalog as a static site                       |
 | `pnpm typecheck`       | TypeScript plus workspace package checks                 |

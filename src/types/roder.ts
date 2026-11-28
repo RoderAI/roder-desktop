@@ -1330,6 +1330,10 @@ declare global {
         context: import("../lib/local-worktrees").LocalWorktreeContext,
         branch: string,
       ) => Promise<import("../lib/local-worktrees").LocalWorktree>;
+      createThreadWorktree: (
+        context: import("../lib/local-worktrees").LocalWorktreeContext,
+        onProgress: (step: import("../lib/local-worktrees").WorktreeCheckoutStep) => void,
+      ) => Promise<import("../lib/local-worktrees").LocalWorktree>;
       removeWorktree: (
         context: import("../lib/local-worktrees").LocalWorktreeContext,
         path: string,
@@ -1385,6 +1389,11 @@ declare global {
       onboardingState: () => Promise<OnboardingRecord>;
       onboardingComplete: () => Promise<void>;
       onboardingEnvironment: () => Promise<EnvironmentProvider[]>;
+      macComputerUsePermissions: () => Promise<import("../lib/macos-computer-use").MacComputerUsePermissions>;
+      openMacFullDiskAccessSettings: () => Promise<void>;
+      openMacComputerUseSettings: (
+        permission: import("../lib/macos-computer-use").MacComputerUsePermission,
+      ) => Promise<void>;
       codexOpenRateLimitHelp: () => Promise<void>;
       extensionsList: () => Promise<ExtensionCatalogSnapshot>;
       extensionsInstallFromFolder: (folderPath: string) => Promise<ExtensionCatalogSnapshot>;

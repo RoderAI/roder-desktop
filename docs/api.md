@@ -929,7 +929,9 @@ Behavior:
 - Uses `prompt` as a transition fallback only when text input is empty.
 - Uses explicit model/provider/reasoning overrides first, then the thread's
   selected provider/model/reasoning when known.
-- Applies `policyMode` as the live policy mode before starting the turn.
+- The server applies `policyMode` to the runtime, not the thread. Desktop applies
+  the composer's choice with `thread/set_mode` first, then starts the turn
+  without `policyMode` so it does not change permissions in other threads.
 - Starts a runtime turn and records the active turn id for optional
   `turn/interrupt`.
 

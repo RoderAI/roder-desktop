@@ -34,7 +34,7 @@ import {
   type TranscriptDisclosureState,
 } from "@/lib/transcript-disclosure-state";
 import {
-  canScrollTranscriptRowsToBottom,
+  canScrollTranscriptViewportToBottom,
   nextTranscriptPinnedToEnd,
   shouldShowTranscriptScrollAffordance,
   transcriptFollowAction,
@@ -244,14 +244,7 @@ export function Transcript({
     if (!viewport) {
       return;
     }
-    transcriptScrollStateByKey.set(
-      key,
-      transcriptScrollRestorationStateFromViewport({
-        clientHeight: viewport.clientHeight,
-        scrollHeight: viewport.scrollHeight,
-        scrollTop: viewport.scrollTop,
-      }),
-    );
+    transcriptScrollStateByKey.set(key, transcriptScrollRestorationStateFromViewport(viewport, pinnedToEndRef.current));
     if (transcriptScrollStateByKey.size > 40) {
       const oldest = transcriptScrollStateByKey.keys().next().value;
       if (oldest) transcriptScrollStateByKey.delete(oldest);
@@ -269,22 +262,16 @@ export function Transcript({
   );
   const getTranscriptScrollElement = useCallback(() => viewportRef.current, []);
   const syncTranscriptScrollState = useCallback(
-    ({
-      source,
-      userScrollIntent,
-    }: {
-      source: { isAtEnd: (threshold?: number) => boolean };
-      userScrollIntent: boolean;
-    }) => {
+    (userScrollIntent: boolean, movingUp = false) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
       const rowCount = transcriptRowsRef.current.length;
-      const observedCanScrollToBottom = canScrollTranscriptRowsToBottom({
-        rowCount,
-        source,
-      });
+      const observedCanScrollToBottom = rowCount > 0 && canScrollTranscriptViewportToBottom(viewport);
       const nextPinnedToEnd = nextTranscriptPinnedToEnd({
         observedCanScrollToBottom,
         pinnedToEnd: pinnedToEndRef.current,
         userScrollIntent,
+        movingUp,
       });
       setPinnedToEndState(nextPinnedToEnd);
       reportCanScrollToBottom(
@@ -297,21 +284,11 @@ export function Transcript({
     },
     [reportCanScrollToBottom, setPinnedToEndState],
   );
-  const handleVirtualizerChange = useCallback(
-    (virtualizer: { isAtEnd: (threshold?: number) => boolean }) => {
-      syncTranscriptScrollState({
-        source: virtualizer,
-        userScrollIntent: userScrollIntentRef.current,
-      });
-      rememberTranscriptScrollState(scrollStateKeyRef.current);
-      userScrollIntentRef.current = false;
-      if (userScrollIntentTimeoutRef.current !== null) {
-        window.clearTimeout(userScrollIntentTimeoutRef.current);
-        userScrollIntentTimeoutRef.current = null;
-      }
-    },
-    [rememberTranscriptScrollState, syncTranscriptScrollState],
-  );
+  const handleVirtualizerChange = useCallback(() => {
+    // Measurements can look like a trip to the bottom without any user scroll.
+    syncTranscriptScrollState(false);
+    rememberTranscriptScrollState(scrollStateKeyRef.current);
+  }, [rememberTranscriptScrollState, syncTranscriptScrollState]);
   const cancelPendingScrollFrame = useCallback(() => {
     if (pendingScrollFrameRef.current === null) {
       return;
@@ -322,10 +299,10 @@ export function Transcript({
   // TanStack Virtual returns mutable objects the React Compiler cannot memoize; this component is not compiled.
   // oxlint-disable-next-line react/incompatible-library
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
-    anchorTo: "end",
+    // Resize anchoring must not pin a reader to the tail. The transcript handles append following and history prepends.
+    anchorTo: pinnedToEnd ? "end" : "start",
     count: transcriptRows.length,
     estimateSize: estimateTranscriptVirtualRowSize,
-    followOnAppend: "auto",
     getItemKey: getTranscriptRowKey,
     getScrollElement: getTranscriptScrollElement,
     onChange: handleVirtualizerChange,
@@ -359,8 +336,16 @@ export function Transcript({
 
   const syncCanScrollToBottom = useCallback(() => {
     scrollObservationVersionRef.current += 1;
-    const currentScrollTop = viewportRef.current?.scrollTop ?? 0;
-    const userScrolledTowardStart = currentScrollTop < previousScrollTopRef.current - 1;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const currentScrollTop = viewport.scrollTop;
+    const delta = currentScrollTop - previousScrollTopRef.current;
+    const userScrolledTowardStart = delta < -1;
+    const movedAwayFromEnd = userScrolledTowardStart && canScrollTranscriptViewportToBottom(viewport);
+    if (movedAwayFromEnd && pinnedToEndRef.current) {
+      cancelPendingScrollFrame();
+      rowVirtualizer.cancelScroll();
+    }
     const pendingAnchor = historyAnchorRef.current;
     if (pendingAnchor?.threadKey === scrollStateKey && pendingAnchor.cursor === historyCursor) {
       historyAnchorRef.current = {
@@ -385,7 +370,7 @@ export function Transcript({
     ) {
       loadOlderHistory();
     }
-    if (!indexedHistoryKey && viewportRef.current) {
+    if (!indexedHistoryKey) {
       lastViewportAnchorRef.current = {
         threadKey: scrollStateKey,
         anchor: captureHistoryScrollAnchor(
@@ -396,17 +381,10 @@ export function Transcript({
       };
     }
     previousScrollTopRef.current = currentScrollTop;
-    syncTranscriptScrollState({
-      source: rowVirtualizer,
-      userScrollIntent: userScrollIntentRef.current || userScrolledTowardStart,
-    });
+    syncTranscriptScrollState(movedAwayFromEnd || (userScrollIntentRef.current && delta !== 0), delta < 0);
     rememberTranscriptScrollState(scrollStateKeyRef.current);
-    userScrollIntentRef.current = false;
-    if (userScrollIntentTimeoutRef.current !== null) {
-      window.clearTimeout(userScrollIntentTimeoutRef.current);
-      userScrollIntentTimeoutRef.current = null;
-    }
   }, [
+    cancelPendingScrollFrame,
     rememberTranscriptScrollState,
     rowVirtualizer,
     syncTranscriptScrollState,
@@ -508,36 +486,48 @@ export function Transcript({
   const setViewportNode = useCallback((viewport: HTMLDivElement | null) => {
     viewportRef.current = viewport;
   }, []);
-  const markUserScrollIntent = useCallback(() => {
-    pendingNavigationRef.current?.controller.abort();
-    pendingNavigationRef.current = null;
-    setSelectedNavigation(null);
-    userScrollIntentRef.current = true;
-    if (userScrollIntentTimeoutRef.current !== null) {
-      window.clearTimeout(userScrollIntentTimeoutRef.current);
-    }
-    userScrollIntentTimeoutRef.current = window.setTimeout(() => {
-      userScrollIntentRef.current = false;
-      userScrollIntentTimeoutRef.current = null;
-    }, 200);
-  }, []);
+  const markUserScrollIntent = useCallback(
+    (movingUp = false) => {
+      pendingNavigationRef.current?.controller.abort();
+      pendingNavigationRef.current = null;
+      setSelectedNavigation(null);
+      if (movingUp || !pinnedToEndRef.current) {
+        cancelPendingScrollFrame();
+        rowVirtualizer.cancelScroll();
+      }
+      if (movingUp) setPinnedToEndState(false);
+      userScrollIntentRef.current = true;
+      if (userScrollIntentTimeoutRef.current !== null) {
+        window.clearTimeout(userScrollIntentTimeoutRef.current);
+      }
+      userScrollIntentTimeoutRef.current = window.setTimeout(() => {
+        userScrollIntentRef.current = false;
+        userScrollIntentTimeoutRef.current = null;
+      }, 200);
+    },
+    [cancelPendingScrollFrame, rowVirtualizer, setPinnedToEndState],
+  );
   const handleViewportWheelCapture = useCallback(
     (event: WheelEvent<HTMLDivElement>) => {
-      if (event.deltaY < 0 || !pinnedToEndRef.current) {
-        markUserScrollIntent();
-      }
       const viewport = viewportRef.current;
+      if (!viewport || event.ctrlKey || !event.deltaY) return;
+      const movingUp = event.deltaY < 0;
       if (
-        viewport &&
+        movingUp &&
+        nestedScrollConsumesUpwardGesture(event.target instanceof HTMLElement ? event.target : null, viewport)
+      ) {
+        return;
+      }
+      markUserScrollIntent(movingUp && (viewport.scrollTop > 0 || hasOlderHistory));
+      if (
         shouldLoadOlderHistory({
           hasMore: hasOlderHistory,
           loading: historyLoading || loadingOlderHistory,
           error: historyError,
           userIntent: true,
-          movingUp: event.deltaY < 0,
+          movingUp,
           scrollTop: viewport.scrollTop,
-        }) &&
-        !nestedScrollConsumesUpwardGesture(event.target instanceof HTMLElement ? event.target : null, viewport)
+        })
       ) {
         loadOlderHistory();
       }
@@ -546,21 +536,16 @@ export function Transcript({
   );
   const handleViewportKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (
+      const viewport = viewportRef.current;
+      if (!viewport || event.target !== viewport) return;
+      const movingUp =
         event.key === "ArrowUp" ||
         event.key === "PageUp" ||
         event.key === "Home" ||
-        event.key === "ArrowDown" ||
-        event.key === "PageDown" ||
-        event.key === "End" ||
-        event.key === " "
-      ) {
-        markUserScrollIntent();
-      }
-      const movingUp = event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Home";
-      const viewport = viewportRef.current;
+        (event.key === " " && event.shiftKey);
+      if (!movingUp && !["ArrowDown", "PageDown", "End", " "].includes(event.key)) return;
+      markUserScrollIntent(movingUp && (viewport.scrollTop > 0 || hasOlderHistory));
       if (
-        viewport &&
         shouldLoadOlderHistory({
           hasMore: hasOlderHistory,
           loading: historyLoading || loadingOlderHistory,
@@ -568,8 +553,7 @@ export function Transcript({
           userIntent: true,
           movingUp,
           scrollTop: viewport.scrollTop,
-        }) &&
-        !nestedScrollConsumesUpwardGesture(event.target instanceof HTMLElement ? event.target : null, viewport)
+        })
       ) {
         loadOlderHistory();
       }
@@ -711,7 +695,9 @@ export function Transcript({
     cancelPendingScrollFrame();
     historyAnchorRef.current = null;
     scrollObservationVersionRef.current += 1;
-    markUserScrollIntent();
+    rowVirtualizer.cancelScroll();
+    pendingNavigationRef.current?.controller.abort();
+    userScrollIntentRef.current = false;
     setSelectedNavigation({ threadKey: scrollStateKey, id });
     setPinnedToEndState(false);
     setNavigationError(null);
@@ -765,10 +751,10 @@ export function Transcript({
         className={cn("h-full", navigationItems.length > 0 && "ml-8")}
         viewportClassName="transcript-viewport"
         hideScrollbar={suppressAutoFollowScrollbar}
+        onPointerDownCapture={() => markUserScrollIntent()}
         viewportProps={{
           onKeyDownCapture: handleViewportKeyDownCapture,
-          onPointerDownCapture: markUserScrollIntent,
-          onTouchStartCapture: markUserScrollIntent,
+          onTouchStartCapture: () => markUserScrollIntent(),
           onWheelCapture: handleViewportWheelCapture,
         }}
         viewportRef={setViewportNode}
