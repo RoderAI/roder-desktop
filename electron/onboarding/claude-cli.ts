@@ -47,7 +47,11 @@ function isExecutableFile(file: string, platform: NodeJS.Platform): boolean {
   }
 }
 
-function locateClaudeCli({ env, platform, homeDir }: FindClaudeCliOptions): { path: string; onPath: boolean } | null {
+export function locateClaudeCli({
+  env,
+  platform,
+  homeDir,
+}: FindClaudeCliOptions): { path: string; onPath: boolean } | null {
   const binaryName = platform === "win32" ? "claude.exe" : "claude";
   const pathDirs = (env.PATH ?? "").split(delimiter).filter((dir) => dir.length > 0);
 
@@ -66,6 +70,23 @@ function locateClaudeCli({ env, platform, homeDir }: FindClaudeCliOptions): { pa
   }
 
   return null;
+}
+
+export function isClaudeCliSignedIn(file: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile(
+      file,
+      ["auth", "status", "--json"],
+      { timeout: versionCheckTimeoutMs, maxBuffer: 32 * 1024 },
+      (error, output) => {
+        try {
+          resolve(!error && JSON.parse(output)?.loggedIn === true);
+        } catch {
+          resolve(false);
+        }
+      },
+    );
+  });
 }
 
 function canRunVersion(file: string, env: NodeJS.ProcessEnv): Promise<boolean> {

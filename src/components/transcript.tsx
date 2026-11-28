@@ -80,6 +80,7 @@ export type TranscriptProps = {
   activeTurnId?: string;
   scrollStateKey?: string;
   showWorkingIndicator?: boolean;
+  workingStatus?: string;
   subagentLifecycleEvents?: readonly SubagentLifecycleEvent[];
   turnChangeSummaries?: Record<string, ReviewTurnChangeSummary>;
   onCanScrollToBottomChange?: (canScrollToBottom: boolean) => void;
@@ -117,6 +118,7 @@ export function Transcript({
   followSignal,
   scrollStateKey = defaultTranscriptScrollStateKey,
   showWorkingIndicator = false,
+  workingStatus,
   subagentLifecycleEvents = emptySubagentLifecycleEvents,
   turnChangeSummaries = emptyTurnChangeSummaries,
   onCanScrollToBottomChange,
@@ -720,7 +722,7 @@ export function Transcript({
   return (
     <div className="relative min-h-0 flex-1">
       <TranscriptSearchMirror text={transcriptSearchText} />
-      <TranscriptWorkingLiveRegion active={showWorkingIndicator} />
+      <TranscriptWorkingLiveRegion active={showWorkingIndicator} caption={workingStatus} />
       {navigationError?.threadKey === scrollStateKey && (
         <p role="alert" className="absolute left-8 top-2 z-30 rounded bg-popover px-3 py-2 text-sm">
           {navigationError.message}
@@ -780,6 +782,7 @@ export function Transcript({
                 >
                   <TranscriptVirtualContent
                     row={row}
+                    workingStatus={workingStatus}
                     indexedHistory={indexedHistory}
                     skills={skills}
                     viewportRef={viewportRef}
@@ -847,6 +850,7 @@ function TranscriptHistoryControls({
 
 function TranscriptVirtualContent({
   row,
+  workingStatus,
   indexedHistory,
   skills,
   viewportRef,
@@ -857,6 +861,7 @@ function TranscriptVirtualContent({
   onDisclosureOpenChange,
 }: {
   row: TranscriptRow;
+  workingStatus?: string;
   indexedHistory?: TranscriptHistoryIndex;
   skills: SkillDescriptor[];
   viewportRef: React.RefObject<HTMLDivElement | null>;
@@ -866,6 +871,7 @@ function TranscriptVirtualContent({
   disclosureOpenByKey: TranscriptDisclosureState;
   onDisclosureOpenChange: (key: string, open: boolean) => void;
 }): React.JSX.Element {
+  if (row.kind === "working") return <ThreadWorkingIndicator caption={workingStatus} />;
   if (row.kind === "history" && indexedHistory)
     return (
       <TranscriptHistoryBlock
@@ -1252,19 +1258,19 @@ function LineDelta({ additions, deletions }: { additions: number; deletions: num
   );
 }
 
-function ThreadWorkingIndicator(): React.JSX.Element {
+function ThreadWorkingIndicator({ caption }: { caption?: string }): React.JSX.Element {
   return (
     <div aria-hidden="true" className="flex h-8 items-center gap-2 text-base font-medium text-muted-foreground">
       <DotMatrixSpinner />
-      <ShimmerText>Working</ShimmerText>
+      <ShimmerText>{caption || "Working"}</ShimmerText>
     </div>
   );
 }
 
-function TranscriptWorkingLiveRegion({ active }: { active: boolean }): React.JSX.Element {
+function TranscriptWorkingLiveRegion({ active, caption }: { active: boolean; caption?: string }): React.JSX.Element {
   return (
     <output aria-live="polite" className="sr-only">
-      {active ? "Agent is working" : ""}
+      {active ? caption || "Agent is working" : ""}
     </output>
   );
 }

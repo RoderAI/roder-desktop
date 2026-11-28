@@ -117,7 +117,9 @@ export function RoderAgentsPage({
                       <RoderAgentAvatar id={c.id} sprite={c.sprite} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">{c.name}</span>
-                        <span className="block truncate text-sm font-normal text-muted-foreground">{c.mission}</span>
+                        <span className="block truncate text-sm font-normal text-muted-foreground">
+                          {c.mission || "No instructions yet"}
+                        </span>
                       </span>
                       <span className="shrink-0 text-sm text-muted-foreground">
                         {c.active ? "Running" : c.enabled ? "Enabled" : "Paused"}

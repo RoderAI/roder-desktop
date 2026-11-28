@@ -1,7 +1,7 @@
 import { Check, ChevronRight, ClipboardCopy, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { useState } from "react";
 import { useSearch } from "@tanstack/react-router";
-import { BackendIcon } from "@/components/agent-backend-picker";
+import { BACKEND_ORDER, BackendIcon, backendDisplayName } from "@/components/agent-backend-picker";
 import { BackendSetupPanel } from "@/components/providers/backend-setup-panel";
 import { ProviderConnectCard } from "@/components/providers/provider-connect-card";
 import { ProviderLogo } from "@/components/provider-logo";
@@ -70,7 +70,11 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <AgentBackendsSection
-        highlightedBackend={setupProvider === "codex" || setupProvider === "antigravity" ? setupProvider : null}
+        highlightedBackend={
+          setupProvider === "codex" || setupProvider === "antigravity" || setupProvider === "claude-code"
+            ? setupProvider
+            : null
+        }
         onRecheckAntigravity={recheckAntigravity}
       />
 
@@ -150,8 +154,6 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
   );
 }
 
-const AGENT_BACKEND_ORDER: readonly AgentBackendId[] = ["roder", "codex", "antigravity"];
-
 function AgentBackendsSection({
   highlightedBackend,
   onRecheckAntigravity,
@@ -186,8 +188,8 @@ function AgentBackendsSection({
     try {
       const snapshot = await window.roderDesktop.agentBackendsSnapshot();
       applyAgentBackends(snapshot);
-      for (const id of ["codex", "antigravity"] as const) {
-        if (snapshot.backends[id]?.runtimeInstalled) {
+      for (const id of BACKEND_ORDER) {
+        if (id !== "roder" && snapshot.backends[id]?.runtimeInstalled) {
           await connectAgentBackend(id, { forceRefresh: true }).catch(() => undefined);
         }
       }
@@ -275,8 +277,7 @@ function AgentBackendsSection({
         <div>
           <h2 className="text-base font-medium">Agent backend</h2>
           <p className="mt-1 text-base text-muted-foreground">
-            Switch between Roder&apos;s native runtime, the Codex CLI backend, or the Antigravity CLI backend. You can
-            also switch directly from the composer.
+            Choose which runtime handles your conversations. You can also switch from the composer.
           </p>
         </div>
         <Button
@@ -291,8 +292,8 @@ function AgentBackendsSection({
       </header>
 
       <div className="flex flex-col gap-4 p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {AGENT_BACKEND_ORDER.map((id) => {
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {BACKEND_ORDER.map((id) => {
             const info = agentBackends[id];
             const isActive = activeBackend === id;
             const isBusy = busyBackend === id || (setupInFlight && backendSetup.backend === id);
@@ -393,7 +394,7 @@ function AgentBackendCard({
 
   return (
     <article
-      aria-label={`${info?.name ?? id} agent backend`}
+      aria-label={`${info?.name ?? backendDisplayName(id)} agent backend`}
       className={cn(
         "flex flex-col justify-between gap-3 rounded-xl bg-background/60 p-4 ring-1 transition-colors",
         active ? "ring-primary/50 bg-primary/[0.03]" : highlighted ? "ring-ring" : "ring-border/70",
@@ -406,12 +407,17 @@ function AgentBackendCard({
               <BackendIcon backend={id} />
             </span>
             <div className="min-w-0">
-              <h3 className="truncate text-base font-medium text-foreground">{info?.name ?? id}</h3>
+              <h3 className="truncate text-base font-medium text-foreground">{info?.name ?? backendDisplayName(id)}</h3>
             </div>
           </div>
           <StatusPill ready={active || connected} readyLabel={statusLabel} idleLabel={statusLabel} />
         </div>
         <p className="text-sm text-muted-foreground">{info?.description}</p>
+        {id === "claude-code" && runtimeInstalled && !connected && (
+          <p className="text-sm text-muted-foreground">
+            Run <code>claude auth login</code> in a terminal, then check the connection.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -432,6 +438,35 @@ function AgentBackendCard({
               "Use Roder"
             )}
           </Button>
+        ) : id === "claude-code" ? (
+          <>
+            {connected ? (
+              <>
+                <Button size="sm" variant={active ? "outline" : "default"} disabled={active || anyBusy} onClick={onUse}>
+                  {active ? "Active" : "Use Claude Code"}
+                </Button>
+                <Button size="sm" variant="ghost" disabled={anyBusy} onClick={onSignOut}>
+                  Sign out
+                </Button>
+              </>
+            ) : (
+              <>
+                {!runtimeInstalled && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void window.roderDesktop.openExternal("https://code.claude.com/docs/en/setup")}
+                  >
+                    Install Claude Code
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" disabled={anyBusy} onClick={onCheck}>
+                  <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
+                  Check connection
+                </Button>
+              </>
+            )}
+          </>
         ) : id === "codex" ? (
           <>
             {runtimeInstalled ? (

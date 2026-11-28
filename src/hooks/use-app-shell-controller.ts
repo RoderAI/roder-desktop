@@ -45,6 +45,7 @@ import {
   type RouteWorkspacePanel,
   type WorkspacePanelState,
 } from "@/lib/route-search";
+import { initialProjectPickerPath } from "@/lib/project-picker";
 import { buildFolderOptions, buildThreadOptions, latestThreadInFolder } from "@/lib/workspace-thread-options";
 import { useCloudMachinesStore } from "@/stores/cloud-machines-store";
 import { useCommandsStore } from "@/stores/commands-store";
@@ -91,6 +92,8 @@ export function useAppShellController(): AppShellController {
   const [nativeCommandOutput, setNativeCommandOutput] = useState<NativeCommandOutput | null>(null);
   const [localTranscriptOffset, setLocalTranscriptOffset] = useState<LocalTranscriptOffset | null>(null);
   const [composerAttachments, setComposerAttachments] = useState<DesktopAttachment[]>([]);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectPickerInitialPath, setProjectPickerInitialPath] = useState("");
   const [projectConfigOpen, setProjectConfigOpen] = useState(false);
   const [projectInitialFolders, setProjectInitialFolders] = useState<string[]>([]);
   const [projectCreating, setProjectCreating] = useState(false);
@@ -239,16 +242,18 @@ export function useAppShellController(): AppShellController {
   const newProject = useCallback(() => {
     if (projectCreating) return;
     followBottom();
-    void roderIpc.openWorkspaceFolder(activeWorkspaceCwd || selectedWorkspaceCwd || status.cwd).then((folder) => {
-      if (!folder) {
-        return;
-      }
-      setProjectInitialFolders([folder]);
-      setProjectCreationError(null);
-      setCreatedProjectThread(null);
-      setProjectConfigOpen(true);
-    });
+    setProjectPickerInitialPath(
+      initialProjectPickerPath(activeWorkspaceCwd || selectedWorkspaceCwd || status.cwd, window.roderDesktop.homeDir),
+    );
+    setProjectPickerOpen(true);
   }, [activeWorkspaceCwd, followBottom, projectCreating, selectedWorkspaceCwd, status.cwd]);
+  const pickProjectFolder = useCallback((folder: string) => {
+    setProjectPickerOpen(false);
+    setProjectInitialFolders([folder]);
+    setProjectCreationError(null);
+    setCreatedProjectThread(null);
+    setProjectConfigOpen(true);
+  }, []);
   async function createConfiguredProject(params: ProjectRoderAgentConfig): Promise<void> {
     if (projectCreating) return;
     setProjectCreating(true);
@@ -591,6 +596,8 @@ export function useAppShellController(): AppShellController {
       threadOptions,
       threads,
       workspacePanelOpen,
+      projectPickerOpen,
+      projectPickerInitialPath,
       projectConfigOpen,
       projectCreating,
       projectCreationError,
@@ -603,6 +610,8 @@ export function useAppShellController(): AppShellController {
       onFileSearchOpenChange: setFileSearchOpen,
       onFileSearchSelect: selectFileSearchPath,
       onProjectConfigOpenChange: setProjectConfigOpen,
+      onProjectPickerOpenChange: setProjectPickerOpen,
+      onPickProjectFolder: pickProjectFolder,
       onNewProject: newProject,
       onNewThread: newThread,
       onNewThreadInFolder: newThreadInFolder,

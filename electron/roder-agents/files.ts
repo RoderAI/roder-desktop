@@ -32,6 +32,11 @@ export const RODER_FILE_MAX_BYTES = 1024 * 1024;
 export const RODER_RULES_PROMPT_MAX_BYTES = 16 * 1024;
 /** How much of NOTES.md reaches a Roder turn (Zuse NOTES_MAX). */
 export const RODER_NOTES_PROMPT_MAX_BYTES = 8 * 1024;
+/**
+ * How much of INSTRUCTIONS.md reaches a Roder turn. Zuse sends its purpose doc whole and only bounds the
+ * whole brief (SYSTEM_PROMPT_MAX, 24 KiB); Roder context rides on every turn, so it takes AGENTS.md's 16 KiB.
+ */
+export const RODER_INSTRUCTIONS_PROMPT_MAX_BYTES = 16 * 1024;
 const SUMMARY_MAX_CHARS = 500;
 
 type Index = { version: 1; files: Record<RoderFilePath, RoderFileVersion[]> };
@@ -113,7 +118,7 @@ export function roderFilesPromptContext(files: {
     );
   sections.push(
     instructions.content.trim()
-      ? `## Instructions (${RODER_INSTRUCTIONS_FILE}, version ${instructions.version})\n${instructions.content.trim()}`
+      ? `## Instructions (${RODER_INSTRUCTIONS_FILE}, version ${instructions.version})\n${roderFileExcerpt(RODER_INSTRUCTIONS_FILE, instructions.content, RODER_INSTRUCTIONS_PROMPT_MAX_BYTES)}`
       : `## Instructions (${RODER_INSTRUCTIONS_FILE}, version ${instructions.version})\nNot written yet. Ask the user what this Roder is for; they can write ${RODER_INSTRUCTIONS_FILE} on the Roders page.`,
   );
   sections.push(

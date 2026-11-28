@@ -3,6 +3,19 @@ import type { BrowserSnapshot, ChromeBridgeStatus } from "@/types/roder";
 import { models, noop, noopAsync, threads, workspace } from "./fixtures";
 
 // No fixture may fall through to real IPC, navigate, or run terminal commands.
+const claudeBackendStatus = {
+  id: "claude-code",
+  name: "Claude Code",
+  description: "Interactive Claude Code CLI.",
+  state: "disconnected",
+  runtimeInstalled: false,
+  runtimePath: null,
+  connected: false,
+  modelCount: 0,
+  models: [],
+  error: null,
+} as const;
+
 export function installNativeFixture(): void {
   useRoderStore.setState({ threads, workspaces: [workspace], models, hydrated: true });
 
@@ -29,6 +42,7 @@ export function installNativeFixture(): void {
   const fixtures = {
     platform: "darwin",
     homeDir: "/storybook",
+    hostName: "Storybook",
     async request(method) {
       switch (method) {
         case "desktop/roders/list":
@@ -75,6 +89,13 @@ export function installNativeFixture(): void {
     openExternal: noopAsync,
     openWorkspaceFolder: async () => workspace.roots[0].path,
     openWorkspaceFolders: async () => [workspace.roots[0].path],
+    projectPickerList: async (path) => ({
+      path,
+      entries: path === "/storybook" ? [{ name: "roder", path: "/storybook/roder", isGitRepo: true }] : [],
+      truncated: false,
+    }),
+    projectPickerSearch: async ({ root, query }) => ({ root, query, matches: [], truncated: false, canceled: false }),
+    projectPickerCancelSearch: noopAsync,
     canvasSavePng: async (imageUrl) => ({
       name: "sketch.png",
       path: "/storybook/sketch.png",
@@ -129,6 +150,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",
@@ -170,6 +192,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",
@@ -211,6 +234,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",
@@ -252,6 +276,7 @@ export function installNativeFixture(): void {
           models: [],
           error: null,
         },
+        "claude-code": { ...claudeBackendStatus, models: [] },
         antigravity: {
           id: "antigravity",
           name: "Antigravity",

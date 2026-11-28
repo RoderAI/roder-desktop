@@ -118,6 +118,7 @@ export function canonicalToolName(toolName: string | undefined): string | undefi
   if (!trimmed) {
     return undefined;
   }
+  if (trimmed === "Read") return "read_file";
   if (NAMESPACED_TOOL_IDENTIFIER_PATTERN.test(trimmed)) {
     const tail = trimmed.split(".").at(-1);
     if (tail && !COMMON_FILE_EXTENSIONS.has(tail.toLowerCase())) {

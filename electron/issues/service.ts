@@ -41,6 +41,13 @@ const readMethods = new Set([
   "desktop/issues/read",
 ]);
 
+/**
+ * Runs inside the service's queue, after the store is read and before the
+ * change applies, so a precondition can't be overtaken by another change.
+ * Throw to refuse; nothing is written.
+ */
+export type IssuesGuard = (issues: readonly Issue[]) => void;
+
 type Database = { version: 2; nextNumber: number; projects: IssueProject[]; issues: Issue[] };
 type Options = {
   storagePath: string;
@@ -72,7 +79,7 @@ function oneOf<T extends string>(value: unknown, values: readonly T[], field: st
 function owner(value: unknown): IssueOwner {
   const input = value as Record<string, unknown> | null;
   if (input && typeof input === "object" && !Array.isArray(input)) {
-    if (input.type === "roder" || input.type === "user") return { type: input.type };
+    if ((input.type === "roder" || input.type === "user") && input.threadId === undefined) return { type: input.type };
     if (input.type === "thread") return { type: "thread", threadId: text(input.threadId, "owner threadId", true) };
   }
   throw new Error('owner must be {type: "roder"}, {type: "user"} or {type: "thread", threadId}');
@@ -130,6 +137,9 @@ function transition(before: Issue, next: Issue, childInProgress: boolean): void 
         `an issue is in_progress only while a thread works on it: launch it with issues_launch, set its owner to the working thread, or, for a parent issue, start work on one of its child issues (parent: "${before.id}") first`,
       );
     if (next.status === "needs_you") throw new Error("hand the issue to the user with issues_ask_user");
+    // Creating outside backlog needs doneCriteria; so does moving out of it.
+    if (next.status !== "backlog" && !next.doneCriteria.trim())
+      throw new Error("add doneCriteria: what must be true for this issue to be done");
   }
   if (!sameOwner(next.owner, before.owner) && next.owner.type === "user")
     throw new Error("hand the issue to the user with issues_ask_user");
@@ -184,10 +194,15 @@ export class IssuesService {
    * Every change takes an actor: `{type: "user"}` for the person using the
    * app, `{type: "agent", threadId}` for an agent's tool call. Reads don't.
    */
-  request<M extends keyof IssuesResults>(method: M, params?: unknown, actor?: IssueActor): Promise<IssuesResults[M]>;
-  request(method: string, params?: unknown, actor?: IssueActor): Promise<unknown>;
-  request(method: string, params: unknown = {}, actor?: IssueActor): Promise<unknown> {
-    const result = this.queue.then(() => this.execute(method, params, actor));
+  request<M extends keyof IssuesResults>(
+    method: M,
+    params?: unknown,
+    actor?: IssueActor,
+    guard?: IssuesGuard,
+  ): Promise<IssuesResults[M]>;
+  request(method: string, params?: unknown, actor?: IssueActor, guard?: IssuesGuard): Promise<unknown>;
+  request(method: string, params: unknown = {}, actor?: IssueActor, guard?: IssuesGuard): Promise<unknown> {
+    const result = this.queue.then(() => this.execute(method, params, actor, guard));
     this.queue = result.catch(() => undefined);
     return result;
   }
@@ -247,12 +262,18 @@ export class IssuesService {
     }
   }
 
-  private async execute(method: string, params: unknown, rawActor: IssueActor | undefined): Promise<unknown> {
+  private async execute(
+    method: string,
+    params: unknown,
+    rawActor: IssueActor | undefined,
+    guard: IssuesGuard | undefined,
+  ): Promise<unknown> {
     if (!params || typeof params !== "object" || Array.isArray(params)) throw new Error("Expected an object");
     const p = params as Record<string, unknown>;
     const actor = readMethods.has(method) ? null : actorOf(rawActor);
     const agent = actor?.type === "agent";
     const db = await this.load();
+    guard?.(db.issues);
     const now = new Date().toISOString();
     const projectById = (id: unknown) => {
       const project = db.projects.find((item) => item.id === text(id, "project id", true));
@@ -450,6 +471,8 @@ export class IssuesService {
         else if (issue.owner.type === "user") next.owner = handBack(next);
       }
       validParent(next);
+      if (next.projectId !== issue.projectId && db.issues.some((child) => child.parent === issue.id))
+        throw new Error("move or detach this issue's child issues before moving it to another project");
       normalize(next);
       const changes = lifecycleChanges(issue, next);
       if (issue.priority !== next.priority)
@@ -498,6 +521,10 @@ export class IssuesService {
       const issue = issueById();
       const url = pullRequestUrl(p.url);
       if (!issue.pullRequests.some((pr) => pr.url === url)) return { issue };
+      if (agent && issue.status === "in_review" && issue.pullRequests.length === 1)
+        throw new Error(
+          "an issue in_review needs a linked pull request: move it out of in_review before unlinking its last one",
+        );
       issue.pullRequests = issue.pullRequests.filter((pr) => pr.url !== url);
       record(issue, {
         kind: "pullRequest",
@@ -550,8 +577,8 @@ export class IssuesService {
     }
     if (method === "desktop/issues/launch") {
       const issue = issueById();
-      if (issue.owner.type === "thread") return { issue, threadId: issue.owner.threadId };
       if (agent && terminal(issue.status)) throw new Error("reopen the issue before starting work");
+      if (issue.owner.type === "thread") return { issue, threadId: issue.owner.threadId };
       const project = projectById(issue.projectId);
       if (project.archived) throw new Error("Unarchive the project before launching work");
       if (!project.workspaceId) throw new Error("Link the project to a workspace before launching work");
