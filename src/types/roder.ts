@@ -3,7 +3,7 @@ import type { MarkdownShellCommand, MarkdownShellResult } from "@/lib/markdown-s
 import type { ExtensionCatalogSnapshot, ExtensionTheme } from "@/types/extensions";
 import type {
   ProjectPickerListing,
-  ProjectPickerSearchParams,
+  ProjectPickerSearchRequest,
   ProjectPickerSearchResult,
 } from "@/types/project-picker";
 
@@ -1371,7 +1371,7 @@ declare global {
       openWorkspaceFolder: (defaultPath?: string) => Promise<string | null>;
       openWorkspaceFolders: (defaultPath?: string) => Promise<string[] | null>;
       projectPickerList: (path: string) => Promise<ProjectPickerListing>;
-      projectPickerSearch: (params: ProjectPickerSearchParams) => Promise<ProjectPickerSearchResult>;
+      projectPickerSearch: (request: ProjectPickerSearchRequest) => Promise<ProjectPickerSearchResult>;
       projectPickerCancelSearch: () => Promise<void>;
       terminalStart: (options?: {
         id?: string;

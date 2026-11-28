@@ -13,7 +13,7 @@ import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
 import type {
   ProjectPickerListing,
-  ProjectPickerSearchParams,
+  ProjectPickerSearchRequest,
   ProjectPickerSearchResult,
 } from "../main/project-picker";
 import type { ClaudeCliStatus } from "../onboarding/claude-cli";
@@ -159,8 +159,8 @@ const api = {
   openWorkspaceFolders: (defaultPath?: string) =>
     ipcRenderer.invoke("workspace:openFolders", defaultPath) as Promise<string[] | null>,
   projectPickerList: (path: string) => ipcRenderer.invoke("projectPicker:list", path) as Promise<ProjectPickerListing>,
-  projectPickerSearch: (params: ProjectPickerSearchParams) =>
-    ipcRenderer.invoke("projectPicker:search", params) as Promise<ProjectPickerSearchResult>,
+  projectPickerSearch: (request: ProjectPickerSearchRequest) =>
+    ipcRenderer.invoke("projectPicker:search", request) as Promise<ProjectPickerSearchResult>,
   projectPickerCancelSearch: () => ipcRenderer.invoke("projectPicker:cancelSearch") as Promise<void>,
   terminalStart: (options?: {
     id?: string;

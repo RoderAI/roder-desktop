@@ -115,7 +115,7 @@ import { createAutoUpdateController } from "./auto-update";
 import {
   listProjectPickerDirectory,
   ProjectPickerSearchRegistry,
-  type ProjectPickerSearchParams,
+  type ProjectPickerSearchRequest,
 } from "./project-picker";
 import {
   createApplicationMenuTemplate,
@@ -440,10 +440,10 @@ ipcMain.handle("workspace:openFolders", async (_event, defaultPath?: string) => 
   const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths;
 });
-const projectPickerSearches = new ProjectPickerSearchRegistry();
+const projectPickerSearches = new ProjectPickerSearchRegistry(homedir());
 ipcMain.handle("projectPicker:list", (_event, path: string) => listProjectPickerDirectory(path));
-ipcMain.handle("projectPicker:search", (event, params: ProjectPickerSearchParams) =>
-  projectPickerSearches.search(event.sender.id, params),
+ipcMain.handle("projectPicker:search", (event, request: ProjectPickerSearchRequest) =>
+  projectPickerSearches.search(event.sender.id, request),
 );
 ipcMain.handle("projectPicker:cancelSearch", (event) => projectPickerSearches.cancel(event.sender.id));
 ipcMain.handle("terminal:start", (_event, options: TerminalStartOptions) =>
