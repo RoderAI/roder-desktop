@@ -115,17 +115,18 @@ describe("describeAutoDetected", () => {
     expect(item.detail).toContain("Restart Roder");
   });
 
-  it("lists an installed Claude Code CLI and signed-in ChatGPT and xAI accounts", () => {
+  it("lists an installed Claude Code CLI and signed-in ChatGPT, Antigravity, and xAI accounts", () => {
     const items = describeAutoDetected({
       environment: [],
       claudeCli: { installed: true, onPath: true, runnable: true, path: "/usr/local/bin/claude" },
       providers: [
         provider({ id: "codex", authType: "oauth", authenticated: true }),
+        provider({ id: "antigravity", authType: "oauth", authenticated: true }),
         provider({ id: "supergrok", authType: "oauth", authenticated: true }),
       ],
     });
 
-    expect(items.map((item) => item.title)).toEqual(["Claude Code", "ChatGPT", "xAI"]);
+    expect(items.map((item) => item.title)).toEqual(["Claude Code", "ChatGPT", "Antigravity", "xAI"]);
     expect(items[0]).toMatchObject({ tone: "ready" });
     expect(items[0].detail).toContain("/usr/local/bin/claude");
   });
@@ -159,6 +160,7 @@ describe("providerSetupKind", () => {
   it("routes each featured provider to its own sign-in path", () => {
     expect(providerSetupKind({ id: "claude-code", authType: "none" })).toBe("claude-cli");
     expect(providerSetupKind({ id: "codex", authType: "oauth" })).toBe("codex-login");
+    expect(providerSetupKind({ id: "antigravity", authType: "oauth" })).toBe("antigravity-login");
     expect(providerSetupKind({ id: "supergrok", authType: "oauth" })).toBe("oauth-rpc");
     expect(providerSetupKind({ id: "kimi-code", authType: "oauth" })).toBe("oauth-rpc");
     expect(providerSetupKind({ id: "opencode", authType: "api_key" })).toBe("api-key");

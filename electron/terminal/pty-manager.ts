@@ -22,6 +22,7 @@ export type TerminalStartOptions = {
   rows?: number;
   remoteWorkspaceId?: string;
   forceRestart?: boolean;
+  antigravitySetupMode?: "login" | "install";
 };
 
 export type RemoteTerminalHandle = EventEmitter & {
@@ -59,7 +60,7 @@ export class TerminalManager extends EventEmitter {
 
   async start(
     options: TerminalStartOptions = {},
-    localCommand?: { executable: string; args: string[] },
+    localCommand?: { executable: string; args: string[]; env?: NodeJS.ProcessEnv },
   ): Promise<TerminalSnapshot> {
     const id = options.id?.trim() || defaultSessionId;
     const cols = options.cols ?? 96;
@@ -114,13 +115,17 @@ export class TerminalManager extends EventEmitter {
     }
 
     const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "zsh");
-    const term: IPty = nodePty.spawn(localCommand?.executable ?? shell, localCommand?.args ?? terminalShellArgs(shell, process.platform), {
-      name: terminalName,
-      cols,
-      rows,
-      cwd: options.cwd || process.cwd(),
-      env: terminalEnvironment(),
-    });
+    const term: IPty = nodePty.spawn(
+      localCommand?.executable ?? shell,
+      localCommand?.args ?? terminalShellArgs(shell, process.platform),
+      {
+        name: terminalName,
+        cols,
+        rows,
+        cwd: options.cwd || process.cwd(),
+        env: localCommand?.env ? { ...terminalEnvironment(), ...localCommand.env } : terminalEnvironment(),
+      },
+    );
     const session: ManagedSession = {
       id,
       pid: term.pid,

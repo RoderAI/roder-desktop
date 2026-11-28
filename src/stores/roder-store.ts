@@ -31,6 +31,7 @@ import {
   modelKey,
   resolveReasoningEffort,
   selectedModelProvider,
+  selectedModelRecord,
   visibleModelsFor,
 } from "@/lib/roder-models";
 import { runStaleEmptyThreadCleanup } from "@/lib/thread-cleanup";
@@ -42,9 +43,13 @@ import {
   upsertWorkspaceRecent,
 } from "@/lib/roder-workspaces";
 import type {
+  AgentBackendId,
+  AgentBackendStatus,
+  AgentBackendsSnapshot,
   ApprovalWaitRequest,
   AgentSwarmModeChangedNotification,
   DesktopAttachment,
+  ExternalAgentBackendId,
   McpAuthWaitRequest,
   PendingWaitRequestsByThread,
   PolicyMode,
@@ -102,6 +107,8 @@ type RoderStore = {
   models: RoderModel[];
   routingOptions: InferenceRoutingOptionDescriptor[];
   providers: ProviderDescriptor[];
+  activeBackend: AgentBackendId;
+  agentBackends: Record<AgentBackendId, AgentBackendStatus>;
   /** Blocklist of provider-qualified model keys the user hid. Empty = all visible. */
   hiddenModelIds: string[];
   defaultModel: string;
@@ -166,6 +173,13 @@ type RoderStore = {
   resetVisibleModels: () => void;
   refreshProviders: () => Promise<void>;
   configureProvider: (provider: string, apiKey: string) => Promise<void>;
+  applyAgentBackends: (snapshot: AgentBackendsSnapshot) => void;
+  selectAgentBackend: (backend: AgentBackendId) => Promise<AgentBackendsSnapshot>;
+  connectAgentBackend: (
+    backend: ExternalAgentBackendId,
+    options?: { forceRefresh?: boolean },
+  ) => Promise<AgentBackendsSnapshot>;
+  logoutAgentBackend: (backend: ExternalAgentBackendId) => Promise<AgentBackendsSnapshot>;
   setSelectedWorkspaceCwd: (cwd: string) => void;
   openWorkspaceFolder: () => Promise<Workspace | null>;
   selectDefaultModel: (model: string, provider: string) => Promise<void>;
@@ -195,6 +209,82 @@ const initialStatus: RoderStatus = {
   state: "starting",
   binary: "unresolved",
 };
+
+const initialAgentBackends: Record<AgentBackendId, AgentBackendStatus> = {
+  roder: {
+    id: "roder",
+    name: "Roder",
+    description: "Native Roder runtime with all your configured model providers.",
+    state: "connected",
+    runtimeInstalled: true,
+    runtimePath: null,
+    connected: true,
+    modelCount: 0,
+    models: [],
+    error: null,
+  },
+  codex: {
+    id: "codex",
+    name: "Codex",
+    description: "OpenAI Codex agent backend via the Codex CLI app-server.",
+    state: "disconnected",
+    runtimeInstalled: false,
+    runtimePath: null,
+    connected: false,
+    modelCount: 0,
+    models: [],
+    error: null,
+  },
+  antigravity: {
+    id: "antigravity",
+    name: "Antigravity",
+    description: "Google Antigravity agent backend via the official agy CLI.",
+    state: "disconnected",
+    runtimeInstalled: false,
+    runtimePath: null,
+    connected: false,
+    modelCount: 0,
+    models: [],
+    error: null,
+  },
+};
+
+function threadBackendFor(thread: RoderThread | undefined): AgentBackendId {
+  if (thread?.agentBackend === "codex" || thread?.agentBackend === "antigravity" || thread?.agentBackend === "roder") {
+    return thread.agentBackend;
+  }
+  if (thread?.modelProvider === "antigravity") {
+    return "antigravity";
+  }
+  return "roder";
+}
+
+function modelsForBackend(
+  state: Pick<RoderStore, "models" | "hiddenModelIds" | "agentBackends">,
+  backend: AgentBackendId,
+): RoderModel[] {
+  if (backend === "roder") {
+    return visibleModelsFor(state.models, state.hiddenModelIds);
+  }
+  return state.agentBackends[backend]?.models ?? [];
+}
+
+function defaultModelForBackend(
+  state: Pick<RoderStore, "models" | "hiddenModelIds" | "agentBackends" | "defaultModel" | "defaultModelProvider">,
+  backend: AgentBackendId,
+): RoderModel | undefined {
+  const candidates = modelsForBackend(state, backend);
+  if (backend === "roder") {
+    return (
+      candidates.find(
+        (model) => model.id === state.defaultModel && model.modelProvider === state.defaultModelProvider,
+      ) ??
+      candidates.find((model) => model.isDefault) ??
+      candidates[0]
+    );
+  }
+  return candidates.find((model) => model.isDefault) ?? candidates[0];
+}
 
 const initialManualSelection: ModelSelectionMode = {
   type: "manual",
@@ -448,6 +538,8 @@ export const useRoderStore = create<RoderStore>()(
       models: [],
       routingOptions: [],
       providers: [],
+      activeBackend: "roder",
+      agentBackends: initialAgentBackends,
       hiddenModelIds: [],
       defaultModel: "",
       defaultModelProvider: "",
@@ -493,14 +585,16 @@ export const useRoderStore = create<RoderStore>()(
         set({ busy: true, error: null });
         try {
           const readyStatus = await roderIpc.start();
-          const [status, threadResult, modelResult, providerResult, settings, workspaceResult] = await Promise.all([
-            roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
-            roderIpc.listThreads(50),
-            roderIpc.listModels(),
-            listProvidersForBootstrap(),
-            roderIpc.settings(),
-            listWorkspacesForBootstrap(),
-          ]);
+          const [status, threadResult, modelResult, providerResult, settings, workspaceResult, backendsSnapshot] =
+            await Promise.all([
+              roderIpc.status().then((current) => (current.state === "starting" ? readyStatus : current)),
+              roderIpc.listThreads(50),
+              roderIpc.listModels(),
+              listProvidersForBootstrap(),
+              roderIpc.settings(),
+              listWorkspacesForBootstrap(),
+              readAgentBackendsForBootstrap(),
+            ]);
 
           const threads = realThreads(normalizeThreadsCwd(threadResult.data, status.cwd));
           const current = get();
@@ -551,10 +645,34 @@ export const useRoderStore = create<RoderStore>()(
               currentSelectedModel,
               providerResult.active_reasoning || settings.default_reasoning,
             );
-          const activeSelectionMode = activeThread?.selectionMode ?? providerSelectionMode;
           const savedControls = activeThreadId
             ? current.threadControlsByThread[activeThreadId]
             : current.draftComposerPreferences;
+
+          const effectiveBackend: AgentBackendId = activeThread
+            ? threadBackendFor(activeThread)
+            : backendsSnapshot.activeBackend;
+          const externalBackendModels =
+            effectiveBackend !== "roder" ? (backendsSnapshot.backends[effectiveBackend]?.models ?? []) : [];
+          const externalDefaultModel =
+            externalBackendModels.find((model) => model.isDefault) ?? externalBackendModels[0];
+          const resolvedSelectedModel =
+            activeThread?.model ||
+            (effectiveBackend !== "roder" ? externalDefaultModel?.id : undefined) ||
+            currentSelectedModel;
+          const resolvedSelectedModelProvider =
+            activeThread?.modelProvider ||
+            (effectiveBackend !== "roder" ? externalDefaultModel?.modelProvider || effectiveBackend : undefined) ||
+            currentSelectedModelProvider;
+          const resolvedActiveSelectionMode =
+            activeThread?.selectionMode ??
+            (effectiveBackend !== "roder"
+              ? manualSelection(
+                  resolvedSelectedModelProvider,
+                  resolvedSelectedModel,
+                  externalDefaultModel?.defaultReasoningEffort || defaultReasoning,
+                )
+              : providerSelectionMode);
 
           set({
             status,
@@ -564,6 +682,8 @@ export const useRoderStore = create<RoderStore>()(
             models,
             routingOptions: providerResult.routingOptions ?? [],
             providers,
+            activeBackend: effectiveBackend,
+            agentBackends: backendsSnapshot.backends,
             hiddenModelIds,
             defaultModel: currentSelectedModel,
             defaultModelProvider: currentSelectedModelProvider,
@@ -575,14 +695,16 @@ export const useRoderStore = create<RoderStore>()(
             selectedWorkspaceId: workspaceSelection?.workspace.id ?? "",
             selectedRootId: workspaceSelection?.root.id ?? "",
             workspaceRecents: upsertWorkspaceRecent(current.workspaceRecents, selectedWorkspaceCwd),
-            selectedModel: activeThread?.model || currentSelectedModel,
-            selectedModelProvider: activeThread?.modelProvider || currentSelectedModelProvider,
-            selectedSelectionMode: activeSelectionMode,
+            selectedModel: resolvedSelectedModel,
+            selectedModelProvider: resolvedSelectedModelProvider,
+            selectedSelectionMode: resolvedActiveSelectionMode,
             selectedReasoning:
               savedControls?.reasoning ??
               (activeThread?.selectionMode?.reasoning
                 ? normalizeReasoningEffort(activeThread.selectionMode.reasoning)
-                : defaultReasoning),
+                : effectiveBackend !== "roder" && externalDefaultModel?.defaultReasoningEffort
+                  ? normalizeReasoningEffort(externalDefaultModel.defaultReasoningEffort)
+                  : defaultReasoning),
             selectedPolicyMode: savedControls?.policyMode ?? defaultPolicyMode,
             agentSwarmMode,
             agentSwarmModeAvailable,
@@ -693,6 +815,7 @@ export const useRoderStore = create<RoderStore>()(
           if (baseline) details[threadId] = baseline;
           return {
             activeThreadId: threadId,
+            activeBackend: threadBackendFor(selectedThread),
             busy: isThreadRunning(selectedThread),
             ...threadComposerControls(state, threadId, selectedThread),
             ...selectedWorkspacePatch,
@@ -731,6 +854,7 @@ export const useRoderStore = create<RoderStore>()(
             const threadIsActive = threadId === state.activeThreadId;
             return {
               busy: threadIsActive ? isThreadRunning(thread) : state.busy,
+              ...(threadIsActive ? { activeBackend: threadBackendFor(thread) } : {}),
               selectedModelProvider: threadIsActive
                 ? state.threadControlsByThread[threadId]?.modelProvider ||
                   thread.modelProvider ||
@@ -1110,19 +1234,46 @@ export const useRoderStore = create<RoderStore>()(
           return;
         }
 
-        let threadId = get().activeThreadId;
-        const activeThread = get().threadDetails[threadId] ?? get().threads.find((thread) => thread.id === threadId);
+        const initialState = get();
+        let threadId = initialState.activeThreadId;
+        const activeThread =
+          initialState.threadDetails[threadId] ?? initialState.threads.find((thread) => thread.id === threadId);
+        const backendModels = modelsForBackend(initialState, initialState.activeBackend);
+        const plannedModel =
+          initialState.activeBackend === "roder"
+            ? effectiveSelectedModel(
+                initialState.models,
+                initialState.hiddenModelIds,
+                initialState.selectedModel,
+                initialState.selectedModelProvider,
+              )
+            : (selectedModelRecord(backendModels, initialState.selectedModel, initialState.selectedModelProvider) ??
+              backendModels[0]);
+        const plannedProvider =
+          plannedModel?.modelProvider ??
+          selectedModelProvider(backendModels, initialState.selectedModel, initialState.selectedModelProvider) ??
+          initialState.selectedModelProvider;
+        const targetBackend: AgentBackendId =
+          initialState.activeBackend !== "roder"
+            ? initialState.activeBackend
+            : !configuredAutoOptionId(initialState.selectedSelectionMode) && plannedProvider === "antigravity"
+              ? "antigravity"
+              : "roder";
+        const switchingBackend = Boolean(threadId && activeThread) && threadBackendFor(activeThread) !== targetBackend;
         let markedTurnStarting = false;
 
-        if (threadId !== "" && isThreadRunning(activeThread)) {
+        if (threadId !== "" && !switchingBackend && isThreadRunning(activeThread)) {
           throw new Error("Thread is still running");
         }
 
         set({ busy: true, error: null });
 
         try {
-          if (!threadId) {
-            threadId = await createThreadForPrompt(set, get, text);
+          if (!threadId || switchingBackend) {
+            threadId = await createThreadForPrompt(set, get, text, {
+              recordHistory: switchingBackend,
+              agentBackend: targetBackend,
+            });
           } else {
             set((state) => patchThreadPreviewFromPrompt(state, threadId, text));
           }
@@ -1141,20 +1292,26 @@ export const useRoderStore = create<RoderStore>()(
             }),
           }));
           const turnState = get();
-          const turnModel = effectiveSelectedModel(
-            turnState.models,
-            turnState.hiddenModelIds,
-            turnState.selectedModel,
-            turnState.selectedModelProvider,
-          );
+          const turnBackendModels = modelsForBackend(turnState, targetBackend);
+          const turnModel =
+            targetBackend === "roder"
+              ? effectiveSelectedModel(
+                  turnState.models,
+                  turnState.hiddenModelIds,
+                  turnState.selectedModel,
+                  turnState.selectedModelProvider,
+                )
+              : (selectedModelRecord(turnBackendModels, turnState.selectedModel, turnState.selectedModelProvider) ??
+                turnBackendModels[0]);
           const selectedTurnModel = turnModel?.id ?? turnState.selectedModel;
           const started = await roderIpc.startTurn(threadId, text, attachments, {
-            ...(configuredAutoOptionId(turnState.selectedSelectionMode)
+            ...(targetBackend === "roder" && configuredAutoOptionId(turnState.selectedSelectionMode)
               ? {}
               : {
                   modelProvider:
                     turnModel?.modelProvider ??
-                    selectedModelProvider(turnState.models, selectedTurnModel, turnState.selectedModelProvider),
+                    selectedModelProvider(turnBackendModels, selectedTurnModel, turnState.selectedModelProvider) ??
+                    (targetBackend === "roder" ? turnState.selectedModelProvider : targetBackend),
                   model: selectedTurnModel,
                   reasoning: resolveReasoningEffort(turnModel, turnState.selectedReasoning) ?? undefined,
                 }),
@@ -1287,12 +1444,16 @@ export const useRoderStore = create<RoderStore>()(
       },
       setSelectedModel: async (selectedModel, selectedModelProviderOverride) => {
         const initialState = get();
+        const availableModels =
+          initialState.activeBackend === "roder"
+            ? initialState.models
+            : modelsForBackend(initialState, initialState.activeBackend);
         const selectedProvider =
           selectedModelProviderOverride ??
-          selectedModelProvider(initialState.models, selectedModel, initialState.selectedModelProvider) ??
-          initialState.selectedModelProvider;
+          selectedModelProvider(availableModels, selectedModel, initialState.selectedModelProvider) ??
+          (initialState.activeBackend === "roder" ? initialState.selectedModelProvider : initialState.activeBackend);
         const nextReasoning =
-          reasoningForModel(initialState.models, selectedProvider, selectedModel, initialState.selectedReasoning) ??
+          reasoningForModel(availableModels, selectedProvider, selectedModel, initialState.selectedReasoning) ??
           initialState.selectedReasoning;
         const selectionMode = manualSelection(selectedProvider, selectedModel, nextReasoning);
         applySelectedModelState(set, selectedModel, selectedProvider, selectionMode, nextReasoning);
@@ -1356,6 +1517,78 @@ export const useRoderStore = create<RoderStore>()(
         set({ error: null });
         await roderIpc.configureProvider(provider, apiKey);
         await get().refreshProviders();
+      },
+      applyAgentBackends: (snapshot) =>
+        set((state) => {
+          const nextBackends = snapshot.backends;
+          const activeBackend = state.activeThreadId ? state.activeBackend : snapshot.activeBackend;
+          const nextState = { ...state, activeBackend, agentBackends: nextBackends };
+          if (activeBackend !== "roder") {
+            const backendModels = modelsForBackend(nextState, activeBackend);
+            const keepsCurrent = backendModels.some((model) => model.id === state.selectedModel);
+            if (!keepsCurrent && backendModels.length > 0) {
+              const chosen = defaultModelForBackend(nextState, activeBackend);
+              if (chosen) {
+                const reasoning = normalizeReasoningEffort(chosen.defaultReasoningEffort || state.selectedReasoning);
+                return {
+                  activeBackend,
+                  agentBackends: nextBackends,
+                  selectedModel: chosen.id,
+                  selectedModelProvider: chosen.modelProvider || activeBackend,
+                  selectedSelectionMode: manualSelection(chosen.modelProvider || activeBackend, chosen.id, reasoning),
+                  selectedReasoning: reasoning,
+                };
+              }
+            }
+          }
+          return {
+            activeBackend,
+            agentBackends: nextBackends,
+          };
+        }),
+      selectAgentBackend: async (backend) => {
+        set({ error: null });
+        const snapshot = await roderIpc.selectAgentBackend(backend);
+        set((state) => {
+          const nextState = { ...state, activeBackend: snapshot.activeBackend, agentBackends: snapshot.backends };
+          const chosen = defaultModelForBackend(nextState, snapshot.activeBackend);
+          if (!chosen) {
+            return {
+              activeBackend: snapshot.activeBackend,
+              agentBackends: snapshot.backends,
+              error: null,
+            };
+          }
+          const provider =
+            chosen.modelProvider ||
+            (snapshot.activeBackend === "roder" ? state.defaultModelProvider : snapshot.activeBackend);
+          const reasoning = normalizeReasoningEffort(chosen.defaultReasoningEffort || state.selectedReasoning);
+          const selectionMode = manualSelection(provider, chosen.id, reasoning);
+          return {
+            activeBackend: snapshot.activeBackend,
+            agentBackends: snapshot.backends,
+            selectedModel: chosen.id,
+            selectedModelProvider: provider,
+            selectedSelectionMode: selectionMode,
+            selectedReasoning: reasoning,
+            error: null,
+          };
+        });
+        return snapshot;
+      },
+      connectAgentBackend: async (backend, options) => {
+        set({ error: null });
+        const snapshot = await roderIpc.connectAgentBackend(backend, options);
+        get().applyAgentBackends(snapshot);
+        await get().refreshProviders();
+        return snapshot;
+      },
+      logoutAgentBackend: async (backend) => {
+        set({ error: null });
+        const snapshot = await roderIpc.logoutAgentBackend(backend);
+        get().applyAgentBackends(snapshot);
+        await get().refreshProviders();
+        return snapshot;
       },
       setSelectedReasoning: (selectedReasoning) =>
         set((state) => ({
@@ -1879,13 +2112,23 @@ async function applyLiveModelSelection(
   selectionMode: ModelSelectionMode,
 ): Promise<void> {
   const state = get();
-  if (!state.activeThreadId) {
+  const targetBackend: AgentBackendId =
+    state.activeBackend !== "roder"
+      ? state.activeBackend
+      : selectionMode.type === "manual" && selectionMode.provider === "antigravity"
+        ? "antigravity"
+        : "roder";
+  if (!state.activeThreadId && targetBackend === "roder") {
     return;
   }
+  const activeThread = state.activeThreadId ? threadForState(state, state.activeThreadId) : undefined;
+  const switchingBackend = Boolean(activeThread) && threadBackendFor(activeThread) !== targetBackend;
+  const availableModels = targetBackend === "roder" ? state.models : modelsForBackend(state, targetBackend);
   try {
     const result = await roderIpc.selectModel(
-      modelSelectChoice(selectionMode, state.selectedReasoning, state.models),
-      state.activeThreadId,
+      modelSelectChoice(selectionMode, state.selectedReasoning, availableModels),
+      switchingBackend || !state.activeThreadId ? undefined : state.activeThreadId,
+      targetBackend === "roder" ? undefined : targetBackend,
     );
     set((state) => ({
       selectedModel: result.model || state.selectedModel,
@@ -2041,6 +2284,17 @@ async function listWorkspacesForBootstrap(): Promise<{ workspaces: Workspace[] }
   }
 }
 
+async function readAgentBackendsForBootstrap(): Promise<AgentBackendsSnapshot> {
+  try {
+    if (typeof window.roderDesktop?.agentBackendsSnapshot !== "function") {
+      return { activeBackend: "roder", backends: initialAgentBackends };
+    }
+    return await roderIpc.agentBackendsSnapshot();
+  } catch {
+    return { activeBackend: "roder", backends: initialAgentBackends };
+  }
+}
+
 async function listProvidersForBootstrap(): Promise<ProvidersListResult> {
   try {
     return await roderIpc.listProviders();
@@ -2147,10 +2401,11 @@ async function createThreadForPrompt(
   set: RoderStoreSet,
   get: () => RoderStore,
   initialPrompt?: string,
-  options: { recordHistory?: boolean; clearBusy?: boolean } = {},
+  options: { recordHistory?: boolean; clearBusy?: boolean; agentBackend?: AgentBackendId } = {},
 ): Promise<string> {
   const state = get();
-  const cloudMachineId = useCloudMachinesStore.getState().selectedMachineId;
+  const requestedBackend = options.agentBackend ?? state.activeBackend;
+  const cloudMachineId = requestedBackend === "roder" ? useCloudMachinesStore.getState().selectedMachineId : undefined;
   const workspaceSelection = await ensureWorkspaceSelection(state, set);
   const draftWorktree = state.draftWorktree;
   const worktreePath =
@@ -2161,36 +2416,51 @@ async function createThreadForPrompt(
       : undefined;
   const latestState = get();
   const usePromptControls = initialPrompt !== undefined;
+  const backendModels = modelsForBackend(latestState, requestedBackend);
+  const externalDefault =
+    requestedBackend !== "roder" ? defaultModelForBackend(latestState, requestedBackend) : undefined;
   const selectionSource = usePromptControls
     ? {
         selectionMode: latestState.selectedSelectionMode,
-        model: latestState.selectedModel || latestState.defaultModel,
-        provider: latestState.selectedModelProvider || latestState.defaultModelProvider,
+        model: latestState.selectedModel || externalDefault?.id || latestState.defaultModel,
+        provider:
+          latestState.selectedModelProvider || externalDefault?.modelProvider || latestState.defaultModelProvider,
         reasoning: latestState.selectedReasoning,
       }
-    : {
-        selectionMode: latestState.defaultSelectionMode,
-        model: latestState.defaultModel,
-        provider: latestState.defaultModelProvider,
-        reasoning: latestState.defaultReasoning,
-      };
+    : requestedBackend !== "roder"
+      ? {
+          selectionMode: manualSelection(
+            externalDefault?.modelProvider || requestedBackend,
+            externalDefault?.id || latestState.selectedModel,
+            externalDefault?.defaultReasoningEffort || latestState.selectedReasoning,
+          ),
+          model: latestState.selectedModel || externalDefault?.id || "",
+          provider: requestedBackend,
+          reasoning: latestState.selectedReasoning || externalDefault?.defaultReasoningEffort || "medium",
+        }
+      : {
+          selectionMode: latestState.defaultSelectionMode,
+          model: latestState.defaultModel,
+          provider: latestState.defaultModelProvider,
+          reasoning: latestState.defaultReasoning,
+        };
   const selectionMode =
     selectionSource.selectionMode ??
     manualSelection(selectionSource.provider, selectionSource.model, selectionSource.reasoning);
   const concrete = concreteSelection(selectionMode);
   const requestedModel = concrete.model || selectionSource.model;
   const requestedProvider = concrete.provider || selectionSource.provider;
-  const model = effectiveSelectedModel(
-    latestState.models,
-    latestState.hiddenModelIds,
-    requestedModel,
-    requestedProvider,
-  );
+  const model =
+    requestedBackend === "roder"
+      ? effectiveSelectedModel(latestState.models, latestState.hiddenModelIds, requestedModel, requestedProvider)
+      : (selectedModelRecord(backendModels, requestedModel, requestedProvider) ?? backendModels[0]);
   const selectedModel = model?.id ?? requestedModel;
   const selectedProvider =
     model?.modelProvider ??
-    selectedModelProvider(latestState.models, selectedModel, requestedProvider) ??
-    requestedProvider;
+    selectedModelProvider(backendModels, selectedModel, requestedProvider) ??
+    (requestedBackend === "roder" ? requestedProvider : requestedBackend);
+  const resolvedBackend: AgentBackendId =
+    requestedBackend !== "roder" ? requestedBackend : selectedProvider === "antigravity" ? "antigravity" : "roder";
   // The engine rejects an effort the model does not advertise, so send only one it accepts.
   const reasoning = resolveReasoningEffort(model, selectionSource.reasoning) ?? undefined;
   const result = await roderIpc.startThread(
@@ -2201,21 +2471,26 @@ async function createThreadForPrompt(
     {
       cloudMachineId,
       worktreePath,
+      ...(resolvedBackend === "roder" ? {} : { agentBackend: resolvedBackend }),
       ...(initialPrompt === undefined ? {} : { initialPrompt }),
-      selection: configuredAutoOptionId(selectionMode)
-        ? modelSelectChoice(selectionMode, selectionSource.reasoning, latestState.models)
-        : {
-            type: "manual",
-            provider: selectedProvider,
-            model: selectedModel,
-            reasoning,
-          },
+      selection:
+        resolvedBackend === "roder" && configuredAutoOptionId(selectionMode)
+          ? modelSelectChoice(selectionMode, selectionSource.reasoning, latestState.models)
+          : {
+              type: "manual",
+              provider: selectedProvider,
+              model: selectedModel,
+              reasoning,
+            },
     },
   );
   if (!result.thread) {
     throw new Error("roder app-server did not return a thread");
   }
-  const thread = normalizeThreadCwd(result.thread, get().status.cwd);
+  const thread = {
+    ...normalizeThreadCwd(result.thread, get().status.cwd),
+    agentBackend: result.thread.agentBackend ?? resolvedBackend,
+  };
   const threadWithPreview = initialPrompt ? threadWithPromptPreview(thread, initialPrompt) : thread;
   const resolvedSelectionMode =
     threadWithPreview.selectionMode ||

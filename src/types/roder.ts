@@ -150,6 +150,7 @@ export type AppServerEvent = {
 export type RoderThread = {
   id: string;
   preview: string;
+  agentBackend?: AgentBackendId;
   modelProvider: string;
   model: string;
   selectionMode?: ModelSelectionMode | null;
@@ -1273,6 +1274,36 @@ export type DesignSpawnAgentsResult = {
   instructions: string;
 };
 
+export type AgentBackendId = "roder" | "codex" | "antigravity";
+export type ExternalAgentBackendId = "codex" | "antigravity";
+
+export type AgentBackendStatus = {
+  id: AgentBackendId;
+  name: string;
+  description: string;
+  state: "connected" | "disconnected" | "missing-runtime" | "connecting" | "error";
+  runtimeInstalled: boolean;
+  runtimePath: string | null;
+  connected: boolean;
+  modelCount: number;
+  models: RoderModel[];
+  error?: string | null;
+};
+
+export type AgentBackendsSnapshot = {
+  activeBackend: AgentBackendId;
+  backends: Record<AgentBackendId, AgentBackendStatus>;
+};
+
+export type AntigravityStatus = {
+  state: "connected" | "disconnected" | "missing-runtime" | "connecting" | "error";
+  runtimeInstalled: boolean;
+  runtimePath: string | null;
+  connected: boolean;
+  modelCount: number;
+  error?: string | null;
+};
+
 export type AppCommand = {
   command: "newProject" | "newThread" | "openSettings" | "openBrowser" | "openFileSearch" | "checkForUpdates";
 };
@@ -1312,6 +1343,7 @@ declare global {
         cwd?: string;
         remoteWorkspaceId?: string;
         forceRestart?: boolean;
+        antigravitySetupMode?: "login" | "install";
       }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string, id?: string) => Promise<void>;
       runMarkdownShellCommand: (command: MarkdownShellCommand) => Promise<MarkdownShellResult>;
@@ -1339,6 +1371,16 @@ declare global {
       codexLogin: () => Promise<CodexAccountSnapshot>;
       codexLogout: () => Promise<CodexAccountSnapshot>;
       codexCancelLogin: () => Promise<CodexAccountSnapshot>;
+      agentBackendsSnapshot: () => Promise<AgentBackendsSnapshot>;
+      agentBackendsSelect: (backend: AgentBackendId) => Promise<AgentBackendsSnapshot>;
+      agentBackendsConnect: (
+        backend: ExternalAgentBackendId,
+        options?: { forceRefresh?: boolean },
+      ) => Promise<AgentBackendsSnapshot>;
+      agentBackendsLogout: (backend: ExternalAgentBackendId) => Promise<AgentBackendsSnapshot>;
+      antigravityStatus: () => Promise<AntigravityStatus>;
+      antigravityConnect: (options?: { forceRefresh?: boolean }) => Promise<AntigravityStatus>;
+      antigravityLogout: () => Promise<AntigravityStatus>;
       claudeCliStatus: () => Promise<ClaudeCliStatus>;
       onboardingState: () => Promise<OnboardingRecord>;
       onboardingComplete: () => Promise<void>;

@@ -1,9 +1,11 @@
-import { Check, ChevronRight, RefreshCw, Search } from "lucide-react";
+import { Check, ChevronRight, ClipboardCopy, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { useState } from "react";
 import { useSearch } from "@tanstack/react-router";
+import { BackendIcon } from "@/components/agent-backend-picker";
+import { BackendSetupTerminal } from "@/components/providers/backend-setup-terminal";
 import { ProviderConnectCard } from "@/components/providers/provider-connect-card";
 import { ProviderLogo } from "@/components/provider-logo";
-import { errorMessage } from "@/components/onboarding/onboarding-primitives";
+import { errorMessage, primaryActionClassName, StatusPill } from "@/components/onboarding/onboarding-primitives";
 import { Button } from "@/components/ui/button";
 import { useProviderSetupState } from "@/hooks/use-provider-setup-state";
 import { isProviderReady, providerSetupKind, providerStatusLabel } from "@/lib/onboarding";
@@ -11,7 +13,16 @@ import { providerCopy, authTypeLabel } from "@/lib/provider-copy";
 import { modelKey, providerName, visibleModelIdsFor } from "@/lib/roder-models";
 import { cn } from "@/lib/utils";
 import { useRoderStore } from "@/stores/roder-store";
-import type { ClaudeCliStatus, ProviderDescriptor, ProviderModelDescriptor, RoderModel } from "@/types/roder";
+import type {
+  AgentBackendId,
+  AgentBackendStatus,
+  AntigravityStatus,
+  ClaudeCliStatus,
+  ExternalAgentBackendId,
+  ProviderDescriptor,
+  ProviderModelDescriptor,
+  RoderModel,
+} from "@/types/roder";
 
 export function ProvidersSettingsPanel(): React.JSX.Element {
   const { setupProvider } = useSearch({ from: "/settings/$section" });
@@ -20,7 +31,7 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
   const hiddenModelIds = useRoderStore((state) => state.hiddenModelIds);
   const setModelVisibility = useRoderStore((state) => state.setModelVisibility);
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
-  const { claudeCli, environment, recheckClaudeCli } = useProviderSetupState();
+  const { claudeCli, antigravityStatus, environment, recheckClaudeCli, recheckAntigravity } = useProviderSetupState();
   const [query, setQuery] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(setupProvider ?? null);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,6 +54,11 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
     setRefreshing(true);
     setError(null);
     try {
+      const latestAntigravity = await recheckAntigravity();
+      if (latestAntigravity.runtimeInstalled && typeof window.roderDesktop?.antigravityConnect === "function") {
+        await window.roderDesktop.antigravityConnect({ forceRefresh: true }).catch(() => undefined);
+        await recheckAntigravity();
+      }
       await refreshProviders();
     } catch (refreshError) {
       setError(errorMessage(refreshError));
@@ -52,75 +68,474 @@ export function ProvidersSettingsPanel(): React.JSX.Element {
   }
 
   return (
-    <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
+    <div className="flex flex-col gap-4">
+      <AgentBackendsSection
+        highlightedBackend={setupProvider === "codex" || setupProvider === "antigravity" ? setupProvider : null}
+        onRecheckAntigravity={recheckAntigravity}
+      />
+
+      <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
+        <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
+          <div>
+            <h1 className="text-base font-medium">Providers</h1>
+            <p className="mt-1 text-base text-muted-foreground">
+              Sign in, paste an API key, or use what is already set up on this machine. {readyProviderIds.size}{" "}
+              connected.
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" disabled={refreshing} onClick={() => void refresh()}>
+            <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+        </header>
+
+        <div className="flex h-12 items-center gap-3 border-b border-border px-5">
+          <Search className="size-4 text-muted-foreground" />
+          <input
+            value={query}
+            aria-label="Search providers and models"
+            className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
+            placeholder="Search providers and models..."
+            onChange={(event) => setQuery(event.currentTarget.value)}
+          />
+        </div>
+
+        {error && (
+          <div role="alert" className="border-b border-border px-5 py-3 text-base text-destructive">
+            {error}
+          </div>
+        )}
+
+        {providers.length === 0 ? (
+          <div className="px-5 py-8 text-base text-muted-foreground">
+            No provider catalog loaded from the app-server yet.
+          </div>
+        ) : filteredProviders.length === 0 ? (
+          <div className="px-5 py-8 text-base text-muted-foreground">No matching providers.</div>
+        ) : (
+          <div className="grid min-h-[560px] grid-cols-[minmax(240px,300px)_1fr] divide-x divide-border">
+            <nav className="space-y-2 p-4" aria-label="Provider list">
+              {filteredProviders.map((provider) => (
+                <ProviderMenuItem
+                  key={provider.id}
+                  provider={provider}
+                  ready={readyProviderIds.has(provider.id)}
+                  environmentVar={environmentVars.get(provider.id)}
+                  modelCount={provider.models?.length ?? 0}
+                  selected={provider.id === selectedProvider?.id}
+                  onSelect={() => setSelectedProviderId(provider.id)}
+                />
+              ))}
+            </nav>
+            {selectedProvider && (
+              <ProviderDetails
+                provider={selectedProvider}
+                ready={readyProviderIds.has(selectedProvider.id)}
+                environmentVar={environmentVars.get(selectedProvider.id)}
+                claudeCli={claudeCli}
+                antigravityStatus={antigravityStatus}
+                models={models}
+                visibleIds={visibleIds}
+                visibleSet={visibleSet}
+                onRecheckClaudeCli={recheckClaudeCli}
+                onRecheckAntigravity={recheckAntigravity}
+                onError={setError}
+                onToggleModel={(modelId, visible) => setModelVisibility(modelId, visible)}
+              />
+            )}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+const AGENT_BACKEND_ORDER: readonly AgentBackendId[] = ["roder", "codex", "antigravity"];
+
+function AgentBackendsSection({
+  highlightedBackend,
+  onRecheckAntigravity,
+}: {
+  highlightedBackend: ExternalAgentBackendId | null;
+  onRecheckAntigravity: () => Promise<AntigravityStatus>;
+}): React.JSX.Element {
+  const activeBackend = useRoderStore((state) => state.activeBackend);
+  const agentBackends = useRoderStore((state) => state.agentBackends);
+  const selectAgentBackend = useRoderStore((state) => state.selectAgentBackend);
+  const connectAgentBackend = useRoderStore((state) => state.connectAgentBackend);
+  const logoutAgentBackend = useRoderStore((state) => state.logoutAgentBackend);
+  const applyAgentBackends = useRoderStore((state) => state.applyAgentBackends);
+
+  const [busyBackend, setBusyBackend] = useState<AgentBackendId | null>(null);
+  const [setupTerminal, setSetupTerminal] = useState<{
+    backend: ExternalAgentBackendId;
+    antigravityMode?: "login" | "install";
+  } | null>(null);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [copiedCodexCmd, setCopiedCodexCmd] = useState(false);
+
+  async function refreshAllBackends(): Promise<void> {
+    setBackendError(null);
+    setBusyBackend("roder");
+    try {
+      const snapshot = await window.roderDesktop.agentBackendsSnapshot();
+      applyAgentBackends(snapshot);
+      for (const id of ["codex", "antigravity"] as const) {
+        if (snapshot.backends[id]?.runtimeInstalled) {
+          await connectAgentBackend(id, { forceRefresh: true }).catch(() => undefined);
+        }
+      }
+      await onRecheckAntigravity();
+    } catch (err) {
+      setBackendError(errorMessage(err));
+    } finally {
+      setBusyBackend(null);
+    }
+  }
+
+  async function useBackend(id: AgentBackendId): Promise<void> {
+    setBackendError(null);
+    setBusyBackend(id);
+    try {
+      await selectAgentBackend(id);
+      if (id === "antigravity") {
+        await onRecheckAntigravity();
+      }
+      setSetupTerminal(null);
+    } catch (err) {
+      setBackendError(errorMessage(err));
+    } finally {
+      setBusyBackend(null);
+    }
+  }
+
+  async function checkBackend(
+    id: ExternalAgentBackendId,
+    options: { activateOnSuccess?: boolean; closeTerminalOnSuccess?: boolean } = {},
+  ): Promise<void> {
+    setBackendError(null);
+    setBusyBackend(id);
+    try {
+      const snapshot = await connectAgentBackend(id, { forceRefresh: true });
+      if (id === "antigravity") {
+        await onRecheckAntigravity();
+      }
+      const status = snapshot.backends[id];
+      if (status?.connected) {
+        if (options.activateOnSuccess) {
+          await selectAgentBackend(id);
+        }
+        if (options.closeTerminalOnSuccess) {
+          setSetupTerminal(null);
+        }
+      } else {
+        setBackendError(
+          status?.runtimeInstalled
+            ? `${status.name} is not signed in yet. Complete sign-in and try again.`
+            : `${status?.name ?? id} CLI was not found on this machine.`,
+        );
+      }
+    } catch (err) {
+      setBackendError(errorMessage(err));
+    } finally {
+      setBusyBackend(null);
+    }
+  }
+
+  async function signOutBackend(id: ExternalAgentBackendId): Promise<void> {
+    setBackendError(null);
+    setBusyBackend(id);
+    try {
+      await logoutAgentBackend(id);
+      if (id === "antigravity") {
+        await onRecheckAntigravity();
+      }
+      setSetupTerminal(null);
+    } catch (err) {
+      setBackendError(errorMessage(err));
+    } finally {
+      setBusyBackend(null);
+    }
+  }
+
+  return (
+    <section aria-label="Agent backend" className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
       <header className="flex items-start justify-between gap-6 border-b border-border px-5 py-4">
         <div>
-          <h1 className="text-base font-medium">Providers</h1>
+          <h2 className="text-base font-medium">Agent backend</h2>
           <p className="mt-1 text-base text-muted-foreground">
-            Sign in, paste an API key, or use what is already set up on this machine. {readyProviderIds.size} connected.
+            Switch between Roder&apos;s native runtime, the Codex CLI backend, or the Antigravity CLI backend. You can
+            also switch directly from the composer.
           </p>
         </div>
-        <Button variant="ghost" size="sm" disabled={refreshing} onClick={() => void refresh()}>
-          <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
-          Refresh
+        <Button variant="ghost" size="sm" disabled={busyBackend !== null} onClick={() => void refreshAllBackends()}>
+          <RefreshCw className={cn("size-3.5", busyBackend === "roder" && "animate-spin")} />
+          Check backends
         </Button>
       </header>
 
-      <div className="flex h-12 items-center gap-3 border-b border-border px-5">
-        <Search className="size-4 text-muted-foreground" />
-        <input
-          value={query}
-          aria-label="Search providers and models"
-          className="min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
-          placeholder="Search providers and models..."
-          onChange={(event) => setQuery(event.currentTarget.value)}
-        />
+      <div className="flex flex-col gap-4 p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {AGENT_BACKEND_ORDER.map((id) => {
+            const info = agentBackends[id];
+            const isActive = activeBackend === id;
+            const isBusy = busyBackend === id;
+            const highlighted = highlightedBackend === id;
+            return (
+              <AgentBackendCard
+                key={id}
+                id={id}
+                info={info}
+                active={isActive}
+                busy={isBusy}
+                anyBusy={busyBackend !== null}
+                highlighted={highlighted}
+                copiedCodexCmd={copiedCodexCmd}
+                onUse={() => void useBackend(id)}
+                onCheck={id === "roder" ? undefined : () => void checkBackend(id)}
+                onOpenSetup={
+                  id === "roder"
+                    ? undefined
+                    : (mode) => {
+                        setBackendError(null);
+                        setSetupTerminal({ backend: id, antigravityMode: mode });
+                      }
+                }
+                onSignOut={id === "roder" ? undefined : () => void signOutBackend(id)}
+                onCopyCodexInstall={() => {
+                  void navigator.clipboard?.writeText("npm i -g @openai/codex");
+                  setCopiedCodexCmd(true);
+                  window.setTimeout(() => setCopiedCodexCmd(false), 1800);
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {setupTerminal && (
+          <BackendSetupTerminal
+            key={`${setupTerminal.backend}:${setupTerminal.antigravityMode ?? "login"}`}
+            backend={setupTerminal.backend}
+            antigravityMode={setupTerminal.antigravityMode}
+            checking={busyBackend === setupTerminal.backend}
+            onCheckConnection={() =>
+              checkBackend(setupTerminal.backend, { activateOnSuccess: true, closeTerminalOnSuccess: true })
+            }
+            onAutoComplete={() =>
+              checkBackend(setupTerminal.backend, { activateOnSuccess: true, closeTerminalOnSuccess: true })
+            }
+            onClose={() => setSetupTerminal(null)}
+          />
+        )}
+
+        {backendError && (
+          <div role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {backendError}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AgentBackendCard({
+  id,
+  info,
+  active,
+  busy,
+  anyBusy,
+  highlighted,
+  copiedCodexCmd,
+  onUse,
+  onCheck,
+  onOpenSetup,
+  onSignOut,
+  onCopyCodexInstall,
+}: {
+  id: AgentBackendId;
+  info: AgentBackendStatus | undefined;
+  active: boolean;
+  busy: boolean;
+  anyBusy: boolean;
+  highlighted: boolean;
+  copiedCodexCmd: boolean;
+  onUse: () => void;
+  onCheck?: () => void;
+  onOpenSetup?: (mode?: "login" | "install") => void;
+  onSignOut?: () => void;
+  onCopyCodexInstall: () => void;
+}): React.JSX.Element {
+  const connected = id === "roder" ? true : Boolean(info?.connected);
+  const runtimeInstalled = id === "roder" ? true : Boolean(info?.runtimeInstalled);
+  const modelCount = info?.modelCount ?? 0;
+
+  const statusLabel = active
+    ? "Active"
+    : connected
+      ? id === "roder"
+        ? "Ready"
+        : `${modelCount} ${modelCount === 1 ? "model" : "models"}`
+      : runtimeInstalled
+        ? "CLI found"
+        : "Not installed";
+
+  return (
+    <article
+      aria-label={`${info?.name ?? id} agent backend`}
+      className={cn(
+        "flex flex-col justify-between gap-3 rounded-xl bg-background/60 p-4 ring-1 transition-colors",
+        active ? "ring-primary/50 bg-primary/[0.03]" : highlighted ? "ring-ring" : "ring-border/70",
+      )}
+    >
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/50">
+              <BackendIcon backend={id} />
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-medium text-foreground">{info?.name ?? id}</h3>
+              {id !== "roder" && connected && (
+                <p className="truncate text-sm text-muted-foreground">
+                  {modelCount} {modelCount === 1 ? "model" : "models"} available
+                </p>
+              )}
+            </div>
+          </div>
+          <StatusPill ready={active || connected} readyLabel={statusLabel} idleLabel={statusLabel} />
+        </div>
+        <p className="text-sm text-muted-foreground">{info?.description}</p>
       </div>
 
-      {error && (
-        <div role="alert" className="border-b border-border px-5 py-3 text-base text-destructive">
-          {error}
-        </div>
-      )}
-
-      {providers.length === 0 ? (
-        <div className="px-5 py-8 text-base text-muted-foreground">
-          No provider catalog loaded from the app-server yet.
-        </div>
-      ) : filteredProviders.length === 0 ? (
-        <div className="px-5 py-8 text-base text-muted-foreground">No matching providers.</div>
-      ) : (
-        <div className="grid min-h-[560px] grid-cols-[minmax(240px,300px)_1fr] divide-x divide-border">
-          <nav className="space-y-2 p-4" aria-label="Provider list">
-            {filteredProviders.map((provider) => (
-              <ProviderMenuItem
-                key={provider.id}
-                provider={provider}
-                ready={readyProviderIds.has(provider.id)}
-                environmentVar={environmentVars.get(provider.id)}
-                modelCount={provider.models?.length ?? 0}
-                selected={provider.id === selectedProvider?.id}
-                onSelect={() => setSelectedProviderId(provider.id)}
-              />
-            ))}
-          </nav>
-          {selectedProvider && (
-            <ProviderDetails
-              provider={selectedProvider}
-              ready={readyProviderIds.has(selectedProvider.id)}
-              environmentVar={environmentVars.get(selectedProvider.id)}
-              claudeCli={claudeCli}
-              models={models}
-              visibleIds={visibleIds}
-              visibleSet={visibleSet}
-              onRecheckClaudeCli={recheckClaudeCli}
-              onError={setError}
-              onToggleModel={(modelId, visible) => setModelVisibility(modelId, visible)}
-            />
-          )}
-        </div>
-      )}
-    </section>
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        {id === "roder" ? (
+          <Button
+            size="sm"
+            variant={active ? "outline" : "default"}
+            className={cn(!active && primaryActionClassName)}
+            disabled={active || anyBusy}
+            onClick={onUse}
+          >
+            {active ? (
+              <>
+                <Check className="size-3.5" />
+                Active
+              </>
+            ) : (
+              "Use Roder"
+            )}
+          </Button>
+        ) : id === "codex" ? (
+          <>
+            {runtimeInstalled ? (
+              <>
+                <Button
+                  size="sm"
+                  variant={active ? "outline" : "default"}
+                  className={cn(!active && primaryActionClassName)}
+                  disabled={active || anyBusy}
+                  onClick={onUse}
+                >
+                  {busy ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                  ) : active ? (
+                    <Check className="size-3.5" />
+                  ) : null}
+                  {active ? "Active" : busy ? "Connecting..." : "Use Codex"}
+                </Button>
+                {!connected && onOpenSetup && (
+                  <Button size="sm" variant="outline" disabled={anyBusy} onClick={() => onOpenSetup("login")}>
+                    Sign in
+                  </Button>
+                )}
+                {connected && onSignOut && (
+                  <Button size="sm" variant="ghost" disabled={anyBusy} onClick={onSignOut}>
+                    Sign out
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" onClick={onCopyCodexInstall}>
+                  <ClipboardCopy className="size-3.5" />
+                  {copiedCodexCmd ? "Copied install cmd" : "Copy install cmd"}
+                </Button>
+                {onCheck && (
+                  <Button size="sm" variant="ghost" disabled={anyBusy} onClick={onCheck}>
+                    <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
+                    Check
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {connected ? (
+              <>
+                <Button
+                  size="sm"
+                  variant={active ? "outline" : "default"}
+                  className={cn(!active && primaryActionClassName)}
+                  disabled={active || anyBusy}
+                  onClick={onUse}
+                >
+                  {busy ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                  ) : active ? (
+                    <Check className="size-3.5" />
+                  ) : null}
+                  {active ? "Active" : busy ? "Connecting..." : "Use Antigravity"}
+                </Button>
+                {onSignOut && (
+                  <Button size="sm" variant="ghost" disabled={anyBusy} onClick={onSignOut}>
+                    Sign out
+                  </Button>
+                )}
+              </>
+            ) : runtimeInstalled ? (
+              <>
+                {onOpenSetup && (
+                  <Button
+                    size="sm"
+                    className={primaryActionClassName}
+                    disabled={anyBusy}
+                    onClick={() => onOpenSetup("login")}
+                  >
+                    Sign in with Google
+                  </Button>
+                )}
+                {onCheck && (
+                  <Button size="sm" variant="ghost" disabled={anyBusy} onClick={onCheck}>
+                    <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
+                    Check
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                {onOpenSetup && (
+                  <Button
+                    size="sm"
+                    className={primaryActionClassName}
+                    disabled={anyBusy}
+                    onClick={() => onOpenSetup("install")}
+                  >
+                    Install & sign in
+                  </Button>
+                )}
+                {onCheck && (
+                  <Button size="sm" variant="ghost" disabled={anyBusy} onClick={onCheck}>
+                    <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
+                    Check
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -170,10 +585,12 @@ function ProviderDetails({
   ready,
   environmentVar,
   claudeCli,
+  antigravityStatus,
   models,
   visibleIds,
   visibleSet,
   onRecheckClaudeCli,
+  onRecheckAntigravity,
   onError,
   onToggleModel,
 }: {
@@ -181,10 +598,12 @@ function ProviderDetails({
   ready: boolean;
   environmentVar: string | undefined;
   claudeCli: ClaudeCliStatus | null;
+  antigravityStatus: AntigravityStatus | null;
   models: RoderModel[];
   visibleIds: string[];
   visibleSet: Set<string>;
   onRecheckClaudeCli: () => Promise<void>;
+  onRecheckAntigravity: () => Promise<AntigravityStatus>;
   onError: (message: string | null) => void;
   onToggleModel: (modelId: string, visible: boolean) => void;
 }): React.JSX.Element {
@@ -195,7 +614,9 @@ function ProviderDetails({
         ready={ready}
         environmentVar={environmentVar}
         claudeCli={claudeCli}
+        antigravityStatus={antigravityStatus}
         onRecheckClaudeCli={onRecheckClaudeCli}
+        onRecheckAntigravity={onRecheckAntigravity}
         onError={onError}
       />
       <ProviderMeta provider={provider} />

@@ -8,6 +8,8 @@ import type { ExtensionTheme } from "../extensions/theme";
 import type { ClaudeCliStatus } from "../onboarding/claude-cli";
 import type { EnvironmentProvider } from "../onboarding/environment";
 import type { OnboardingRecord } from "../onboarding/record";
+import type { AgentBackendsSnapshot, AntigravityStatus } from "../roder/agent-backends";
+import type { AgentBackendId, ExternalAgentBackendId } from "../roder/desktop-backend";
 
 export type RoderNotification = {
   method: string;
@@ -136,6 +138,7 @@ const api = {
     cwd?: string;
     remoteWorkspaceId?: string;
     forceRestart?: boolean;
+    antigravitySetupMode?: "login" | "install";
   }) => ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
   terminalWrite: (data: string, id?: string) => ipcRenderer.invoke("terminal:write", data, id) as Promise<void>,
   runMarkdownShellCommand: (command: MarkdownShellCommand) =>
@@ -166,6 +169,17 @@ const api = {
   codexLogin: () => ipcRenderer.invoke("codex:login") as Promise<CodexAccountSnapshot>,
   codexLogout: () => ipcRenderer.invoke("codex:logout") as Promise<CodexAccountSnapshot>,
   codexCancelLogin: () => ipcRenderer.invoke("codex:cancelLogin") as Promise<CodexAccountSnapshot>,
+  agentBackendsSnapshot: () => ipcRenderer.invoke("agentBackends:snapshot") as Promise<AgentBackendsSnapshot>,
+  agentBackendsSelect: (backend: AgentBackendId) =>
+    ipcRenderer.invoke("agentBackends:select", backend) as Promise<AgentBackendsSnapshot>,
+  agentBackendsConnect: (backend: ExternalAgentBackendId, options?: { forceRefresh?: boolean }) =>
+    ipcRenderer.invoke("agentBackends:connect", backend, options ?? {}) as Promise<AgentBackendsSnapshot>,
+  agentBackendsLogout: (backend: ExternalAgentBackendId) =>
+    ipcRenderer.invoke("agentBackends:logout", backend) as Promise<AgentBackendsSnapshot>,
+  antigravityStatus: () => ipcRenderer.invoke("antigravity:status") as Promise<AntigravityStatus>,
+  antigravityConnect: (options?: { forceRefresh?: boolean }) =>
+    ipcRenderer.invoke("antigravity:connect", options ?? {}) as Promise<AntigravityStatus>,
+  antigravityLogout: () => ipcRenderer.invoke("antigravity:logout") as Promise<AntigravityStatus>,
   claudeCliStatus: () => ipcRenderer.invoke("claude:cliStatus") as Promise<ClaudeCliStatus>,
   onboardingState: () => ipcRenderer.invoke("onboarding:state") as Promise<OnboardingRecord>,
   onboardingComplete: () => ipcRenderer.invoke("onboarding:complete") as Promise<void>,

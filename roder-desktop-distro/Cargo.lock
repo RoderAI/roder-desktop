@@ -3476,9 +3476,9 @@ dependencies = [
 
 [[package]]
 name = "roder"
-version = "0.4.19"
+version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ea3434071a7dbd375b53f3d98b21b943014814002fc5587dd3de6bd688cd4ee"
+checksum = "a9db3e8bb69bd9540d9ad123ff3c0b8a45ffdb132161508ae61be8de59d8e80c"
 dependencies = [
  "agent-client-protocol-schema",
  "anyhow",
@@ -3528,9 +3528,9 @@ dependencies = [
 
 [[package]]
 name = "roder-api"
-version = "0.3.5"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfc4187eef336c5ac138392e71501ac0bd5fafd869d98aa229c4f790c6e02ca4"
+checksum = "1362feab703f6f449ee923e5fd1db33f2f7e9fa5c3ec5480899fa2d37d752a2d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3714,9 +3714,9 @@ dependencies = [
 
 [[package]]
 name = "roder-core"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb0d6f053224edeb58817efa1c6c2bd74686a5fcea0888c91b364a260b966751"
+checksum = "b4e971a6514687421d3e2574b1a29807afa1a94b99417d4d684af89d9123a681"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3776,9 +3776,9 @@ dependencies = [
 
 [[package]]
 name = "roder-evals"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1753eaa2d3ddda4400c1a3cd0de45af6b8a6772c070e8653146e28e82d192c42"
+checksum = "1112d0ef8aa9971a41657a3e9e6de94cf1d829ca6e817b1271fddf436c7f9096"
 dependencies = [
  "anyhow",
  "roder-api",
@@ -3880,9 +3880,9 @@ dependencies = [
 
 [[package]]
 name = "roder-ext-claude-code"
-version = "0.4.2"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9f1cb8d3c6fa86acbdb156b8fdb5149191e337baf0e3cdd7edaec07ffa5e1c1"
+checksum = "d8ebf0335b99fa88b819874ebdb61030ec4f879c436f3b9ebdd78d3496c1e0a3"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -5198,9 +5198,9 @@ dependencies = [
 
 [[package]]
 name = "roder-tui"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae806927f6c9e7a8b3b1410174158f532f8b324fa50c50f10162353789ea768"
+checksum = "968321eeb8043b371e11e8d48bdd31e6aa6f5356669700b44748cd6d642e1d9f"
 dependencies = [
  "anyhow",
  "async-trait",
