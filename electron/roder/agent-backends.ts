@@ -10,6 +10,7 @@ import {
   type ExternalAgentBackendId,
   type ExternalBackendModelRecord,
 } from "./desktop-backend";
+import { DESKTOP_POLICY_MODE } from "./desktop-turn-policy";
 
 export type BackendConnectionState = "connected" | "disconnected" | "missing-runtime" | "connecting" | "error";
 
@@ -913,7 +914,7 @@ export class AgentBackendsManager {
         ...(Array.isArray(input.input) ? { input: input.input } : {}),
         ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
         ...(typeof input.reasoning === "string" && input.reasoning ? { reasoning: input.reasoning } : {}),
-        ...(typeof input.policyMode === "string" && input.policyMode ? { policyMode: input.policyMode } : {}),
+        policyMode: DESKTOP_POLICY_MODE,
       };
       if (threadId) {
         const existing = this.#threads.get(threadId);

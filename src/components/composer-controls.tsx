@@ -8,7 +8,6 @@ import {
   PencilLine,
   Search,
   Server,
-  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
@@ -19,7 +18,6 @@ import type {
   DesktopAttachment,
   InferenceRoutingOptionDescriptor,
   ModelSelectionMode,
-  PolicyMode,
   ReasoningEffort,
   RoderModel,
 } from "@/types/roder";
@@ -47,101 +45,6 @@ import { useRoderStore } from "@/stores/roder-store";
 import { cn } from "@/lib/utils";
 
 export const pickerMenuSurfaceClassName = "bg-card text-card-foreground ring-border/70";
-
-export function PolicyModePicker({
-  selectedMode,
-  onChange,
-  usesDefault,
-  locked = false,
-}: {
-  selectedMode: PolicyMode;
-  onChange: (mode: PolicyMode | null) => void;
-  usesDefault?: boolean;
-  locked?: boolean;
-}): React.JSX.Element {
-  const selected = policyModeOptions.find((option) => option.mode === selectedMode) ?? policyModeOptions[0];
-
-  if (locked) {
-    return (
-      <span
-        className="inline-flex items-center gap-2 px-2.5 text-base text-muted-foreground sm:px-3"
-        title="Persistent agents always use bypass permissions."
-        aria-label={`Permission mode: ${selected.label} (always on for persistent agents)`}
-      >
-        <ShieldCheck className="size-4 shrink-0" />
-        <span>{selected.label}</span>
-      </span>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        variant="pill"
-        chevronClassName="size-3.5 @[520px]:size-4"
-        className="min-w-0 max-w-32 gap-1 px-2 text-sm text-muted-foreground @[520px]:max-w-48 @[520px]:gap-1.5 @[520px]:px-2.5 @[520px]:text-base"
-        aria-label={`Choose permission mode: ${selected.label}`}
-        title={selected.label}
-      >
-        <ShieldCheck className="size-3.5 shrink-0 @[520px]:size-4" />
-        <span className="truncate">{selected.label}</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-64">
-        <DropdownMenuGroup>
-          {usesDefault !== undefined && (
-            <DropdownMenuItem selected={usesDefault} onSelect={() => onChange(null)}>
-              <span className="flex-1">Use app default</span>
-              {usesDefault && <Check className="size-3.5 shrink-0 text-primary" />}
-            </DropdownMenuItem>
-          )}
-          {policyModeOptions.map((option) => (
-            <DropdownMenuItem
-              key={option.mode}
-              selected={!usesDefault && option.mode === selected.mode}
-              className="items-start gap-2 py-2"
-              onSelect={() => onChange(option.mode)}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-foreground">{option.label}</div>
-                <div className="mt-0.5 text-sm leading-5 text-muted-foreground">{option.description}</div>
-              </div>
-              {!usesDefault && option.mode === selected.mode && (
-                <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-const policyModeOptions: Array<{
-  mode: PolicyMode;
-  label: string;
-  description: string;
-}> = [
-  {
-    mode: "accept_all",
-    label: "Accept all",
-    description: "Run edits and commands without stopping for approval.",
-  },
-  {
-    mode: "default",
-    label: "Ask before changes",
-    description: "Pause before writes, commands, and other side effects.",
-  },
-  {
-    mode: "plan",
-    label: "Plan only",
-    description: "Read and reason while blocking edits and commands.",
-  },
-  {
-    mode: "bypass",
-    label: "Full access",
-    description: "Auto-approve every tool the harness allows.",
-  },
-];
 
 export function AttachmentChip({
   attachment,
@@ -221,24 +124,6 @@ export function ComposerMcpServersMenuItem({ onSelect }: { onSelect: () => void 
         <span>MCP servers</span>
       </span>
       <span className="ml-auto shrink-0 text-sm text-muted-foreground">@</span>
-    </DropdownMenuItem>
-  );
-}
-
-export function ComposerPlanModeMenuItem({
-  enabled,
-  onToggle,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-}): React.JSX.Element {
-  return (
-    <DropdownMenuItem className="h-9 justify-between" selected={enabled} onSelect={onToggle}>
-      <span className="flex min-w-0 items-center gap-2">
-        <ShieldCheck className="size-4 shrink-0" />
-        <span>Plan mode</span>
-      </span>
-      {enabled && <Check className="size-3.5 shrink-0 text-primary" />}
     </DropdownMenuItem>
   );
 }

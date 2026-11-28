@@ -14,35 +14,11 @@ import type {
   AgentBackendId,
   InferenceRoutingOptionDescriptor,
   ModelSelectionMode,
-  PolicyMode,
   ReasoningEffort,
   RoderModel,
 } from "@/types/roder";
 
 const reasoningOptions: ReasoningEffort[] = ["low", "medium", "high", "xhigh", "ultra"];
-
-const policyOptions: Array<{ mode: PolicyMode; label: string; description: string }> = [
-  {
-    mode: "accept_all",
-    label: "Accept all",
-    description: "Run edits and commands without stopping for approval.",
-  },
-  {
-    mode: "default",
-    label: "Ask before changes",
-    description: "Pause before writes, commands, and other side effects.",
-  },
-  {
-    mode: "plan",
-    label: "Plan only",
-    description: "Read and reason while blocking edits and commands.",
-  },
-  {
-    mode: "bypass",
-    label: "Full access",
-    description: "Auto-approve every tool the harness allows.",
-  },
-];
 
 export function GeneralSettingsPanel(): React.JSX.Element {
   const hydrated = useRoderStore((state) => state.hydrated);
@@ -53,14 +29,12 @@ export function GeneralSettingsPanel(): React.JSX.Element {
   const defaultModelProvider = useRoderStore((state) => state.defaultModelProvider);
   const defaultSelectionMode = useRoderStore((state) => state.defaultSelectionMode);
   const defaultReasoning = useRoderStore((state) => state.defaultReasoning);
-  const defaultPolicyMode = useRoderStore((state) => state.pendingDefaultPolicyMode ?? state.defaultPolicyMode);
   const activeBackend = useRoderStore((state) => state.activeBackend);
   const agentBackends = useRoderStore((state) => state.agentBackends);
   const selectAgentBackend = useRoderStore((state) => state.selectAgentBackend);
   const setDefaultModel = useRoderStore((state) => state.setDefaultModel);
   const setDefaultAutoModel = useRoderStore((state) => state.setDefaultAutoModel);
   const setDefaultReasoning = useRoderStore((state) => state.setDefaultReasoning);
-  const setDefaultPolicyMode = useRoderStore((state) => state.setDefaultPolicyMode);
   const saveDefaults = useRoderStore((state) => state.saveDefaults);
   const [saving, setSaving] = useState(false);
   const [switchingBackend, setSwitchingBackend] = useState(false);
@@ -240,29 +214,6 @@ export function GeneralSettingsPanel(): React.JSX.Element {
           </Select>
         </SettingsRow>
 
-        <SettingsRow
-          label="Default permissions"
-          description={policyOptions.find((option) => option.mode === defaultPolicyMode)?.description ?? ""}
-        >
-          <Select
-            items={Object.fromEntries(policyOptions.map((option) => [option.mode, option.label]))}
-            value={defaultPolicyMode}
-            onValueChange={(value) => setDefaultPolicyMode((value ?? "default") as PolicyMode)}
-          >
-            <SelectTrigger className="w-[220px] max-w-full border border-border bg-card">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {policyOptions.map((option) => (
-                  <SelectItem key={option.mode} value={option.mode}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </SettingsRow>
       </div>
 
       {error && <div className="border-t border-border px-4 py-2 text-base text-destructive">{error}</div>}

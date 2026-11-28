@@ -1,31 +1,32 @@
 import { expect, test, vi } from "vitest";
 import { applyDesktopTurnPolicy } from "../electron/roder/desktop-turn-policy";
 
-test("sets the thread policy before forwarding the turn without a runtime policy change", async () => {
-  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async () => ({ mode: "bypass" }));
-  const input = { threadId: "thread-1", policyMode: "bypass", input: [{ type: "text", text: "Continue" }] };
+test.each([undefined, "plan", "default", "bypass"])(
+  "uses Full access regardless of the requested Desktop mode (%s)",
+  async (policyMode) => {
+    const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async () => ({ mode: "bypass" }));
+    const input = { threadId: "thread-1", policyMode, input: [{ type: "text", text: "Continue" }] };
 
-  const forwarded = await applyDesktopTurnPolicy(request, input);
+    const forwarded = await applyDesktopTurnPolicy(request, input);
 
-  expect(request).toHaveBeenCalledExactlyOnceWith("thread/set_mode", {
-    threadId: "thread-1",
-    mode: "bypass",
-    reason: "desktop turn permissions",
-  });
-  expect(forwarded).toEqual({ threadId: input.threadId, input: input.input });
-});
+    expect(request).toHaveBeenCalledExactlyOnceWith("thread/set_mode", {
+      threadId: "thread-1",
+      mode: "bypass",
+      reason: "desktop turn permissions",
+    });
+    expect(forwarded).toEqual({ threadId: input.threadId, input: input.input });
+  },
+);
 
-test("leaves a turn with no policy alone and propagates a failed policy change", async () => {
+test("leaves invalid input to the server and propagates a failed policy change for valid turns", async () => {
   const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async () => {
     throw new Error("Could not set policy");
   });
-  const input = { threadId: "thread-1", prompt: "Continue" };
+  const input = { prompt: "Continue" };
 
   await expect(applyDesktopTurnPolicy(request, input)).resolves.toBe(input);
   expect(request).not.toHaveBeenCalled();
-  await expect(applyDesktopTurnPolicy(request, { ...input, policyMode: "plan" })).rejects.toThrow(
-    "Could not set policy",
-  );
+  await expect(applyDesktopTurnPolicy(request, { ...input, threadId: "thread-1" })).rejects.toThrow("Could not set policy");
 });
 
 test("blocks a turn when the engine reports a different effective policy", async () => {
