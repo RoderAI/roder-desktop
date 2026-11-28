@@ -103,44 +103,6 @@ const refusals: Case[] = [
     }),
   },
   {
-    name: "move to in_progress on a thread that no longer owns the issue",
-    refusal: "an issue is in_progress only while a thread works on it",
-    call: async ({ service, create }) => {
-      const issue = await create({ owner: { type: "thread", threadId: "old-thread" }, doneCriteria: "Ships" });
-      await service.request("desktop/issues/update", { id: issue.id, owner: { type: "roder" } }, user);
-      return { method: "desktop/issues/update", params: { id: issue.id, status: "in_progress" } };
-    },
-  },
-  {
-    name: "take the thread off an in_progress issue by changing only the owner",
-    refusal: "an issue is in_progress only while a thread works on it",
-    call: async ({ create }) => {
-      const issue = await create({
-        status: "in_progress",
-        owner: { type: "thread", threadId: "old-thread" },
-        doneCriteria: "Ships",
-      });
-      return { method: "desktop/issues/update", params: { id: issue.id, owner: { type: "roder" } } };
-    },
-  },
-  {
-    name: "edit an in_progress issue that no thread owns",
-    refusal: "an issue is in_progress only while a thread works on it",
-    call: async ({ create }) => {
-      const issue = await create({ status: "in_progress", doneCriteria: "Ships" });
-      return { method: "desktop/issues/update", params: { id: issue.id, title: "Renamed" } };
-    },
-  },
-  {
-    name: "answer for the user into in_progress by handing the issue to the Roder",
-    refusal: "an issue is in_progress only while a thread works on it",
-    call: async ({ service, create }) => {
-      const issue = await create({ owner: { type: "thread", threadId: "old-thread" } });
-      await service.request("desktop/issues/askUser", { id: issue.id, question: "Go?" }, roder);
-      return { method: "desktop/issues/update", params: { id: issue.id, owner: { type: "roder" } } };
-    },
-  },
-  {
     name: "move to needs_you without askUser",
     refusal: "hand the issue to the user with issues_ask_user",
     call: async ({ create }) => ({
@@ -234,50 +196,38 @@ test("a parent issue is in_progress while one of its children is", async () => {
   await service.request("desktop/issues/launch", { id: child.id }, agent);
   const { issue } = await service.request("desktop/issues/update", { id: parent.id, status: "in_progress" }, agent);
   expect(issue.status).toBe("in_progress");
-  // The child is the evidence, so the parent needs no thread owner of its own.
-  const { issue: edited } = await service.request(
-    "desktop/issues/update",
-    { id: parent.id, title: "Whole request" },
-    agent,
-  );
-  expect(edited).toMatchObject({ status: "in_progress", owner: { type: "roder" } });
-  // Once no child is in progress, an agent has to move the parent on too.
-  await service.request("desktop/issues/close", { id: child.id, outcome: "dropped", note: "Moot" }, agent);
-  await expect(service.request("desktop/issues/update", { id: parent.id, priority: "high" }, agent)).rejects.toThrow(
-    "in_progress only while a thread works on it",
-  );
-  const { issue: waiting } = await service.request(
-    "desktop/issues/update",
-    { id: parent.id, status: "todo", priority: "high" },
-    agent,
-  );
-  expect(waiting).toMatchObject({ status: "todo", priority: "high" });
 });
 
-test("a refused owner change leaves the in_progress issue as it was", async () => {
+// Parity with zuse transition(): the evidence is any linked thread, and it is
+// asked for only when the status changes into in_progress.
+test("a thread that no longer owns the issue still counts as in_progress evidence", async () => {
   const { service, create } = await setup();
-  const issue = await create({
-    status: "in_progress",
-    owner: { type: "thread", threadId: agent.threadId },
-    doneCriteria: "Ships",
-  });
-  await expect(
-    service.request("desktop/issues/update", { id: issue.id, owner: { type: "roder" } }, agent),
-  ).rejects.toThrow("in_progress only while a thread works on it");
-  expect((await service.request("desktop/issues/read", { id: issue.id })).issue).toEqual(issue);
-  // Another thread can take it over, and it can leave in_progress with its owner.
-  const { issue: taken } = await service.request(
+  const issue = await create({ owner: { type: "thread", threadId: "old-thread" }, doneCriteria: "Ships" });
+  await service.request("desktop/issues/update", { id: issue.id, owner: { type: "roder" } }, user);
+  const { issue: moved } = await service.request(
     "desktop/issues/update",
-    { id: issue.id, owner: { type: "thread", threadId: "next-thread" } },
+    { id: issue.id, status: "in_progress" },
     agent,
   );
-  expect(taken.status).toBe("in_progress");
+  expect(moved).toMatchObject({ status: "in_progress", owner: { type: "roder" } });
+});
+
+test("updates that leave the status in_progress ask for no evidence", async () => {
+  const { service, create } = await setup();
+  const issue = await create({ status: "in_progress", doneCriteria: "Ships" });
+  const { issue: renamed } = await service.request("desktop/issues/update", { id: issue.id, title: "Renamed" }, agent);
+  expect(renamed).toMatchObject({ status: "in_progress", title: "Renamed", threadIds: [] });
+  await service.request(
+    "desktop/issues/update",
+    { id: issue.id, owner: { type: "thread", threadId: agent.threadId } },
+    agent,
+  );
   const { issue: released } = await service.request(
     "desktop/issues/update",
-    { id: issue.id, owner: { type: "roder" }, status: "todo" },
+    { id: issue.id, owner: { type: "roder" } },
     agent,
   );
-  expect(released).toMatchObject({ status: "todo", owner: { type: "roder" } });
+  expect(released).toMatchObject({ status: "in_progress", owner: { type: "roder" } });
 });
 
 test("close: merged needs a linked pull request and a note; dropped cancels", async () => {

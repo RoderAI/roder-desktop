@@ -116,29 +116,24 @@ function linkOwner(issue: Issue): void {
 
 /**
  * Status moves an agent may make itself. Each needs the evidence that makes it
- * true, so the board can't drift ahead of the work. in_progress is checked on
- * every update, not only on a status move: it needs a thread owner, or, for a
- * parent issue, a child in progress.
+ * true, so the board can't drift ahead of the work. A parent issue is in
+ * progress while one of its children is.
  */
 function transition(before: Issue, next: Issue, childInProgress: boolean): void {
-  const moved = next.status !== before.status;
-  if (moved) {
+  if (next.status !== before.status) {
     if (terminal(next.status))
       throw new Error("close issues with issues_close (outcome merged or dropped, plus a note)");
     if (next.status === "in_review" && !next.pullRequests.length)
       throw new Error("link the pull request with issues_link_pull_request before moving the issue to in_review");
+    if (next.status === "in_progress" && !next.threadIds.length && !childInProgress)
+      throw new Error(
+        `an issue is in_progress only while a thread works on it: launch it with issues_launch, set its owner to the working thread, or, for a parent issue, start work on one of its child issues (parent: "${before.id}") first`,
+      );
     if (next.status === "needs_you") throw new Error("hand the issue to the user with issues_ask_user");
+    // Creating outside backlog needs doneCriteria; so does moving out of it.
+    if (next.status !== "backlog" && !next.doneCriteria.trim())
+      throw new Error("add doneCriteria: what must be true for this issue to be done");
   }
-  // Leaving the user can move the status by itself, so check where it settles.
-  const settled = { ...next };
-  normalize(settled);
-  if (settled.status === "in_progress" && settled.owner.type !== "thread" && !childInProgress)
-    throw new Error(
-      `an issue is in_progress only while a thread works on it: launch it with issues_launch, set its owner to the working thread, or, for a parent issue, start work on one of its child issues (parent: "${before.id}") first. If no work is under way, move it to another status such as todo`,
-    );
-  // Creating outside backlog needs doneCriteria; so does moving out of it.
-  if (moved && next.status !== "backlog" && !next.doneCriteria.trim())
-    throw new Error("add doneCriteria: what must be true for this issue to be done");
   if (!sameOwner(next.owner, before.owner) && next.owner.type === "user")
     throw new Error("hand the issue to the user with issues_ask_user");
   if (before.doneCriteria.trim() && !next.doneCriteria.trim())

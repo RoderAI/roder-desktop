@@ -103,7 +103,7 @@ export const issueToolDefinitions = [
   tool(
     "issues_update",
     "desktop/issues/update",
-    "Edit an issue, change its owner, priority or status. in_progress needs a thread owner or a child issue in progress, in_review a linked pull request. Close with issues_close and hand over to the user with issues_ask_user. doneCriteria can be edited but not cleared.",
+    "Edit an issue, change its owner, priority or status. in_progress needs a linked thread or a child issue in progress, in_review a linked pull request. Close with issues_close and hand over to the user with issues_ask_user. doneCriteria can be edited but not cleared.",
     { id: string, ...issueFields },
     ["id"],
   ),

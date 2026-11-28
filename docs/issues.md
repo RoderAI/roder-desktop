@@ -69,11 +69,11 @@ change.
 - Create: only in `backlog` or `todo`; `todo` needs `doneCriteria`; the owner
   can't be the user.
 - Update: `done` and `cancelled` only through `close`; `in_review` needs a
-  linked pull request; `needs_you` and a user owner only through `askUser`;
-  moving out of `backlog` needs `doneCriteria`; a non-empty `doneCriteria` can
-  be edited but not cleared. Every update that leaves an issue `in_progress`
-  needs a thread owner, or a child issue in progress; a thread that only worked
-  on it earlier doesn't count.
+  linked pull request; `in_progress` needs a linked thread, past or present, or
+  a child issue in progress; `needs_you` and a user owner only through
+  `askUser`; moving out of `backlog` needs `doneCriteria`; a non-empty
+  `doneCriteria` can be edited but not cleared. The evidence for `in_review` and
+  `in_progress` is checked only when the status changes into them.
 - Launch: refused on a closed issue, even one a thread still owns.
 
 Operations for every actor:
