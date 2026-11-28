@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AppUpdateStatus } from "../../src/lib/app-update";
 import type { LocalWorktree, LocalWorktreeContext, LocalWorktreeList } from "../../src/lib/local-worktrees";
+import type { MarkdownShellCommand, MarkdownShellResult } from "../../src/lib/markdown-shell-command";
 import type { Workspace } from "../../src/types/roder";
 import type { ExtensionCatalogSnapshot } from "../extensions/catalog";
 import type { ExtensionTheme } from "../extensions/theme";
@@ -137,6 +138,8 @@ const api = {
     forceRestart?: boolean;
   }) => ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
   terminalWrite: (data: string, id?: string) => ipcRenderer.invoke("terminal:write", data, id) as Promise<void>,
+  runMarkdownShellCommand: (command: MarkdownShellCommand) =>
+    ipcRenderer.invoke("terminal:runMarkdownCommand", command) as Promise<MarkdownShellResult>,
   terminalResize: (cols: number, rows: number, id?: string) =>
     ipcRenderer.invoke("terminal:resize", cols, rows, id) as Promise<void>,
   terminalStop: (id?: string) => ipcRenderer.invoke("terminal:stop", id) as Promise<void>,

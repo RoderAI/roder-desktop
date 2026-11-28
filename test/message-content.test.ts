@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
+import { MarkdownShellProvider } from "../src/components/markdown-shell-block";
 import { MessageContent } from "../src/components/message-content";
 import { renderTextWithSkillTokens } from "../src/components/skill-token-pill";
 import type { SkillDescriptor } from "../src/types/roder";
@@ -82,6 +83,30 @@ test("does not render Streamdown's streaming caret marker", () => {
 
   expect(html).not.toContain("--streamdown-caret");
   expect(html).not.toContain("▋");
+});
+
+test("only offers to run completed shell fences when a local target is available", () => {
+  const run = async () => {
+    throw new Error("Rendering Markdown must not execute it.");
+  };
+  const bash = "```bash\nprintf hello\n```";
+  const target = { cwd: "/project", run };
+  const render = (text: string, isStreaming = false) =>
+    renderToStaticMarkup(
+      React.createElement(
+        MarkdownShellProvider,
+        { target },
+        React.createElement(MessageContent, { text, isStreaming }),
+      ),
+    );
+
+  const shellHtml = render(bash);
+  expect(shellHtml).toContain('aria-label="Run bash command"');
+  expect(shellHtml).not.toContain('aria-haspopup="dialog"');
+  expect(render("```bash\nprintf hello")).not.toContain("Run bash command");
+  expect(render(bash, true)).not.toContain("Run bash command");
+  expect(render("```python\nprint(1)\n```")).not.toContain("Run python command");
+  expect(renderToStaticMarkup(React.createElement(MessageContent, { text: bash }))).not.toContain("Run bash command");
 });
 
 function skill(patch: Partial<SkillDescriptor> = {}): SkillDescriptor {

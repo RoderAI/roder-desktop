@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { MarkdownShellProvider } from "@/components/markdown-shell-block";
 import { MessageContent } from "@/components/message-content";
+import { storybookShellTarget } from "./fixtures";
 
 const meta = {
   title: "Desktop/Markdown",
@@ -9,7 +11,9 @@ const meta = {
   decorators: [
     (Story) => (
       <div className="mx-auto max-w-3xl">
-        <Story />
+        <MarkdownShellProvider target={storybookShellTarget}>
+          <Story />
+        </MarkdownShellProvider>
       </div>
     ),
   ],
