@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   applyThreadItemEvent,
+  applyThreadItemEventToItems,
   isThreadRunning,
   markThreadStatus,
   messagesFromThread,
@@ -8,6 +9,50 @@ import {
   shouldShowThreadWorkingIndicator,
   upsertThread,
 } from "../src/lib/roder-thread";
+import { groupToolMessagesForTranscript } from "../src/lib/tool-message-groups";
+import type { RoderThreadItemEventKind } from "../src/types/roder";
+
+test("reused commentary streams stay interleaved with tools", () => {
+  const id = "turn-a-agent-commentary";
+  const delta = (text: string): RoderThreadItemEventKind => ({
+    type: "itemDelta",
+    itemId: id,
+    delta: { type: "agentMessageText", phase: "commentary", delta: text },
+  });
+  const tool = (id: string): RoderThreadItemEventKind => ({
+    type: "itemCompleted",
+    item: { id, type: "toolExecution", toolCallId: id, toolName: "shell", status: "completed" },
+  });
+  const events: RoderThreadItemEventKind[] = [
+    delta("Checking "),
+    delta("files."),
+    tool("first-tool"),
+    delta("Running tests."),
+    {
+      type: "itemCompleted",
+      item: {
+        id,
+        type: "agentMessage",
+        phase: "commentary",
+        text: "Checking files.Running tests.",
+        status: "completed",
+      },
+    },
+    tool("second-tool"),
+  ];
+  const items = events.reduce(applyThreadItemEventToItems, [] as import("../src/types/roder").RoderItem[]);
+  const messages = messagesFromThread({
+    ...thread("thread-a", 100),
+    turns: [{ id: "turn-a", status: "completed", itemsView: "default", items }],
+  });
+  const rows = groupToolMessagesForTranscript(messages);
+  expect(rows.map((row) => row.kind === "message" && (row.message.toolCallId ?? row.message.text))).toEqual([
+    "Checking files.",
+    "first-tool",
+    "Running tests.",
+    "second-tool",
+  ]);
+});
 
 function thread(id, updatedAt) {
   return {
@@ -481,7 +526,7 @@ test("itemStarted after tools keeps later assistant messages chronological", () 
         toolCallId: "call-1",
         status: "completed",
         input: JSON.stringify({ path: "package.json" }),
-        output: "{ \"name\": \"roder-desktop\" }",
+        output: '{ "name": "roder-desktop" }',
       },
     },
   });

@@ -481,10 +481,36 @@ code[data-streamdown="inline-code"] {
   min-height: 1lh;
 }
 
+.message-markdown [data-streamdown="code-block"] {
+  gap: 0;
+  padding: 0;
+}
+
+.message-markdown [data-streamdown="code-block-header"] {
+  height: 1.75rem;
+  padding-inline: 0.75rem;
+}
+
+.message-markdown [data-streamdown="code-block"] > div:has(> [data-streamdown="code-block-actions"]) {
+  top: 0.125rem;
+  right: 0.5rem;
+}
+
+.message-markdown [data-streamdown="code-block-actions"] {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
 .message-markdown [data-streamdown="code-block-body"] {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  padding: 0.125rem 0.75rem 0.625rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .message-markdown [data-streamdown="code-block-body"] pre {

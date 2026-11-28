@@ -122,6 +122,24 @@ export function applyThreadItemEventToItems(items: RoderItem[], event: RoderThre
     return [...items, applyThreadItemDelta(item, event.delta)];
   }
   const nextItems = [...items];
+  const active = items[index];
+  if (
+    active.type === "agentMessage" &&
+    active.text &&
+    event.delta.type === "agentMessageText" &&
+    normalizeAssistantPhase(event.delta.phase ?? active.phase) === "commentary" &&
+    items.slice(index + 1).some((item) => item.type === "toolExecution")
+  ) {
+    // The app server can reuse a turn-scoped commentary ID without starting
+    // a new item. A tool between deltas marks a new visible update.
+    nextItems[index] = { ...active, status: "completed" };
+    const segment = itemFromDelta(nextLocalItemId(items, event.itemId), {
+      ...event.delta,
+      phase: event.delta.phase ?? active.phase,
+    });
+    nextItems.push(applyThreadItemDelta(segment, event.delta));
+    return nextItems;
+  }
   nextItems[index] = applyThreadItemDelta(nextItems[index], event.delta);
   return nextItems;
 }
@@ -156,7 +174,23 @@ function completeRoderItem(items: RoderItem[], incoming: RoderItem): RoderItem[]
   if (activeIndex !== -1) {
     const nextItems = [...items];
     const existing = nextItems[activeIndex];
-    nextItems[activeIndex] = mergeCompletedItem(existing, { ...incoming, id: existing.id });
+    let completion = { ...incoming, id: existing.id };
+    if (
+      completion.type === "agentMessage" &&
+      existing.type === "agentMessage" &&
+      normalizeAssistantPhase(existing.phase) === "commentary" &&
+      completion.text !== existing.text
+    ) {
+      const earlierText = items
+        .slice(0, activeIndex)
+        .flatMap((item) => (item.type === "agentMessage" && protocolItemId(item.id) === incoming.id ? [item.text] : []))
+        .join("");
+      // Some completions contain the entire stream rather than just this update.
+      if (earlierText && existing.text && completion.text.startsWith(earlierText + existing.text)) {
+        completion = { ...completion, text: completion.text.slice(earlierText.length) };
+      }
+    }
+    nextItems[activeIndex] = mergeCompletedItem(existing, completion);
     return nextItems;
   }
 

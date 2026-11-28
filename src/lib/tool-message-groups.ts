@@ -151,7 +151,10 @@ function groupToolActivityRuns(
   };
 
   for (const entry of entries) {
-    if (entry.kind === "message" && entry.message.role === "user") {
+    if (
+      entry.kind === "message" &&
+      (entry.message.role === "user" || (entry.message.role === "assistant" && entry.message.phase === "commentary"))
+    ) {
       flushActivity();
       grouped.push(entry);
       continue;
