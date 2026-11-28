@@ -1361,7 +1361,7 @@ export const useRoderStore = create<RoderStore>()(
             };
             const existingDetail = threadForState(state, threadId);
             const ensuredDetail =
-              targetBackend !== "roder"
+              targetBackend !== "roder" && targetBackend !== "claude-code"
                 ? ensureTurnUserMessage(existingDetail, started.turnId, text, userImages)
                 : existingDetail;
             return {
@@ -1433,7 +1433,7 @@ export const useRoderStore = create<RoderStore>()(
             };
             const existingDetail = threadForState(latest, threadId);
             const ensuredDetail =
-              nextTurnId !== activeTurnId || targetBackend !== "roder"
+              targetBackend !== "claude-code" && (nextTurnId !== activeTurnId || targetBackend !== "roder")
                 ? ensureTurnUserMessage(existingDetail, nextTurnId, text, userImages)
                 : existingDetail;
             return {

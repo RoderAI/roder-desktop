@@ -59,6 +59,35 @@ async function loadRoderStore(
   return module.useRoderStore;
 }
 
+test("renders a Claude prompt once when its canonical item follows the start response", async () => {
+  const request = vi.fn<(method: string) => Promise<unknown>>(async (method) =>
+    method === "turn/start" ? { turnId: "claude-turn" } : {},
+  );
+  const store = await loadRoderStore(request);
+  const thread: RoderThread = {
+    ...runningThread(),
+    turns: [],
+    model: "haiku",
+    modelProvider: "claude-code",
+    agentBackend: "claude-code",
+    status: { type: "idle", activeTurnId: null, activeFlags: [] },
+  };
+  store.setState({ activeBackend: "claude-code", threads: [thread], threadDetails: { [thread.id]: thread } });
+  await store.getState().sendPrompt("Read sample.txt");
+  store.getState().applyNotification({
+    method: "item/completed",
+    params: {
+      threadId: thread.id,
+      turnId: "claude-turn",
+      seq: 1,
+      eventId: "user-item-event",
+      timestamp: "2026-11-28T17:00:00Z",
+      event: { type: "itemCompleted", item: { id: "server-user", type: "userMessage", text: "Read sample.txt" } },
+    },
+  });
+  expect(store.getState().threadDetails[thread.id]?.turns?.[0]?.items.map((item) => item.id)).toEqual(["server-user"]);
+});
+
 test("shows progress only for the matching Claude turn and keeps its native token usage", async () => {
   const store = await loadRoderStore();
   const thread: RoderThread = {
