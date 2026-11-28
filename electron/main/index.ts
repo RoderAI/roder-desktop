@@ -901,6 +901,7 @@ function getRoderAgentService(): ReturnType<typeof createRoderAgentService> {
     directory: join(app.getPath("userData"), "roders"),
     request: (method, params) => requestEngine(method, params, false),
     sprites: getSpriteManager(),
+    issues: getIssuesService(),
     notify: () => sendToRenderer("roder:notification", { method: "desktop/roders/changed", params: {} }),
   });
   return roderAgentService;

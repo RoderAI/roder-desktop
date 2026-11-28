@@ -115,11 +115,11 @@ at creation and the others are empty.
 
 | File              | Written by                              | Reaches                                        |
 | ----------------- | --------------------------------------- | ---------------------------------------------- |
-| `INSTRUCTIONS.md` | The user                                | Every Roder turn, first 16 KiB                 |
+| `INSTRUCTIONS.md` | The user and the Roder                  | Every Roder turn, first 16 KiB                 |
 | `AGENTS.md`       | The user only; Roder writes are refused | Every Roder turn, first 16 KiB, when not empty |
 | `NOTES.md`        | The Roder and the user                  | Every Roder turn, first 8 KiB                  |
-| `WORKERS.md`      | The user                                | Nobody yet; worker prompts come later          |
-| `DIGEST.md`       | The user                                | Nobody's prompt; the user reads it             |
+| `WORKERS.md`      | The user and the Roder                  | Nobody yet; worker prompts come later          |
+| `DIGEST.md`       | The user and the Roder                  | Nobody's prompt; the user reads it             |
 
 Every write is a new version. A write names the version it read as
 `expectedVersion`; a stale one is refused with an error that names the current
@@ -137,9 +137,66 @@ has no opening paragraph, and the list then says "No instructions yet". The Rode
 the file list, an editor, and each file's history with view and restore. A
 save from a stale editor is refused and keeps the draft.
 
+The Roder writes its files with `roder_command` `writeFile` and `restoreFile`
+(see Roder commands below).
+
 Roders saved before files existed get empty files on first use. Their old
 `<roder-id>.md` memory and mission are not migrated; the memory file is left on
 disk untouched.
+
+## Roder commands
+
+A Roder changes its board, its files and its status through one tool,
+`roder_command {commandId, roderId, expectedRevision?, action}`, modelled on
+Zuse's `zapper_command`. One action table, `electron/roder-agents/actions.ts`,
+generates the tool's JSON schema, its description and the action parser.
+Actions:
+
+| Action                                         | Goes through                                  |
+| ---------------------------------------------- | --------------------------------------------- |
+| `createIssue {details}`                        | Issue service, in the Roder's project         |
+| `editIssue {issueId, details}`                 | Issue service; only the given fields change   |
+| `commentIssue {issueId, text}`                 | Issue service                                 |
+| `linkIssuePullRequest {issueId, url, title?}`  | Issue service                                 |
+| `unlinkIssuePullRequest {issueId, url}`        | Issue service                                 |
+| `askUser {issueId, question, recommendation?}` | Issue service                                 |
+| `closeIssue {issueId, outcome, note}`          | Issue service; `outcome` is merged or dropped |
+| `writeFile {path, content, expectedVersion}`   | Roder file store                              |
+| `restoreFile {path, version, expectedVersion}` | Roder file store                              |
+| `setStatus {status}`                           | Roder state; a Roder can only pause itself    |
+
+Issue actions act as the Roder's thread, so the agent lifecycle rules in
+`docs/issues.md` apply. The Roder's board is the project linked to its thread
+(`roderThreadId`, set when the Roder is created); `issueId` takes an issue id
+or number. Only the user makes a Roder active: `setStatus active` from a
+paused Roder is refused, and from an active one it changes nothing.
+
+`roder_issue {roderId, issueId?}` reads the whole board (descriptions cut to
+500 characters, the last three activity entries) or one issue in full, with the
+current revision. Both tools refuse a `roderId` other than the calling thread's
+Roder; the turn context names it.
+
+State lives in `roders/commands/<roder-id>.json`: the Roder's revision, the
+revision at which each issue and file last changed, and the newest 256
+receipts. Commands run one at a time in the Roder service's queue.
+
+- **Receipts.** Retrying a `commandId` with the same input returns the original
+  result and changes nothing. Different input is refused. A refused action
+  leaves no receipt, so its `commandId` can be retried. If the app stops
+  between applying an action and recording its result, a retry is refused
+  with what to re-read instead of applying the action twice.
+- **Revisions.** Every applied command adds one. Changes made outside
+  commands, such as the user editing an issue or a file, are noticed before
+  the next command or read and get a revision of their own. A stale
+  `expectedRevision` conflicts only when what the action depends on changed
+  after it, as in Zuse's `ConflictScope`: `editIssue`, `askUser` and
+  `closeIssue` depend on their issue's details (not its comments or links),
+  `writeFile` and `restoreFile` on their file, and `setStatus` on the exact
+  current revision. `createIssue`, `commentIssue` and the link actions never
+  conflict. The error names the issue or file to re-read and the current
+  revision. The issue is checked again inside the issue service's queue just
+  before the change applies, so a person's edit that lands while the command
+  runs also conflicts instead of being overwritten.
 
 ## Persistence and recovery
 
@@ -234,12 +291,13 @@ and ignores irrelevant streaming notifications. At most 50 pending wakes,
 20 event methods, 100 runs per rolling day, and 60 minutes per run are allowed.
 These hard ceilings cannot be increased through agent tools.
 
-Agent tools are `roder_files`, `roder_memory_read`, `roder_memory_write`,
-`roder_memory_save`, `roder_memory_query`, and `roder_wake_schedule`.
-`roder_files` lists the files with no `path`, reads one file (or `version`)
-with `path`, and lists its versions with `path` and `history: true`.
-`roder_memory_read` and `roder_memory_write` read and write `NOTES.md`;
-`roder_memory_write` takes `{ memory, expectedVersion }`. The last three use
+Agent tools are `roder_command`, `roder_issue`, `roder_files`,
+`roder_memory_read`, `roder_memory_save`, `roder_memory_query`, and
+`roder_wake_schedule`. `roder_command` and `roder_issue` are described under
+Roder commands. `roder_files` lists the files with no `path`, reads one file
+(or `version`) with `path`, and lists its versions with `path` and
+`history: true`. `roder_memory_read` reads `NOTES.md`; the Roder writes it with
+`roder_command` `writeFile`. The last three use
 native `memory/save`, `memory/query`, and the durable wake queue
 respectively. All tools resolve ownership from the caller's thread.
 Through these tools a Roder cannot create or enable Roders, change controls, or
