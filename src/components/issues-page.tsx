@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, ClipboardList, FolderPlus, Plus, RefreshCw } from "lucide-react";
 import { useId, useState } from "react";
+import { IssueConversation } from "@/components/roder-issue-conversation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMountEffect } from "@/hooks/use-mount-effect";
@@ -540,7 +541,18 @@ function IssueEditor({
             Save the issue first, then launch work from its editor.
           </p>
         ) : null}
-        {issue ? <IssueRecord issue={issue} threads={threads} /> : null}
+        {issue ? (
+          <div className="border-t border-border pt-3">
+            <IssueConversation
+              issue={issue}
+              threads={threads}
+              onOpenThread={(threadId) =>
+                void navigate({ to: "/threads/$threadId", params: { threadId }, search: true })
+              }
+              onOpenPullRequest={(url) => void window.roderDesktop.openExternal(url)}
+            />
+          </div>
+        ) : null}
         {issue ? (
           <div className="space-y-2">
             <label htmlFor={commentId} className="block space-y-1">
@@ -576,64 +588,6 @@ function IssueEditor({
         ) : null}
       </fieldset>
     </form>
-  );
-}
-
-function IssueRecord({ issue, threads }: { issue: Issue; threads: RoderThread[] }): React.JSX.Element {
-  return (
-    <div className="space-y-3 border-t border-border pt-3">
-      {issue.threadIds.length ? (
-        <section aria-label="Linked threads" className="space-y-1">
-          <h3>Threads</h3>
-          <ul className="space-y-1 text-sm">
-            {issue.threadIds.map((id) => (
-              <li key={id}>
-                <Link
-                  className="rounded-md px-1 hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
-                  to="/threads/$threadId"
-                  params={{ threadId: id }}
-                  search={true}
-                >
-                  {threadName(threads, id)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {issue.pullRequests.length ? (
-        <section aria-label="Pull requests" className="space-y-1">
-          <h3>Pull requests</h3>
-          <ul className="space-y-1 text-sm">
-            {issue.pullRequests.map((pr) => (
-              <li key={pr.url}>
-                <button
-                  type="button"
-                  className="rounded-md px-1 text-left hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
-                  onClick={() => void window.roderDesktop.openExternal(pr.url)}
-                >
-                  {pr.title || pr.url}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      <section aria-label="Activity" className="space-y-1">
-        <h3>Activity</h3>
-        <ol className="space-y-2 text-sm">
-          {issue.activity.map((entry) => (
-            <li key={entry.id}>
-              <span className="text-muted-foreground">
-                {ownerLabel(entry.actor, threads)} · {new Date(entry.createdAt).toLocaleString()}
-                {entry.kind === "question" ? " · Question" : ""}
-              </span>
-              <p className="whitespace-pre-wrap font-normal">{entry.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-    </div>
   );
 }
 

@@ -9,6 +9,7 @@ import type {
   RoderTurn,
 } from "@/types/roder";
 import { canonicalToolName, classifyDescriptiveTool, isDescriptiveToolName, isShellToolName } from "@/lib/tool-display";
+import { roderTurnMessageText } from "@/lib/roder-turn-message";
 import { normalizedToolPreview, summarizeApplyPatch } from "@/lib/tool-preview";
 
 const emptyMessages: ConversationMessage[] = [];
@@ -653,7 +654,11 @@ function messageStatusFromTurnStatus(turnStatus: string): ConversationMessage["s
 }
 
 function extractItemText(item: RoderItem): string {
-  if (item.type === "userMessage" || item.type === "agentMessage") {
+  if (item.type === "userMessage") {
+    // A Roder turn carries the app's context before the message; show the message.
+    return roderTurnMessageText(item.text);
+  }
+  if (item.type === "agentMessage") {
     return item.text;
   }
   if (item.type === "reasoning") {

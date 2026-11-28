@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { roderAgentToolDefinitions, createRoderAgentService } from "../electron/roder-agents/service";
+import { roderThreadInstructions } from "../electron/roder-agents/brief";
 import type { RoderAgentDetail, RoderFile } from "../src/types/roder-agents";
 import type { createRoderAgentSpriteManager } from "../electron/roder-agents/sprites";
 
@@ -30,6 +31,20 @@ async function setup(sprites?: ReturnType<typeof createRoderAgentSpriteManager>)
     workspaceId: "ws",
   })) as RoderAgentDetail;
   return { service, roderAgent, request, directory };
+}
+function writeNotes(roderId: string, content: string) {
+  return {
+    commandId: `write-${content.length}-${roderId}`,
+    roderId,
+    action: { type: "writeFile", path: "NOTES.md", content, expectedVersion: 1 },
+  };
+}
+/** The text of the turn the app would start for `message` in the Roder's thread. */
+async function turnText(service: ReturnType<typeof createRoderAgentService>, threadId: string, message = "Hello") {
+  const params = (await service.turnStartParams({ threadId, input: [{ type: "text", text: message }] })) as {
+    input: { text: string }[];
+  };
+  return params.input[0].text;
 }
 async function notes(service: ReturnType<typeof createRoderAgentService>, id: string) {
   return ((await service.handleRequest("desktop/roders/files/read", { id, path: "NOTES.md" })) as RoderFile).content;
@@ -132,9 +147,10 @@ test("Roder chat overrides permission mode without changing ordinary threads", a
     input: [{ type: "text", text: "Update docs" }],
   };
   expect(await service.turnStartParams(input)).toMatchObject({
-    ...input,
+    threadId: roderAgent.threadId,
     policyMode: "bypass",
-    developerContext: expect.stringContaining("Desktop context"),
+    developerContext: "Desktop context",
+    input: [{ type: "text", text: expect.stringMatching(/^\[Roder turn context[^]*## User message\nUpdate docs$/) }],
   });
   const ordinary = { ...input, threadId: "ordinary", policyMode: "plan" };
   expect(await service.turnStartParams(ordinary)).toBe(ordinary);
@@ -200,16 +216,14 @@ test("tools cannot enable Roders or access another thread's memory", async () =>
   const { service, roderAgent } = await setup();
   await expect(service.handleTool("roder_memory_read", {}, { threadId: "other" })).rejects.toThrow(/Roder thread/);
   await expect(service.handleTool("roder_enable", {}, { threadId: roderAgent.threadId })).rejects.toThrow(/Unknown/);
-  await service.handleTool(
-    "roder_memory_write",
-    { memory: "Decision: ship Friday", expectedVersion: 1 },
-    { threadId: roderAgent.threadId },
-  );
+  await service.handleTool("roder_command", writeNotes(roderAgent.id, "Decision: ship Friday"), {
+    threadId: roderAgent.threadId,
+  });
   expect(await notes(service, roderAgent.id)).toContain("Friday");
   await service.stop();
 });
 
-test("native memory uses the released engine's externally tagged scope and per-turn developer context", async () => {
+test("native memory uses the released engine's externally tagged scope and rides as per-turn developer context", async () => {
   const { service, roderAgent, request } = await setup();
   await service.handleTool("roder_memory_save", { text: "Release on Friday" }, { threadId: roderAgent.threadId });
   expect(request).toHaveBeenCalledWith(
@@ -225,7 +239,8 @@ test("native memory uses the released engine's externally tagged scope and per-t
     "turn/start",
     expect.objectContaining({
       threadId: "thread-1",
-      developerContext: expect.stringContaining("## Notes (NOTES.md, version 1)"),
+      developerContext: 'Native memory recall:\n{"results":[]}',
+      input: [{ type: "text", text: expect.stringMatching(/^\[Roder turn context[^]*## Wake\nRoder wake: /) }],
     }),
   );
   await service.stop();
@@ -321,11 +336,9 @@ test("configured events coalesce, exclude the Roder's own thread, and never enab
 
 test("notes saves reject stale editor content rather than losing agent updates", async () => {
   const { service, roderAgent } = await setup();
-  await service.handleTool(
-    "roder_memory_write",
-    { memory: "Agent's new decision", expectedVersion: 1 },
-    { threadId: roderAgent.threadId },
-  );
+  await service.handleTool("roder_command", writeNotes(roderAgent.id, "Agent's new decision"), {
+    threadId: roderAgent.threadId,
+  });
   await expect(
     service.handleRequest("desktop/roders/files/write", {
       id: roderAgent.id,
@@ -379,22 +392,24 @@ test("a missing persisted thread is never silently replaced", async () => {
 test("interactive context belongs to the Roder thread and rereads notes edits", async () => {
   const { service, roderAgent, request } = await setup();
   request.mockClear();
-  expect(await service.contextForThread("unrelated-thread")).toBeNull();
-  expect(await service.contextForThread(roderAgent.threadId)).toContain(roderAgent.mission);
+  const unrelated = { threadId: "unrelated-thread", input: [{ type: "text", text: "Hello" }] };
+  expect(await service.turnStartParams(unrelated)).toBe(unrelated);
+  expect(await turnText(service, roderAgent.threadId)).toContain(roderAgent.mission);
   await service.handleRequest("desktop/roders/files/write", {
     id: roderAgent.id,
     path: "NOTES.md",
     content: "User edit: release is now Monday.",
     expectedVersion: 1,
   });
-  const context = await service.contextForThread(roderAgent.threadId);
+  const context = await turnText(service, roderAgent.threadId);
   expect(context).toContain("User edit: release is now Monday.");
-  expect(context).toContain(roderAgent.mission);
+  // The brief did not change, so it is not sent again.
+  expect(context).not.toContain(roderAgent.mission);
   expect(request).not.toHaveBeenCalled();
   await service.stop();
 });
 
-test("Roder creation forwards model choices and injects an original delegation strategy", async () => {
+test("Roder creation forwards model choices and the first turn carries the delegation rules", async () => {
   const { service, request } = await setup();
   request.mockImplementation(async (method) => (method === "thread/start" ? { thread: { id: "model-thread" } } : {}));
   const c = (await service.handleRequest("desktop/roders/create", {
@@ -412,13 +427,13 @@ test("Roder creation forwards model choices and injects an original delegation s
       modelProvider: "openai",
       model: "chosen-model",
       reasoning: "high",
-      developerInstructions: expect.stringContaining("write ownership"),
+      developerInstructions: roderThreadInstructions,
     }),
   );
-  const context = await service.contextForThread(c.threadId);
-  expect(context).toContain("task");
-  expect(context).toContain("agent_swarm");
-  expect(context).toContain("Do not commit, push, or merge");
+  const context = await turnText(service, c.threadId);
+  expect(context).toContain("task and agent_swarm tools are for read-only research only");
+  expect(context).toContain("Never edit code");
+  expect(context).toContain("Never merge a pull request without the user's explicit word");
   await service.stop();
 });
 
@@ -441,11 +456,7 @@ test("promotion retains the existing idle thread and is idempotent without repla
   request.mockClear();
   const params = { threadId: "existing", workspaceId: "ws", name: "Project", mission: "Maintain the project" };
   const c = (await service.handleRequest("desktop/roders/promote", params)) as RoderAgentDetail;
-  await service.handleTool(
-    "roder_memory_write",
-    { memory: "Existing decision", expectedVersion: 1 },
-    { threadId: "existing" },
-  );
+  await service.handleTool("roder_command", writeNotes(c.id, "Existing decision"), { threadId: "existing" });
   const again = (await service.handleRequest("desktop/roders/promote", params)) as RoderAgentDetail;
   expect(again.id).toBe(c.id);
   expect(await notes(service, c.id)).toBe("Existing decision");

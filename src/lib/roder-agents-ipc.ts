@@ -26,6 +26,7 @@ export const roderAgentsIpc = {
   schedule: (id: string, at: number, reason: string) => request<RoderAgentDetail>("schedule", { id, at, reason }),
   cancelWake: (id: string, wakeId: string) => request<RoderAgentDetail>("cancelWake", { id, wakeId }),
   compact: (id: string) => request<{ compacted: boolean; reason?: string }>("compact", { id }),
+  freshConversation: (id: string) => request<RoderAgentDetail>("freshConversation", { id }),
   listFiles: (id: string) => request<{ files: RoderFileVersion[] }>("files/list", { id }),
   readFile: (id: string, path: RoderFilePath, version?: number) =>
     request<RoderFile>("files/read", { id, path, ...(version === undefined ? {} : { version }) }),

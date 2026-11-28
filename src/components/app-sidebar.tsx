@@ -29,6 +29,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIssuesStore } from "@/lib/issues-ipc";
+import { roderNeedsYouCount } from "@/lib/roder-board";
 import { roderAgentsIpc } from "@/lib/roder-agents-ipc";
 import { roderIpc } from "@/lib/roder-ipc";
 import type { RoderAgent } from "@/types/roder-agents";
@@ -717,8 +719,11 @@ export function useSidebarRoderAgents() {
     refreshRef.current = refresh;
     const unsubscribe = roderIpc.onNotification((notification) => {
       if (notification.method === "desktop/roders/changed") void refresh();
+      // Needs-you counts follow the issue board.
+      if (notification.method === "desktop/issues/changed") void useIssuesStore.getState().refresh();
     });
     void refresh();
+    void useIssuesStore.getState().refresh();
     return () => {
       mounted = false;
       unsubscribe();
@@ -727,7 +732,21 @@ export function useSidebarRoderAgents() {
   return { roderAgents, error, loading, refresh: () => refreshRef.current() };
 }
 
-function RoderAgentLinks({
+/** How many of a Roder's issues wait on the user; nothing when none do. */
+export function RoderNeedsYouBadge({ count }: { count: number }): React.JSX.Element | null {
+  if (!count) return null;
+  return (
+    <span
+      aria-label={`${count} need you`}
+      title={`${count} ${count === 1 ? "issue needs" : "issues need"} you`}
+      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-amber-500 px-1.5 text-sm text-white"
+    >
+      {count}
+    </span>
+  );
+}
+
+export function RoderAgentLinks({
   roderAgents,
   error,
   loading,
@@ -749,6 +768,8 @@ function RoderAgentLinks({
   const workspaces = useRoderStore((state) => state.workspaces);
   const listId = useId();
   const filtered = filterRoderAgents(roderAgents, search.query, workspaces);
+  const issueProjects = useIssuesStore((state) => state.projects);
+  const issues = useIssuesStore((state) => state.issues);
   return (
     <section aria-label="Roders">
       <div className="flex h-7 items-center gap-1 text-sidebar-heading">
@@ -827,6 +848,7 @@ function RoderAgentLinks({
                 <span className="block truncate">{roderAgent.name}</span>
                 <span className="block truncate text-sm font-normal text-sidebar-muted">{roderAgent.mission}</span>
               </span>
+              <RoderNeedsYouBadge count={roderNeedsYouCount(roderAgent, issueProjects, issues)} />
             </SidebarRowButton>
           ))}
         </div>

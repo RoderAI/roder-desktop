@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { Button } from "@/components/ui/button";
 import { RoderAgentCreateDialog } from "@/components/roder-agent-create-dialog";
 import { RoderAgentAvatar } from "@/components/roder-agent-avatar";
 import { RoderAgentFiles } from "@/components/roder-agent-files";
 import { RoderAgentImageSetup } from "@/components/roder-agent-image-setup";
+import { RoderAgentView } from "@/components/roder-agent-view";
+import { useIssuesStore } from "@/lib/issues-ipc";
+import { answerIssue } from "@/lib/roder-board";
 import { roderAgentsIpc } from "@/lib/roder-agents-ipc";
 import { roderAgentCharacterPresentation } from "@/lib/roder-agent-character";
 import { roderIpc } from "@/lib/roder-ipc";
 import { cn } from "@/lib/utils";
+import { useRoderStore } from "@/stores/roder-store";
 import type { RoderAgent, RoderAgentDetail } from "@/types/roder-agents";
 import type { RoderModel, Workspace } from "@/types/roder";
 
@@ -28,6 +32,9 @@ export function RoderAgentsPage({
   const [creating, setCreating] = useState(false);
   const [models, setModels] = useState<RoderModel[]>([]);
   const [observedAt, setObservedAt] = useState(() => Date.now());
+  const { projects, issues } = useIssuesStore();
+  const threads = useRoderStore((state) => state.threads);
+  const navigate = useNavigate();
 
   async function refresh() {
     const result = await roderAgentsIpc.list();
@@ -57,9 +64,11 @@ export function RoderAgentsPage({
     const timer = setInterval(() => {
       if (mounted) void refresh().catch((cause) => setError(String(cause)));
     }, 15000);
+    void useIssuesStore.getState().refresh();
     const unsubscribe = roderIpc.onNotification((notification) => {
       if (mounted && notification.method === "desktop/roders/changed")
         void refresh().catch((cause) => setError(String(cause)));
+      if (mounted && notification.method === "desktop/issues/changed") void useIssuesStore.getState().refresh();
     });
     return () => {
       mounted = false;
@@ -149,17 +158,35 @@ export function RoderAgentsPage({
           </section>
           <section className="lg:col-span-2">
             {selected ? (
-              <RoderAgentEditor
+              <RoderAgentView
                 key={selected.id}
-                initial={selected}
-                status={roderAgents.find((c) => c.id === selected.id) ?? selected}
-                busy={busy}
-                observedAt={observedAt}
-                perform={perform}
+                roder={roderAgents.find((c) => c.id === selected.id) ?? selected}
+                files={selected.files}
+                projects={projects}
+                issues={issues}
+                threads={threads}
+                onComment={async (issueId, text) => {
+                  await answerIssue(issueId, text);
+                  await useIssuesStore.getState().refresh();
+                }}
+                onOpenThread={(threadId) =>
+                  void navigate({ to: "/threads/$threadId", params: { threadId }, search: true })
+                }
+                onOpenPullRequest={(url) => void window.roderDesktop.openExternal(url)}
+                settings={
+                  <RoderAgentEditor
+                    initial={selected}
+                    status={roderAgents.find((c) => c.id === selected.id) ?? selected}
+                    busy={busy}
+                    observedAt={observedAt}
+                    perform={perform}
+                    showFiles={false}
+                  />
+                }
               />
             ) : (
               <p className="rounded-xl border border-dashed border-border p-4 text-muted-foreground font-normal">
-                Select a Roder to edit its files and opt in to proactive work.
+                Select a Roder to see what needs you, its issues, threads and files.
               </p>
             )}
           </section>
@@ -176,6 +203,7 @@ export function RoderAgentEditor({
   observedAt,
   perform,
   showThreadLink = true,
+  showFiles = true,
 }: {
   initial: RoderAgentDetail;
   status: RoderAgent;
@@ -183,6 +211,8 @@ export function RoderAgentEditor({
   observedAt: number;
   perform: <T>(action: () => Promise<T>) => Promise<T | undefined>;
   showThreadLink?: boolean;
+  /** The Roder page shows files in their own tab. */
+  showFiles?: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   return (
@@ -257,6 +287,19 @@ export function RoderAgentEditor({
           >
             Compact context
           </Button>
+          <Button
+            disabled={busy || !!status.active}
+            variant="outline"
+            onClick={async () => {
+              const moved = await perform(() => roderAgentsIpc.freshConversation(status.id));
+              if (moved)
+                setMessage(
+                  "Started a fresh conversation. Files, issues and budgets are unchanged; the previous thread is listed below.",
+                );
+            }}
+          >
+            Fresh conversation
+          </Button>
         </div>
         {status.lastError ? (
           <p role="status" className="text-sm text-destructive">
@@ -269,7 +312,30 @@ export function RoderAgentEditor({
           </p>
         ) : null}
       </div>
-      <RoderAgentFiles key={status.id} roderId={status.id} initialFiles={initial.files} />
+      {status.previousThreadIds.length ? (
+        <section aria-label="Previous conversations" className="space-y-2">
+          <h3 className="font-semibold">Previous conversations</h3>
+          <p className="text-sm text-muted-foreground font-normal">
+            Threads this Roder talked in before a fresh conversation. They stay readable; its tools work only in the
+            current thread.
+          </p>
+          <ul className="space-y-1">
+            {status.previousThreadIds.map((threadId, index) => (
+              <li key={threadId}>
+                <Link
+                  to="/threads/$threadId"
+                  params={{ threadId }}
+                  search={true}
+                  className="rounded-md px-3 py-2 underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Conversation {index + 1}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {showFiles ? <RoderAgentFiles key={status.id} roderId={status.id} initialFiles={initial.files} /> : null}
       <form
         className="space-y-3"
         onSubmit={async (event) => {
@@ -282,6 +348,8 @@ export function RoderAgentEditor({
               intervalMinutes: Number(data.get("interval")),
               maxRunsPerDay: Number(data.get("runs")),
               maxRunMinutes: Number(data.get("minutes")),
+              maxConcurrentWorkers: Number(data.get("workers")),
+              maxFollowups: Number(data.get("followups")),
               eventMethods: String(data.get("events"))
                 .split(",")
                 .map((v) => v.trim())
@@ -328,6 +396,32 @@ export function RoderAgentEditor({
               min={1}
               max={60}
               defaultValue={initial.maxRunMinutes}
+              required
+              className={fieldClass}
+            />
+          </label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="space-y-1">
+            <span>Workers at once</span>
+            <input
+              name="workers"
+              type="number"
+              min={1}
+              max={32}
+              defaultValue={initial.maxConcurrentWorkers}
+              required
+              className={fieldClass}
+            />
+          </label>
+          <label className="space-y-1">
+            <span>Automatic follow-ups per worker</span>
+            <input
+              name="followups"
+              type="number"
+              min={0}
+              max={32}
+              defaultValue={initial.maxFollowups}
               required
               className={fieldClass}
             />
