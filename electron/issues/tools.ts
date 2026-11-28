@@ -1,4 +1,4 @@
-import { issuePriorities, issueStatuses } from "../../src/types/issues";
+import { issueOutcomes, issuePriorities, issueStatuses } from "../../src/types/issues";
 import type { IssuesService } from "./service";
 
 const string = { type: "string" };
@@ -9,10 +9,10 @@ const status = { type: "string", enum: issueStatuses };
 const owner = {
   type: "object",
   description:
-    'Who holds the issue, one of: {type: "roder"} (the project\'s Roder), {type: "thread", threadId} (a thread doing the work, which also links it), or {type: "user"} (agents hand over with issues_ask_user instead). threadId is required for thread and not allowed otherwise.',
+    'Who holds the issue, one of: {type: "roder"} (the project\'s Roder) or {type: "thread", threadId} (a thread doing the work, which also links it). threadId is required for thread and not allowed otherwise. To hand the issue to the user, use issues_ask_user.',
   properties: {
-    type: { type: "string", enum: ["roder", "thread", "user"] },
-    threadId: { type: "string", description: 'Required when type is "thread"; omit it for "roder" and "user".' },
+    type: { type: "string", enum: ["roder", "thread"] },
+    threadId: { type: "string", description: 'Required when type is "thread"; omit it for "roder".' },
   },
   required: ["type"],
   additionalProperties: false,
@@ -103,7 +103,7 @@ export const issueToolDefinitions = [
   tool(
     "issues_update",
     "desktop/issues/update",
-    "Edit an issue, change its owner, priority or status. in_progress needs a linked thread, in_review a linked pull request. Close with issues_close and hand over to the user with issues_ask_user. doneCriteria can be edited but not cleared.",
+    "Edit an issue, change its owner, priority or status. in_progress needs a thread owner or a child issue in progress, in_review a linked pull request. Close with issues_close and hand over to the user with issues_ask_user. doneCriteria can be edited but not cleared.",
     { id: string, ...issueFields },
     ["id"],
   ),
@@ -131,8 +131,8 @@ export const issueToolDefinitions = [
   tool(
     "issues_close",
     "desktop/issues/close",
-    "Close an issue. outcome merged (needs a linked pull request) moves it to done; dropped moves it to cancelled. The note says what happened.",
-    { id: string, outcome: { type: "string", enum: ["merged", "dropped"] }, note: string },
+    "Close an issue. outcome merged (needs a linked pull request) moves it to done; dropped moves it to cancelled. The note says what happened. Closing an already closed issue changes nothing.",
+    { id: string, outcome: { type: "string", enum: issueOutcomes }, note: string },
     ["id", "outcome", "note"],
   ),
   tool(

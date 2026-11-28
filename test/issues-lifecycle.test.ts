@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { IssuesService } from "../electron/issues/service";
 import type { Issue, IssueActor } from "../src/types/issues";
 
@@ -12,14 +12,17 @@ const pr = "https://github.com/team/repo/pull/7";
 
 const directories: string[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
 async function setup() {
   const directory = await mkdtemp(join(tmpdir(), "roder-issue-lifecycle-"));
   directories.push(directory);
+  const changed = vi.fn<() => void>();
   const service = new IssuesService({
     storagePath: join(directory, "issues.json"),
+    onEvent: changed,
     launchIssue: async () => ({ threadId: "launched-thread" }),
   });
   const { project } = await service.request(
@@ -29,7 +32,7 @@ async function setup() {
   );
   const create = async (fields: Record<string, unknown> = {}) =>
     (await service.request("desktop/issues/create", { projectId: project.id, title: "Work", ...fields }, user)).issue;
-  return { service, project, create };
+  return { service, project, create, changed };
 }
 
 type Setup = Awaited<ReturnType<typeof setup>>;
@@ -98,6 +101,44 @@ const refusals: Case[] = [
       method: "desktop/issues/update",
       params: { id: (await create()).id, status: "in_progress" },
     }),
+  },
+  {
+    name: "move to in_progress on a thread that no longer owns the issue",
+    refusal: "an issue is in_progress only while a thread works on it",
+    call: async ({ service, create }) => {
+      const issue = await create({ owner: { type: "thread", threadId: "old-thread" }, doneCriteria: "Ships" });
+      await service.request("desktop/issues/update", { id: issue.id, owner: { type: "roder" } }, user);
+      return { method: "desktop/issues/update", params: { id: issue.id, status: "in_progress" } };
+    },
+  },
+  {
+    name: "take the thread off an in_progress issue by changing only the owner",
+    refusal: "an issue is in_progress only while a thread works on it",
+    call: async ({ create }) => {
+      const issue = await create({
+        status: "in_progress",
+        owner: { type: "thread", threadId: "old-thread" },
+        doneCriteria: "Ships",
+      });
+      return { method: "desktop/issues/update", params: { id: issue.id, owner: { type: "roder" } } };
+    },
+  },
+  {
+    name: "edit an in_progress issue that no thread owns",
+    refusal: "an issue is in_progress only while a thread works on it",
+    call: async ({ create }) => {
+      const issue = await create({ status: "in_progress", doneCriteria: "Ships" });
+      return { method: "desktop/issues/update", params: { id: issue.id, title: "Renamed" } };
+    },
+  },
+  {
+    name: "answer for the user into in_progress by handing the issue to the Roder",
+    refusal: "an issue is in_progress only while a thread works on it",
+    call: async ({ service, create }) => {
+      const issue = await create({ owner: { type: "thread", threadId: "old-thread" } });
+      await service.request("desktop/issues/askUser", { id: issue.id, question: "Go?" }, roder);
+      return { method: "desktop/issues/update", params: { id: issue.id, owner: { type: "roder" } } };
+    },
   },
   {
     name: "move to needs_you without askUser",
@@ -193,6 +234,50 @@ test("a parent issue is in_progress while one of its children is", async () => {
   await service.request("desktop/issues/launch", { id: child.id }, agent);
   const { issue } = await service.request("desktop/issues/update", { id: parent.id, status: "in_progress" }, agent);
   expect(issue.status).toBe("in_progress");
+  // The child is the evidence, so the parent needs no thread owner of its own.
+  const { issue: edited } = await service.request(
+    "desktop/issues/update",
+    { id: parent.id, title: "Whole request" },
+    agent,
+  );
+  expect(edited).toMatchObject({ status: "in_progress", owner: { type: "roder" } });
+  // Once no child is in progress, an agent has to move the parent on too.
+  await service.request("desktop/issues/close", { id: child.id, outcome: "dropped", note: "Moot" }, agent);
+  await expect(service.request("desktop/issues/update", { id: parent.id, priority: "high" }, agent)).rejects.toThrow(
+    "in_progress only while a thread works on it",
+  );
+  const { issue: waiting } = await service.request(
+    "desktop/issues/update",
+    { id: parent.id, status: "todo", priority: "high" },
+    agent,
+  );
+  expect(waiting).toMatchObject({ status: "todo", priority: "high" });
+});
+
+test("a refused owner change leaves the in_progress issue as it was", async () => {
+  const { service, create } = await setup();
+  const issue = await create({
+    status: "in_progress",
+    owner: { type: "thread", threadId: agent.threadId },
+    doneCriteria: "Ships",
+  });
+  await expect(
+    service.request("desktop/issues/update", { id: issue.id, owner: { type: "roder" } }, agent),
+  ).rejects.toThrow("in_progress only while a thread works on it");
+  expect((await service.request("desktop/issues/read", { id: issue.id })).issue).toEqual(issue);
+  // Another thread can take it over, and it can leave in_progress with its owner.
+  const { issue: taken } = await service.request(
+    "desktop/issues/update",
+    { id: issue.id, owner: { type: "thread", threadId: "next-thread" } },
+    agent,
+  );
+  expect(taken.status).toBe("in_progress");
+  const { issue: released } = await service.request(
+    "desktop/issues/update",
+    { id: issue.id, owner: { type: "roder" }, status: "todo" },
+    agent,
+  );
+  expect(released).toMatchObject({ status: "todo", owner: { type: "roder" } });
 });
 
 test("close: merged needs a linked pull request and a note; dropped cancels", async () => {
@@ -223,6 +308,53 @@ test("close: merged needs a linked pull request and a note; dropped cancels", as
     agent,
   );
   expect(dropped.status).toBe("cancelled");
+});
+
+test.each(["merged", "dropped"])("closing an issue already closed as %s changes nothing", async (outcome) => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-01-01T00:00:00Z") });
+  const { service, create, changed } = await setup();
+  const issue = await create();
+  await service.request("desktop/issues/linkPullRequest", { id: issue.id, url: pr }, agent);
+  const { issue: closed } = await service.request(
+    "desktop/issues/close",
+    { id: issue.id, outcome, note: "First" },
+    agent,
+  );
+  vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+  changed.mockClear();
+  for (const actor of [agent, user] as IssueActor[])
+    for (const again of ["merged", "dropped"])
+      expect(
+        await service.request("desktop/issues/close", { id: issue.id, outcome: again, note: "Again" }, actor),
+      ).toEqual({ issue: closed });
+  expect(changed).not.toHaveBeenCalled();
+  expect((await service.request("desktop/issues/read", { id: issue.id })).issue).toEqual(closed);
+});
+
+test("deleting a parent records the removal on each child", async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-01-01T00:00:00Z") });
+  const { service, create } = await setup();
+  const parent = await create({ title: "Request" });
+  const children = [
+    await create({ title: "First", parent: parent.id }),
+    await create({ title: "Second", parent: parent.id }),
+  ];
+  const bystander = await create({ title: "Unrelated" });
+  vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+  await service.request("desktop/issues/delete", { id: parent.id }, agent);
+  for (const child of children) {
+    const { issue } = await service.request("desktop/issues/read", { id: child.id });
+    expect(issue).toMatchObject({ parent: null, updatedAt: "2026-01-02T00:00:00.000Z" });
+    expect(issue.activity).toHaveLength(child.activity.length + 1);
+    expect(issue.activity.at(-1)).toMatchObject({
+      kind: "updated",
+      text: "Parent issue deleted",
+      createdAt: "2026-01-02T00:00:00.000Z",
+      actor: { type: "thread", threadId: agent.threadId },
+      changes: [{ field: "parent", before: parent.id, after: null }],
+    });
+  }
+  expect((await service.request("desktop/issues/read", { id: bystander.id })).issue).toEqual(bystander);
 });
 
 test("askUser makes the user the owner and the issue needs_you, recording the asking thread", async () => {
@@ -363,11 +495,7 @@ test("a person moving the status alone moves the owner with it", async () => {
     user,
   );
   expect(waiting.owner).toEqual({ type: "user" });
-  const { issue: back } = await service.request(
-    "desktop/issues/update",
-    { id: issue.id, status: "todo", owner: { type: "user" } },
-    user,
-  );
+  const { issue: back } = await service.request("desktop/issues/update", { id: issue.id, status: "todo" }, user);
   expect(back).toMatchObject({ owner: { type: "roder" }, status: "todo" });
 });
 

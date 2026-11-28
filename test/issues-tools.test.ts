@@ -71,6 +71,15 @@ test("a thread that is not a Roder can file, take, report on and close an issue"
   }
 });
 
+test("the agent owner schema offers only the owners an agent may set", () => {
+  for (const name of ["issues_create", "issues_update"]) {
+    const tool = issueToolDefinitions.find((item) => item.name === name);
+    expect(tool?.inputSchema.properties).toMatchObject({
+      owner: { properties: { type: { enum: ["roder", "thread"] } } },
+    });
+  }
+});
+
 test("tool calls act as the calling agent, not the user", async () => {
   const directory = await mkdtemp(join(tmpdir(), "roder-issue-tools-"));
   try {

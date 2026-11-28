@@ -23,7 +23,8 @@ export type IssueOwner = { type: "roder" } | { type: "user" } | { type: "thread"
  */
 export type IssueActor = { type: "user" } | { type: "agent"; threadId: string };
 
-export type IssueOutcome = "merged" | "dropped";
+export const issueOutcomes = ["merged", "dropped"] as const;
+export type IssueOutcome = (typeof issueOutcomes)[number];
 
 export type IssuePullRequest = { url: string; title: string };
 

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
+  issueOutcomes,
   issuePriorities,
   issueStatuses,
   type Issue,
@@ -115,24 +116,29 @@ function linkOwner(issue: Issue): void {
 
 /**
  * Status moves an agent may make itself. Each needs the evidence that makes it
- * true, so the board can't drift ahead of the work. A parent issue is in
- * progress while one of its children is.
+ * true, so the board can't drift ahead of the work. in_progress is checked on
+ * every update, not only on a status move: it needs a thread owner, or, for a
+ * parent issue, a child in progress.
  */
 function transition(before: Issue, next: Issue, childInProgress: boolean): void {
-  if (next.status !== before.status) {
+  const moved = next.status !== before.status;
+  if (moved) {
     if (terminal(next.status))
       throw new Error("close issues with issues_close (outcome merged or dropped, plus a note)");
     if (next.status === "in_review" && !next.pullRequests.length)
       throw new Error("link the pull request with issues_link_pull_request before moving the issue to in_review");
-    if (next.status === "in_progress" && !next.threadIds.length && !childInProgress)
-      throw new Error(
-        `an issue is in_progress only while a thread works on it: launch it with issues_launch, set its owner to the working thread, or, for a parent issue, start work on one of its child issues (parent: "${before.id}") first`,
-      );
     if (next.status === "needs_you") throw new Error("hand the issue to the user with issues_ask_user");
-    // Creating outside backlog needs doneCriteria; so does moving out of it.
-    if (next.status !== "backlog" && !next.doneCriteria.trim())
-      throw new Error("add doneCriteria: what must be true for this issue to be done");
   }
+  // Leaving the user can move the status by itself, so check where it settles.
+  const settled = { ...next };
+  normalize(settled);
+  if (settled.status === "in_progress" && settled.owner.type !== "thread" && !childInProgress)
+    throw new Error(
+      `an issue is in_progress only while a thread works on it: launch it with issues_launch, set its owner to the working thread, or, for a parent issue, start work on one of its child issues (parent: "${before.id}") first. If no work is under way, move it to another status such as todo`,
+    );
+  // Creating outside backlog needs doneCriteria; so does moving out of it.
+  if (moved && next.status !== "backlog" && !next.doneCriteria.trim())
+    throw new Error("add doneCriteria: what must be true for this issue to be done");
   if (!sameOwner(next.owner, before.owner) && next.owner.type === "user")
     throw new Error("hand the issue to the user with issues_ask_user");
   if (before.doneCriteria.trim() && !next.doneCriteria.trim())
@@ -518,25 +524,30 @@ export class IssuesService {
     }
     if (method === "desktop/issues/close") {
       const issue = issueById();
-      const outcome = oneOf(p.outcome, ["merged", "dropped"] as const, "outcome");
+      const outcome = oneOf(p.outcome, issueOutcomes, "outcome");
       const note = text(p.note, "note", true, 8_192);
+      // A closed issue is history: closing it again changes nothing.
+      if (terminal(issue.status)) return { issue };
       if (outcome === "merged" && !issue.pullRequests.length)
         throw new Error("link the merged pull request before closing the issue as merged");
       const status = outcome === "merged" ? "done" : "cancelled";
-      const changes: IssueChange[] =
-        issue.status === status ? [] : [{ field: "status", before: issue.status, after: status }];
+      const changes: IssueChange[] = [{ field: "status", before: issue.status, after: status }];
       issue.status = status;
-      record(issue, {
-        kind: "closed",
-        text: `${outcome === "merged" ? "Merged" : "Dropped"} · ${note}`,
-        ...(changes.length ? { changes } : {}),
-      });
+      record(issue, { kind: "closed", text: `${outcome === "merged" ? "Merged" : "Dropped"} · ${note}`, changes });
       return issueResult(issue);
     }
     if (method === "desktop/issues/delete") {
       const issue = issueById();
       db.issues = db.issues.filter((item) => item.id !== issue.id);
-      for (const child of db.issues) if (child.parent === issue.id) child.parent = null;
+      for (const child of db.issues) {
+        if (child.parent !== issue.id) continue;
+        child.parent = null;
+        record(child, {
+          kind: "updated",
+          text: "Parent issue deleted",
+          changes: [{ field: "parent", before: issue.id, after: null }],
+        });
+      }
       await this.save(db);
       return { deleted: true };
     }
