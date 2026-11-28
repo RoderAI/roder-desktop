@@ -1713,8 +1713,9 @@ export const useRoderStore = create<RoderStore>()(
           ...selectedComposerPreferencePatch(state, { policyMode: preference }),
           error: null,
         }));
-        // A draft has no live thread. Its preference is copied when the thread is created.
-        if (!activeThreadId || (preference === previousPreference && mode === previousMode)) {
+        // A draft has no live thread. For a live thread, reselecting the mode
+        // also reapplies it so the engine can reevaluate pending approvals.
+        if (!activeThreadId) {
           return;
         }
         try {
