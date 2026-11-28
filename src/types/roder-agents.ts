@@ -5,7 +5,10 @@ export type RoderAgent = {
   /** One-line summary for lists. It mirrors the opening paragraph of INSTRUCTIONS.md once that is written. */
   mission: string;
   workspaceId: string;
+  /** The thread the Roder talks in now. */
   threadId: string;
+  /** Threads it talked in before a fresh conversation, oldest first. They stay readable. */
+  previousThreadIds: string[];
   modelProvider?: string;
   model?: string;
   reasoning?: string;
