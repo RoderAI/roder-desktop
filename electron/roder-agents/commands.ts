@@ -29,6 +29,7 @@ import {
   type RoderActionType,
 } from "./actions";
 import type { RoderFileStore } from "./files";
+import type { RoderWorkers } from "./workers";
 import type { IssuesService } from "../issues/service";
 
 /** Receipts kept per Roder; the oldest are dropped first. */
@@ -56,7 +57,15 @@ export type RoderCommandOptions = {
   pause: (roder: RoderAgent) => Promise<void>;
   /** Called after a Roder's command writes one of its files. */
   fileWritten: (roder: RoderAgent, path: RoderFilePath) => Promise<void>;
+  /** The Roder's worker registry (electron/roder-agents/workers.ts). */
+  workers?: Pick<RoderWorkers, "delegate" | "message" | "stop" | "release">;
 };
+
+/** What a worker thread may do with roder_command (Zuse `crates/engine/src/rpc/zappers.rs`). */
+export const RODER_WORKER_ACTIONS: readonly RoderActionType[] = ["commentIssue", "linkIssuePullRequest"];
+
+/** Who sends a command: the Roder's own thread, or one of its worker threads. */
+export type RoderCommandCaller = { type: "roder" } | { type: "worker"; threadId: string };
 
 function object(value: unknown, label: string): ObjectValue {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
@@ -249,10 +258,10 @@ export function createRoderCommands(options: RoderCommandOptions) {
   async function issueAction(
     method: string,
     params: ObjectValue,
-    roder: RoderAgent,
+    actorThreadId: string,
     summary: (issue: Issue) => string,
   ) {
-    const actor: IssueActor = { type: "agent", threadId: roder.threadId };
+    const actor: IssueActor = { type: "agent", threadId: actorThreadId };
     try {
       const { issue } = (await issues().request(method, params, actor)) as { issue: Issue };
       return { issue: resultIssue(issue), summary: summary(issue) };
@@ -268,44 +277,44 @@ export function createRoderCommands(options: RoderCommandOptions) {
   }
 
   const handlers = {
-    createIssue: async (roder, action) => {
+    createIssue: async (roder, action, actor) => {
       const { id } = await requireProject(roder);
       return issueAction(
         "desktop/issues/create",
         { ...details(action.details), projectId: id },
-        roder,
+        actor,
         (issue) => `Created issue #${issue.number} ${issue.title} (${issue.status})`,
       );
     },
-    editIssue: (roder, action) =>
+    editIssue: (_roder, action, actor) =>
       issueAction(
         "desktop/issues/update",
         { ...details(action.details), id: action.issueId },
-        roder,
+        actor,
         (issue) => `Edited issue #${issue.number} (${issue.status})`,
       ),
-    commentIssue: (roder, action) =>
+    commentIssue: (_roder, action, actor) =>
       issueAction(
         "desktop/issues/comment",
         { id: action.issueId, text: action.text },
-        roder,
+        actor,
         (issue) => `Commented on issue #${issue.number}`,
       ),
-    linkIssuePullRequest: (roder, action) =>
+    linkIssuePullRequest: (_roder, action, actor) =>
       issueAction(
         "desktop/issues/linkPullRequest",
         { id: action.issueId, url: action.url, ...(action.title === undefined ? {} : { title: action.title }) },
-        roder,
+        actor,
         (issue) => `Linked ${String(action.url)} to issue #${issue.number}`,
       ),
-    unlinkIssuePullRequest: (roder, action) =>
+    unlinkIssuePullRequest: (_roder, action, actor) =>
       issueAction(
         "desktop/issues/unlinkPullRequest",
         { id: action.issueId, url: action.url },
-        roder,
+        actor,
         (issue) => `Unlinked ${String(action.url)} from issue #${issue.number}`,
       ),
-    askUser: (roder, action) =>
+    askUser: (_roder, action, actor) =>
       issueAction(
         "desktop/issues/askUser",
         {
@@ -313,14 +322,14 @@ export function createRoderCommands(options: RoderCommandOptions) {
           question: action.question,
           ...(action.recommendation === undefined ? {} : { recommendation: action.recommendation }),
         },
-        roder,
+        actor,
         (issue) => `Asked the user about issue #${issue.number}; it needs them now`,
       ),
-    closeIssue: (roder, action) =>
+    closeIssue: (_roder, action, actor) =>
       issueAction(
         "desktop/issues/close",
         { id: action.issueId, outcome: action.outcome, note: action.note },
-        roder,
+        actor,
         (issue) => `Closed issue #${issue.number} as ${String(action.outcome)} (${issue.status})`,
       ),
     writeFile: (roder, action) =>
@@ -347,6 +356,91 @@ export function createRoderCommands(options: RoderCommandOptions) {
           }),
         `Restored version ${String(action.version)} of`,
       ),
+    delegate: async (roder, action, actor) => {
+      const workers = requireWorkers();
+      const issue = await resolveIssue(roder, action.issueId);
+      if (issue.status === "done" || issue.status === "cancelled")
+        throw new Error(`Issue #${issue.number} is closed; reopen it with editIssue before delegating it`);
+      if (issue.status === "needs_you")
+        throw new Error(
+          `Issue #${issue.number} waits on the user (needs_you); wait for their answer before delegating it`,
+        );
+      if (!issue.doneCriteria.trim())
+        throw new Error(
+          `Issue #${issue.number} has no doneCriteria; add them with editIssue so the worker knows what done means`,
+        );
+      const worker = object(action.worker, "worker");
+      for (const key of Object.keys(worker))
+        if (key !== "objective") throw new Error(`Unknown worker field ${key}; worker takes {objective}`);
+      let model: { modelProvider: string; model: string; reasoning?: string } | undefined;
+      if (action.model !== undefined) {
+        const input = object(action.model, "model");
+        for (const key of Object.keys(input))
+          if (!["modelProvider", "model", "reasoning"].includes(key))
+            throw new Error(`Unknown model field ${key}; model takes {modelProvider, model, reasoning?}`);
+        if (typeof input.modelProvider !== "string" || !input.modelProvider.trim())
+          throw new Error("model.modelProvider must be a provider id");
+        if (typeof input.model !== "string" || !input.model.trim()) throw new Error("model.model must be a model id");
+        if (input.reasoning !== undefined && typeof input.reasoning !== "string")
+          throw new Error("model.reasoning must be a string");
+        model = {
+          modelProvider: input.modelProvider,
+          model: input.model,
+          ...(input.reasoning === undefined ? {} : { reasoning: input.reasoning as string }),
+        };
+      }
+      const delegated = await workers.delegate(roder, {
+        issue,
+        objective: worker.objective,
+        ...(action.base === undefined ? {} : { base: action.base }),
+        ...(model ? { model } : {}),
+      });
+      let linked: Awaited<ReturnType<typeof issueAction>>;
+      try {
+        linked = await issueAction(
+          "desktop/issues/update",
+          { id: issue.id, owner: { type: "thread", threadId: delegated.threadId }, status: "in_progress" },
+          actor,
+          (updated) => `Delegated issue #${updated.number}`,
+        );
+      } catch (error) {
+        await workers.release(roder, delegated.threadId);
+        throw new Error(
+          `${error instanceof Error ? error.message : String(error)}. The worker thread ${delegated.threadId} and its worktree ${delegated.worktreePath} were made but released, so nothing was sent to it`,
+          { cause: error },
+        );
+      }
+      const queued = delegated.queuePosition
+        ? `; it is queued at position ${delegated.queuePosition} and starts when a running worker goes idle`
+        : "; it starts now";
+      return {
+        ...linked,
+        worker: structuredClone(delegated),
+        summary: `Delegated issue #${issue.number} to thread ${delegated.threadId} on branch ${delegated.branch} from ${delegated.base}${queued}`,
+      };
+    },
+    messageWorker: async (roder, action) => {
+      const worker = await requireWorkers().message(
+        roder,
+        { threadId: action.threadId, text: action.text, automatic: action.automatic },
+        "roder",
+      );
+      return {
+        worker: structuredClone(worker),
+        summary: `Queued a message to worker ${worker.threadId} (${worker.followups} of ${roder.maxFollowups} automatic follow-ups used)`,
+      };
+    },
+    stopWorker: async (roder, action) => {
+      const worker = await requireWorkers().stop(roder, action.threadId, "roder");
+      return { worker: structuredClone(worker), summary: `Stopped worker ${worker.threadId}` };
+    },
+    releaseWorker: async (roder, action) => {
+      const worker = await requireWorkers().release(roder, action.threadId);
+      return {
+        worker: structuredClone(worker),
+        summary: `Released worker ${worker.threadId}; its thread and worktree are kept`,
+      };
+    },
     setStatus: async (roder, action) => {
       if (action.status === "active") {
         if (!roder.enabled)
@@ -359,7 +453,25 @@ export function createRoderCommands(options: RoderCommandOptions) {
       if (roder.enabled) await options.pause(roder);
       return { status: "paused", summary: "Paused: no automatic turns until the user resumes you" };
     },
-  } satisfies Record<RoderActionType, (roder: RoderAgent, action: RoderAction) => Promise<Outcome>>;
+  } satisfies Record<RoderActionType, (roder: RoderAgent, action: RoderAction, actor: string) => Promise<Outcome>>;
+
+  function requireWorkers() {
+    if (!options.workers) throw new Error("Delegation to worker threads is unavailable in this build");
+    return options.workers;
+  }
+
+  /** A worker may only comment on, or link a pull request to, an issue linked to its own thread. */
+  async function authorizeWorker(roder: RoderAgent, action: RoderAction, threadId: string) {
+    if (!RODER_WORKER_ACTIONS.includes(action.type))
+      throw new Error(
+        `A worker thread may use roder_command only for ${RODER_WORKER_ACTIONS.join(" and ")} on its own linked issues; ${action.type} is the Roder's. Say what you need in your report instead.`,
+      );
+    const issue = await resolveIssue(roder, action.issueId);
+    if (!issue.threadIds.includes(threadId))
+      throw new Error(
+        `Issue #${issue.number} is not linked to this thread; a worker comments only on its own linked issues`,
+      );
+  }
 
   function roderIdOf(input: ObjectValue, roder: RoderAgent) {
     if (input.roderId !== roder.id)
@@ -367,8 +479,8 @@ export function createRoderCommands(options: RoderCommandOptions) {
   }
 
   return {
-    /** Apply one command for the Roder that owns the calling thread. */
-    async command(roder: RoderAgent, value: unknown): Promise<unknown> {
+    /** Apply one command for the Roder that owns the calling thread, or one of its workers. */
+    async command(roder: RoderAgent, value: unknown, caller: RoderCommandCaller = { type: "roder" }): Promise<unknown> {
       const input = object(value, "roder_command input");
       const commandId = input.commandId;
       if (typeof commandId !== "string" || !/^[A-Za-z0-9._:-]{1,160}$/.test(commandId))
@@ -378,7 +490,15 @@ export function createRoderCommands(options: RoderCommandOptions) {
       if (expected !== undefined && (!Number.isSafeInteger(expected) || (expected as number) < 0))
         throw new Error("expectedRevision must be a non-negative whole number");
       const action = parseRoderAction(input.action);
-      const fingerprint = canonical({ commandId, roderId: roder.id, expectedRevision: expected, action });
+      if (caller.type === "worker") await authorizeWorker(roder, action, caller.threadId);
+      const actor = caller.type === "worker" ? caller.threadId : roder.threadId;
+      const fingerprint = canonical({
+        commandId,
+        roderId: roder.id,
+        expectedRevision: expected,
+        action,
+        ...(caller.type === "worker" ? { worker: caller.threadId } : {}),
+      });
 
       const ledger = await load(roder);
       const receipt = ledger.receipts.find((entry) => entry.commandId === commandId);
@@ -406,7 +526,7 @@ export function createRoderCommands(options: RoderCommandOptions) {
       await save(roder, ledger);
       let outcome: Outcome;
       try {
-        outcome = await handlers[resolved.type](roder, resolved);
+        outcome = await handlers[resolved.type](roder, resolved, actor);
       } catch (error) {
         // A refused action wrote nothing; forget it so the same commandId can be retried.
         ledger.receipts = ledger.receipts.filter((entry) => entry !== pending);

@@ -1,6 +1,6 @@
 import { realpath } from "node:fs/promises";
 import { isRemoteRunner } from "../../src/lib/cloud-machines";
-import type { LocalWorktreeContext, WorktreeCheckoutStep } from "../../src/lib/local-worktrees";
+import type { LocalWorktree, LocalWorktreeContext, WorktreeCheckoutStep } from "../../src/lib/local-worktrees";
 import type { RoderThread, Workspace, WorkspaceRoot } from "../../src/types/roder";
 import { GitWorktrees, pathIsWithin } from "./git-worktrees";
 
@@ -90,27 +90,50 @@ export class DesktopWorktrees {
     path: string,
     start: (root: WorkspaceRoot) => Promise<unknown>,
   ): Promise<unknown> {
+    return this.serial(() => this.startInCheckout(context, path, start));
+  }
+
+  /**
+   * Make a new checkout on its own `branch` from `base` (default: the
+   * repository's default branch at origin) and start a thread in it, as one
+   * step. The workspace's primary checkout is left as it is.
+   */
+  startThreadInNewWorktree(
+    context: LocalWorktreeContext,
+    options: { branch: string; base?: string },
+    start: (root: WorkspaceRoot) => Promise<unknown>,
+  ): Promise<{ result: unknown; checkout: LocalWorktree; base: string; workspace: Workspace }> {
     return this.serial(async () => {
-      let { workspace, root } = await this.selection(context);
-      const checkout = await this.git.resolve(root.path, path);
-      const matchesCheckout = (entry: WorkspaceRoot) =>
-        pathIsWithin(entry.path, checkout.path) && pathIsWithin(checkout.path, entry.path);
-      const existing = workspace.roots.find(matchesCheckout);
-      if (existing) {
-        root = existing;
-      } else {
-        const checkoutName = checkout.branch ?? `Detached ${checkout.head.slice(0, 7)}`;
-        workspace = await this.updateRoots(workspace, [
-          ...workspace.roots,
-          { path: checkout.path, name: checkoutName },
-        ]);
-        const added = workspace.roots.find(matchesCheckout);
-        if (!added) throw new Error("The app server did not register the worktree folder.");
-        root = added;
-      }
-      const result = await start(root);
-      return { ...(result as Record<string, unknown>), desktopWorktreeWorkspace: workspace };
+      const { root } = await this.selection(context);
+      const base = options.base ?? (await this.git.defaultBase(root.path));
+      const checkout = await this.git.create(root.path, options.branch, undefined, base);
+      const started = (await this.startInCheckout(context, checkout.path, start)) as Record<string, unknown>;
+      const { desktopWorktreeWorkspace, ...result } = started;
+      return { result, checkout, base, workspace: desktopWorktreeWorkspace as Workspace };
     });
+  }
+
+  private async startInCheckout(
+    context: LocalWorktreeContext,
+    path: string,
+    start: (root: WorkspaceRoot) => Promise<unknown>,
+  ): Promise<Record<string, unknown>> {
+    let { workspace, root } = await this.selection(context);
+    const checkout = await this.git.resolve(root.path, path);
+    const matchesCheckout = (entry: WorkspaceRoot) =>
+      pathIsWithin(entry.path, checkout.path) && pathIsWithin(checkout.path, entry.path);
+    const existing = workspace.roots.find(matchesCheckout);
+    if (existing) {
+      root = existing;
+    } else {
+      const checkoutName = checkout.branch ?? `Detached ${checkout.head.slice(0, 7)}`;
+      workspace = await this.updateRoots(workspace, [...workspace.roots, { path: checkout.path, name: checkoutName }]);
+      const added = workspace.roots.find(matchesCheckout);
+      if (!added) throw new Error("The app server did not register the worktree folder.");
+      root = added;
+    }
+    const result = await start(root);
+    return { ...(result as Record<string, unknown>), desktopWorktreeWorkspace: workspace };
   }
 
   startInCurrentFolder(start: () => Promise<unknown>): Promise<unknown> {

@@ -41,6 +41,7 @@ const issueId = required(
   "issueId",
   string("The issue's id, or its number (such as 12). Read the board with roder_issue to find it."),
 );
+const threadId = required("threadId", string("The worker's thread id, from delegate's result."));
 const version = (description: string): JsonSchema => ({ type: "integer", minimum: 0, description });
 
 /** The fields of an issue a Roder writes. editIssue changes only the fields given. */
@@ -134,6 +135,50 @@ export const roderActions = [
       required("expectedVersion", version("The file's current version, from roder_files.")),
     ],
     scope: fileScope,
+  },
+  {
+    type: "delegate",
+    summary:
+      "Hand an issue to a new worker thread in its own git worktree, on a new branch from base (default: the repository's default branch at origin). The thread becomes the issue's owner and the issue moves to in_progress. Over maxConcurrentWorkers the worker waits with a queue position and starts when a running worker goes idle. All repository writes go to workers.",
+    fields: [
+      issueId,
+      required("worker", {
+        type: "object",
+        description: "objective: a self-contained brief: goal, relevant paths and facts, acceptance checks.",
+        properties: { objective: string() },
+        required: ["objective"],
+        additionalProperties: false,
+      }),
+      optional("model", {
+        type: "object",
+        description: "The worker's model. Default: your own model.",
+        properties: { modelProvider: string(), model: string(), reasoning: string() },
+        required: ["modelProvider", "model"],
+        additionalProperties: false,
+      }),
+      optional("base", string("Branch, tag or commit the worker's branch starts from, such as origin/main.")),
+    ],
+    scope: issueScope,
+  },
+  {
+    type: "messageWorker",
+    summary:
+      "Send one of your workers more work. automatic: true for your own follow-ups, which are limited by maxFollowups; false only to relay the user's own words, which resets that count.",
+    fields: [threadId, required("text", string()), required("automatic", { type: "boolean" })],
+    scope: commutes,
+  },
+  {
+    type: "stopWorker",
+    summary: "Stop a worker: cancel its pending messages and interrupt its running turn. messageWorker resumes it.",
+    fields: [threadId],
+    scope: commutes,
+  },
+  {
+    type: "releaseWorker",
+    summary:
+      "Stop tracking a worker. Its thread, worktree and issue links are kept; it no longer counts against your limits.",
+    fields: [threadId],
+    scope: commutes,
   },
   {
     type: "setStatus",

@@ -80,20 +80,18 @@ cap in this MVP.
 
 The Roder uses an original Roder coordination strategy, not a copied private
 prompt. It owns the project outcome, writes self-contained worker briefs with
-explicit write ownership and acceptance evidence, and runs independent work in
-parallel only when the actual advertised engine tools support it. The released
-`task` and optional `agent_swarm` tools dispatch configured roles; the strategy
-requires their exact advertised role IDs and schemas rather than inventing
-roles or APIs. An advertised `spawn_agent` can handle generic workers. If tools
-aren't available, the Roder works serially and reports that limitation.
+acceptance evidence, inspects worker diffs and test evidence, runs integration
+checks, records decisions/blockers, and reports unverified behavior honestly.
+It must not commit, push, merge, or discard unrelated work without explicit
+user authorization.
 
-Local workers may share the worktree. Disjoint writes or read-only research
-can run together; shared files, dependency changes, generated output, and git
-operations must have one owner or be sequenced. The Roder inspects worker
-diffs and test evidence, runs integration checks, records decisions/blockers,
-and reports unverified behavior honestly. It must not commit, push, merge, or
-discard unrelated work without explicit user authorization. These instructions
-guide actual engine behavior; they are not a new OS sandbox or isolation layer.
+Repository writes go to worker threads, each in its own git worktree, through
+`roder_command delegate` (see [Workers](#workers)). In-turn `task` /
+`agent_swarm` sub-agents are for read-only research inside a Roder turn
+(decision D3). The coordinator brief that states this is slice 5's; the
+strategy text in `strategy.ts` still describes the older shared-worktree
+pattern until then. These instructions guide actual engine behavior; they are
+not a new OS sandbox or isolation layer.
 
 An existing project thread can be promoted without starting a second thread.
 Promotion requires an idle persisted thread in the selected workspace with the
@@ -159,6 +157,10 @@ Actions:
 | `closeIssue {issueId, outcome, note}`          | Issue service; `outcome` is merged or dropped |
 | `writeFile {path, content, expectedVersion}`   | Roder file store                              |
 | `restoreFile {path, version, expectedVersion}` | Roder file store                              |
+| `delegate {issueId, worker, model?, base?}`    | Worker registry, then the issue service       |
+| `messageWorker {threadId, text, automatic}`    | Worker outbox; bounded by `maxFollowups`      |
+| `stopWorker {threadId}`                        | Worker outbox; interrupts a running turn      |
+| `releaseWorker {threadId}`                     | Worker registry                               |
 | `setStatus {status}`                           | Roder state; a Roder can only pause itself    |
 
 Issue actions act as the Roder's thread, so the agent lifecycle rules in
@@ -188,15 +190,77 @@ receipts. Commands run one at a time in the Roder service's queue.
   after it, as in Zuse's `ConflictScope`: `editIssue`, `askUser` and
   `closeIssue` depend on their issue's details (not its comments or links),
   `writeFile` and `restoreFile` on their file, and `setStatus` on the exact
-  current revision. `createIssue`, `commentIssue` and the link actions never
+  current revision. `delegate` depends on its issue. `createIssue`,
+  `commentIssue`, the link actions and the other worker actions never
   conflict. The error names the issue or file to re-read and the current
   revision.
+
+## Workers
+
+A Roder does repository work through worker threads, modelled on Zuse's
+worker registry, outbox and `admit` (`crates/engine/src/zappers.rs`,
+`zappers/supervision.rs`). The code is `electron/roder-agents/workers.ts`
+(registry, outbox, queue, limits) and `worker-brief.ts` (what a worker reads).
+
+- **Delegate.** `delegate {issueId, worker: {objective}, model?, base?}` makes
+  a new git worktree on its own branch (`roder/issue-<number>-<8 hex>`) in the
+  Roder workspace's default folder, from `base`: a branch, tag or commit, by
+  default the repository's default branch at origin (`origin/HEAD`, else
+  `origin/main` or `origin/master`; that branch is fetched first, best effort;
+  a repository without an origin uses `HEAD`). The checkout is registered as a
+  workspace folder and a persisted thread starts with its `cwd` there. The
+  workspace's primary checkout is never touched. The thread is registered as a
+  worker, linked to the issue, made its owner, and the issue moves to
+  `in_progress`. `model` is `{modelProvider, model, reasoning?}`, default the
+  Roder's own. Delegate refuses closed issues, issues waiting on the user and
+  issues without `doneCriteria`, and an invalid base, before making anything.
+- **Outbox and queue.** Nothing is sent to a worker directly. Its objective
+  and later messages wait in the Roder's outbox and go out in order while
+  fewer than `maxConcurrentWorkers` (1-32, default 2) workers are running. A
+  delegate that doesn't fit is `queued` with a `queuePosition` (1 starts next)
+  and starts when a running worker goes idle (`turn/completed` for its thread,
+  or, if that notification was missed, the next 15 s tick seeing the thread
+  idle). Raising the limit starts queued workers at once. A delivery records
+  the thread's turn count before it is sent, so one interrupted by a crash is
+  checked on restart rather than sent twice. A delivery that fails three times
+  is dropped and the error kept on the worker.
+- **Follow-ups.** `messageWorker {threadId, text, automatic}` with
+  `automatic: true` counts against `maxFollowups` (0-32, default 3) and is
+  refused at the limit with "askUser before sending this thread more work". A
+  user message resets the count: `desktop/roders/workers/message`, the user
+  typing in the worker's own thread, or the Roder relaying the user's words
+  with `automatic: false`.
+- **Stop and release.** `stopWorker` cancels the worker's pending deliveries
+  and interrupts a running turn. The Roder may resume a worker it stopped; a
+  worker the user stopped (`desktop/roders/workers/stop`) refuses automatic
+  messages until the user messages it. `releaseWorker` forgets the worker: its
+  thread, worktree and issue links stay, and it no longer counts against the
+  limits or gets the worker context.
+- **Worker context.** Every worker turn gets, through `developerContext`, the
+  worker brief (its Roder, roderId and worktree; stay in scope; verify; record
+  PRs and progress with `roder_command`; leave issue status alone; never
+  merge), the Roder's `WORKERS.md`, and the issues linked to the thread. Each
+  worker must end with a report whose first line is `Status: done` or
+  `Status: blocked`.
+- **Worker permissions.** A worker thread may call only `roder_command`, and
+  only `commentIssue` and `linkIssuePullRequest` on issues linked to its own
+  thread. Every other action and every other Roder tool is refused. Its issue
+  changes are attributed to the worker's thread.
+- **Permission mode.** Worker turns run in the Roder's `workerPolicyMode`
+  (`bypass`, `accept_all` or `default`; default `bypass`, decision D7),
+  applied through `thread/set_mode` like every desktop turn.
+- **`issues_launch`.** Launching an issue in a Roder's project goes through the
+  same delegate path; other projects still start a plain thread.
+- **Supervision seam.** Turning worker reports into issue entries, events and
+  coordinator wakes is slice 7. It plugs in at `onTurnSettled` in
+  `createRoderWorkers`, called once a worker's turn ends and before its slot
+  goes to the next delivery.
 
 ## Persistence and recovery
 
 The host chooses a private application-data directory. It contains
 `roders.json` (versioned records, enabled state, rolling budget ledger,
-pending wakes, and active leases) and `files/<roder-id>/`: `index.json` lists
+pending wakes, active leases, workers and their outbox) and `files/<roder-id>/`: `index.json` lists
 every version of every file and `<FILE>/<version>.md` holds each version's
 content. Writes use a same-directory temporary file followed by rename; a file
 version's content is written before the index that names it. State files are
@@ -234,6 +298,13 @@ const roderAgents = createRoderAgentService({
 await roderAgents.start();
 ```
 
+Pass `startWorker` to enable delegation: the host's `roderWorkerThreadStarter`
+(`workers.ts`) makes the worktree with `DesktopWorktrees.startThreadInNewWorktree`
+and starts the thread with the desktop tools. Apply
+`roderAgents.policyModeForThread(threadId)` as the turn's permission mode when
+it is defined, and send `issues_launch` for a project with a `roderThreadId`
+to `roderAgents.launchIssue(roderThreadId, issue)` first.
+
 Route requests with a `desktop/roders/` prefix to
 `roderAgents.handleRequest(method, params)`. Forward engine notifications with
 `roderAgents.onNotification(method, params)`. Await `roderAgents.stop()` before stopping
@@ -256,22 +327,25 @@ need the same host tool dispatcher available after restart.
 
 Requests:
 
-| Suffix          | Parameters                                                                                 | Result                             |
-| --------------- | ------------------------------------------------------------------------------------------ | ---------------------------------- |
-| `list`          | `{}`                                                                                       | `{ roders: RoderAgent[] }`         |
-| `create`        | `{ name, mission, workspaceId, modelProvider?, model?, reasoning? }`                       | `RoderAgentDetail`                 |
-| `promote`       | `{ threadId, name, mission, workspaceId, modelProvider?, model?, reasoning? }`             | `RoderAgentDetail`                 |
-| `read`          | `{ id }`                                                                                   | `RoderAgentDetail`                 |
-| `update`        | `{ id, name?, enabled?, intervalMinutes?, eventMethods?, maxRunsPerDay?, maxRunMinutes? }` | `RoderAgentDetail`                 |
-| `files/list`    | `{ id }`                                                                                   | `{ files: RoderFileVersion[] }`    |
-| `files/read`    | `{ id, path, version? }`                                                                   | `RoderFile`                        |
-| `files/history` | `{ id, path }` (newest first)                                                              | `{ versions: RoderFileVersion[] }` |
-| `files/write`   | `{ id, path, content, expectedVersion }`                                                   | `RoderFileVersion`                 |
-| `files/restore` | `{ id, path, version, expectedVersion }`                                                   | `RoderFileVersion`                 |
-| `schedule`      | `{ id, at, reason }` (`at` is Unix milliseconds)                                           | `RoderAgentDetail`                 |
-| `cancelWake`    | `{ id, wakeId }`                                                                           | `RoderAgentDetail`                 |
-| `run`           | `{ id, reason? }`                                                                          | `RoderAgentDetail`                 |
-| `compact`       | `{ id }`                                                                                   | Native `thread/compact` result     |
+| Suffix            | Parameters                                                                                                                                          | Result                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `list`            | `{}`                                                                                                                                                | `{ roders: RoderAgent[] }`         |
+| `create`          | `{ name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                                                | `RoderAgentDetail`                 |
+| `promote`         | `{ threadId, name, mission, workspaceId, modelProvider?, model?, reasoning? }`                                                                      | `RoderAgentDetail`                 |
+| `read`            | `{ id }`                                                                                                                                            | `RoderAgentDetail`                 |
+| `update`          | `{ id, name?, enabled?, intervalMinutes?, eventMethods?, maxRunsPerDay?, maxRunMinutes?, maxConcurrentWorkers?, maxFollowups?, workerPolicyMode? }` | `RoderAgentDetail`                 |
+| `files/list`      | `{ id }`                                                                                                                                            | `{ files: RoderFileVersion[] }`    |
+| `files/read`      | `{ id, path, version? }`                                                                                                                            | `RoderFile`                        |
+| `files/history`   | `{ id, path }` (newest first)                                                                                                                       | `{ versions: RoderFileVersion[] }` |
+| `files/write`     | `{ id, path, content, expectedVersion }`                                                                                                            | `RoderFileVersion`                 |
+| `files/restore`   | `{ id, path, version, expectedVersion }`                                                                                                            | `RoderFileVersion`                 |
+| `schedule`        | `{ id, at, reason }` (`at` is Unix milliseconds)                                                                                                    | `RoderAgentDetail`                 |
+| `cancelWake`      | `{ id, wakeId }`                                                                                                                                    | `RoderAgentDetail`                 |
+| `run`             | `{ id, reason? }`                                                                                                                                   | `RoderAgentDetail`                 |
+| `compact`         | `{ id }`                                                                                                                                            | Native `thread/compact` result     |
+| `workers/message` | `{ id, threadId, text }` (a user message: resets follow-ups)                                                                                        | `RoderAgentDetail`                 |
+| `workers/stop`    | `{ id, threadId }` (a user stop)                                                                                                                    | `RoderAgentDetail`                 |
+| `workers/release` | `{ id, threadId }`                                                                                                                                  | `RoderAgentDetail`                 |
 
 `start`, `tick`, `stop`, request handlers, and notification handlers return
 promises. The service serializes state mutations, persists only changed state,

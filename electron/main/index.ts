@@ -89,6 +89,7 @@ import { DesktopAgentTools } from "../agents/desktop-agent-tools";
 import { IssuesService } from "../issues/service";
 import { handleIssueToolCall, issueToolDefinitions } from "../issues/tools";
 import { roderAgentToolDefinitions, createRoderAgentService } from "../roder-agents/service";
+import { roderWorkerThreadStarter } from "../roder-agents/workers";
 import {
   createRoderAgentFromTool,
   mergeRoderAgentSkill,
@@ -867,6 +868,18 @@ function getIssuesService(): IssuesService {
 }
 
 async function launchIssue(issue: Issue, project: IssueProject): Promise<{ threadId: string }> {
+  // A Roder's project launches through the Roder: a worker thread in its own worktree.
+  if (project.roderThreadId) {
+    await startRoderAgents();
+    const delegated = await getRoderAgentService().launchIssue(project.roderThreadId, issue);
+    if (delegated) {
+      sendToRenderer("roder:notification", {
+        method: "desktop/issues/threadStarted",
+        params: { threadId: delegated.threadId },
+      });
+      return delegated;
+    }
+  }
   const result = (await roder.request("workspace/list", {})) as { workspaces: Workspace[] };
   const workspace = result.workspaces.find((entry) => entry.id === project.workspaceId);
   if (!workspace) throw new Error("Link this project to an existing workspace before starting work");
@@ -891,6 +904,11 @@ function getRoderAgentService(): ReturnType<typeof createRoderAgentService> {
     request: (method, params) => requestEngine(method, params, false),
     sprites: getSpriteManager(),
     issues: getIssuesService(),
+    startWorker: roderWorkerThreadStarter({
+      worktrees: getDesktopWorktrees(),
+      request: (method, params) => roder.request(method, params),
+      threadStartParams: (params) => getDesktopAgentTools().threadStartParams(params),
+    }),
     notify: () => sendToRenderer("roder:notification", { method: "desktop/roders/changed", params: {} }),
   });
   return roderAgentService;
@@ -1074,7 +1092,11 @@ async function requestEngine(method: string, params: unknown, enrichRoderAgentCo
     params = await roderAgentService.turnStartParams(params);
   }
   if (method === "turn/start") {
-    params = await applyDesktopTurnPolicy((rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams), params);
+    params = await applyDesktopTurnPolicy(
+      (rpcMethod, rpcParams) => roder.request(rpcMethod, rpcParams),
+      params,
+      roderAgentService?.policyModeForThread((params as { threadId?: unknown } | null)?.threadId),
+    );
   }
   return roder.request(method, params);
 }

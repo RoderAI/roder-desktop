@@ -377,6 +377,10 @@ test("the tool description and schema list exactly the actions in the action tab
     "closeIssue",
     "writeFile",
     "restoreFile",
+    "delegate",
+    "messageWorker",
+    "stopWorker",
+    "releaseWorker",
     "setStatus",
   ]);
   const tool = roderAgentToolDefinitions.find((entry) => entry.name === "roder_command")!;
@@ -413,7 +417,7 @@ test("the tool description and schema list exactly the actions in the action tab
   expect(tool.description).toContain("restoreFile {path, version, expectedVersion}");
 
   // The parser accepts exactly the table's actions.
-  expect(() => parseRoderAction({ type: "delegate" })).toThrow(/Unknown action type "delegate"/);
+  expect(() => parseRoderAction({ type: "archiveWorker" })).toThrow(/Unknown action type "archiveWorker"/);
   expect(() => parseRoderAction({ type: "commentIssue", issueId: "1" })).toThrow(
     "Missing text. commentIssue takes commentIssue {issueId, text}",
   );

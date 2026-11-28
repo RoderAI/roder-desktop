@@ -14,6 +14,14 @@ import {
 import type { createRoderAgentSpriteManager } from "./sprites";
 import { roderCommandDescription, roderCommandToolSchema } from "./actions";
 import { createRoderCommands } from "./commands";
+import {
+  RODER_WORKER_DEFAULTS,
+  applyRoderWorkerSettings,
+  createRoderWorkers,
+  loadRoderWorkerState,
+  type StartWorkerThread,
+} from "./workers";
+import type { Issue } from "../../src/types/issues";
 import type { IssuesService } from "../issues/service";
 
 type Options = {
@@ -23,6 +31,8 @@ type Options = {
   sprites?: ReturnType<typeof createRoderAgentSpriteManager>;
   /** The issue service a Roder's issue commands go through. */
   issues?: Pick<IssuesService, "request">;
+  /** Makes a worker's git worktree and thread; without it, delegation is refused. */
+  startWorker?: StartWorkerThread;
 };
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {
@@ -151,10 +161,18 @@ export function createRoderAgentService(options: Options) {
     if (!c) throw new Error("Roder not found");
     return c;
   }
+  const workers = createRoderWorkers({
+    request: options.request,
+    startThread: options.startWorker,
+    files,
+    issues: options.issues,
+    persist,
+  });
   const commands = createRoderCommands({
     directory: join(options.directory, "commands"),
     files,
     issues: options.issues,
+    workers,
     async pause(c) {
       c.enabled = false;
       await persist();
@@ -265,6 +283,7 @@ export function createRoderAgentService(options: Options) {
       if (!running) return;
       for (const c of roderAgents) {
         try {
+          await workers.reconcile(c);
           if (c.active) {
             const snapshot = await thread(c);
             if (object(snapshot.status).type === "idle") c.active = null;
@@ -377,6 +396,9 @@ export function createRoderAgentService(options: Options) {
           lastError: null,
           lastRunAt: null,
           sprite: null,
+          ...RODER_WORKER_DEFAULTS,
+          workers: [],
+          outbox: [],
         };
         // New Roders start with every reserved file at version 1; INSTRUCTIONS.md holds the mission given at creation.
         await files.ensure(c.id, { [RODER_INSTRUCTIONS_FILE]: mission });
@@ -440,11 +462,19 @@ export function createRoderAgentService(options: Options) {
             throw new Error("Invalid event methods");
           next.eventMethods = params.eventMethods.map((m) => text(m, "event method", 120));
         }
+        applyRoderWorkerSettings(next, params);
         Object.assign(c, next);
-        await persist();
+        await workers.pump(c);
         if (params.enabled === false && c.active) await interrupt(c);
       } else if (method === "desktop/roders/schedule") schedule(c, params);
       else if (method === "desktop/roders/cancelWake") c.wakes = c.wakes.filter((w) => w.id !== params.wakeId);
+      else if (method === "desktop/roders/workers/message") {
+        await workers.message(c, { threadId: params.threadId, text: params.text, automatic: false }, "user");
+        await workers.pump(c);
+      } else if (method === "desktop/roders/workers/stop") {
+        await workers.stop(c, params.threadId, "user");
+        await workers.pump(c);
+      } else if (method === "desktop/roders/workers/release") await workers.release(c, params.threadId);
       else if (method === "desktop/roders/run")
         await run(c, text(params.reason ?? "User requested check-in", "reason", 2000));
       else if (method === "desktop/roders/compact") {
@@ -459,12 +489,52 @@ export function createRoderAgentService(options: Options) {
       return detail(c);
     });
   }
+  /** A user turn in a worker's own composer: reset its follow-ups and give it the worker context. */
+  async function workerTurnContext(threadId: string): Promise<string | null> {
+    if (!workers.find(roderAgents, threadId)) return null;
+    const found = await serial(async () => {
+      const current = workers.find(roderAgents, threadId);
+      if (current) {
+        workers.userTurn(current.roder, current.worker);
+        await persist();
+      }
+      return current;
+    });
+    return found ? workers.context(found.roder, found.worker) : null;
+  }
   return {
     contextForThread,
+    /** The permission mode for a worker thread's turns (decision D7); undefined for other threads. */
+    policyModeForThread(threadId: unknown) {
+      return workers.find(roderAgents, threadId)?.roder.workerPolicyMode;
+    },
+    /**
+     * `issues_launch` on a Roder's project: the same path as delegate. Called
+     * from inside the issue service's queue, which links the thread, makes it
+     * the owner and moves the issue to in_progress itself, so the objective is
+     * sent afterwards. Returns null when no Roder owns `roderThreadId`.
+     */
+    async launchIssue(roderThreadId: string, issue: Issue): Promise<{ threadId: string } | null> {
+      return serial(async () => {
+        const c = roderAgents.find((entry) => entry.threadId === roderThreadId);
+        if (!c) return null;
+        const worker = await workers.delegate(c, {
+          issue,
+          objective: `Work on issue #${issue.number}: ${issue.title}\n\n${issue.description}`.trim(),
+        });
+        void serial(() => workers.pump(c)).catch(() => {});
+        return { threadId: worker.threadId };
+      });
+    },
     async turnStartParams(params: unknown): Promise<unknown> {
       if (!params || typeof params !== "object" || Array.isArray(params)) return params;
       const input = params as ObjectValue;
       if (typeof input.threadId !== "string") return params;
+      const worker = await workerTurnContext(input.threadId);
+      if (worker !== null) {
+        const existing = typeof input.developerContext === "string" ? input.developerContext : "";
+        return { ...input, developerContext: existing ? `${worker}\n\n${existing}` : worker };
+      }
       const context = await contextForThread(input.threadId);
       if (context === null) return params;
       const existing = typeof input.developerContext === "string" ? input.developerContext : "";
@@ -521,6 +591,7 @@ export function createRoderAgentService(options: Options) {
           }
           if (c.lastRunAt !== null) number(c.lastRunAt, "last run", 0, Number.MAX_SAFE_INTEGER);
           if (c.lastError !== null && typeof c.lastError !== "string") throw new Error("Invalid Roder error");
+          loadRoderWorkerState(c);
         }
         roderAgents = loaded;
         persisted = JSON.stringify({ version: 1, roders: roderAgents }, null, 2);
@@ -553,9 +624,17 @@ export function createRoderAgentService(options: Options) {
       });
     },
     async onNotification(method: string, value: unknown) {
-      if (method !== "turn/completed" && !roderAgents.some((c) => c.enabled && c.eventMethods.includes(method))) return;
+      const forWorker =
+        method === "turn/started" && !!workers.find(roderAgents, (value as ObjectValue | null)?.threadId);
+      if (
+        method !== "turn/completed" &&
+        !forWorker &&
+        !roderAgents.some((c) => c.enabled && c.eventMethods.includes(method))
+      )
+        return;
       return serial(async () => {
         const params = object(value);
+        await workers.onNotification(roderAgents, method, params);
         for (const c of roderAgents) {
           if (params.threadId === c.threadId) {
             if (
@@ -580,8 +659,16 @@ export function createRoderAgentService(options: Options) {
     async handleTool(name: string, value: unknown, context: { threadId: string }): Promise<unknown> {
       return serial(async () => {
         const c = roderAgents.find((entry) => entry.threadId === context.threadId);
-        if (!c) throw new Error("Tool requires an owning Roder thread");
         const params = object(value);
+        if (!c) {
+          const found = workers.find(roderAgents, context.threadId);
+          if (!found) throw new Error("Tool requires an owning Roder thread");
+          if (name !== "roder_command")
+            throw new Error(
+              `A worker thread may use only roder_command (commentIssue and linkIssuePullRequest on its own issues); ${name} is the Roder's`,
+            );
+          return commands.command(found.roder, params, { type: "worker", threadId: context.threadId });
+        }
         if (name === "roder_files") {
           if (params.path === undefined) {
             if (params.history !== undefined || params.version !== undefined)
@@ -598,7 +685,11 @@ export function createRoderAgentService(options: Options) {
           const notes = await files.read(c.id, RODER_NOTES_FILE);
           return { memory: notes.content, path: notes.path, version: notes.version };
         }
-        if (name === "roder_command") return commands.command(c, params);
+        if (name === "roder_command") {
+          const result = await commands.command(c, params);
+          if (c.outbox.length) await workers.pump(c).catch((error) => (c.lastError = String(error)));
+          return result;
+        }
         if (name === "roder_issue") return commands.issue(c, params);
         if (name === "roder_wake_schedule") {
           schedule(c, params);

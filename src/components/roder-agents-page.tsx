@@ -280,6 +280,8 @@ export function RoderAgentEditor({
               intervalMinutes: Number(data.get("interval")),
               maxRunsPerDay: Number(data.get("runs")),
               maxRunMinutes: Number(data.get("minutes")),
+              maxConcurrentWorkers: Number(data.get("workers")),
+              maxFollowups: Number(data.get("followups")),
               eventMethods: String(data.get("events"))
                 .split(",")
                 .map((v) => v.trim())
@@ -326,6 +328,32 @@ export function RoderAgentEditor({
               min={1}
               max={60}
               defaultValue={initial.maxRunMinutes}
+              required
+              className={fieldClass}
+            />
+          </label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="space-y-1">
+            <span>Workers at once</span>
+            <input
+              name="workers"
+              type="number"
+              min={1}
+              max={32}
+              defaultValue={initial.maxConcurrentWorkers}
+              required
+              className={fieldClass}
+            />
+          </label>
+          <label className="space-y-1">
+            <span>Automatic follow-ups per worker</span>
+            <input
+              name="followups"
+              type="number"
+              min={0}
+              max={32}
+              defaultValue={initial.maxFollowups}
               required
               className={fieldClass}
             />
