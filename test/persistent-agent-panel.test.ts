@@ -2,7 +2,6 @@ import { expect, test } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PersistentAgentEditor } from "../src/components/persistent-agents-page";
-import { PolicyModePicker } from "../src/components/composer-controls";
 import { rightWorkspacePanelEntriesForThread } from "../src/components/right-workspace-panel-registry";
 import { normalizeRouteSearch } from "../src/lib/route-search";
 import type { PersistentAgentDetail } from "../src/types/persistent-agents";
@@ -19,23 +18,6 @@ test("agent settings can be opened and restored through thread route search", ()
   expect(search.panelTabs).toEqual(["persistentAgent", "files"]);
   expect(search.panelActive).toBe("persistentAgent");
   expect(search.panelOpen).toBe(true);
-});
-
-test("persistent agent composer shows full access without offering a misleading permission selector", () => {
-  let changes = 0;
-  const html = renderToStaticMarkup(
-    createElement(PolicyModePicker, {
-      selectedMode: "bypass",
-      locked: true,
-      onChange: () => {
-        changes++;
-      },
-    }),
-  );
-  expect(html).toContain("Full access");
-  expect(html).toContain("always on for persistent agents");
-  expect(html).not.toContain("Choose permission mode");
-  expect(changes).toBe(0);
 });
 
 test("inline editor exposes paused agent controls and memory without navigating away from chat", () => {

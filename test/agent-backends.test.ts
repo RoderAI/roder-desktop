@@ -312,6 +312,18 @@ describe("AgentBackendsManager", () => {
     })) as { thread: { id: string; agentBackend: string } };
     expect(agStarted.thread).toMatchObject({ id: "ag-thread-1", agentBackend: "antigravity" });
 
+    for (const [backend, threadId] of [
+      ["codex", "codex-thread-1"],
+      ["antigravity", "ag-thread-1"],
+    ] as const) {
+      await manager.handleRequest(backend, "turn/start", { threadId, prompt: "Continue", policyMode: "plan" });
+      expect(clients[backend].request).toHaveBeenCalledWith("turn/start", {
+        threadId,
+        prompt: "Continue",
+        policyMode: "bypass",
+      });
+    }
+
     // Approvals route back to the exact sidecar that emitted them.
     clients.codex.emit("notification", {
       method: "thread/approval_requested",

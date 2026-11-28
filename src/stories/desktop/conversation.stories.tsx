@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Composer } from "@/components/composer";
 import { MarkdownShellProvider } from "@/components/markdown-shell-block";
 import { Transcript } from "@/components/transcript";
-import type { DesktopAttachment, ModelSelectionMode, PolicyMode, QueuedPrompt, ReasoningEffort } from "@/types/roder";
+import type { DesktopAttachment, ModelSelectionMode, QueuedPrompt, ReasoningEffort } from "@/types/roder";
 import { messages, models, noop, noopAsync, storybookShellTarget, threads } from "./fixtures";
 
 const meta = { title: "Desktop/Conversation" } satisfies Meta;
@@ -16,7 +16,6 @@ function ComposerExample({ busy = false }: { busy?: boolean }) {
     model: models[0].id,
     provider: models[0].modelProvider,
   });
-  const [policy, setPolicy] = useState<PolicyMode>("default");
   const [reasoning, setReasoning] = useState<ReasoningEffort>("medium");
   const [swarm, setSwarm] = useState(false);
   const [attachments, setAttachments] = useState<DesktopAttachment[]>(
@@ -40,7 +39,6 @@ function ComposerExample({ busy = false }: { busy?: boolean }) {
         selectedModel={selection.model}
         selectedModelProvider={selection.provider}
         selectedSelectionMode={selection}
-        selectedPolicyMode={policy}
         agentSwarmMode={swarm}
         agentSwarmModeAvailable
         selectedReasoning={reasoning}
@@ -52,7 +50,6 @@ function ComposerExample({ busy = false }: { busy?: boolean }) {
           setSelection({ type: "manual", model, provider })
         }
         onSelectedAutoModelChange={noop}
-        onSelectedPolicyModeChange={setPolicy}
         onAgentSwarmModeChange={setSwarm}
         onSelectedReasoningChange={setReasoning}
         onScrollToBottom={noop}

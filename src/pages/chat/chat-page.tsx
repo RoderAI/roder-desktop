@@ -332,8 +332,6 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             selectedModel={agent.selectedModel}
             selectedModelProvider={agent.selectedModelProvider}
             selectedSelectionMode={agent.selectedSelectionMode}
-            selectedPolicyMode={agent.selectedPolicyMode}
-            usesDefaultPolicyMode={agent.usesDefaultPolicyMode}
             agentSwarmMode={agent.agentSwarmMode}
             agentSwarmModeAvailable={agent.agentSwarmModeAvailable}
             selectedReasoning={agent.selectedReasoning}
@@ -343,8 +341,6 @@ export function ChatPage({ route, threadId }: { route: "new" | "thread"; threadI
             showScrollToBottom={showScrollToBottom}
             onSelectedModelChange={(model, provider) => void agent.setSelectedModel(model, provider)}
             onSelectedAutoModelChange={(optionId) => void agent.setSelectedAutoModel(optionId)}
-            onSelectedPolicyModeChange={(mode) => void agent.setSelectedPolicyMode(mode)}
-            onUseDefaultPolicyMode={() => void agent.setSelectedPolicyMode(null)}
             onAgentSwarmModeChange={(enabled) => void agent.setAgentSwarmMode(enabled)}
             onSelectedReasoningChange={agent.setSelectedReasoning}
             onScrollToBottom={followBottom}

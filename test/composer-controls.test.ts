@@ -4,7 +4,6 @@ import { expect, test } from "vitest";
 import {
   AttachmentChip,
   ComposerAttachMenuItems,
-  ComposerPlanModeMenuItem,
   ModelPicker,
   pickerMenuSurfaceClassName,
 } from "../src/components/composer-controls";
@@ -49,26 +48,6 @@ test("composer attach menu offers upload and sketch actions", () => {
 
   expect(html).toContain("Upload file");
   expect(html).toContain("Sketch");
-});
-
-test("composer add menu exposes a checked plan mode toggle", () => {
-  const html = renderToStaticMarkup(
-    React.createElement(
-      DropdownMenu,
-      null,
-      React.createElement(
-        DropdownMenuGroup,
-        null,
-        React.createElement(ComposerPlanModeMenuItem, {
-          enabled: true,
-          onToggle: () => undefined,
-        }),
-      ),
-    ),
-  );
-
-  expect(html).toContain("Plan mode");
-  expect(html).toContain('aria-selected="true"');
 });
 
 test("composer picker menus use themed card surfaces", () => {

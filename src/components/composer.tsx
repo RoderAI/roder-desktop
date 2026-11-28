@@ -6,11 +6,11 @@ import { NewWorktreeCheckbox, WorktreeSetupProgress } from "@/components/new-wor
 import { useRoderStore } from "@/stores/roder-store";
 import { AttachmentPreparation, attachmentImageType, mergeAttachments } from "@/lib/attachment-preparation";
 import {
-  use,
   useCallback,
   useEffect,
   useId,
   useLayoutEffect,
+  use,
   useMemo,
   useRef,
   useState,
@@ -22,7 +22,6 @@ import type {
   DesktopAttachment,
   InferenceRoutingOptionDescriptor,
   ModelSelectionMode,
-  PolicyMode,
   QueuedPrompt,
   RoderModel,
   ReasoningEffort,
@@ -34,10 +33,8 @@ import {
   ComposerAgentSwarmModeMenuItem,
   ComposerAttachMenuItems,
   ComposerMcpServersMenuItem,
-  ComposerPlanModeMenuItem,
   ComposerSkillsMenuItem,
   ModelPicker,
-  PolicyModePicker,
 } from "@/components/composer-controls";
 import { CommandCompletionPopup, commandCompletionOptionId } from "@/components/command-completion-popup";
 import { ComposerSketchPad } from "@/components/composer-sketch-pad";
@@ -63,7 +60,6 @@ import {
   registerSkillPromptSubmit,
   writeSkillPromptEditorText,
 } from "@/lib/lexical-skill-prompt";
-import { isPlanModeToggleKey } from "@/lib/composer-keyboard";
 import { cn } from "@/lib/utils";
 import type { LexicalEditor } from "lexical";
 
@@ -99,8 +95,6 @@ type ComposerProps = {
   selectedModel: string;
   selectedModelProvider: string;
   selectedSelectionMode: ModelSelectionMode;
-  selectedPolicyMode: PolicyMode;
-  usesDefaultPolicyMode?: boolean;
   agentSwarmMode: boolean;
   agentSwarmModeAvailable: boolean;
   selectedReasoning: ReasoningEffort;
@@ -110,8 +104,6 @@ type ComposerProps = {
   showScrollToBottom: boolean;
   onSelectedModelChange: (model: string, provider?: string) => void;
   onSelectedAutoModelChange: (optionId: string) => void;
-  onSelectedPolicyModeChange: (mode: PolicyMode) => void;
-  onUseDefaultPolicyMode?: () => void;
   onAgentSwarmModeChange: (enabled: boolean) => void;
   onSelectedReasoningChange: (reasoning: ReasoningEffort) => void;
   onScrollToBottom: () => void;
@@ -154,8 +146,6 @@ export function Composer({
   selectedModel,
   selectedModelProvider,
   selectedSelectionMode,
-  selectedPolicyMode: requestedPolicyMode,
-  usesDefaultPolicyMode,
   agentSwarmMode,
   agentSwarmModeAvailable,
   selectedReasoning,
@@ -165,8 +155,6 @@ export function Composer({
   showScrollToBottom,
   onSelectedModelChange,
   onSelectedAutoModelChange,
-  onSelectedPolicyModeChange,
-  onUseDefaultPolicyMode,
   onAgentSwarmModeChange,
   onSelectedReasoningChange,
   onScrollToBottom,
@@ -180,7 +168,6 @@ export function Composer({
 }: ComposerProps): React.JSX.Element {
   const persistentAgentThread = use(PersistentAgentThreadContext);
   const activeBackend = useRoderStore((state) => state.activeBackend) ?? "roder";
-  const selectedPolicyMode = persistentAgentThread ? "bypass" : requestedPolicyMode;
   const [prompt, setPrompt] = useState("");
   // Guard only, never rendered: refs avoid synchronous setState inside the drain effect.
   const drainingQueuedPromptIdRef = useRef<string | null>(null);
@@ -420,12 +407,6 @@ export function Composer({
   }
 
   function handlePromptEditorKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>): void {
-    if (isPlanModeToggleKey(event)) {
-      event.preventDefault();
-      event.stopPropagation();
-      togglePlanMode();
-      return;
-    }
     if (commandCompletion.handleCommandCompletionKeyDown(event)) {
       return;
     }
@@ -433,11 +414,6 @@ export function Composer({
       return;
     }
     skillCompletion.handleSkillCompletionKeyDown(event);
-  }
-
-  function togglePlanMode(): void {
-    if (persistentAgentThread) return;
-    onSelectedPolicyModeChange(selectedPolicyMode === "plan" ? "default" : "plan");
   }
 
   function toggleAgentSwarmMode(): void {
@@ -701,9 +677,6 @@ export function Composer({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-48">
                   <DropdownMenuGroup>
-                    {!persistentAgentThread ? (
-                      <ComposerPlanModeMenuItem enabled={selectedPolicyMode === "plan"} onToggle={togglePlanMode} />
-                    ) : null}
                     <ComposerAgentSwarmModeMenuItem
                       enabled={agentSwarmMode}
                       available={agentSwarmModeAvailable}
@@ -731,12 +704,6 @@ export function Composer({
                   <span className="truncate">Agent Swarm</span>
                 </Button>
               )}
-              <PolicyModePicker
-                selectedMode={selectedPolicyMode}
-                usesDefault={usesDefaultPolicyMode}
-                onChange={(mode) => (mode === null ? onUseDefaultPolicyMode?.() : onSelectedPolicyModeChange(mode))}
-                locked={persistentAgentThread}
-              />
               {activeThreadId ? (
                 <ThreadExecutionMachine threadId={activeThreadId} />
               ) : (

@@ -192,11 +192,6 @@ function selectAgentState(state: RoderStoreState) {
     selectedModelProvider: state.selectedModelProvider,
     selectedSelectionMode: state.selectedSelectionMode,
     selectedReasoning: state.selectedReasoning,
-    selectedPolicyMode: state.selectedPolicyMode,
-    usesDefaultPolicyMode:
-      (state.activeThreadId
-        ? state.threadControlsByThread[state.activeThreadId]?.policyMode
-        : state.draftComposerPreferences.policyMode) === undefined,
     agentSwarmMode: state.agentSwarmMode,
     agentSwarmModeAvailable: state.agentSwarmModeAvailable,
     workspaces: state.workspaces,
@@ -231,7 +226,6 @@ function selectAgentState(state: RoderStoreState) {
     setSelectedModel: state.setSelectedModel,
     setSelectedAutoModel: state.setSelectedAutoModel,
     setSelectedReasoning: state.setSelectedReasoning,
-    setSelectedPolicyMode: state.setSelectedPolicyMode,
     setAgentSwarmMode: state.setAgentSwarmMode,
     saveDefaults: state.saveDefaults,
     setSelectedWorkspaceCwd: state.setSelectedWorkspaceCwd,
