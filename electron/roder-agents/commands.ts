@@ -29,7 +29,7 @@ import {
   type RoderActionType,
 } from "./actions";
 import type { RoderFileStore } from "./files";
-import type { IssuesService } from "../issues/service";
+import type { IssuesGuard, IssuesService } from "../issues/service";
 
 /** Receipts kept per Roder; the oldest are dropped first. */
 export const RODER_RECEIPT_LIMIT = 256;
@@ -251,10 +251,11 @@ export function createRoderCommands(options: RoderCommandOptions) {
     params: ObjectValue,
     roder: RoderAgent,
     summary: (issue: Issue) => string,
+    guard?: IssuesGuard,
   ) {
     const actor: IssueActor = { type: "agent", threadId: roder.threadId };
     try {
-      const { issue } = (await issues().request(method, params, actor)) as { issue: Issue };
+      const { issue } = (await issues().request(method, params, actor, guard)) as { issue: Issue };
       return { issue: resultIssue(issue), summary: summary(issue) };
     } catch (error) {
       throw roderIssueError(error);
@@ -277,12 +278,13 @@ export function createRoderCommands(options: RoderCommandOptions) {
         (issue) => `Created issue #${issue.number} ${issue.title} (${issue.status})`,
       );
     },
-    editIssue: (roder, action) =>
+    editIssue: (roder, action, guard) =>
       issueAction(
         "desktop/issues/update",
         { ...details(action.details), id: action.issueId },
         roder,
         (issue) => `Edited issue #${issue.number} (${issue.status})`,
+        guard,
       ),
     commentIssue: (roder, action) =>
       issueAction(
@@ -305,7 +307,7 @@ export function createRoderCommands(options: RoderCommandOptions) {
         roder,
         (issue) => `Unlinked ${String(action.url)} from issue #${issue.number}`,
       ),
-    askUser: (roder, action) =>
+    askUser: (roder, action, guard) =>
       issueAction(
         "desktop/issues/askUser",
         {
@@ -315,13 +317,15 @@ export function createRoderCommands(options: RoderCommandOptions) {
         },
         roder,
         (issue) => `Asked the user about issue #${issue.number}; it needs them now`,
+        guard,
       ),
-    closeIssue: (roder, action) =>
+    closeIssue: (roder, action, guard) =>
       issueAction(
         "desktop/issues/close",
         { id: action.issueId, outcome: action.outcome, note: action.note },
         roder,
         (issue) => `Closed issue #${issue.number} as ${String(action.outcome)} (${issue.status})`,
+        guard,
       ),
     writeFile: (roder, action) =>
       fileAction(
@@ -359,7 +363,37 @@ export function createRoderCommands(options: RoderCommandOptions) {
       if (roder.enabled) await options.pause(roder);
       return { status: "paused", summary: "Paused: no automatic turns until the user resumes you" };
     },
-  } satisfies Record<RoderActionType, (roder: RoderAgent, action: RoderAction) => Promise<Outcome>>;
+  } satisfies Record<
+    RoderActionType,
+    (roder: RoderAgent, action: RoderAction, guard: IssuesGuard | undefined) => Promise<Outcome>
+  >;
+
+  /**
+   * The revision check runs before the action, but the issue service may take
+   * a person's edit in between. Re-check the issue inside the service's queue,
+   * so a stale action can't overwrite that edit.
+   */
+  function issueGuard(
+    ledger: Ledger,
+    expected: number | undefined,
+    action: RoderAction,
+    roder: RoderAgent,
+  ): IssuesGuard | undefined {
+    const scope = roderActionScope(action);
+    if (expected === undefined || scope === "whole") return undefined;
+    const targets = scope.filter((target) => target.startsWith("issue:"));
+    if (!targets.length) return undefined;
+    return (list) => {
+      for (const target of targets) {
+        const id = target.slice("issue:".length);
+        const issue = list.find((entry) => entry.id === id);
+        if ((issue ? issueFingerprint(issue) : "absent") !== ledger.targets[target]?.fingerprint)
+          throw new Error(
+            `Roder revision conflict: issue ${id} changed while this command was being applied, after your expectedRevision ${expected}. Re-read it with roder_issue {roderId: "${roder.id}", issueId: "${id}"}, then retry with a new commandId`,
+          );
+      }
+    };
+  }
 
   function roderIdOf(input: ObjectValue, roder: RoderAgent) {
     if (input.roderId !== roder.id)
@@ -400,13 +434,22 @@ export function createRoderCommands(options: RoderCommandOptions) {
       checkRevision(ledger, expected as number | undefined, resolved, roder);
 
       const pending: Receipt = { commandId, input: fingerprint, state: "pending" };
-      ledger.receipts.push(pending);
-      if (ledger.receipts.length > RODER_RECEIPT_LIMIT)
-        ledger.receipts.splice(0, ledger.receipts.length - RODER_RECEIPT_LIMIT);
-      await save(roder, ledger);
+      const previous = ledger.receipts;
+      ledger.receipts = [...previous, pending].slice(-RODER_RECEIPT_LIMIT);
+      try {
+        await save(roder, ledger);
+      } catch (error) {
+        // The action never ran; don't leave a pending receipt that would refuse a retry.
+        ledger.receipts = previous;
+        throw error;
+      }
       let outcome: Outcome;
       try {
-        outcome = await handlers[resolved.type](roder, resolved);
+        outcome = await handlers[resolved.type](
+          roder,
+          resolved,
+          issueGuard(ledger, expected as number | undefined, resolved, roder),
+        );
       } catch (error) {
         // A refused action wrote nothing; forget it so the same commandId can be retried.
         ledger.receipts = ledger.receipts.filter((entry) => entry !== pending);

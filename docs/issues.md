@@ -82,7 +82,8 @@ Operations for every actor:
   `in_progress`), else the Roder (status `todo`).
 - `linkPullRequest {id, url, title?}` links a pull request once per URL.
 - `unlinkPullRequest {id, url}` removes a linked pull request; an unknown URL
-  changes nothing.
+  changes nothing. An agent can't unlink the last pull request of an
+  `in_review` issue.
 - `askUser {id, question, recommendation?}` makes the user the owner and the
   status `needs_you`, recording the question with the thread that held the
   issue. Refused on a closed issue.

@@ -168,8 +168,8 @@ Actions:
 Issue actions act as the Roder's thread, so the agent lifecycle rules in
 `docs/issues.md` apply. The Roder's board is the project linked to its thread
 (`roderThreadId`, set when the Roder is created); `issueId` takes an issue id
-or number. `setStatus active` from the Roder is refused: only the user makes a
-Roder active.
+or number. Only the user makes a Roder active: `setStatus active` from a
+paused Roder is refused, and from an active one it changes nothing.
 
 `roder_issue {roderId, issueId?}` reads the whole board (descriptions cut to
 500 characters, the last three activity entries) or one issue in full, with the
@@ -194,7 +194,9 @@ receipts. Commands run one at a time in the Roder service's queue.
   `writeFile` and `restoreFile` on their file, and `setStatus` on the exact
   current revision. `createIssue`, `commentIssue` and the link actions never
   conflict. The error names the issue or file to re-read and the current
-  revision.
+  revision. The issue is checked again inside the issue service's queue just
+  before the change applies, so a person's edit that lands while the command
+  runs also conflicts instead of being overwritten.
 
 ## Persistence and recovery
 

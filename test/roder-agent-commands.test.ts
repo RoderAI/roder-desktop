@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, expect, test, vi } from "vitest";
-import { IssuesService } from "../electron/issues/service";
+import { IssuesService, type IssuesGuard } from "../electron/issues/service";
 import {
   parseRoderAction,
   roderActionSignature,
@@ -12,18 +12,23 @@ import {
 } from "../electron/roder-agents/actions";
 import { RODER_RECEIPT_LIMIT } from "../electron/roder-agents/commands";
 import { createRoderAgentService, roderAgentToolDefinitions } from "../electron/roder-agents/service";
-import type { Issue } from "../src/types/issues";
+import type { Issue, IssueActor } from "../src/types/issues";
 import type { RoderAgentDetail, RoderFile } from "../src/types/roder-agents";
 
 const directories: string[] = [];
+const services: ReturnType<typeof createRoderAgentService>[] = [];
 afterEach(async () => {
+  for (const service of services.splice(0)) await service.stop();
   for (const path of directories.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
 type Result = { revision: number; action: string; summary: string; issue?: Issue; file?: RoderFile };
 type Board = { revision: number; project: { id: string } | null; issues: (Issue & { activityCount: number })[] };
 
-async function setup(directory?: string) {
+async function setup(
+  directory?: string,
+  wrapIssues: (issues: IssuesService) => Pick<IssuesService, "request"> = (issues) => issues,
+) {
   directory ??= await mkdtemp(join(tmpdir(), "roder-commands-test-"));
   if (!directories.includes(directory)) directories.push(directory);
   const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(async (method) => {
@@ -34,7 +39,8 @@ async function setup(directory?: string) {
     return {};
   });
   const issues = new IssuesService({ storagePath: join(directory, "issues", "issues.json") });
-  const roders = createRoderAgentService({ directory: join(directory, "roders"), request, issues });
+  const roders = createRoderAgentService({ directory: join(directory, "roders"), request, issues: wrapIssues(issues) });
+  services.push(roders);
   await roders.start();
   const listed = (await roders.handleRequest("desktop/roders/list", {})) as { roders: RoderAgentDetail[] };
   let roder = listed.roders[0];
@@ -102,7 +108,6 @@ test("replaying a commandId with identical input returns the original result and
   expect(after.revision).toBe(before.revision);
   expect(after.issues).toHaveLength(1);
   expect(after.issues[0].activityCount).toBe(before.issues[0].activityCount);
-  await roders.stop();
 });
 
 test("replaying a commandId with different input is refused and changes nothing", async () => {
@@ -120,7 +125,6 @@ test("replaying a commandId with different input is refused and changes nothing"
     ),
   ).rejects.toThrow(/already used with different input/);
   expect(await board()).toEqual(before);
-  await roders.stop();
 });
 
 test("a refused action leaves no receipt, so the same commandId can be retried", async () => {
@@ -136,7 +140,6 @@ test("a refused action leaves no receipt, so the same commandId can be retried",
     thread,
   )) as Result;
   expect(fixed).toMatchObject({ revision: 1, issue: { status: "todo" } });
-  await roders.stop();
 });
 
 test("receipts survive a restart; an interrupted command is refused instead of applied twice", async () => {
@@ -161,7 +164,6 @@ test("receipts survive a restart; an interrupted command is refused instead of a
     /interrupted before its result was recorded.*Re-read the board with roder_issue/,
   );
   expect((await second.board()).issues.map((issue) => issue.title).sort()).toEqual(["Durable", "Interrupted"]);
-  await second.roders.stop();
 });
 
 test("the receipt ledger is bounded; the oldest receipts go first", async () => {
@@ -176,11 +178,10 @@ test("the receipt ledger is bounded; the oldest receipts go first", async () => 
   await expect(
     roders.handleTool("roder_command", { commandId: "pause-0", roderId: roder.id, action: todo("Fresh") }, thread),
   ).resolves.toMatchObject({ action: "createIssue" });
-  await roders.stop();
 });
 
 test("a stale revision conflicts only when the targeted issue changed, and names what to re-read", async () => {
-  const { roders, roder, command, board, issues } = await setup();
+  const { roder, command, board, issues } = await setup();
   const a = (await command(todo("Alpha"))).issue!;
   const b = (await command(todo("Beta"))).issue!;
   const seen = (await board()).revision;
@@ -219,7 +220,28 @@ test("a stale revision conflicts only when the targeted issue changed, and names
   await expect(
     command({ type: "editIssue", issueId: a.id, details: { title: "Alpha (roder)" } }, { expectedRevision: 6 }),
   ).resolves.toMatchObject({ revision: 7, issue: { title: "Alpha (roder)" } });
-  await roders.stop();
+});
+
+test("a person's edit that lands while a stale command runs conflicts instead of being overwritten", async () => {
+  let personEdits: string | null = null;
+  const { command, board, read } = await setup(undefined, (issues) => ({
+    // The person's edit reaches the issue service after the revision check, just before the Roder's change.
+    request: (async (method: string, params?: unknown, actor?: IssueActor, guard?: IssuesGuard) => {
+      const id = method === "desktop/issues/update" ? personEdits : null;
+      if (id) personEdits = null;
+      if (id) await issues.request("desktop/issues/update", { id, title: "Person's title" }, { type: "user" });
+      return issues.request(method, params, actor, guard);
+    }) as IssuesService["request"],
+  }));
+  const issue = (await command(todo("Race"))).issue!;
+  const seen = (await board()).revision;
+  personEdits = issue.id;
+  await expect(
+    command({ type: "editIssue", issueId: issue.id, details: { title: "Roder title" } }, { expectedRevision: seen }),
+  ).rejects.toThrow(`issue ${issue.id} changed while this command was being applied`);
+  expect((await read(issue.id)).title).toBe("Person's title");
+  // Nothing was recorded for the refused command; the next one sees the edit as its own revision.
+  expect((await board()).revision).toBe(seen + 1);
 });
 
 test("a stale revision conflicts on a file only when that file changed", async () => {
@@ -246,11 +268,10 @@ test("a stale revision conflicts on a file only when that file changed", async (
   ).rejects.toThrow(
     `Roder revision conflict: file NOTES.md changed at revision 1, after your expectedRevision 0. Re-read it with roder_files {path: "NOTES.md"}, then retry with expectedRevision 2 and a new commandId`,
   );
-  await roders.stop();
 });
 
 test("setStatus needs the exact current revision, and no revision may be from the future", async () => {
-  const { roders, command } = await setup();
+  const { command } = await setup();
   await command(todo("Bump"));
   await expect(command({ type: "setStatus", status: "paused" }, { expectedRevision: 0 })).rejects.toThrow(
     "Roder revision conflict: expected 0, current revision is 1. setStatus needs the exact current revision",
@@ -259,7 +280,6 @@ test("setStatus needs the exact current revision, and no revision may be from th
     revision: 2,
   });
   await expect(command(todo("Later"), { expectedRevision: 9 })).rejects.toThrow(/expected 9, current revision is 2/);
-  await roders.stop();
 });
 
 test("every action reaches its service, acting as the Roder", async () => {
@@ -305,6 +325,10 @@ test("every action reaches its service, acting as the Roder", async () => {
     /link the merged pull request/,
   );
   await command({ type: "linkIssuePullRequest", issueId: other.id, url: pr });
+  await command({ type: "editIssue", issueId: other.id, details: { status: "in_review" } });
+  await expect(command({ type: "unlinkIssuePullRequest", issueId: other.id, url: pr })).rejects.toThrow(
+    "an issue in_review needs a linked pull request: move it out of in_review before unlinking its last one",
+  );
   await command({ type: "closeIssue", issueId: other.id, outcome: "merged", note: "Merged #7" });
   expect((await read(other.id)).status).toBe("done");
 
@@ -326,7 +350,6 @@ test("every action reaches its service, acting as the Roder", async () => {
     false,
   );
   await expect(command({ type: "setStatus", status: "active" })).rejects.toThrow(/Only the user makes a Roder active/);
-  await roders.stop();
 });
 
 test("roder_issue returns the whole board or one issue in full", async () => {
@@ -354,7 +377,6 @@ test("roder_issue returns the whole board or one issue in full", async () => {
   await expect(roders.handleTool("roder_issue", { roderId: roder.id, issueId: "nope" }, thread)).rejects.toThrow(
     /not on this Roder's board/,
   );
-  await roders.stop();
 });
 
 test("the tools act only for the calling thread's own Roder", async () => {
@@ -369,7 +391,6 @@ test("the tools act only for the calling thread's own Roder", async () => {
     roders.handleTool("roder_command", { commandId: "x", roderId: roder.id, action: todo("x") }, { threadId: "other" }),
   ).rejects.toThrow(/owning Roder thread/);
   expect(await roders.contextForThread(roder.threadId)).toContain(`Your roderId is "${roder.id}"`);
-  await roders.stop();
 });
 
 test("the tool description and schema list exactly the actions in the action table", () => {
