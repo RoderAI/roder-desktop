@@ -390,7 +390,9 @@ test("the tools act only for the calling thread's own Roder", async () => {
   await expect(
     roders.handleTool("roder_command", { commandId: "x", roderId: roder.id, action: todo("x") }, { threadId: "other" }),
   ).rejects.toThrow(/owning Roder thread/);
-  expect(await roders.contextForThread(roder.threadId)).toContain(`Your roderId is "${roder.id}"`);
+  const turn = (await roders.turnStartParams({ threadId: roder.threadId, prompt: "Hello" })) as { prompt: string };
+  expect(turn.prompt).toContain(`Your roderId is "${roder.id}"`);
+  await roders.stop();
 });
 
 test("the tool description and schema list exactly the actions in the action table", () => {
@@ -410,6 +412,7 @@ test("the tool description and schema list exactly the actions in the action tab
     "stopWorker",
     "releaseWorker",
     "setStatus",
+    "freshConversation",
   ]);
   const tool = roderAgentToolDefinitions.find((entry) => entry.name === "roder_command")!;
   expect(tool.description).toBe(roderCommandDescription());

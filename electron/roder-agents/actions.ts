@@ -1,7 +1,7 @@
 // The one table of `roder_command` actions, modelled on Zuse's `ZapperAction`
 // (crates/protocol/src/zappers.rs). The JSON schema, the tool description and
 // the action parser are all generated from it, so they can't drift from what
-// the command runner accepts. Slice 5 generates the commands guide from it too.
+// the command runner accepts. The commands guide (guide.ts) is generated from it too.
 import { issuePriorities, issueStatuses } from "../../src/types/issues";
 import { roderFilePaths } from "../../src/types/roder-agents";
 
@@ -185,6 +185,13 @@ export const roderActions = [
     summary: "Pause yourself: no automatic turns until the user resumes you. Only the user makes a Roder active.",
     fields: [required("status", { type: "string", enum: ["active", "paused"] })],
     scope: () => "whole",
+  },
+  {
+    type: "freshConversation",
+    summary:
+      "Start a new conversation thread for yourself with the current tools. Your files, issues and budgets are unchanged and the old thread stays readable from the Roders page. Your tools stop working in the old thread, so end your turn after it.",
+    fields: [],
+    scope: commutes,
   },
 ] as const satisfies readonly ActionSpec[];
 

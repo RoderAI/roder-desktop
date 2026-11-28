@@ -45,6 +45,7 @@ function engine(repo: string) {
   } as unknown as Workspace;
   const threads = new Map<string, { busy: boolean; turns: number }>();
   let workers = 0;
+  let roderThreads = 0;
   const request = async (method: string, value: unknown): Promise<unknown> => {
     const params = (value ?? {}) as Record<string, unknown>;
     calls.push({ method, params });
@@ -58,7 +59,11 @@ function engine(repo: string) {
       return { workspace };
     }
     if (method === "thread/start") {
-      const id = params.cwd ? `worker-${++workers}` : "roder-thread";
+      const id = params.cwd
+        ? `worker-${++workers}`
+        : ++roderThreads === 1
+          ? "roder-thread"
+          : `roder-thread-${roderThreads}`;
       threads.set(id, { busy: false, turns: 0 });
       return { thread: { id } };
     }
@@ -543,4 +548,105 @@ test("workers, queue and limits survive a restart; older records get the default
     workers: [],
     outbox: [],
   });
+});
+
+test("the worker context rides on every worker turn, not only the first", async () => {
+  const { fake, roders, roder, command, createIssue, delegate, finish } = await setup();
+  await roders.handleRequest("desktop/roders/files/write", {
+    id: roder.id,
+    path: "WORKERS.md",
+    content: "Run pnpm test before reporting.",
+    expectedVersion: 1,
+  });
+  const work = await createIssue("Two turns");
+  const { threadId } = (await delegate(work)).worker!;
+  await finish(threadId);
+  await command({ type: "messageWorker", threadId, text: "Now the docs", automatic: true });
+  await finish(threadId);
+  // A turn the user starts in the worker's thread goes through the host's turnStartParams.
+  const typed = (await roders.turnStartParams({
+    threadId,
+    input: [{ type: "text", text: "and the changelog" }],
+  })) as { developerContext: string; input: { text: string }[] };
+
+  const contexts = [
+    ...fake.turns(threadId).map((turn) => turn.params.developerContext as string),
+    typed.developerContext,
+  ];
+  expect(contexts).toHaveLength(3);
+  for (const context of contexts) {
+    expect(context).toContain('You are a thread working for the Roder "Release"');
+    expect(context).toContain("Rules from your Roder (WORKERS.md):\nRun pnpm test before reporting.");
+    expect(context).toContain(`"issueId":"${work.id}"`);
+  }
+  // The worker's own messages stay as they were: the Roder's turn wrapping is for the Roder's thread only.
+  expect(typed.input).toEqual([{ type: "text", text: "and the changelog" }]);
+  expect(JSON.stringify(fake.turns(threadId)[1].params.input)).not.toContain("Roder turn context");
+});
+
+test("a fresh conversation keeps the worker registry, queue and outbox", async () => {
+  const { fake, roders, roder, createIssue, delegate, read, worker, finish } = await setup();
+  await roders.handleRequest("desktop/roders/update", { id: roder.id, maxConcurrentWorkers: 1 });
+  const ownIssue = await createIssue("First");
+  const first = (await delegate(ownIssue)).worker!;
+  const second = (await delegate(await createIssue("Second"))).worker!;
+  const before = await read();
+
+  const fresh = (await roders.handleRequest("desktop/roders/freshConversation", { id: roder.id })) as RoderAgentDetail;
+  expect(fresh.threadId).not.toBe(roder.threadId);
+  expect(fresh.previousThreadIds).toEqual([roder.threadId]);
+  expect(fresh.workers).toEqual(before.workers);
+  expect(fresh.outbox).toEqual(before.outbox);
+  expect(fresh).toMatchObject({ maxConcurrentWorkers: 1, maxFollowups: 3, workerPolicyMode: "bypass" });
+
+  // The workers keep working for the Roder: the queue moves, their tools still work, and
+  // the Roder manages them from its new thread.
+  await finish(first.threadId);
+  expect(await worker(second.threadId)).toMatchObject({ state: "running", queuePosition: null });
+  await roders.handleTool(
+    "roder_command",
+    {
+      commandId: randomUUID(),
+      roderId: roder.id,
+      action: { type: "commentIssue", issueId: ownIssue.id, text: "Done" },
+    },
+    { threadId: first.threadId },
+  );
+  await roders.handleTool(
+    "roder_command",
+    {
+      commandId: randomUUID(),
+      roderId: roder.id,
+      action: { type: "messageWorker", threadId: first.threadId, text: "Add a test", automatic: true },
+    },
+    { threadId: fresh.threadId },
+  );
+  expect(await worker(first.threadId)).toMatchObject({ followups: 1 });
+  expect(fake.turns(first.threadId)).toHaveLength(1); // waits: the one slot is taken by the second worker
+  expect(roders.policyModeForThread(first.threadId)).toBe("bypass");
+});
+
+test("the brief and guides tell the Roder to delegate, and list the worker actions", async () => {
+  const { roders, roder } = await setup();
+  const thread = { threadId: roder.threadId };
+  const guide = async (path: string) =>
+    ((await roders.handleTool("roder_files", { path }, thread)) as { content: string }).content;
+  const commands = await guide("guide/commands.md");
+  for (const signature of [
+    "delegate {issueId, worker, model?, base?}",
+    "messageWorker {threadId, text, automatic}",
+    "stopWorker {threadId}",
+    "releaseWorker {threadId}",
+  ])
+    expect(commands).toContain(signature);
+  expect(await guide("guide/lifecycle.md")).toContain(
+    "links the thread to the issue, makes it the owner and moves the issue to in_progress",
+  );
+  const turn = (await roders.turnStartParams({ threadId: roder.threadId, input: [{ type: "text", text: "Hi" }] })) as {
+    input: { text: string }[];
+  };
+  const brief = turn.input[0].text;
+  expect(brief).toContain("Delegate it with the roder_command delegate action");
+  expect(brief).not.toContain("Issues page");
+  expect(brief).not.toMatch(/share (a|the) worktree/);
 });

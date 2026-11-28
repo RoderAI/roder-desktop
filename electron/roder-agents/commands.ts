@@ -18,7 +18,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Issue, IssueActor, IssueProject } from "../../src/types/issues";
-import type { RoderAgent, RoderFilePath } from "../../src/types/roder-agents";
+import type { RoderAgent, RoderFilePath, RoderFileVersion } from "../../src/types/roder-agents";
 import {
   fileTarget,
   issueTarget,
@@ -59,6 +59,8 @@ export type RoderCommandOptions = {
   fileWritten: (roder: RoderAgent, path: RoderFilePath) => Promise<void>;
   /** The Roder's worker registry (electron/roder-agents/workers.ts). */
   workers?: Pick<RoderWorkers, "delegate" | "message" | "stop" | "release">;
+  /** Move the Roder to a new thread; returns the new thread's id. */
+  freshConversation: (roder: RoderAgent) => Promise<string>;
 };
 
 /** What a worker thread may do with roder_command (Zuse `crates/engine/src/rpc/zappers.rs`). */
@@ -458,6 +460,15 @@ export function createRoderCommands(options: RoderCommandOptions) {
       if (roder.enabled) await options.pause(roder);
       return { status: "paused", summary: "Paused: no automatic turns until the user resumes you" };
     },
+    freshConversation: async (roder) => {
+      const previousThreadId = roder.threadId;
+      const threadId = await options.freshConversation(roder);
+      return {
+        threadId,
+        previousThreadId,
+        summary: `Started a fresh conversation in thread ${threadId}. Your tools no longer work in this thread: end your turn now`,
+      };
+    },
   } satisfies Record<
     RoderActionType,
     (roder: RoderAgent, action: RoderAction, actor: string, guard: IssuesGuard | undefined) => Promise<Outcome>
@@ -586,6 +597,17 @@ export function createRoderCommands(options: RoderCommandOptions) {
       pending.result = result;
       await save(roder, ledger);
       return structuredClone(result);
+    },
+
+    /** The revision, every issue and the current file versions, for composing a turn. */
+    async state(roder: RoderAgent): Promise<{ revision: number; issues: Issue[]; files: RoderFileVersion[] }> {
+      const ledger = await load(roder);
+      if (await observe(roder, ledger)) await save(roder, ledger);
+      return {
+        revision: ledger.revision,
+        issues: (await board(roder)).issues,
+        files: await options.files.list(roder.id),
+      };
     },
 
     /** The whole board, or one issue in full. */

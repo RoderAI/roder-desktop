@@ -2,7 +2,10 @@
 // `prepare_request` (crates/engine/src/zappers.rs). Each worker turn gets the
 // brief, the Roder's WORKERS.md and the issues linked to the thread through
 // `developerContext`, so the rules arrive with every turn, including turns the
-// user starts in the worker's own composer.
+// user starts in the worker's own composer. The engine applies
+// `developerContext` to the turn that carries it and never stores it
+// (roder-core runtime.rs), so it is sent whole on every worker turn; unlike the
+// Roder's own turns (turn-prompt.ts) nothing relies on what an earlier turn saw.
 import type { Issue } from "../../src/types/issues";
 import type { RoderAgent, RoderWorker } from "../../src/types/roder-agents";
 

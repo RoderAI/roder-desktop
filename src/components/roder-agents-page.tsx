@@ -257,6 +257,19 @@ export function RoderAgentEditor({
           >
             Compact context
           </Button>
+          <Button
+            disabled={busy || !!status.active}
+            variant="outline"
+            onClick={async () => {
+              const moved = await perform(() => roderAgentsIpc.freshConversation(status.id));
+              if (moved)
+                setMessage(
+                  "Started a fresh conversation. Files, issues and budgets are unchanged; the previous thread is listed below.",
+                );
+            }}
+          >
+            Fresh conversation
+          </Button>
         </div>
         {status.lastError ? (
           <p role="status" className="text-sm text-destructive">
@@ -269,6 +282,29 @@ export function RoderAgentEditor({
           </p>
         ) : null}
       </div>
+      {status.previousThreadIds.length ? (
+        <section aria-label="Previous conversations" className="space-y-2">
+          <h3 className="font-semibold">Previous conversations</h3>
+          <p className="text-sm text-muted-foreground font-normal">
+            Threads this Roder talked in before a fresh conversation. They stay readable; its tools work only in the
+            current thread.
+          </p>
+          <ul className="space-y-1">
+            {status.previousThreadIds.map((threadId, index) => (
+              <li key={threadId}>
+                <Link
+                  to="/threads/$threadId"
+                  params={{ threadId }}
+                  search={true}
+                  className="rounded-md px-3 py-2 underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Conversation {index + 1}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <RoderAgentFiles key={status.id} roderId={status.id} initialFiles={initial.files} />
       <form
         className="space-y-3"
