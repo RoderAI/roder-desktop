@@ -56,7 +56,9 @@ export function ProjectPickerDialog({
         className="w-[min(calc(100vw-theme(spacing.8)),36rem)] max-w-none gap-0 overflow-hidden rounded-2xl p-0"
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
+        {/* Keyed so that asking for a new project again with another start folder resets the panel. */}
         <ProjectPickerPanel
+          key={initialPath}
           initialPath={initialPath}
           title={title}
           homeDir={window.roderDesktop.homeDir}
@@ -81,7 +83,7 @@ type DeepSearchState = {
 };
 
 /** Mounted only while the dialog is open, so every open starts from fresh state. */
-function ProjectPickerPanel({
+export function ProjectPickerPanel({
   initialPath,
   title,
   homeDir,
@@ -104,11 +106,13 @@ function ProjectPickerPanel({
   const deepRequestSeq = useRef(0);
   const deepTimer = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
 
   const listingRequestSeq = useRef(0);
 
   useMountEffect(() => {
+    inputRef.current?.focus();
     loadListing(path);
     return () => {
       listingRequestSeq.current += 1;
@@ -173,7 +177,7 @@ function ProjectPickerPanel({
     deepTimer.current = window.setTimeout(() => {
       deepTimer.current = null;
       roderIpc
-        .projectPickerSearch({ root: homeDir, query: trimmed })
+        .projectPickerSearch({ query: trimmed })
         .then((result) => {
           if (deepRequestSeq.current !== requestId || result.canceled) {
             return;
@@ -203,6 +207,8 @@ function ProjectPickerPanel({
     setQuery("");
     setSelectedKey(selectKey);
     scheduleDeepSearch("");
+    // Clicking a breadcrumb or row takes focus; return it so the list keys keep working.
+    inputRef.current?.focus();
   }
 
   function goUp(): void {
@@ -218,6 +224,26 @@ function ProjectPickerPanel({
 
   function addProject(): void {
     onPick(addTarget);
+  }
+
+  function moveSelection(delta: 1 | -1): void {
+    const nextIndex = moveSelectionIndex(selectedIndex, delta, rows.all.length, !query.trim());
+    setSelectedKey(nextIndex === -1 ? null : (rows.all[nextIndex]?.key ?? null));
+    if (nextIndex === -1) {
+      listRef.current?.scrollTo({ top: 0 });
+    } else {
+      revealRow(`[data-index="${nextIndex}"]`);
+    }
+  }
+
+  /** Up and Down pressed on a breadcrumb return to the list. */
+  function handleBreadcrumbKeyDown(event: React.KeyboardEvent<HTMLElement>): void {
+    if ((event.key !== "ArrowUp" && event.key !== "ArrowDown") || event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    inputRef.current?.focus();
+    moveSelection(event.key === "ArrowDown" ? 1 : -1);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
@@ -239,13 +265,7 @@ function ProjectPickerPanel({
     }
     event.preventDefault();
     if (action === "up" || action === "down") {
-      const nextIndex = moveSelectionIndex(selectedIndex, action === "down" ? 1 : -1, rows.all.length, !query.trim());
-      setSelectedKey(nextIndex === -1 ? null : (rows.all[nextIndex]?.key ?? null));
-      if (nextIndex === -1) {
-        listRef.current?.scrollTo({ top: 0 });
-      } else {
-        revealRow(`[data-index="${nextIndex}"]`);
-      }
+      moveSelection(action === "down" ? 1 : -1);
       return;
     }
     if (action === "open") {
@@ -268,7 +288,7 @@ function ProjectPickerPanel({
       <div className="flex h-12 items-center gap-2.5 bg-muted/40 px-4">
         <SearchIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <input
-          ref={focusInput}
+          ref={inputRef}
           type="text"
           role="combobox"
           aria-label="Search folders"
@@ -310,12 +330,21 @@ function ProjectPickerPanel({
               crumb={crumb}
               current={index === breadcrumbs.length - 1}
               onNavigate={() => navigateTo(crumb.path)}
+              onKeyDown={handleBreadcrumbKeyDown}
             />
           </Fragment>
         ))}
       </nav>
 
-      <div ref={listRef} id={listId} role="listbox" aria-label="Folders" className="h-80 overflow-y-auto p-1.5">
+      {/* Out of the tab order: the combobox input drives the list, and Chromium would otherwise focus a scroller. */}
+      <div
+        ref={listRef}
+        id={listId}
+        role="listbox"
+        aria-label="Folders"
+        tabIndex={-1}
+        className="h-80 overflow-y-auto p-1.5"
+      >
         {rows.local.map((row, index) => (
           <ProjectPickerRowItem
             key={row.key}
@@ -464,23 +493,26 @@ function BreadcrumbButton({
   crumb,
   current,
   onNavigate,
+  onKeyDown,
 }: {
   crumb: ProjectPickerBreadcrumb;
   current: boolean;
   onNavigate: () => void;
+  onKeyDown: React.KeyboardEventHandler<HTMLButtonElement>;
 }): React.JSX.Element {
   const Icon = crumb.kind === "device" ? LaptopIcon : crumb.kind === "home" ? HouseIcon : null;
   return (
     <button
       type="button"
-      tabIndex={-1}
+      data-slot="project-picker-breadcrumb"
       aria-current={current ? "location" : undefined}
       title={crumb.path}
       className={cn(
-        "inline-flex h-7 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 outline-none hover:bg-accent/60",
+        "inline-flex h-7 min-w-0 shrink items-center gap-1.5 rounded-md px-1.5 outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
         current ? "text-foreground" : "text-muted-foreground hover:text-foreground",
       )}
       onClick={onNavigate}
+      onKeyDown={onKeyDown}
     >
       {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden="true" /> : null}
       <span className="truncate">{crumb.label}</span>
@@ -501,10 +533,6 @@ function KeyHint({ keys, label }: { keys: React.ReactNode[]; label: string }): R
       <span>{label}</span>
     </span>
   );
-}
-
-function focusInput(element: HTMLInputElement | null): void {
-  element?.focus();
 }
 
 function rowElementId(listId: string, index: number): string {

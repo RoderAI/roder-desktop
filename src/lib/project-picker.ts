@@ -278,8 +278,12 @@ export function trimTrailingSeparators(path: string): string {
 export function parentPath(path: string): string | null {
   const normalized = trimTrailingSeparators(path);
   const separator = pathSeparator(normalized);
-  const index = normalized.lastIndexOf(separator);
-  if (index === -1 || normalized === separator || /^[A-Za-z]:[\\/]$/.test(normalized)) {
+  const root = windowsRoot(normalized);
+  // Windows accepts both slashes, so a path under a Windows root may mix them.
+  const index = root
+    ? Math.max(normalized.lastIndexOf("\\"), normalized.lastIndexOf("/"))
+    : normalized.lastIndexOf(separator);
+  if (index === -1 || normalized === separator || normalized === root) {
     return null;
   }
   if (index === 0) {
@@ -304,7 +308,9 @@ export function displayPath(path: string, homeDir: string): string {
   const normalized = trimTrailingSeparators(path);
   const home = homeDir ? trimTrailingSeparators(homeDir) : "";
   if (home && isSameOrInside(normalized, home)) {
-    return `~${normalized.slice(home.length).replaceAll("\\", "/")}`;
+    // A root home ("/" or "C:\") ends in a separator, so the remainder has none of its own.
+    const rest = normalized.slice(home.length).replaceAll("\\", "/").replace(/^\//, "");
+    return rest ? `~/${rest}` : "~";
   }
   return normalized;
 }
@@ -320,8 +326,7 @@ export function projectPickerBreadcrumbs(path: string, homeDir: string, deviceNa
   const normalized = trimTrailingSeparators(path);
   const separator = pathSeparator(normalized);
   const home = homeDir ? trimTrailingSeparators(homeDir) : "";
-  const rootMatch = /^[A-Za-z]:[\\/]/.exec(normalized);
-  const fsRoot = rootMatch ? rootMatch[0] : separator;
+  const fsRoot = windowsRoot(normalized) ?? separator;
   const crumbs: ProjectPickerBreadcrumb[] = [{ key: "device", label: deviceName, path: fsRoot, kind: "device" }];
 
   let base = fsRoot;
@@ -356,6 +361,11 @@ export function initialProjectPickerPath(activeCwd: string | undefined, homeDir:
 export function deviceDisplayName(hostName: string | undefined): string {
   const name = (hostName ?? "").replace(/\.local$/i, "").trim();
   return name || "This computer";
+}
+
+/** The Windows root a path sits under: a drive ("C:\") or a UNC share ("\\server\share"). */
+function windowsRoot(path: string): string | null {
+  return /^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/]+[\\/][^\\/]+)/.exec(path)?.[0] ?? null;
 }
 
 function localRow(entry: ProjectPickerEntry, match: ProjectPickerMatch | null): ProjectPickerRow {

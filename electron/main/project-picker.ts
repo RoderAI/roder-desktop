@@ -1,4 +1,4 @@
-import { access, readdir, stat } from "node:fs/promises";
+import { access, opendir, stat } from "node:fs/promises";
 import { Worker } from "node:worker_threads";
 import { isAbsolute, join, resolve } from "node:path";
 
@@ -12,6 +12,11 @@ export type ProjectPickerListing = {
   path: string;
   entries: ProjectPickerEntry[];
   truncated: boolean;
+};
+
+/** What the renderer may ask for. The main process owns the search root and bounds. */
+export type ProjectPickerSearchRequest = {
+  query: string;
 };
 
 export type ProjectPickerSearchParams = {
@@ -74,13 +79,16 @@ export function shouldSkipDirectoryInSearch(name: string): boolean {
   return skippedDirectorySuffixes.some((suffix) => name.endsWith(suffix));
 }
 
-export async function listProjectPickerDirectory(path: string): Promise<ProjectPickerListing> {
+export async function listProjectPickerDirectory(
+  path: string,
+  limit: number = projectPickerListLimit,
+): Promise<ProjectPickerListing> {
   const directory = absoluteDirectory(path);
   const names: string[] = [];
   let truncated = false;
-  // One scandir call; directory listings are flat and cheap compared to the git checks below.
-  for (const dirent of await readdir(directory, { withFileTypes: true })) {
-    if (names.length >= projectPickerListLimit) {
+  // Read in batches so a huge folder is not loaded in full once the limit is reached.
+  for await (const dirent of await opendir(directory, { bufferSize: 1_024 })) {
+    if (names.length >= limit) {
       truncated = true;
       break;
     }
@@ -110,7 +118,8 @@ type SearchWorkerMessage =
  * result count, visited directory count and a wall-clock budget that the main
  * thread enforces even if a filesystem call hangs. Cancel via `signal`; the
  * worker is terminated. Hidden and heavy directories (node_modules, Library,
- * build output, app bundles, ...) are never entered and symlinks are not followed.
+ * build output, app bundles, ...) are never matched or entered, and symlinks are
+ * not followed.
  */
 export function searchProjectPickerFolders(
   params: ProjectPickerSearchParams,
@@ -169,6 +178,10 @@ export function searchProjectPickerFolders(
     const hardDeadline = setTimeout(() => finish({ truncated: true }), limits.timeBudgetMs + 500);
     signal?.addEventListener("abort", abort, { once: true });
     worker.on("message", (message: SearchWorkerMessage) => {
+      // Messages already queued by the worker can arrive after a cancel or timeout.
+      if (settled) {
+        return;
+      }
       if (message.type === "match") {
         result.matches.push(message.entry);
       } else if (message.type === "done") {
@@ -194,7 +207,9 @@ const skipped = new Set(skippedNames);
 const deadline = Date.now() + timeBudgetMs;
 let found = 0;
 let visited = 0;
+let queued = 1;
 let truncated = false;
+let dropped = false;
 
 function shouldSkip(name) {
   return name.startsWith(".") || skipped.has(name) || skippedSuffixes.some((suffix) => name.endsWith(suffix));
@@ -217,7 +232,7 @@ try {
         continue;
       }
       for (const dirent of dirents) {
-        if (!dirent.isDirectory() || dirent.name.startsWith(".")) {
+        if (!dirent.isDirectory() || shouldSkip(dirent.name)) {
           continue;
         }
         const childPath = join(directory, dirent.name);
@@ -228,14 +243,20 @@ try {
             entry: { name: dirent.name, path: childPath, isGitRepo: existsSync(join(childPath, ".git")) },
           });
         }
-        if (depth < maxDepth && !shouldSkip(dirent.name)) {
-          nextLevel.push(childPath);
+        if (depth < maxDepth) {
+          // Never queue more folders than the visit limit allows to be read.
+          if (queued < maxVisitedDirectories) {
+            queued += 1;
+            nextLevel.push(childPath);
+          } else {
+            dropped = true;
+          }
         }
       }
     }
     level = nextLevel;
   }
-  parentPort.postMessage({ type: "done", truncated });
+  parentPort.postMessage({ type: "done", truncated: truncated || dropped });
 } catch (error) {
   parentPort.postMessage({ type: "error", message: String(error && error.message ? error.message : error) });
 }
@@ -244,13 +265,19 @@ try {
 /** One in-flight deep search per renderer; starting a new one cancels the previous. */
 export class ProjectPickerSearchRegistry {
   private readonly controllers = new Map<number, AbortController>();
+  private readonly root: string;
 
-  async search(ownerId: number, params: ProjectPickerSearchParams): Promise<ProjectPickerSearchResult> {
+  constructor(root: string) {
+    this.root = root;
+  }
+
+  async search(ownerId: number, request: ProjectPickerSearchRequest): Promise<ProjectPickerSearchResult> {
     this.cancel(ownerId);
     const controller = new AbortController();
     this.controllers.set(ownerId, controller);
     try {
-      return await searchProjectPickerFolders(params, controller.signal);
+      // Only the query is taken from the request, so it cannot move the root or raise the limits.
+      return await searchProjectPickerFolders({ root: this.root, query: request.query }, controller.signal);
     } finally {
       if (this.controllers.get(ownerId) === controller) {
         this.controllers.delete(ownerId);

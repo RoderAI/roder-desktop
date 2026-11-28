@@ -12,11 +12,8 @@ export type ProjectPickerListing = {
   truncated: boolean;
 };
 
-export type ProjectPickerSearchParams = {
-  root: string;
+export type ProjectPickerSearchRequest = {
   query: string;
-  maxDepth?: number;
-  limit?: number;
 };
 
 export type ProjectPickerSearchResult = {

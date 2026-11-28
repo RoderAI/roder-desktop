@@ -57,10 +57,43 @@ test("rejects relative paths and surfaces missing folders", async () => {
 
 test("deep search finds folder-name matches and skips hidden and heavy directories", async () => {
   const result = await searchProjectPickerFolders({ root, query: "RODER" });
-  const paths = result.matches.map((match) => match.path.slice(root.length)).sort();
+  const paths = result.matches.map((match) => match.path.slice(root.length).replaceAll("\\", "/")).sort();
   expect(paths).toEqual(["/w/roder", "/w/roder-desktop", "/w/roder/crates/roder-core", "/w/vex-intsearch/vex-roder"]);
   expect(result.matches.find((match) => match.name === "roder")?.isGitRepo).toBe(true);
   expect(result.canceled).toBe(false);
+});
+
+test("deep search never offers skipped folders as matches", async () => {
+  for (const query of ["node_modules", "Library"]) {
+    const result = await searchProjectPickerFolders({ root, query });
+    expect(result.matches).toEqual([]);
+  }
+});
+
+test("deep search reports truncation when it stops queueing folders", async () => {
+  const result = await searchProjectPickerFolders({ root: join(root, "w"), query: "roder" }, undefined, {
+    maxVisitedDirectories: 1,
+  });
+  expect(result.matches.map((match) => match.name).sort()).toEqual(["roder", "roder-desktop"]);
+  expect(result.truncated).toBe(true);
+});
+
+test("listing stops at its folder limit", async () => {
+  const listing = await listProjectPickerDirectory(join(root, "w"), 2);
+  expect(listing.entries).toHaveLength(2);
+  expect(listing.truncated).toBe(true);
+});
+
+test("a canceled search result is not changed by matches still queued from the worker", async () => {
+  const controller = new AbortController();
+  const pending = searchProjectPickerFolders({ root, query: "roder" }, controller.signal);
+  // Block this thread so the worker posts its matches before the cancel is handled.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+  controller.abort();
+  const result = await pending;
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(result.canceled).toBe(true);
+  expect(result.matches).toEqual([]);
 });
 
 test("deep search is bounded by depth and result count", async () => {
@@ -84,13 +117,22 @@ test("deep search stops when aborted", async () => {
 });
 
 test("a new search from the same renderer cancels the previous one", async () => {
-  const registry = new ProjectPickerSearchRegistry();
-  const first = registry.search(1, { root, query: "roder" });
-  const second = registry.search(1, { root, query: "notes" });
+  const registry = new ProjectPickerSearchRegistry(root);
+  const first = registry.search(1, { query: "roder" });
+  const second = registry.search(1, { query: "notes" });
   const [firstResult, secondResult] = await Promise.all([first, second]);
   expect(firstResult.canceled).toBe(true);
   expect(secondResult.canceled).toBe(false);
   expect(secondResult.matches.map((match) => match.name)).toEqual(["notes"]);
+});
+
+test("renderer requests cannot change the search root or widen its bounds", async () => {
+  const registry = new ProjectPickerSearchRegistry(join(root, "a"));
+  const request = { query: "roder", root, maxDepth: 20, limit: 500 };
+  const result = await registry.search(1, request);
+  expect(result.root).toBe(join(root, "a"));
+  // "roder-too-deep" sits below the five-level bound, and nothing outside "a" is searched.
+  expect(result.matches).toEqual([]);
 });
 
 test("skips package-like and heavy directory names", () => {

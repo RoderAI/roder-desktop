@@ -1,4 +1,4 @@
-import type { ProjectPickerSearchParams } from "@/types/project-picker";
+import type { ProjectPickerSearchRequest } from "@/types/project-picker";
 import type {
   BlaxelCliStatus,
   BlaxelSandboxSummary,
@@ -472,7 +472,7 @@ export const roderIpc = {
   openWorkspaceFolder: (defaultPath?: string) => window.roderDesktop.openWorkspaceFolder(defaultPath),
   openWorkspaceFolders: (defaultPath?: string) => window.roderDesktop.openWorkspaceFolders(defaultPath),
   projectPickerList: (path: string) => window.roderDesktop.projectPickerList(path),
-  projectPickerSearch: (params: ProjectPickerSearchParams) => window.roderDesktop.projectPickerSearch(params),
+  projectPickerSearch: (request: ProjectPickerSearchRequest) => window.roderDesktop.projectPickerSearch(request),
   projectPickerCancelSearch: () => window.roderDesktop.projectPickerCancelSearch(),
   listWorkspaces: () => window.roderDesktop.request("workspace/list", {}) as Promise<WorkspaceListResult>,
   createWorkspace: (params: WorkspaceCreateParams) =>

@@ -90,8 +90,13 @@ describe("matching and filtering", () => {
 
   test("deep matches from an earlier query narrow instantly for a longer query", () => {
     const deep = [entry("/Users/pz/x/roder"), entry("/Users/pz/x/rollup")];
-    expect(filterDeepFolders(deep, "rod", "/Users/pz/w", home).map((row) => row.entry.name)).toEqual(["roder"]);
-    expect(filterDeepFolders(deep, "r", "/Users/pz/w", home)).toEqual([]);
+    const names = (query: string) => filterDeepFolders(deep, query, "/Users/pz/w", home).map((row) => row.entry.name);
+    expect(names("ro")).toEqual(["roder", "rollup"]);
+    expect(names("rod")).toEqual(["roder"]);
+  });
+
+  test("deep matches stay hidden below the minimum query length", () => {
+    expect(filterDeepFolders([entry("/Users/pz/x/roder")], "r", "/Users/pz/w", home)).toEqual([]);
   });
 
   test("builds one flat row list with local rows before deep rows", () => {
@@ -215,6 +220,42 @@ describe("paths and breadcrumbs", () => {
     expect(displayPath("/opt/src", home)).toBe("/opt/src");
   });
 
+  test("keeps the ~ separator when home is a filesystem root", () => {
+    expect(displayPath("/tmp/project", "/")).toBe("~/tmp/project");
+    expect(displayPath("/", "/")).toBe("~");
+    expect(displayPath("D:\\src\\app", "D:\\")).toBe("~/src/app");
+  });
+
+  test("stops at a UNC share root", () => {
+    expect(parentPath("\\\\server\\share\\team\\app")).toBe("\\\\server\\share\\team");
+    expect(parentPath("\\\\server\\share\\team")).toBe("\\\\server\\share");
+    expect(parentPath("\\\\server\\share")).toBeNull();
+    expect(parentPath("\\\\server\\share\\")).toBeNull();
+  });
+
+  test("breadcrumbs on a UNC path start at the share root", () => {
+    const crumbs = projectPickerBreadcrumbs("\\\\server\\share\\team\\app", "C:\\Users\\pz", "Mdizzy");
+    expect(crumbs.map((crumb) => [crumb.label, crumb.path])).toEqual([
+      ["Mdizzy", "\\\\server\\share"],
+      ["team", "\\\\server\\share\\team"],
+      ["app", "\\\\server\\share\\team\\app"],
+    ]);
+    expect(projectPickerBreadcrumbs("\\\\server\\share\\", "C:\\Users\\pz", "Mdizzy")).toEqual([
+      { key: "device", label: "Mdizzy", path: "\\\\server\\share", kind: "device" },
+    ]);
+  });
+
+  test("stops at a UNC share root written with forward or mixed slashes", () => {
+    expect(parentPath("//server/share/team")).toBe("//server/share");
+    expect(parentPath("//server/share")).toBeNull();
+    expect(parentPath("\\\\server/share")).toBeNull();
+    expect(parentPath("\\\\server/share\\team")).toBe("\\\\server/share");
+    expect(projectPickerBreadcrumbs("//server/share/team", "", "Mdizzy").map((crumb) => crumb.path)).toEqual([
+      "//server/share",
+      "//server/share/team",
+    ]);
+  });
+
   test("breadcrumbs show device, Home, then each folder under home", () => {
     expect(projectPickerBreadcrumbs("/Users/pz/w", home, "Mdizzy")).toEqual([
       { key: "device", label: "Mdizzy", path: "/", kind: "device" },
@@ -245,7 +286,7 @@ describe("paths and breadcrumbs", () => {
   });
 });
 
-async function renderRow(props: { row: ProjectPickerRow; selected: boolean }): Promise<string> {
+async function loadDialogModule() {
   // The component module pulls in roder-ipc, which binds to the preload bridge at import time.
   (globalThis as { window?: unknown }).window = {
     roderDesktop: {
@@ -254,7 +295,11 @@ async function renderRow(props: { row: ProjectPickerRow; selected: boolean }): P
       onStderr: () => () => undefined,
     },
   };
-  const { ProjectPickerRowItem } = await import("../src/components/project-picker-dialog");
+  return import("../src/components/project-picker-dialog");
+}
+
+async function renderRow(props: { row: ProjectPickerRow; selected: boolean }): Promise<string> {
+  const { ProjectPickerRowItem } = await loadDialogModule();
   return renderToStaticMarkup(
     React.createElement(ProjectPickerRowItem, { id: "row-0", index: 0, onHover() {}, onOpen() {}, ...props }),
   );
@@ -277,5 +322,27 @@ describe("row rendering", () => {
     const html = await renderRow({ row: rows[0]!, selected: false });
     expect(html).not.toContain("project-picker-git");
     expect(html).not.toContain("<mark");
+  });
+});
+
+describe("panel keyboard order", () => {
+  test("keeps breadcrumbs in the tab order and the scrolling list out of it", async () => {
+    const { ProjectPickerPanel } = await loadDialogModule();
+    const html = renderToStaticMarkup(
+      React.createElement(ProjectPickerPanel, {
+        initialPath: "/Users/pz/w",
+        title: "New project",
+        homeDir: home,
+        deviceName: "Mdizzy",
+        platform: "darwin",
+        onPick() {},
+      }),
+    );
+    const breadcrumbs = [...html.matchAll(/<button[^>]*data-slot="project-picker-breadcrumb"[^>]*>/g)];
+    expect(breadcrumbs).toHaveLength(3);
+    for (const [button] of breadcrumbs) {
+      expect(button).not.toContain("tabindex");
+    }
+    expect(html).toMatch(/<div[^>]*role="listbox"[^>]*tabindex="-1"|<div[^>]*tabindex="-1"[^>]*role="listbox"/);
   });
 });
