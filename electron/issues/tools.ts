@@ -1,9 +1,17 @@
-import { issueStatuses } from "../../src/types/issues";
+import { issuePriorities, issueStatuses } from "../../src/types/issues";
 import type { IssuesService } from "./service";
 
 const string = { type: "string" };
 const nullableString = { type: ["string", "null"] };
 const status = { type: "string", enum: issueStatuses };
+const owner = {
+  type: "object",
+  description:
+    'Who holds the issue: {type: "roder"} (the project\'s Roder), {type: "thread", threadId} (a thread doing the work, which also links it), or {type: "user"} (agents hand over with issues_ask_user instead).',
+  properties: { type: { type: "string", enum: ["roder", "thread", "user"] }, threadId: string },
+  required: ["type"],
+  additionalProperties: false,
+};
 const projectFields = {
   name: string,
   description: string,
@@ -11,7 +19,17 @@ const projectFields = {
   roderThreadId: nullableString,
   archived: { type: "boolean" },
 };
-const issueFields = { projectId: string, title: string, description: string, status, threadId: nullableString };
+const issueFields = {
+  projectId: string,
+  title: string,
+  description: string,
+  status,
+  priority: { type: "string", enum: issuePriorities },
+  owner,
+  doneCriteria: { type: "string", description: "What must be true for the issue to be done." },
+  outOfScope: { type: "string", description: "What the issue deliberately leaves alone." },
+  parent: { ...nullableString, description: "ID of the issue in the same project this one is part of." },
+};
 
 function tool(
   name: string,
@@ -60,48 +78,82 @@ export const issueToolDefinitions = [
   tool(
     "issues_list",
     "desktop/issues/list",
-    "List local issues, optionally filtering by project, status, assigned thread, or search text. threadId null finds unassigned issues.",
+    "List local issues, optionally filtering by project, status, linked thread, or search text. threadId null finds issues no thread has worked on.",
     { projectId: string, status, threadId: nullableString, query: string },
   ),
   tool(
     "issues_read",
     "desktop/issues/read",
-    "Read a local issue including its description and assigned thread.",
+    "Read a local issue including its owner, doneCriteria, linked threads, pull requests and activity.",
     { id: string },
     ["id"],
   ),
   tool(
     "issues_create",
     "desktop/issues/create",
-    "Create an issue in a local project. Default status is backlog.",
+    "Create an issue in a local project. New issues start in backlog (default) or todo; todo needs doneCriteria. Owner defaults to the Roder; set a thread owner to take it yourself.",
     issueFields,
     ["projectId", "title"],
   ),
   tool(
     "issues_update",
     "desktop/issues/update",
-    "Edit or move a local issue, change status, or assign a thread. Use threadId null to unassign.",
+    "Edit an issue, change its owner, priority or status. in_progress needs a linked thread, in_review a linked pull request. Close with issues_close and hand over to the user with issues_ask_user. doneCriteria can be edited but not cleared.",
     { id: string, ...issueFields },
     ["id"],
   ),
   tool(
+    "issues_comment",
+    "desktop/issues/comment",
+    "Add a comment to an issue's activity: progress, findings, blockers.",
+    { id: string, text: string },
+    ["id", "text"],
+  ),
+  tool(
+    "issues_link_pull_request",
+    "desktop/issues/linkPullRequest",
+    "Link a GitHub pull request (https://github.com/<owner>/<repo>/pull/<n>) to an issue.",
+    { id: string, url: string, title: string },
+    ["id", "url"],
+  ),
+  tool(
+    "issues_ask_user",
+    "desktop/issues/askUser",
+    "Hand an open issue to the user with a question: the user becomes the owner and the status needs_you. Their reply hands it back to the newest linked thread, else the Roder.",
+    { id: string, question: string, recommendation: string },
+    ["id", "question"],
+  ),
+  tool(
+    "issues_close",
+    "desktop/issues/close",
+    "Close an issue. outcome merged (needs a linked pull request) moves it to done; dropped moves it to cancelled. The note says what happened.",
+    { id: string, outcome: { type: "string", enum: ["merged", "dropped"] }, note: string },
+    ["id", "outcome", "note"],
+  ),
+  tool(
     "issues_delete",
     "desktop/issues/delete",
-    "Permanently delete a local issue. Prefer done or cancelled status to preserve history.",
+    "Permanently delete a local issue. Prefer issues_close to preserve history.",
     { id: string },
     ["id"],
   ),
   tool(
     "issues_launch",
     "desktop/issues/launch",
-    "Launch work on an issue in its linked workspace and assign the resulting thread. If already assigned, return that thread without launching again.",
+    "Launch work on an issue in its linked workspace; the new thread becomes the owner and the issue moves to in_progress. If a thread already owns it, return that thread without launching again.",
     { id: string },
     ["id"],
   ),
 ];
 
-export async function handleIssueToolCall(service: IssuesService, name: string, args: unknown): Promise<unknown> {
+/** Tool calls always act as the calling agent's thread, never as the user. */
+export async function handleIssueToolCall(
+  service: IssuesService,
+  name: string,
+  args: unknown,
+  context: { threadId: string },
+): Promise<unknown> {
   const definition = issueToolDefinitions.find((item) => item.name === name);
   if (!definition) throw new Error(`Unknown issue tool: ${name}`);
-  return service.request(definition.method, args);
+  return service.request(definition.method, args, { type: "agent", threadId: context.threadId });
 }

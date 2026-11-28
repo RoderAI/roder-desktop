@@ -12,8 +12,8 @@ export function groupIssues(
   for (const issue of issues) {
     if (filters.projectId && issue.projectId !== filters.projectId) continue;
     if (filters.status && issue.status !== filters.status) continue;
-    if (filters.assignment === "assigned" && !issue.threadId) continue;
-    if (filters.assignment === "unassigned" && issue.threadId) continue;
+    if (filters.assignment === "assigned" && issue.owner.type !== "thread") continue;
+    if (filters.assignment === "unassigned" && issue.owner.type === "thread") continue;
     if (query && !`${issue.title}\n${issue.description}\n${issue.number}`.toLowerCase().includes(query)) continue;
     const group = byStatus.get(issue.status) ?? [];
     group.push(issue);
@@ -27,6 +27,14 @@ export function groupIssues(
   }
   return groups;
 }
+
+/** Fields a person can edit on an issue; threads, pull requests and activity change through their own requests. */
+export type IssueEdit = Partial<
+  Pick<
+    Issue,
+    "projectId" | "title" | "description" | "status" | "priority" | "owner" | "doneCriteria" | "outOfScope" | "parent"
+  >
+>;
 
 export const issuesIpc = {
   listProjects: () => window.roderDesktop.request("desktop/projects/list", {}) as Promise<{ projects: IssueProject[] }>,
@@ -42,15 +50,12 @@ export const issuesIpc = {
     window.roderDesktop.request("desktop/projects/update", params) as Promise<{ project: IssueProject }>,
   deleteProject: (id: string) => window.roderDesktop.request("desktop/projects/delete", { id }),
   listIssues: () => window.roderDesktop.request("desktop/issues/list", {}) as Promise<{ issues: Issue[] }>,
-  createIssue: (params: {
-    projectId: string;
-    title: string;
-    description: string;
-    status?: IssueStatus;
-    threadId?: string | null;
-  }) => window.roderDesktop.request("desktop/issues/create", params) as Promise<{ issue: Issue }>,
-  updateIssue: (params: Partial<Issue> & { id: string }) =>
+  createIssue: (params: IssueEdit & { projectId: string; title: string }) =>
+    window.roderDesktop.request("desktop/issues/create", params) as Promise<{ issue: Issue }>,
+  updateIssue: (params: IssueEdit & { id: string }) =>
     window.roderDesktop.request("desktop/issues/update", params) as Promise<{ issue: Issue }>,
+  commentIssue: (id: string, text: string) =>
+    window.roderDesktop.request("desktop/issues/comment", { id, text }) as Promise<{ issue: Issue }>,
   deleteIssue: (id: string) => window.roderDesktop.request("desktop/issues/delete", { id }),
   launchIssue: (id: string) =>
     window.roderDesktop.request("desktop/issues/launch", { id }) as Promise<{ issue: Issue; threadId: string }>,

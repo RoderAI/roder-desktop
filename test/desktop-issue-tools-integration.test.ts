@@ -16,7 +16,7 @@ test("engine-issued desktop tool calls manage the same persisted issues the UI r
         name: tool.name,
         description: tool.description,
         parameters: tool.inputSchema,
-        execute: (args) => handleIssueToolCall(service, tool.name, args),
+        execute: (args, context) => handleIssueToolCall(service, tool.name, args, context),
       })),
       async (method, params) => {
         expect(method).toBe("tools/resolve");
@@ -40,12 +40,26 @@ test("engine-issued desktop tool calls manage the same persisted issues the UI r
     const { issue } = await call("issues_create", {
       projectId: project.id,
       title: "Fix regression",
-      threadId: "agent-thread",
+      owner: { type: "thread", threadId: "agent-thread" },
     });
-    await call("issues_update", { id: issue.id, status: "done", description: "Verified the fix" });
+    await call("issues_update", { id: issue.id, status: "in_progress", description: "Verified the fix" });
+    await call("issues_close", { id: issue.id, outcome: "dropped", note: "Fixed upstream" });
     const reloaded = new IssuesService({ storagePath: join(directory, "issues.json") });
     expect(await reloaded.request("desktop/issues/list", {})).toMatchObject({
-      issues: [{ id: issue.id, status: "done", description: "Verified the fix", threadId: "agent-thread" }],
+      issues: [{ id: issue.id, status: "cancelled", description: "Verified the fix", threadIds: ["agent-thread"] }],
+    });
+    // The engine's calling thread is the actor: agents can't skip the lifecycle.
+    const { issue: other } = await call("issues_create", { projectId: project.id, title: "Next" });
+    await bridge.onNotification("thread/toolExecutionRequested", {
+      threadId: "agent-thread",
+      turnId: "agent-turn",
+      requestId: `request-${++next}`,
+      call: { name: "issues_update", arguments: { id: other.id, status: "done" } },
+    });
+    expect(replies.at(-1)).toMatchObject({ isError: true });
+    expect((await reloaded.request("desktop/issues/read", { id: other.id })).issue.activity[0].actor).toEqual({
+      type: "thread",
+      threadId: "agent-thread",
     });
   } finally {
     await rm(directory, { recursive: true, force: true });

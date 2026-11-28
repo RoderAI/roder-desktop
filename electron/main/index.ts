@@ -874,7 +874,7 @@ async function launchIssue(issue: Issue, project: IssueProject): Promise<{ threa
     workspaceId: workspace.id,
     rootId: workspace.defaultRootId,
     ephemeral: false,
-    developerInstructions: `Work on local Roder issue #${issue.number} (${issue.id}) in project ${project.name} (${project.id}). Use issues_read and issues_update to record progress and blockers. Do not mark work done before verifying it.`,
+    developerInstructions: `Work on local Roder issue #${issue.number} (${issue.id}) in project ${project.name} (${project.id}). Use issues_read and issues_comment to record progress and blockers, issues_link_pull_request for your pull request, and issues_ask_user when you need a decision. Do not close the issue before verifying the work.`,
   })) as { thread: { id: string } };
   const threadId = created.thread.id;
   await requestEngine("turn/start", {
@@ -955,7 +955,8 @@ function getDesktopAgentTools(): DesktopAgentTools {
         name: tool.name,
         description: tool.description,
         parameters: tool.inputSchema,
-        execute: (args: unknown) => handleIssueToolCall(getIssuesService(), tool.name, args),
+        execute: (args: unknown, context: { threadId: string }) =>
+          handleIssueToolCall(getIssuesService(), tool.name, args, context),
       })),
       ...roderAgentToolDefinitions.map((tool) => ({
         ...tool,
@@ -1622,19 +1623,23 @@ async function handleRoderRequest(method: string, params: unknown): Promise<unkn
     throw new Error("Invalid cloud machine request.");
   }
   if (method.startsWith("desktop/issues/") || method.startsWith("desktop/projects/")) {
-    return getIssuesService().request(method, params ?? {});
+    return getIssuesService().request(method, params ?? {}, { type: "user" });
   }
   if (method.startsWith("desktop/roders/")) {
     await startRoderAgents();
     const result = await getRoderAgentService().handleRequest(method, params ?? {});
     if (method === "desktop/roders/create" || method === "desktop/roders/promote") {
       const roderAgent = result as RoderAgentDetail;
-      await getIssuesService().request("desktop/projects/ensureWorkspace", {
-        workspaceId: roderAgent.workspaceId,
-        name: roderAgent.name,
-        description: roderAgent.mission,
-        roderThreadId: roderAgent.threadId,
-      });
+      await getIssuesService().request(
+        "desktop/projects/ensureWorkspace",
+        {
+          workspaceId: roderAgent.workspaceId,
+          name: roderAgent.name,
+          description: roderAgent.mission,
+          roderThreadId: roderAgent.threadId,
+        },
+        { type: "user" },
+      );
     }
     return result;
   }

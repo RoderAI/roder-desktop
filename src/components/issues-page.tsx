@@ -6,12 +6,29 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMountEffect } from "@/hooks/use-mount-effect";
 import { groupIssues, issuesIpc, useIssuesStore } from "@/lib/issues-ipc";
 import { useRoderStore } from "@/stores/roder-store";
-import { issueStatuses, type Issue, type IssueProject, type IssueStatus } from "@/types/issues";
+import {
+  issuePriorities,
+  issueStatuses,
+  type Issue,
+  type IssueOwner,
+  type IssuePriority,
+  type IssueProject,
+  type IssueStatus,
+} from "@/types/issues";
 import type { RoderThread, Workspace } from "@/types/roder";
 
 const controlClass =
   "h-8 rounded-lg border border-input bg-background px-2.5 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const statusLabel = (status: string) => status.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase());
+const ownerKey = (owner: IssueOwner) => (owner.type === "thread" ? `thread:${owner.threadId}` : owner.type);
+const ownerFromKey = (key: string): IssueOwner =>
+  key.startsWith("thread:") ? { type: "thread", threadId: key.slice(7) } : { type: key === "user" ? "user" : "roder" };
+const threadName = (threads: RoderThread[], id: string) => {
+  const thread = threads.find((item) => item.id === id);
+  return thread?.name || thread?.preview || id;
+};
+const ownerLabel = (owner: IssueOwner, threads: RoderThread[]) =>
+  owner.type === "thread" ? threadName(threads, owner.threadId) : owner.type === "user" ? "You" : "Roder";
 
 export function IssuesPage(): React.JSX.Element {
   const { projects, issues, loading, loaded, error, refresh } = useIssuesStore();
@@ -202,19 +219,21 @@ export function IssuesPage(): React.JSX.Element {
                       {issue.title}
                       <span className="mt-1 block text-sm font-normal text-muted-foreground">
                         {projects.find((project) => project.id === issue.projectId)?.name} · {statusLabel(issue.status)}
+                        {issue.priority === "normal" ? "" : ` · ${statusLabel(issue.priority)}`}
+                        {issue.pullRequests.length ? ` · ${issue.pullRequests.length} PR` : ""}
                       </span>
                     </button>
-                    {issue.threadId ? (
+                    {issue.owner.type === "thread" ? (
                       <Link
                         className="rounded-md px-2 py-1 text-sm hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
                         to="/threads/$threadId"
-                        params={{ threadId: issue.threadId }}
+                        params={{ threadId: issue.owner.threadId }}
                         search={true}
                       >
                         Open thread
                       </Link>
                     ) : (
-                      <span className="text-sm text-muted-foreground">Unassigned</span>
+                      <span className="text-sm text-muted-foreground">{ownerLabel(issue.owner, threads)}</span>
                     )}
                   </li>
                 ))}
@@ -231,6 +250,7 @@ export function IssuesPage(): React.JSX.Element {
               <IssueEditor
                 key={editor.issue?.id ?? "new-issue"}
                 issue={editor.issue}
+                issues={issues}
                 projects={projects}
                 defaultProjectId={projectId}
                 threads={threads}
@@ -253,18 +273,23 @@ export function IssuesPage(): React.JSX.Element {
 
 function IssueEditor({
   issue,
+  issues,
   projects,
   defaultProjectId,
   threads,
   onClose,
 }: {
   issue?: Issue;
+  issues: Issue[];
   projects: IssueProject[];
   defaultProjectId: string;
   threads: RoderThread[];
   onClose: () => void;
 }): React.JSX.Element {
   const descriptionId = useId();
+  const doneCriteriaId = useId();
+  const outOfScopeId = useId();
+  const commentId = useId();
   const navigate = useNavigate();
   const [title, setTitle] = useState(issue?.title ?? "");
   const [description, setDescription] = useState(issue?.description ?? "");
@@ -275,28 +300,47 @@ function IssueEditor({
         ""),
   );
   const [status, setStatus] = useState<IssueStatus>(issue?.status ?? "backlog");
-  const [threadId, setThreadId] = useState(issue?.threadId ?? "");
+  const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? "normal");
+  const [owner, setOwner] = useState(ownerKey(issue?.owner ?? { type: "roder" }));
+  const [doneCriteria, setDoneCriteria] = useState(issue?.doneCriteria ?? "");
+  const [outOfScope, setOutOfScope] = useState(issue?.outOfScope ?? "");
+  const [parent, setParent] = useState(issue?.parent ?? "");
+  const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const project = projects.find((item) => item.id === projectId);
+  const linkedThreadIds = issue?.threadIds ?? [];
   const availableThreads = threads.filter(
-    (thread) => !project?.workspaceId || thread.workspaceId === project.workspaceId || thread.id === threadId,
+    (thread) =>
+      !project?.workspaceId ||
+      thread.workspaceId === project.workspaceId ||
+      linkedThreadIds.includes(thread.id) ||
+      `thread:${thread.id}` === owner,
   );
+  const extraThreadIds = [...linkedThreadIds, ...(owner.startsWith("thread:") ? [owner.slice(7)] : [])].filter(
+    (id, index, all) => all.indexOf(id) === index && !availableThreads.some((thread) => thread.id === id),
+  );
+  const parentOptions = issues.filter((item) => item.projectId === projectId && item.id !== issue?.id);
+  const ownedByThread = owner.startsWith("thread:");
 
   async function save(launch = false): Promise<void> {
     setBusy(true);
     setError(null);
     try {
+      const fields = {
+        title,
+        description,
+        projectId,
+        status,
+        priority,
+        owner: ownerFromKey(owner),
+        doneCriteria,
+        outOfScope,
+        parent: parent || null,
+      };
       const saved = issue
-        ? await issuesIpc.updateIssue({
-            id: issue.id,
-            title,
-            description,
-            projectId,
-            status,
-            threadId: threadId || null,
-          })
-        : await issuesIpc.createIssue({ title, description, projectId, status, threadId: threadId || null });
+        ? await issuesIpc.updateIssue({ id: issue.id, ...fields })
+        : await issuesIpc.createIssue(fields);
       if (launch) {
         const result = await issuesIpc.launchIssue(saved.issue.id);
         await useIssuesStore.getState().refresh();
@@ -306,6 +350,20 @@ function IssueEditor({
         await useIssuesStore.getState().refresh();
         onClose();
       }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+    setBusy(false);
+  }
+
+  async function addComment(): Promise<void> {
+    if (!issue) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await issuesIpc.commentIssue(issue.id, comment);
+      await useIssuesStore.getState().refresh();
+      onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -387,27 +445,76 @@ function IssueEditor({
           </select>
         </label>
         <label className="block space-y-1">
-          <span>Assigned thread</span>
+          <span>Priority</span>
           <select
             className={`${controlClass} w-full`}
-            value={threadId}
-            onChange={(event) => setThreadId(event.target.value)}
+            value={priority}
+            onChange={(event) => setPriority(event.target.value as IssuePriority)}
           >
-            <option value="">Unassigned</option>
-            {threadId && !availableThreads.some((thread) => thread.id === threadId) ? (
-              <option value={threadId}>{threadId}</option>
-            ) : null}
+            {issuePriorities.map((value) => (
+              <option key={value} value={value}>
+                {statusLabel(value)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block space-y-1">
+          <span>Owner</span>
+          <select className={`${controlClass} w-full`} value={owner} onChange={(event) => setOwner(event.target.value)}>
+            <option value="roder">Roder</option>
+            <option value="user">You</option>
+            {extraThreadIds.map((id) => (
+              <option key={id} value={`thread:${id}`}>
+                {id}
+              </option>
+            ))}
             {availableThreads.map((thread) => (
-              <option key={thread.id} value={thread.id}>
+              <option key={thread.id} value={`thread:${thread.id}`}>
                 {thread.name || thread.preview || thread.id}
               </option>
             ))}
           </select>
         </label>
         <p className="text-sm font-normal text-muted-foreground">
-          Assignment lists loaded threads{project?.workspaceId ? " in this workspace" : ""}. Agents can also assign a
-          thread by ID.
+          Threads list loaded threads{project?.workspaceId ? " in this workspace" : ""}. Agents can also hand an issue
+          to a thread by ID.
         </p>
+        <label htmlFor={doneCriteriaId} className="block space-y-1">
+          <span>Done criteria</span>
+          <Textarea
+            id={doneCriteriaId}
+            className="min-h-20 font-normal"
+            value={doneCriteria}
+            onChange={(event) => setDoneCriteria(event.target.value)}
+          />
+        </label>
+        <label htmlFor={outOfScopeId} className="block space-y-1">
+          <span>Out of scope</span>
+          <Textarea
+            id={outOfScopeId}
+            className="min-h-20 font-normal"
+            value={outOfScope}
+            onChange={(event) => setOutOfScope(event.target.value)}
+          />
+        </label>
+        <label className="block space-y-1">
+          <span>Parent issue</span>
+          <select
+            className={`${controlClass} w-full`}
+            value={parent}
+            onChange={(event) => setParent(event.target.value)}
+          >
+            <option value="">None</option>
+            {parent && !parentOptions.some((item) => item.id === parent) ? (
+              <option value={parent}>{parent}</option>
+            ) : null}
+            {parentOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                #{item.number} {item.title}
+              </option>
+            ))}
+          </select>
+        </label>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -425,7 +532,7 @@ function IssueEditor({
             disabled={!title.trim() || !project?.workspaceId || project.archived || !issue}
             onClick={() => void save(true)}
           >
-            {threadId ? "Save & open thread" : "Save & launch work"}
+            {ownedByThread ? "Save & open thread" : "Save & launch work"}
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             Cancel
@@ -439,6 +546,35 @@ function IssueEditor({
             Save the issue first, then launch work from its editor.
           </p>
         ) : null}
+        {issue ? <IssueRecord issue={issue} threads={threads} /> : null}
+        {issue ? (
+          <div className="space-y-2">
+            <label htmlFor={commentId} className="block space-y-1">
+              <span>Comment</span>
+              <Textarea
+                id={commentId}
+                className="min-h-20 font-normal"
+                value={comment}
+                onChange={(event) => setComment(event.target.value)}
+              />
+            </label>
+            {issue.status === "needs_you" ? (
+              <p className="text-sm font-normal text-muted-foreground">
+                Your comment answers the question and hands the issue back.
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              disabled={!comment.trim()}
+              onClick={() => void addComment()}
+            >
+              Comment
+            </Button>
+          </div>
+        ) : null}
         {issue ? (
           <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => void remove()}>
             Delete issue
@@ -446,6 +582,64 @@ function IssueEditor({
         ) : null}
       </fieldset>
     </form>
+  );
+}
+
+function IssueRecord({ issue, threads }: { issue: Issue; threads: RoderThread[] }): React.JSX.Element {
+  return (
+    <div className="space-y-3 border-t border-border pt-3">
+      {issue.threadIds.length ? (
+        <section aria-label="Linked threads" className="space-y-1">
+          <h3>Threads</h3>
+          <ul className="space-y-1 text-sm">
+            {issue.threadIds.map((id) => (
+              <li key={id}>
+                <Link
+                  className="rounded-md px-1 hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
+                  to="/threads/$threadId"
+                  params={{ threadId: id }}
+                  search={true}
+                >
+                  {threadName(threads, id)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {issue.pullRequests.length ? (
+        <section aria-label="Pull requests" className="space-y-1">
+          <h3>Pull requests</h3>
+          <ul className="space-y-1 text-sm">
+            {issue.pullRequests.map((pr) => (
+              <li key={pr.url}>
+                <button
+                  type="button"
+                  className="rounded-md px-1 text-left hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => void window.roderDesktop.openExternal(pr.url)}
+                >
+                  {pr.title || pr.url}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <section aria-label="Activity" className="space-y-1">
+        <h3>Activity</h3>
+        <ol className="space-y-2 text-sm">
+          {issue.activity.map((entry) => (
+            <li key={entry.id}>
+              <span className="text-muted-foreground">
+                {ownerLabel(entry.actor, threads)} · {new Date(entry.createdAt).toLocaleString()}
+                {entry.kind === "question" ? " · Question" : ""}
+              </span>
+              <p className="whitespace-pre-wrap font-normal">{entry.text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </div>
   );
 }
 

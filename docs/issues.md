@@ -5,8 +5,10 @@ no GitHub or Linear synchronization, hosted account, or background network servi
 
 Create a project from **Issues → New project**, optionally linking an existing
 Roder workspace. Create an issue, then open its editor to change its title,
-description, project, status, and assigned thread. Filters cover project, status,
-assignment, and text. Selecting a project exposes **Edit project**, including
+description, project, status, priority, owner, done criteria, out of scope and
+parent issue. A saved issue's editor also lists its linked threads, pull
+requests and activity, and takes a comment. Filters cover project, status,
+assignment (a thread owns the issue, or not), and text. Selecting a project exposes **Edit project**, including
 archiving. Archived projects keep their issue history but cannot create new
 issues or launch work.
 
@@ -19,18 +21,71 @@ When a workspace has a project Roder, selecting that project exposes
 **Open project Roder**. The Roder link uses the same persistent thread as
 the workspace's Roder; it does not create a second agent.
 
-Statuses are `backlog`, `todo`, `in_progress`, `blocked`, `done`, and `cancelled`.
-Assignment is a Roder thread ID, or `null` when unassigned. The UI picker shows
-loaded threads in the linked workspace; agents can assign other thread IDs.
-Assignment is a link, not a scheduler: changing issue status does not stop a
-thread, and thread completion does not automatically close the issue.
+## Issue model
+
+Statuses, in board order: `backlog`, `todo`, `in_progress`, `needs_you`,
+`blocked`, `in_review`, `done`, and `cancelled`. Each has its own group on the
+Issues page.
+
+| Field          | Meaning                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------- |
+| `owner`        | Exactly one: `{type: "roder"}`, `{type: "user"}`, or `{type: "thread", threadId}`. Default Roder. |
+| `priority`     | `urgent`, `high`, `normal` (default), or `low`.                                                   |
+| `doneCriteria` | What must be true for the issue to be done.                                                       |
+| `outOfScope`   | What the issue deliberately leaves alone.                                                         |
+| `parent`       | ID of another issue in the same project that this one is part of, or `null`. No cycles.           |
+| `threadIds`    | Threads that worked on the issue, oldest first. A thread owner is always linked.                  |
+| `pullRequests` | `{url, title}` entries. URLs must be `https://github.com/<owner>/<repo>/pull/<n>`.                |
+| `activity`     | Entries for creation, status and owner changes, comments, questions, linked PRs, launch, close.   |
+
+`roder` means the project's Roder; in a project without one it means nobody in
+particular. The owner and status stay in step for every actor: a user owner on
+an open issue makes it `needs_you`, and an issue that leaves the user goes to
+`in_progress` if a thread is linked, else `todo`. Activity entries carry an
+`actor` in the owner shape; an agent whose thread is the project's
+`roderThreadId` is recorded as `roder`.
+
+Owning is a link, not a scheduler: changing issue status does not stop a
+thread, and thread completion does not close the issue.
 
 Save an issue, reopen it, and choose **Save & launch work** to start a thread in
-the project's linked workspace. Work cannot launch without that workspace.
-Already-assigned issues open their thread instead of launching a duplicate.
-Unassign an issue explicitly if a new thread is needed. A launch failure keeps
-the issue unassigned so it can be retried. Saving edits happens before launching,
-so those edits remain saved even if launching fails.
+the project's linked workspace. Work cannot launch without that workspace. The
+new thread becomes the owner and is linked, and the issue moves to
+`in_progress`. An issue a thread already owns opens that thread instead of
+launching a duplicate; set the owner to the Roder or yourself if a new thread is
+needed. A launch failure leaves the issue unchanged so it can be retried. Saving
+edits happens before launching, so those edits remain saved even if launching
+fails.
+
+## Actors and the lifecycle
+
+Every change takes an actor: `{type: "user"}` for the person using the app, or
+`{type: "agent", threadId}` for an agent's tool call. Reads take none. The rules
+below, ported from Zuse Zappers, apply to agents only; the user can make any
+change.
+
+- Create: only in `backlog` or `todo`; `todo` needs `doneCriteria`; the owner
+  can't be the user.
+- Update: `done` and `cancelled` only through `close`; `in_review` needs a
+  linked pull request; `in_progress` needs a linked thread, or a child issue in
+  progress; `needs_you` and a user owner only through `askUser`; a non-empty
+  `doneCriteria` can be edited but not cleared.
+- Launch: refused on a closed issue.
+
+Operations for every actor:
+
+- `comment {id, text}` adds a comment. The user's comment on a `needs_you`
+  issue answers it: the newest linked thread takes the issue back (status
+  `in_progress`), else the Roder (status `todo`).
+- `linkPullRequest {id, url, title?}` links a pull request once per URL.
+- `askUser {id, question, recommendation?}` makes the user the owner and the
+  status `needs_you`, recording the question with the thread that held the
+  issue. Refused on a closed issue.
+- `close {id, outcome, note}`: `merged` moves the issue to `done` and needs a
+  linked pull request; `dropped` moves it to `cancelled`. The note is required.
+
+In the UI, changing only the status into `needs_you` makes you the owner, and
+changing it out of `needs_you` hands the issue back the same way a comment does.
 
 ## Main-process integration
 
@@ -52,18 +107,29 @@ service per database with `{ storagePath, onEvent, launchIssue }`:
   creation and storing the link can leave an unlinked thread; reconcile that
   thread manually before retrying.
 
-Forward `desktop/projects/*` and `desktop/issues/*` requests to
-`service.request(method, params)`. Params are plain objects. The UI only uses
+Forward `desktop/projects/*` and `desktop/issues/*` requests from the renderer
+to `service.request(method, params, { type: "user" })`. Params are plain objects.
+Agent tool calls go through `handleIssueToolCall`, which always acts as the
+calling thread; never forward agent input with the user actor. The UI only uses
 `window.roderDesktop.request` and existing notification/workspace/thread state.
 
-| Method suffix | Project params                                                  | Issue params                                                             | Result                        |
-| ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------- |
-| `list`        | optional `workspaceId`, `archived`                              | optional `projectId`, `status`, `threadId`, `query`                      | `{ projects }` / `{ issues }` |
-| `read`        | `id`                                                            | `id`                                                                     | `{ project }` / `{ issue }`   |
-| `create`      | `name`, optional `description`, `workspaceId`                   | `projectId`, `title`, optional `description`, `status`, `threadId`       | `{ project }` / `{ issue }`   |
-| `update`      | `id`, optional `name`, `description`, `workspaceId`, `archived` | `id`, optional `projectId`, `title`, `description`, `status`, `threadId` | `{ project }` / `{ issue }`   |
-| `delete`      | `id` (must have no issues)                                      | `id`                                                                     | `{ deleted: true }`           |
-| `launch`      | not supported                                                   | `id`                                                                     | `{ issue, threadId }`         |
+| Method suffix     | Project params                                                  | Issue params                                        | Result                        |
+| ----------------- | --------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- |
+| `list`            | optional `workspaceId`, `archived`                              | optional `projectId`, `status`, `threadId`, `query` | `{ projects }` / `{ issues }` |
+| `read`            | `id`                                                            | `id`                                                | `{ project }` / `{ issue }`   |
+| `create`          | `name`, optional `description`, `workspaceId`                   | `projectId`, `title`, optional issue fields¹        | `{ project }` / `{ issue }`   |
+| `update`          | `id`, optional `name`, `description`, `workspaceId`, `archived` | `id`, optional `projectId`, `title`, issue fields¹  | `{ project }` / `{ issue }`   |
+| `delete`          | `id` (must have no issues)                                      | `id` (children lose their `parent`)                 | `{ deleted: true }`           |
+| `launch`          | not supported                                                   | `id`                                                | `{ issue, threadId }`         |
+| `comment`         | not supported                                                   | `id`, `text`                                        | `{ issue }`                   |
+| `linkPullRequest` | not supported                                                   | `id`, `url`, optional `title`                       | `{ issue }`                   |
+| `askUser`         | not supported                                                   | `id`, `question`, optional `recommendation`         | `{ issue }`                   |
+| `close`           | not supported                                                   | `id`, `outcome` (`merged` \| `dropped`), `note`     | `{ issue }`                   |
+
+¹ `description`, `status`, `priority`, `owner`, `doneCriteria`, `outOfScope`,
+`parent`. Threads link through a thread `owner` or `launch`; pull requests and
+activity have their own operations. List's `threadId` matches any linked
+thread; `null` finds issues no thread has worked on.
 
 After workspace creation or Roder promotion, call
 `desktop/projects/ensureWorkspace` with `{workspaceId, name, description?, roderThreadId?}`
@@ -73,14 +139,19 @@ nonarchived project with that workspace ID, otherwise reuses an archived one
 without unarchiving it. Existing project names and descriptions are preserved;
 supplied name/description initialize only a new record. Explicitly supplied
 `roderThreadId` updates the link; omitting it preserves the link and `null`
-clears it. Project `update` also accepts `roderThreadId`. Schema-1 records
-without Roder metadata load as `roderThreadId: null`.
+clears it. Project `update` also accepts `roderThreadId`.
 
 Project IDs are local stable UUIDs; `workspaceId` references an existing harness
 workspace identity rather than an arbitrary path. Issue IDs are stable UUIDs;
 display numbers increase globally and are never reused after deletion. Dates
-are ISO strings. Clearing workspace or assignment uses explicit `null`.
+are ISO strings. Clearing a workspace or parent uses explicit `null`.
 Malformed or unsupported storage is reported as an error, never reset silently.
+
+The store is schema version 2. Version 1 records are not carried over: a
+version 1 `issues.json` is renamed aside to
+`issues.json.v1-<timestamp>-<id>.bak` in the same directory, never deleted or
+overwritten, and the store starts empty. Workspace projects are registered
+again the next time a Roder is created or promoted.
 
 ## Agent integration
 
@@ -89,19 +160,24 @@ Malformed or unsupported storage is reported as an error, never reset silently.
 `handleIssueToolCall(service, name, args)`. Register those definitions in the
 actual harness tool discovery (native external tools or an MCP bridge), not only
 the renderer's `tools/list`. Forward execution to the handler and return its
-JSON result to the harness. Tool names are `projects_list`, `projects_read`,
-`projects_create`, `projects_update`, `projects_delete`, `issues_list`,
-`issues_read`, `issues_create`, `issues_update`, `issues_delete`, `issues_launch`.
-These are app-local tools available to local trusted agents, not a remote
-multi-tenant authorization boundary. Caller thread IDs may be supplied by the
-integration as `threadId` when creating or updating assignments; the service
-does not implicitly claim issues for a caller.
+JSON result to the harness, passing the tool context's `threadId`: every tool
+call acts as `{type: "agent", threadId}`. Tool names are `projects_list`,
+`projects_read`, `projects_create`, `projects_update`, `projects_delete`,
+`issues_list`, `issues_read`, `issues_create`, `issues_update`,
+`issues_comment`, `issues_link_pull_request`, `issues_ask_user`, `issues_close`,
+`issues_delete`, `issues_launch`. They work for any thread, Roder or not; the
+lifecycle rules above apply to all of them. These are app-local tools
+available to local trusted agents, not a remote multi-tenant authorization
+boundary. A thread takes an issue by setting `owner: {type: "thread", threadId}`;
+the service does not implicitly claim issues for a caller.
 
 ## Verification
 
-Run `pnpm exec vitest run test/issues-service.test.ts test/issues-tools.test.ts`
+Run `pnpm exec vitest run test/issues-*.test.ts test/desktop-issue-tools-integration.test.ts`
 and the project typecheck/lint. Verify the integrated page inside Electron:
-create a project linked to a workspace, create/edit an issue, filter it, assign
-or unassign a thread, launch work, and reopen the app to confirm persistence.
-Ask an agent to list, create, and close an issue and confirm the open UI updates.
+create a project linked to a workspace, create/edit an issue with the new
+fields, filter it, change its owner, launch work, and reopen the app to confirm
+persistence. Ask an agent to list, create, comment on, ask about, and close an
+issue and confirm the open UI updates; answer its question with a comment and
+check the issue goes back to the thread.
 Plain browser previews cannot verify Electron preload integration.
