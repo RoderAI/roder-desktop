@@ -7,6 +7,7 @@ import { commandInvocationText, type CommandInvocation } from "@/lib/roder-comma
 import {
   applyThreadItemEvent,
   activeTurnIdForThread,
+  ensureTurnUserMessage,
   isThreadRunning,
   markThreadStatus,
   messagesFromThread,
@@ -48,6 +49,7 @@ import type {
   AgentBackendsSnapshot,
   ApprovalWaitRequest,
   AgentSwarmModeChangedNotification,
+  BackendSetupState,
   DesktopAttachment,
   ExternalAgentBackendId,
   McpAuthWaitRequest,
@@ -96,6 +98,7 @@ type RoderStore = {
   threadControlsByThread: Record<string, ThreadControlState>;
   draftComposerPreferences: Partial<Pick<ThreadControlState, "reasoning" | "policyMode">>;
   queuedPromptsByThread: Record<string, QueuedPrompt[]>;
+  steeringThreadIds: Record<string, true>;
   hunkRevisionByThread: Record<string, number>;
   subagentTracesByThread: SubagentTracesByThread;
   subagentLifecycleByThread: SubagentLifecycleByThread;
@@ -109,6 +112,7 @@ type RoderStore = {
   providers: ProviderDescriptor[];
   activeBackend: AgentBackendId;
   agentBackends: Record<AgentBackendId, AgentBackendStatus>;
+  backendSetup: BackendSetupState;
   /** Blocklist of provider-qualified model keys the user hid. Empty = all visible. */
   hiddenModelIds: string[];
   defaultModel: string;
@@ -183,6 +187,13 @@ type RoderStore = {
     options?: { forceRefresh?: boolean },
   ) => Promise<AgentBackendsSnapshot>;
   logoutAgentBackend: (backend: ExternalAgentBackendId) => Promise<AgentBackendsSnapshot>;
+  applyBackendSetup: (state: BackendSetupState) => void;
+  startBackendSetup: (
+    backend: ExternalAgentBackendId,
+    options?: { forceInstall?: boolean },
+  ) => Promise<BackendSetupState>;
+  submitBackendSetupCode: (code: string) => Promise<BackendSetupState>;
+  cancelBackendSetup: () => Promise<BackendSetupState>;
   setSelectedWorkspaceCwd: (cwd: string) => void;
   openWorkspaceFolder: () => Promise<Workspace | null>;
   selectDefaultModel: (model: string, provider: string) => Promise<void>;
@@ -211,6 +222,14 @@ type ThreadControlState = {
 const initialStatus: RoderStatus = {
   state: "starting",
   binary: "unresolved",
+};
+
+const initialBackendSetup: BackendSetupState = {
+  backend: null,
+  phase: "idle",
+  message: "",
+  authUrl: null,
+  error: null,
 };
 
 const initialAgentBackends: Record<AgentBackendId, AgentBackendStatus> = {
@@ -530,6 +549,7 @@ export const useRoderStore = create<RoderStore>()(
       threadControlsByThread: {},
       draftComposerPreferences: {},
       queuedPromptsByThread: {},
+      steeringThreadIds: {},
       hunkRevisionByThread: {},
       subagentTracesByThread: {},
       subagentLifecycleByThread: {},
@@ -543,6 +563,7 @@ export const useRoderStore = create<RoderStore>()(
       providers: [],
       activeBackend: "roder",
       agentBackends: initialAgentBackends,
+      backendSetup: initialBackendSetup,
       hiddenModelIds: [],
       defaultModel: "",
       defaultModelProvider: "",
@@ -1310,18 +1331,29 @@ export const useRoderStore = create<RoderStore>()(
           if (!started.turnId) {
             throw new Error("roder app-server did not return a turn");
           }
-          set((state) => ({
-            threads: markThreadStatus(state.threads, threadId, {
+          const userImages = attachments.flatMap((attachment) =>
+            attachment.imageUrl ? [{ imageUrl: attachment.imageUrl }] : [],
+          );
+          set((state) => {
+            const runningStatus: RoderThread["status"] = {
               type: "running",
               activeTurnId: started.turnId,
               activeFlags: [],
-            }),
-            threadDetails: markThreadDetailStatus(state.threadDetails, threadId, {
-              type: "running",
-              activeTurnId: started.turnId,
-              activeFlags: [],
-            }),
-          }));
+            };
+            const existingDetail = threadForState(state, threadId);
+            const ensuredDetail =
+              targetBackend !== "roder"
+                ? ensureTurnUserMessage(existingDetail, started.turnId, text, userImages)
+                : existingDetail;
+            return {
+              busy: state.activeThreadId === threadId ? true : state.busy,
+              error: null,
+              threads: markThreadStatus(state.threads, threadId, runningStatus),
+              threadDetails: ensuredDetail
+                ? { ...state.threadDetails, [threadId]: { ...ensuredDetail, status: runningStatus } }
+                : markThreadDetailStatus(state.threadDetails, threadId, runningStatus),
+            };
+          });
         } catch (error) {
           set((state) => ({
             busy: false,
@@ -1350,27 +1382,68 @@ export const useRoderStore = create<RoderStore>()(
         const threadId = state.activeThreadId;
         const activeThread = state.threadDetails[threadId] ?? state.threads.find((thread) => thread.id === threadId);
         const activeTurnId = activeTurnIdForThread(activeThread);
+        const targetBackend = activeThread ? threadBackendFor(activeThread) : state.activeBackend;
+        const clearSteering = (record: Record<string, true>): Record<string, true> => {
+          if (!record[threadId]) return record;
+          const next = { ...record };
+          delete next[threadId];
+          return next;
+        };
         try {
           if (!threadId || !activeTurnId || !isThreadRunning(activeThread)) {
             throw new Error("No running turn to steer");
           }
-          await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
+          set((latest) => ({
+            error: null,
+            steeringThreadIds: { ...latest.steeringThreadIds, [threadId]: true },
+          }));
+          const steered = await roderIpc.steerTurn(threadId, activeTurnId, text, attachments);
+          const nextTurnId = steered?.turnId || activeTurnId;
+          const userImages = attachments.flatMap((attachment) =>
+            attachment.imageUrl ? [{ imageUrl: attachment.imageUrl }] : [],
+          );
+          set((latest) => {
+            const nextSteering = clearSteering(latest.steeringThreadIds);
+            if (!nextTurnId || (nextTurnId === activeTurnId && targetBackend === "roder")) {
+              return { steeringThreadIds: nextSteering };
+            }
+            const runningStatus: RoderThread["status"] = {
+              type: "running",
+              activeTurnId: nextTurnId,
+              activeFlags: [],
+            };
+            const existingDetail = threadForState(latest, threadId);
+            const ensuredDetail =
+              nextTurnId !== activeTurnId || targetBackend !== "roder"
+                ? ensureTurnUserMessage(existingDetail, nextTurnId, text, userImages)
+                : existingDetail;
+            return {
+              steeringThreadIds: nextSteering,
+              busy: latest.activeThreadId === threadId ? true : latest.busy,
+              threads: markThreadStatus(latest.threads, threadId, runningStatus),
+              threadDetails: ensuredDetail
+                ? { ...latest.threadDetails, [threadId]: { ...ensuredDetail, status: runningStatus } }
+                : markThreadDetailStatus(latest.threadDetails, threadId, runningStatus),
+            };
+          });
         } catch (error) {
           const message = (error as Error).message;
           set((latest) => {
+            const nextSteering = clearSteering(latest.steeringThreadIds);
             const thread = threadForState(latest, threadId);
             // A rejected steer can reveal a missed completion notification. Do not
             // clear a newer turn that started while the request was in flight.
             if (/no active turn to steer/i.test(message) && activeTurnIdForThread(thread) === activeTurnId) {
               const status: RoderThread["status"] = { type: "idle", activeTurnId: null, activeFlags: [] };
               return {
+                steeringThreadIds: nextSteering,
                 error: message,
                 threads: markThreadStatus(latest.threads, threadId, status),
                 threadDetails: markThreadDetailStatus(latest.threadDetails, threadId, status),
                 busy: latest.activeThreadId === threadId ? false : latest.busy,
               };
             }
-            return { error: message };
+            return { steeringThreadIds: nextSteering, error: message };
           });
           throw error;
         }
@@ -1579,6 +1652,22 @@ export const useRoderStore = create<RoderStore>()(
         get().applyAgentBackends(snapshot);
         await get().refreshProviders();
         return snapshot;
+      },
+      applyBackendSetup: (backendSetup) => set({ backendSetup }),
+      startBackendSetup: async (backend, options) => {
+        const next = await roderIpc.startBackendSetup(backend, options);
+        set({ backendSetup: next });
+        return next;
+      },
+      submitBackendSetupCode: async (code) => {
+        const next = await roderIpc.submitBackendSetupCode(code);
+        set({ backendSetup: next });
+        return next;
+      },
+      cancelBackendSetup: async () => {
+        const next = await roderIpc.cancelBackendSetup();
+        set({ backendSetup: next });
+        return next;
       },
       setSelectedReasoning: (selectedReasoning) =>
         set((state) => ({
@@ -2999,6 +3088,12 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const threadId = String(params.threadId ?? state.activeThreadId);
     const turnId = String(turn.id ?? "");
     const nextThread = completeTurn(threadForState(state, threadId), turnId, turn);
+    if (state.steeringThreadIds[threadId]) {
+      return {
+        ...waitPatch,
+        threadDetails: nextThread ? { ...state.threadDetails, [threadId]: nextThread } : state.threadDetails,
+      };
+    }
     const status: RoderThread["status"] = { type: "idle", activeTurnId: null, activeFlags: [] };
     return {
       ...waitPatch,
@@ -3015,6 +3110,9 @@ function reduceNotification(state: RoderStore, notification: RoderNotification):
     const status = isRecord(params.status)
       ? (params.status as RoderThread["status"])
       : { type: "idle", activeTurnId: null, activeFlags: [] };
+    if (state.steeringThreadIds[threadId] && status.type !== "running") {
+      return waitPatch;
+    }
     return {
       ...waitPatch,
       threads: markThreadStatus(state.threads, threadId, status),

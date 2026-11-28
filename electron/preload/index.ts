@@ -15,6 +15,7 @@ import type { ClaudeCliStatus } from "../onboarding/claude-cli";
 import type { EnvironmentProvider } from "../onboarding/environment";
 import type { OnboardingRecord } from "../onboarding/record";
 import type { AgentBackendsSnapshot, AntigravityStatus } from "../roder/agent-backends";
+import type { BackendSetupState } from "../roder/backend-setup";
 import type { AgentBackendId, ExternalAgentBackendId } from "../roder/desktop-backend";
 
 export type RoderNotification = {
@@ -158,7 +159,6 @@ const api = {
     cwd?: string;
     remoteWorkspaceId?: string;
     forceRestart?: boolean;
-    antigravitySetupMode?: "login" | "install";
   }) => ipcRenderer.invoke("terminal:start", options ?? {}) as Promise<TerminalSnapshot>,
   terminalWrite: (data: string, id?: string) => ipcRenderer.invoke("terminal:write", data, id) as Promise<void>,
   runMarkdownShellCommand: (command: MarkdownShellCommand) =>
@@ -196,6 +196,12 @@ const api = {
     ipcRenderer.invoke("agentBackends:connect", backend, options ?? {}) as Promise<AgentBackendsSnapshot>,
   agentBackendsLogout: (backend: ExternalAgentBackendId) =>
     ipcRenderer.invoke("agentBackends:logout", backend) as Promise<AgentBackendsSnapshot>,
+  agentBackendsSetupState: () => ipcRenderer.invoke("agentBackends:setupState") as Promise<BackendSetupState>,
+  agentBackendsStartSetup: (backend: ExternalAgentBackendId, options?: { forceInstall?: boolean }) =>
+    ipcRenderer.invoke("agentBackends:startSetup", backend, options ?? {}) as Promise<BackendSetupState>,
+  agentBackendsSubmitSetupCode: (code: string) =>
+    ipcRenderer.invoke("agentBackends:submitSetupCode", code) as Promise<BackendSetupState>,
+  agentBackendsCancelSetup: () => ipcRenderer.invoke("agentBackends:cancelSetup") as Promise<BackendSetupState>,
   antigravityStatus: () => ipcRenderer.invoke("antigravity:status") as Promise<AntigravityStatus>,
   antigravityConnect: (options?: { forceRefresh?: boolean }) =>
     ipcRenderer.invoke("antigravity:connect", options ?? {}) as Promise<AntigravityStatus>,

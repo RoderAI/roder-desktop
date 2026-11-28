@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { parseBoatMachineConfig, type BoatClient, type BoatMachineTargetConfig } from "./boat-client";
 import { parseSshMachineConfig, type SshMachineTargetConfig } from "./ssh-config";
 import { parseTailscalePeerConfig } from "./tailscale";
 import { shellQuotePosixSsh, TailscaleSshClient } from "./tailscale-ssh";
@@ -20,15 +21,22 @@ export type BackingGatewaySpec = (typeof HOSTED_GATEWAY_CANDIDATES)[number];
 
 export type TailscaleRunnerGatewayOptions = {
   sshClient?: TailscaleSshClient;
+  boatClient?: BoatClient;
   preferredPort?: number;
   authToken?: string;
 };
 
-type GatewaySession = {
-  id: string;
-  transport: "tailscale" | "ssh";
-  peer: SshMachineTargetConfig;
-};
+type GatewaySession =
+  | {
+      id: string;
+      transport: "tailscale" | "ssh";
+      peer: SshMachineTargetConfig;
+    }
+  | {
+      id: string;
+      transport: "boat";
+      boat: BoatMachineTargetConfig;
+    };
 
 const envVarKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 
@@ -48,6 +56,26 @@ export function selectBackingGatewayProvider(
     if (installedFallback) return installedFallback;
   }
   return HOSTED_GATEWAY_CANDIDATES[0];
+}
+
+export function encodeBoatSessionId(boat: BoatMachineTargetConfig): string {
+  const payload = Buffer.from(JSON.stringify({ ...boat, transport: "boat" }), "utf8").toString("base64url");
+  return `boat_${payload}`;
+}
+
+export function decodeBoatSessionId(sessionId: string): BoatMachineTargetConfig | null {
+  if (!sessionId.startsWith("boat_")) return null;
+  try {
+    const raw = Buffer.from(sessionId.slice(5), "base64url").toString("utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return parseBoatMachineConfig({
+      sandbox_id: parsed.sandboxId,
+      sandbox_name: parsed.sandboxName,
+      tailscale_tunnel: parsed.tailscaleTunnel,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function encodeTailscaleSessionId(
@@ -118,6 +146,7 @@ export function buildRemoteShellExecCommand(request: {
 
 export class TailscaleRunnerGateway {
   private readonly sshClient: TailscaleSshClient;
+  private readonly boatClient?: BoatClient;
   private readonly ownsSshClient: boolean;
   private readonly preferredPort: number;
   private readonly authToken: string;
@@ -129,6 +158,7 @@ export class TailscaleRunnerGateway {
   constructor(options: TailscaleRunnerGatewayOptions = {}) {
     this.ownsSshClient = !options.sshClient;
     this.sshClient = options.sshClient ?? new TailscaleSshClient();
+    this.boatClient = options.boatClient;
     this.preferredPort = options.preferredPort ?? DEFAULT_TAILSCALE_GATEWAY_PORT;
     this.authToken = options.authToken ?? randomBytes(32).toString("base64url");
   }
@@ -205,6 +235,13 @@ export class TailscaleRunnerGateway {
   private resolveSession(sessionId: string): GatewaySession | null {
     const existing = this.sessions.get(sessionId);
     if (existing) return existing;
+    if (sessionId.startsWith("boat_")) {
+      const boat = decodeBoatSessionId(sessionId);
+      if (!boat) return null;
+      const restored: GatewaySession = { id: sessionId, transport: "boat", boat };
+      this.sessions.set(sessionId, restored);
+      return restored;
+    }
     const decoded = decodeTailscaleSessionId(sessionId);
     if (!decoded) return null;
     const transport: "tailscale" | "ssh" = sessionId.startsWith("ssh_") ? "ssh" : "tailscale";
@@ -223,13 +260,25 @@ export class TailscaleRunnerGateway {
     const parsedUrl = new URL(req.url ?? "/", "http://127.0.0.1");
     const pathname = parsedUrl.pathname.replace(/\/+$/u, "") || "/";
 
-    // POST /sessions — create a runner session bound to a Tailscale or SSH remote machine
+    // POST /sessions — create a runner session bound to a Tailscale, SSH, or Boat remote machine
     if (method === "POST" && pathname === "/sessions") {
       const body = await readJsonBody(req);
       const config =
         body.config && typeof body.config === "object" && !Array.isArray(body.config)
           ? (body.config as Record<string, unknown>)
           : {};
+      if (config.roder_transport === "boat") {
+        if (!this.boatClient) {
+          sendJson(res, 503, { error: "Boat sandbox client is unavailable." });
+          return;
+        }
+        const boat = parseBoatMachineConfig(config);
+        await this.boatClient.ensureRunning(boat.sandboxId);
+        const sessionId = encodeBoatSessionId(boat);
+        this.sessions.set(sessionId, { id: sessionId, transport: "boat", boat });
+        sendJson(res, 200, { session_id: sessionId });
+        return;
+      }
       const transport: "tailscale" | "ssh" = config.roder_transport === "ssh" ? "ssh" : "tailscale";
       const peer = transport === "ssh" ? parseSshMachineConfig(config) : parseTailscalePeerConfig(config);
       const check = await this.sshClient.execCommand(peer, "printf RODER_TS_OK", { timeoutMs: 15_000 });
@@ -264,6 +313,15 @@ export class TailscaleRunnerGateway {
 
     // GET /sessions/:id — resume / health check
     if (method === "GET" && subPath === "") {
+      if (session.transport === "boat") {
+        if (!this.boatClient) {
+          sendJson(res, 503, { error: "Boat sandbox client is unavailable." });
+          return;
+        }
+        await this.boatClient.ensureRunning(session.boat.sandboxId);
+        sendJson(res, 200, { session_id: session.id, status: "ready" });
+        return;
+      }
       const check = await this.sshClient.execCommand(session.peer, "printf RODER_TS_OK", { timeoutMs: 15_000 });
       if (check.exitCode !== 0) {
         sendJson(res, 502, { error: check.stderr.trim() || `Tailscale peer "${session.peer.host}" is unreachable.` });
@@ -281,7 +339,7 @@ export class TailscaleRunnerGateway {
       return;
     }
 
-    // POST /sessions/:id/commands — execute command on Tailscale peer
+    // POST /sessions/:id/commands — execute command on remote machine
     if (method === "POST" && subPath === "commands") {
       const body = await readJsonBody(req);
       const commandId = typeof body.command_id === "string" && body.command_id ? body.command_id : "cmd";
@@ -298,6 +356,23 @@ export class TailscaleRunnerGateway {
           ? body.timeout_ms
           : 120_000;
       const remoteCommand = buildRemoteShellExecCommand({ program, args, cwd, env });
+      if (session.transport === "boat") {
+        if (!this.boatClient) {
+          sendJson(res, 503, { error: "Boat sandbox client is unavailable." });
+          return;
+        }
+        const result = await this.boatClient.execCommand(session.boat.sandboxId, {
+          command: remoteCommand,
+          timeoutSeconds: Math.max(1, Math.min(600, Math.ceil(timeoutMs / 1000))),
+        });
+        sendJson(res, 200, {
+          command_id: commandId,
+          exit_code: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        });
+        return;
+      }
       const result = await this.sshClient.execCommand(session.peer, remoteCommand, {
         timeoutMs,
         commandId,
@@ -314,6 +389,13 @@ export class TailscaleRunnerGateway {
     // DELETE /sessions/:id/commands/:commandId — cancel running command
     if (method === "DELETE" && subPath.startsWith("commands/")) {
       const commandId = decodeURIComponent(subPath.slice("commands/".length));
+      if (session.transport === "boat") {
+        const cancelled = this.boatClient
+          ? await this.boatClient.cancelCommand(session.boat.sandboxId, commandId)
+          : false;
+        sendJson(res, 200, { cancelled });
+        return;
+      }
       const cancelled = this.sshClient.cancelCommand(commandId);
       sendJson(res, 200, { cancelled });
       return;
@@ -327,7 +409,13 @@ export class TailscaleRunnerGateway {
         return;
       }
       try {
-        const bytes = await this.sshClient.readFile(session.peer, filePath);
+        const bytes =
+          session.transport === "boat"
+            ? await (() => {
+                if (!this.boatClient) throw new Error("Boat sandbox client is unavailable.");
+                return this.boatClient.readFile(session.boat.sandboxId, filePath);
+              })()
+            : await this.sshClient.readFile(session.peer, filePath);
         res.writeHead(200, {
           "Content-Type": "application/octet-stream",
           "Content-Length": String(bytes.length),
@@ -347,18 +435,35 @@ export class TailscaleRunnerGateway {
         return;
       }
       const bytes = await readRawBody(req);
-      await this.sshClient.writeFile(session.peer, filePath, bytes);
+      if (session.transport === "boat") {
+        if (!this.boatClient) {
+          sendJson(res, 503, { error: "Boat sandbox client is unavailable." });
+          return;
+        }
+        await this.boatClient.writeFile(session.boat.sandboxId, filePath, bytes);
+      } else {
+        await this.sshClient.writeFile(session.peer, filePath, bytes);
+      }
       res.writeHead(204);
       res.end();
       return;
     }
 
-    // POST /sessions/:id/ports — return private Tailscale URL or open SSH local port forward
+    // POST /sessions/:id/ports — return hosted URL, private Tailscale URL, or SSH local port forward
     if (method === "POST" && subPath === "ports") {
       const body = await readJsonBody(req);
       const port = typeof body.port === "number" ? body.port : Number.parseInt(String(body.port ?? ""), 10);
       if (!Number.isInteger(port) || port < 1 || port > 65535) {
         sendJson(res, 400, { error: "Invalid port" });
+        return;
+      }
+      if (session.transport === "boat") {
+        if (!this.boatClient) {
+          sendJson(res, 503, { error: "Boat sandbox client is unavailable." });
+          return;
+        }
+        const hosted = await this.boatClient.hostPort(session.boat.sandboxId, port, { public: true, localhost: true });
+        sendJson(res, 200, { port, url: hosted.url });
         return;
       }
       if (session.transport === "ssh" && !session.peer.tailscaleIp) {

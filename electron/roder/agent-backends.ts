@@ -394,6 +394,8 @@ export class AgentBackendsManager {
   #threads = new Map<string, SavedExternalThread>();
   #approvalRoutes = new Map<string, ExternalAgentBackendId>();
   #userInputRoutes = new Map<string, ExternalAgentBackendId>();
+  #turnIdleWaiters = new Map<string, Set<() => void>>();
+  #steeringThreads = new Set<string>();
   #hydrated = false;
 
   constructor(options: AgentBackendsManagerOptions) {
@@ -588,6 +590,7 @@ export class AgentBackendsManager {
     await this.hydrate();
     const slot = this.#slots[backend];
     const wasConnected = this.getBackendStatus(backend).connected;
+    const previousState = slot.state;
     const previousSignature = slot.models.map((model) => model.id).join(",");
     const runtimePath = this.#findRuntime(backend);
 
@@ -596,7 +599,7 @@ export class AgentBackendsManager {
       slot.models = [];
       slot.state = "missing-runtime";
       slot.lastError = null;
-      if (wasConnected && options.notifyOnChange) {
+      if ((wasConnected || previousState !== slot.state) && options.notifyOnChange) {
         this.#emitChanged();
       }
       return this.getBackendStatus(backend);
@@ -651,7 +654,7 @@ export class AgentBackendsManager {
       slot.models = [];
       slot.state = options.silentFailure ? "disconnected" : "error";
       slot.lastError = options.silentFailure ? null : message;
-      if (wasConnected && options.notifyOnChange) {
+      if ((wasConnected || previousState !== slot.state) && options.notifyOnChange) {
         this.#emitChanged();
       }
       if (!options.silentFailure) {
@@ -926,10 +929,51 @@ export class AgentBackendsManager {
           await this.#persist();
         }
       }
-      return client.request("turn/start", turnParams);
+      try {
+        return await client.request("turn/start", turnParams);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (backend === "antigravity" && threadId && /already has an active turn/iu.test(message)) {
+          return this.#interruptAndStartTurn(client, threadId, turnParams);
+        }
+        throw error;
+      }
     }
 
-    if (method === "turn/steer" || method === "turn/interrupt") {
+    if (method === "turn/steer") {
+      const cleanParams = stripAgentBackendField(params);
+      try {
+        return await client.request("turn/steer", cleanParams);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const threadId = threadIdFromParams(cleanParams);
+        if (backend === "antigravity" && threadId && /already has an active turn/iu.test(message)) {
+          const expectedTurnId =
+            typeof cleanParams.expectedTurnId === "string" && cleanParams.expectedTurnId
+              ? cleanParams.expectedTurnId
+              : undefined;
+          const startParams: Record<string, unknown> = {
+            threadId,
+            ...(typeof cleanParams.prompt === "string" ? { prompt: cleanParams.prompt } : {}),
+            ...(Array.isArray(cleanParams.input) ? { input: cleanParams.input } : {}),
+          };
+          const started = (await this.#interruptAndStartTurn(client, threadId, startParams, expectedTurnId)) as {
+            turnId?: string;
+            turn_id?: string;
+          };
+          const nextTurnId =
+            typeof started?.turnId === "string"
+              ? started.turnId
+              : typeof started?.turn_id === "string"
+                ? started.turn_id
+                : (expectedTurnId ?? "");
+          return { turnId: nextTurnId };
+        }
+        throw error;
+      }
+    }
+
+    if (method === "turn/interrupt") {
       return client.request(method, stripAgentBackendField(params));
     }
 
@@ -1111,8 +1155,10 @@ export class AgentBackendsManager {
         return;
       }
       const payload = { method: raw.method, params: raw.params };
-      this.#observeNotification(backend, payload);
-      this.#onNotification?.(payload);
+      const suppressForward = this.#observeNotification(backend, payload);
+      if (!suppressForward) {
+        this.#onNotification?.(payload);
+      }
     };
     const onStatus = (raw: unknown) => {
       if (slot.client !== client || !isRecord(raw)) {
@@ -1124,6 +1170,11 @@ export class AgentBackendsManager {
         slot.cleanup = null;
         slot.state = raw.state === "error" ? "error" : "disconnected";
         slot.lastError = typeof raw.message === "string" ? raw.message : null;
+        for (const [threadId, entry] of this.#threads) {
+          if (entry.backend === backend) {
+            this.#notifyTurnIdle(threadId);
+          }
+        }
         this.#emitChanged();
       }
     };
@@ -1158,9 +1209,80 @@ export class AgentBackendsManager {
     }
   }
 
-  #observeNotification(backend: ExternalAgentBackendId, payload: { method: string; params: unknown }): void {
-    if (!isRecord(payload.params)) {
+  async #interruptAndStartTurn(
+    client: ExternalBackendClient,
+    threadId: string,
+    startParams: Record<string, unknown>,
+    expectedTurnId?: string,
+  ): Promise<unknown> {
+    this.#steeringThreads.add(threadId);
+    try {
+      const idlePromise = this.#waitForTurnIdle(threadId, 12_000);
+      await client.request("turn/interrupt", {
+        threadId,
+        ...(expectedTurnId ? { turnId: expectedTurnId } : {}),
+      });
+      await idlePromise;
+
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        try {
+          return await client.request("turn/start", startParams);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (!/already has an active turn/iu.test(message)) {
+            throw error;
+          }
+          lastError = error;
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+      }
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Antigravity did not finish cancelling the active turn.");
+    } finally {
+      this.#steeringThreads.delete(threadId);
+    }
+  }
+
+  #waitForTurnIdle(threadId: string, timeoutMs: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        const set = this.#turnIdleWaiters.get(threadId);
+        set?.delete(done);
+        if (set && set.size === 0) {
+          this.#turnIdleWaiters.delete(threadId);
+        }
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      let set = this.#turnIdleWaiters.get(threadId);
+      if (!set) {
+        set = new Set();
+        this.#turnIdleWaiters.set(threadId, set);
+      }
+      set.add(done);
+    });
+  }
+
+  #notifyTurnIdle(threadId: string): void {
+    const waiters = this.#turnIdleWaiters.get(threadId);
+    if (!waiters || waiters.size === 0) {
       return;
+    }
+    this.#turnIdleWaiters.delete(threadId);
+    for (const resolve of waiters) {
+      resolve();
+    }
+  }
+
+  #observeNotification(backend: ExternalAgentBackendId, payload: { method: string; params: unknown }): boolean {
+    if (!isRecord(payload.params)) {
+      return false;
     }
     const { method, params } = payload;
     if (method === "thread/approval_requested" && typeof params.approvalId === "string" && params.approvalId) {
@@ -1174,6 +1296,20 @@ export class AgentBackendsManager {
     }
 
     const threadId = threadIdFromParams(params);
+    if (threadId && method === "turn/completed") {
+      this.#notifyTurnIdle(threadId);
+    } else if (
+      threadId &&
+      method === "thread/status/changed" &&
+      isRecord(params.status) &&
+      params.status.type !== "running"
+    ) {
+      this.#notifyTurnIdle(threadId);
+      if (this.#steeringThreads.has(threadId)) {
+        return true;
+      }
+    }
+
     if (threadId && this.#threads.has(threadId) && (method === "turn/started" || method === "turn/completed")) {
       const saved = this.#threads.get(threadId);
       if (saved) {
@@ -1181,6 +1317,7 @@ export class AgentBackendsManager {
         void this.#persist();
       }
     }
+    return false;
   }
 }
 

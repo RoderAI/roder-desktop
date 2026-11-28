@@ -1,6 +1,6 @@
 import { ClipboardCopy, ExternalLink, KeyRound, LoaderCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { BackendSetupTerminal } from "@/components/providers/backend-setup-terminal";
+import { BackendSetupPanel } from "@/components/providers/backend-setup-panel";
 import { ProviderLogo } from "@/components/provider-logo";
 import {
   errorMessage,
@@ -51,12 +51,21 @@ export function ProviderConnectCard({
   const refreshProviders = useRoderStore((state) => state.refreshProviders);
   const configureProvider = useRoderStore((state) => state.configureProvider);
   const restart = useRoderStore((state) => state.restart);
+  const backendSetup = useRoderStore((state) => state.backendSetup);
+  const startBackendSetup = useRoderStore((state) => state.startBackendSetup);
+  const cancelBackendSetup = useRoderStore((state) => state.cancelBackendSetup);
 
   const [pending, setPending] = useState<"codex" | "oauth" | "antigravity" | "sign-out" | null>(null);
-  const [antigravityTerminalMode, setAntigravityTerminalMode] = useState<"login" | "install" | null>(null);
+  const [lastAntigravityForceInstall, setLastAntigravityForceInstall] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+
+  const antigravitySetupInFlight =
+    backendSetup.backend === "antigravity" &&
+    backendSetup.phase !== "idle" &&
+    backendSetup.phase !== "completed" &&
+    backendSetup.phase !== "error";
 
   function reportError(message: string | null): void {
     setCardError(message);
@@ -133,15 +142,15 @@ export function ProviderConnectCard({
     }
   }
 
-  async function connectAntigravity(options: { closeTerminalOnSuccess?: boolean } = {}): Promise<void> {
+  async function connectAntigravity(): Promise<void> {
     reportError(null);
     setPending("antigravity");
     try {
       const status = await window.roderDesktop.antigravityConnect({ forceRefresh: true });
       await onRecheckAntigravity?.();
       await refreshProviders();
-      if (status.connected && options.closeTerminalOnSuccess) {
-        setAntigravityTerminalMode(null);
+      if (status.connected && backendSetup.backend === "antigravity" && backendSetup.phase !== "idle") {
+        await cancelBackendSetup().catch(() => undefined);
       } else if (!status.connected) {
         reportError(
           status.runtimeInstalled
@@ -157,12 +166,24 @@ export function ProviderConnectCard({
     }
   }
 
+  async function startAntigravityNativeSetup(forceInstall: boolean): Promise<void> {
+    reportError(null);
+    setLastAntigravityForceInstall(forceInstall);
+    try {
+      await startBackendSetup("antigravity", { forceInstall });
+    } catch (setupError) {
+      reportError(errorMessage(setupError));
+    }
+  }
+
   async function signOutAntigravity(): Promise<void> {
     reportError(null);
     setPending("sign-out");
     try {
+      if (backendSetup.backend === "antigravity" && backendSetup.phase !== "idle") {
+        await cancelBackendSetup().catch(() => undefined);
+      }
       await window.roderDesktop.antigravityLogout();
-      setAntigravityTerminalMode(null);
       await onRecheckAntigravity?.();
       await refreshProviders();
     } catch (logoutError) {
@@ -311,11 +332,8 @@ export function ProviderConnectCard({
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   className={primaryActionClassName}
-                  disabled={pending !== null}
-                  onClick={() => {
-                    reportError(null);
-                    setAntigravityTerminalMode(antigravityStatus?.runtimeInstalled === false ? "install" : "login");
-                  }}
+                  disabled={pending !== null || antigravitySetupInFlight}
+                  onClick={() => void startAntigravityNativeSetup(antigravityStatus?.runtimeInstalled === false)}
                 >
                   {antigravityStatus?.runtimeInstalled === false
                     ? "Install & sign in"
@@ -323,36 +341,30 @@ export function ProviderConnectCard({
                 </Button>
                 <Button
                   variant="ghost"
-                  disabled={pending !== null}
-                  onClick={() => void connectAntigravity({ closeTerminalOnSuccess: true })}
+                  disabled={pending !== null || antigravitySetupInFlight}
+                  onClick={() => void connectAntigravity()}
                 >
                   <RefreshCw
                     className={cn("size-4", pending === "antigravity" && "animate-spin motion-reduce:animate-none")}
                   />
                   {pending === "antigravity" ? "Checking..." : "Check connection"}
                 </Button>
-                {antigravityStatus?.runtimeInstalled && antigravityTerminalMode !== "install" && (
+                {antigravityStatus?.runtimeInstalled && !antigravitySetupInFlight && (
                   <Button
                     variant="ghost"
                     disabled={pending !== null}
-                    onClick={() => {
-                      reportError(null);
-                      setAntigravityTerminalMode("install");
-                    }}
+                    onClick={() => void startAntigravityNativeSetup(true)}
                   >
                     Repair CLI
                   </Button>
                 )}
               </div>
-              {antigravityTerminalMode && (
-                <BackendSetupTerminal
-                  key={antigravityTerminalMode}
+              {backendSetup.backend === "antigravity" && backendSetup.phase !== "idle" && (
+                <BackendSetupPanel
                   backend="antigravity"
-                  antigravityMode={antigravityTerminalMode}
-                  checking={pending === "antigravity"}
-                  onCheckConnection={() => connectAntigravity({ closeTerminalOnSuccess: true })}
-                  onAutoComplete={() => connectAntigravity({ closeTerminalOnSuccess: true })}
-                  onClose={() => setAntigravityTerminalMode(null)}
+                  state={backendSetup}
+                  onRetry={() => void startAntigravityNativeSetup(lastAntigravityForceInstall)}
+                  onDismiss={() => void onRecheckAntigravity?.()}
                 />
               )}
             </>

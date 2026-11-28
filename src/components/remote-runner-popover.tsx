@@ -1,5 +1,17 @@
 import { Popover } from "@base-ui/react/popover";
-import { Cloud, ExternalLink, Globe2, Network, Pause, Play, RefreshCw, Server } from "lucide-react";
+import {
+  Cloud,
+  ExternalLink,
+  Globe2,
+  Monitor,
+  Network,
+  Pause,
+  Play,
+  RefreshCw,
+  Server,
+  Ship,
+  Square,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useMountEffect } from "@/hooks/use-mount-effect";
@@ -47,11 +59,31 @@ export function RemoteRunnerPopover({
     try {
       const result = await roderIpc.wakeRemoteRunner(remoteWorkspace.workspaceId);
       setSnapshot(result.status);
-      setFeedback({ kind: "info", text: "Remote sandbox is awake and ready." });
+      setFeedback({
+        kind: "info",
+        text: isBoatProvider ? "Boat sandbox is awake and ready." : "Remote sandbox is awake and ready.",
+      });
     } catch (error) {
       setFeedback({
         kind: "error",
         text: error instanceof Error ? error.message : "Could not wake remote sandbox.",
+      });
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleStopBoat(): Promise<void> {
+    setActionBusy("stop");
+    setFeedback(null);
+    try {
+      const result = await roderIpc.stopRemoteRunner(remoteWorkspace.workspaceId);
+      setSnapshot(result.status);
+      setFeedback({ kind: "info", text: "Boat sandbox stopped." });
+    } catch (error) {
+      setFeedback({
+        kind: "error",
+        text: error instanceof Error ? error.message : "Could not stop Boat sandbox.",
       });
     } finally {
       setActionBusy(null);
@@ -127,7 +159,9 @@ export function RemoteRunnerPopover({
             ? `Opened port ${port} over Tailscale.`
             : result.transport === "ssh-forward"
               ? `Opened port ${port} via local SSH tunnel (${result.url}).`
-              : `Opened port ${port} preview.`,
+              : result.transport === "boat-host"
+                ? `Opened port ${port} via Boat.`
+                : `Opened port ${port} preview.`,
       });
     } catch (error) {
       setFeedback({
@@ -141,10 +175,12 @@ export function RemoteRunnerPopover({
 
   const reachable = snapshot ? snapshot.reachable : true;
   const statusText = snapshot?.status ? formatStatusLabel(snapshot.status) : "Remote";
+  const isBoatProvider = remoteWorkspace.providerId === "boat";
   const isTailscaleProvider = remoteWorkspace.providerId === "tailscale";
   const isSshProvider = remoteWorkspace.providerId === "ssh";
   const isTailscaleActive = Boolean(snapshot?.tailscaleActive || snapshot?.bridgeMode === "tailscale-tunnel");
-  const supportsPortPreview = remoteWorkspace.providerId === "blaxel" || isTailscaleProvider || isSshProvider;
+  const supportsPortPreview =
+    remoteWorkspace.providerId === "blaxel" || isBoatProvider || isTailscaleProvider || isSshProvider;
 
   return (
     <Popover.Root
@@ -168,6 +204,8 @@ export function RemoteRunnerPopover({
           <Network className="size-3.5 shrink-0" />
         ) : isSshProvider ? (
           <Server className="size-3.5 shrink-0" />
+        ) : isBoatProvider ? (
+          <Ship className="size-3.5 shrink-0" />
         ) : (
           <Cloud className="size-3.5 shrink-0" />
         )}
@@ -187,6 +225,8 @@ export function RemoteRunnerPopover({
                       <Network className="size-4 shrink-0 text-muted-foreground" />
                     ) : isSshProvider ? (
                       <Server className="size-4 shrink-0 text-muted-foreground" />
+                    ) : isBoatProvider ? (
+                      <Ship className="size-4 shrink-0 text-muted-foreground" />
                     ) : (
                       <Cloud className="size-4 shrink-0 text-muted-foreground" />
                     )}
@@ -278,7 +318,7 @@ export function RemoteRunnerPopover({
               )}
 
               <div className="flex flex-wrap items-center gap-2">
-                {(remoteWorkspace.providerId === "blaxel" || isSshProvider) && (
+                {(remoteWorkspace.providerId === "blaxel" || isBoatProvider || isSshProvider) && (
                   <Button
                     type="button"
                     size="sm"
@@ -291,13 +331,43 @@ export function RemoteRunnerPopover({
                     {actionBusy === "wake"
                       ? isSshProvider
                         ? "Connecting…"
-                        : "Waking…"
+                        : isBoatProvider
+                          ? "Resuming…"
+                          : "Waking…"
                       : isSshProvider
                         ? "Connect tunnel"
-                        : "Wake"}
+                        : isBoatProvider
+                          ? "Resume"
+                          : "Wake"}
                   </Button>
                 )}
-                {(((remoteWorkspace.providerId === "blaxel" || isSshProvider) &&
+                {isBoatProvider && snapshot?.status?.toLowerCase() !== "stopped" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-md"
+                    disabled={actionBusy !== null}
+                    onClick={() => void handleStopBoat()}
+                  >
+                    <Square className="size-3.5" />
+                    {actionBusy === "stop" ? "Stopping…" : "Stop"}
+                  </Button>
+                )}
+                {snapshot?.desktopUrl && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-md"
+                    disabled={actionBusy !== null}
+                    onClick={() => void window.roderDesktop.openExternal(snapshot.desktopUrl!)}
+                  >
+                    <Monitor className="size-3.5" />
+                    Open Desktop
+                  </Button>
+                )}
+                {(((remoteWorkspace.providerId === "blaxel" || isBoatProvider || isSshProvider) &&
                   snapshot?.tailscaleConfigured &&
                   !isTailscaleActive) ||
                   isTailscaleProvider) && (
@@ -317,7 +387,7 @@ export function RemoteRunnerPopover({
                         : "Inject Tailscale"}
                   </Button>
                 )}
-                {remoteWorkspace.threadId && !isTailscaleProvider && !isSshProvider && (
+                {remoteWorkspace.threadId && !isBoatProvider && !isTailscaleProvider && !isSshProvider && (
                   <>
                     <Button
                       type="button"
@@ -358,7 +428,9 @@ export function RemoteRunnerPopover({
                         ? " (via Tailscale)"
                         : isSshProvider
                           ? " (via SSH tunnel)"
-                          : ""}
+                          : isBoatProvider
+                            ? " (via Boat)"
+                            : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -407,14 +479,24 @@ function formatBridgeModeLabel(mode: NonNullable<RemoteRunnerStatusSnapshot["bri
   if (mode === "remote-roder-tunnel") return "remote-roder (WSS tunnel)";
   if (mode === "tailscale-ssh") return "Tailscale SSH bridge";
   if (mode === "ssh-direct") return "SSH bridge";
+  if (mode === "boat-api") return "Boat API fallback";
   if (mode === "blaxel-api") return "Blaxel API fallback";
   return "Ready to connect";
 }
 
 function formatStatusLabel(raw: string): string {
   const upper = raw.toUpperCase();
-  if (upper === "DEPLOYED") return "Ready";
+  if (upper === "DEPLOYED" || upper === "IDLE" || upper === "ACTIVE" || upper === "RUNNING") return "Ready";
   if (upper === "STANDBY") return "Standby";
-  if (upper === "DEPLOYING" || upper === "CREATING") return "Starting";
+  if (upper === "STOPPED" || upper === "ARCHIVED") return "Stopped";
+  if (
+    upper === "DEPLOYING" ||
+    upper === "CREATING" ||
+    upper === "PROVISIONING" ||
+    upper === "BOOTING" ||
+    upper === "RESUMING"
+  ) {
+    return "Starting";
+  }
   return raw.slice(0, 1).toUpperCase() + raw.slice(1).toLowerCase();
 }

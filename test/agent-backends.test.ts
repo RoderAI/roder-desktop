@@ -375,4 +375,71 @@ describe("AgentBackendsManager", () => {
     expect(afterLogout.activeBackend).toBe("roder");
     expect(afterLogout.backends.antigravity.connected).toBe(false);
   });
+
+  it("steers an active Antigravity turn by interrupting, waiting for completion, and starting the steered turn", async () => {
+    const client = new FakeBackendClient();
+    let activeTurn: string | null = "ag-turn-1";
+    const forwarded: Array<{ method: string; params: unknown }> = [];
+    const seenMethods: string[] = [];
+
+    client.request.mockImplementation(async (method: string, params?: Record<string, unknown>) => {
+      seenMethods.push(method);
+      if (method === "model/list") {
+        return {
+          models: [{ id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", modelProvider: "antigravity", isDefault: true }],
+        };
+      }
+      if (method === "turn/steer") {
+        throw new Error("Antigravity already has an active turn");
+      }
+      if (method === "turn/interrupt") {
+        setTimeout(() => {
+          activeTurn = null;
+          client.emit("notification", {
+            method: "turn/completed",
+            params: { threadId: "ag-thread-1", turn: { id: "ag-turn-1", status: "interrupted" } },
+          });
+          client.emit("notification", {
+            method: "thread/status/changed",
+            params: { threadId: "ag-thread-1", status: { type: "idle", activeTurnId: null, activeFlags: [] } },
+          });
+        }, 10);
+        return { turnId: params?.turnId ?? "ag-turn-1" };
+      }
+      if (method === "turn/start") {
+        if (activeTurn) {
+          throw new Error("Antigravity already has an active turn");
+        }
+        activeTurn = "ag-turn-2";
+        return { turnId: "ag-turn-2" };
+      }
+      throw new Error(`Unexpected method ${method}`);
+    });
+
+    const manager = new AgentBackendsManager({
+      createClient: () => client,
+      findRuntime: () => "/usr/local/bin/agy",
+      onNotification: (payload) => forwarded.push(payload),
+    });
+
+    await manager.selectBackend("antigravity");
+    const steered = (await manager.handleRequest("antigravity", "turn/steer", {
+      threadId: "ag-thread-1",
+      expectedTurnId: "ag-turn-1",
+      prompt: "is it implemented?",
+    })) as { turnId: string };
+
+    expect(steered).toEqual({ turnId: "ag-turn-2" });
+    expect(seenMethods).toEqual(["model/list", "turn/steer", "turn/interrupt", "turn/start"]);
+    // Intermediate idle thread/status/changed is suppressed while steering replaces the turn.
+    expect(forwarded.some((item) => item.method === "thread/status/changed")).toBe(false);
+    expect(forwarded.some((item) => item.method === "turn/completed")).toBe(true);
+
+    // Direct turn/start also recovers seamlessly if Antigravity still holds an active turn.
+    const started = (await manager.handleRequest("antigravity", "turn/start", {
+      threadId: "ag-thread-1",
+      prompt: "switch focus now",
+    })) as { turnId: string };
+    expect(started).toEqual({ turnId: "ag-turn-2" });
+  });
 });

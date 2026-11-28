@@ -32,7 +32,21 @@ test("keeps dangerous links and unsolicited remote images blocked", () => {
   expect(html).not.toContain('href="file:');
   expect(html).not.toContain('href="data:');
   expect(html).not.toContain('data-streamdown="link"');
+  expect(html).not.toContain("[blocked]");
   expect(html).not.toContain("<img");
+});
+
+test("renders file:// markdown links from external harnesses cleanly without [blocked] markers", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MessageContent, {
+      text: "Updated [roder-store.ts](file:///Users/pz/w/roder-desktop/src/stores/roder-store.ts#L10-L20) and [`app-sidebar.tsx`](file:///Users/pz/w/roder-desktop/src/components/app-sidebar.tsx).",
+    }),
+  );
+  expect(html).toContain("roder-store.ts");
+  expect(html).toContain("app-sidebar.tsx");
+  expect(html).toContain('title="/Users/pz/w/roder-desktop/src/stores/roder-store.ts#L10-L20"');
+  expect(html).not.toContain('href="file:');
+  expect(html).not.toContain("[blocked]");
 });
 
 test("renders known skill references as pills in plain text", () => {

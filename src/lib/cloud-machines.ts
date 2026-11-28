@@ -36,10 +36,45 @@ export type ThreadRunner = {
 export type CloudProviderCredentialStatus = {
   providerId: string;
   configured: boolean;
-  source: "saved" | "blaxel-cli" | "env" | "none";
+  source: "saved" | "blaxel-cli" | "oauth" | "env" | "none";
   workspace?: string | null;
   preview?: string | null;
   envVars: string[];
+};
+
+export type BoatCredentialStatus = {
+  configured: boolean;
+  mode: "oauth" | "api-key" | "none";
+  source: "oauth" | "saved" | "env" | "none";
+  preview: string | null;
+  userLogin: string | null;
+  userDisplayName: string | null;
+  userEmail: string | null;
+  scope: string | null;
+  expiresAt: number | null;
+};
+
+export type BoatOAuthState = {
+  phase: "idle" | "awaiting-browser" | "exchanging" | "completed" | "error";
+  message: string;
+  authUrl: string | null;
+  error: string | null;
+};
+
+export type BoatSandboxSize = "small" | "default" | "large" | "xlarge";
+
+export type BoatSandboxSummary = {
+  id: string;
+  name: string;
+  state: string;
+  url: string | null;
+  ip: string | null;
+  desktopAvailable: boolean;
+  desktopUrl: string | null;
+  snapshotAvailable: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  archiveAfter: string | null;
 };
 
 export type BlaxelCliStatus = {
@@ -146,6 +181,7 @@ export type RemoteRunnerStatusSnapshot = {
   status: string;
   region?: string | null;
   url?: string | null;
+  desktopUrl?: string | null;
   reachable: boolean;
   bridgeMode?:
     | "tailscale-tunnel"
@@ -154,6 +190,7 @@ export type RemoteRunnerStatusSnapshot = {
     | "tailscale-ssh"
     | "ssh-direct"
     | "blaxel-api"
+    | "boat-api"
     | "pending";
   bridgeDetail?: string;
   tailscaleActive?: boolean;
@@ -178,6 +215,9 @@ export function effectiveRunnerProviderId(
   runner: Pick<ThreadRunner, "providerId" | "config"> | null | undefined,
 ): string {
   if (!runner) return "";
+  if (runner.providerId === "boat" || runner.config?.roder_transport === "boat") {
+    return "boat";
+  }
   if (runner.providerId === "ssh" || runner.config?.roder_transport === "ssh") {
     return "ssh";
   }
@@ -217,6 +257,13 @@ export function remoteRunnerTargetName(runner: Pick<ThreadRunner, "providerId" |
     const label = config.machine_name ?? config.tailscale_host ?? config.dns_name ?? config.tailscale_ip ?? config.host;
     if (typeof label === "string" && label.trim()) {
       return label.trim().replace(/\.+$/u, "");
+    }
+  }
+  if (providerId === "boat") {
+    const label =
+      config.machine_name ?? config.sandbox_name ?? config.sandboxName ?? config.sandbox_id ?? config.sandboxId;
+    if (typeof label === "string" && label.trim()) {
+      return label.trim();
     }
   }
   if (providerId === "blaxel") {

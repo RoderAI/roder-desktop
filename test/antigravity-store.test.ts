@@ -230,6 +230,81 @@ describe("Antigravity store switching behavior", () => {
     const turnCall = calls.find((call) => call.method === "turn/start");
     expect(turnCall?.params.threadId).toBe("thread-ag-new");
     expect(useRoderStore.getState().activeThreadId).toBe("thread-ag-new");
+    const detail = useRoderStore.getState().threadDetails["thread-ag-new"];
+    expect(detail?.turns?.[0]?.items[0]).toMatchObject({
+      id: "user-turn-1",
+      type: "userMessage",
+      text: "Hello from Antigravity",
+    });
+  });
+
+  it("prepends the first user message above tools even if turn/started and tool items arrive before turn/start resolves", async () => {
+    const { useRoderStore } = await import("../src/stores/roder-store");
+    const originalRequest = window.roderDesktop.request as unknown as (
+      method: string,
+      params?: Record<string, unknown>,
+    ) => Promise<unknown>;
+    window.roderDesktop.request = vi.fn<(method: string, params?: Record<string, unknown>) => Promise<unknown>>(
+      async (method: string, params?: Record<string, unknown>) => {
+        const response = await originalRequest(method, params);
+        if (method === "turn/start") {
+          // Simulate Antigravity emitting turn/started and a tool call before turn/start RPC returns,
+          // without emitting a userMessage item notification.
+          useRoderStore.getState().applyNotification({
+            method: "turn/started",
+            params: { threadId: "thread-ag-new", turn: { id: "turn-1" } },
+          });
+          useRoderStore.getState().applyNotification({
+            method: "item/started",
+            params: {
+              seq: 1,
+              eventId: "evt-1",
+              threadId: "thread-ag-new",
+              turnId: "turn-1",
+              timestamp: "2026-11-27T21:00:00Z",
+              event: {
+                type: "itemStarted",
+                item: {
+                  id: "tool-1",
+                  type: "toolExecution",
+                  toolCallId: "tool-1",
+                  toolName: "git status",
+                  status: "inProgress",
+                },
+              },
+            },
+          });
+        }
+        return response;
+      },
+    ) as typeof window.roderDesktop.request;
+
+    useRoderStore.setState({
+      activeBackend: "antigravity",
+      models: [claudeModel, antigravityModelA],
+      hiddenModelIds: [],
+      workspaces: [workspace],
+      selectedWorkspaceId: "ws-1",
+      selectedRootId: "root-1",
+      selectedWorkspaceCwd: "/repo/app",
+      threads: [],
+      threadDetails: {},
+      activeThreadId: "",
+      selectedModel: antigravityModelA.id,
+      selectedModelProvider: "antigravity",
+      error: null,
+    });
+
+    await useRoderStore.getState().sendPrompt("i want real antigravity logos hehre plz");
+
+    const detail = useRoderStore.getState().threadDetails["thread-ag-new"];
+    expect(detail?.turns).toHaveLength(1);
+    expect(detail?.turns?.[0]?.items.map((item) => item.type)).toEqual(["userMessage", "toolExecution"]);
+    expect(detail?.turns?.[0]?.items[0]).toMatchObject({
+      id: "user-turn-1",
+      type: "userMessage",
+      text: "i want real antigravity logos hehre plz",
+    });
   });
 
   it("keeps the same Antigravity thread when switching between Antigravity models", async () => {
@@ -298,6 +373,71 @@ describe("Antigravity store switching behavior", () => {
       agentBackend: "codex",
       modelProvider: "codex",
       model: "gpt-6.2-sol",
+    });
+  });
+
+  it("steers an active Antigravity turn without flashing idle and displays the steered user message", async () => {
+    const { useRoderStore } = await import("../src/stores/roder-store");
+    let midSteerSnapshot: { busy: boolean; statusType: string | undefined } | null = null;
+    window.roderDesktop.request = vi.fn<(method: string, params?: Record<string, unknown>) => Promise<unknown>>(
+      async (method: string) => {
+        if (method === "turn/steer") {
+          // Simulate the interrupted turn completing while turn/steer replaces it with turn-2.
+          useRoderStore.getState().applyNotification({
+            method: "turn/completed",
+            params: { threadId: antigravityThread.id, turn: { id: "turn-1", status: "interrupted" } },
+          });
+          midSteerSnapshot = {
+            busy: useRoderStore.getState().busy,
+            statusType: useRoderStore.getState().threadDetails[antigravityThread.id]?.status.type,
+          };
+          return { turnId: "turn-2" };
+        }
+        return {};
+      },
+    ) as typeof window.roderDesktop.request;
+
+    const runningAgThread: RoderThread = {
+      ...antigravityThread,
+      status: { type: "running", activeTurnId: "turn-1", activeFlags: [] },
+      turns: [
+        {
+          id: "turn-1",
+          status: "inProgress",
+          items: [{ id: "user-turn-1", type: "userMessage", text: "first prompt" }],
+        },
+      ],
+    };
+
+    useRoderStore.setState({
+      activeBackend: "antigravity",
+      models: [claudeModel, antigravityModelA],
+      hiddenModelIds: [],
+      workspaces: [workspace],
+      selectedWorkspaceId: "ws-1",
+      selectedRootId: "root-1",
+      selectedWorkspaceCwd: "/repo/app",
+      threads: [runningAgThread],
+      threadDetails: { [runningAgThread.id]: runningAgThread },
+      activeThreadId: runningAgThread.id,
+      busy: true,
+      selectedModel: antigravityModelA.id,
+      selectedModelProvider: "antigravity",
+      error: null,
+    });
+
+    await useRoderStore.getState().steerPrompt("is it implemented?");
+
+    expect(midSteerSnapshot).toEqual({ busy: true, statusType: "running" });
+    const nextState = useRoderStore.getState();
+    expect(nextState.busy).toBe(true);
+    expect(nextState.error).toBeNull();
+    const detail = nextState.threadDetails[runningAgThread.id];
+    expect(detail?.status).toEqual({ type: "running", activeTurnId: "turn-2", activeFlags: [] });
+    expect(detail?.turns?.find((turn) => turn.id === "turn-2")?.items[0]).toMatchObject({
+      id: "user-turn-2",
+      type: "userMessage",
+      text: "is it implemented?",
     });
   });
 });

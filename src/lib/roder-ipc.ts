@@ -2,6 +2,10 @@ import type {
   BlaxelCliStatus,
   BlaxelSandboxSummary,
   BlaxelWorkspaceInfo,
+  BoatCredentialStatus,
+  BoatOAuthState,
+  BoatSandboxSize,
+  BoatSandboxSummary,
   CloudMachine,
   CloudMachineInput,
   CloudMachineProfileDetail,
@@ -18,6 +22,7 @@ import { attachmentImageType } from "@/lib/attachment-preparation";
 import type {
   AgentBackendId,
   AgentBackendsSnapshot,
+  BackendSetupState,
   CommandsListResult,
   CommandsRunResult,
   DesktopAttachment,
@@ -661,9 +666,44 @@ export const roderIpc = {
     window.roderDesktop.request("desktop/cloud-machines/credentials/status", {}) as Promise<{
       statuses: CloudProviderCredentialStatus[];
       blaxelCli: BlaxelCliStatus;
+      boatCredentials?: BoatCredentialStatus;
+      boatAuthState?: BoatOAuthState;
       tailscaleCredentials: TailscaleCredentialStatus;
       localTailscale: LocalTailscaleStatus;
       localSsh?: LocalSshEnvironment;
+    }>,
+  boatStatus: () =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/status", {}) as Promise<{
+      credentials: BoatCredentialStatus;
+      authState: BoatOAuthState;
+    }>,
+  startBoatOAuth: () =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/startOAuth", {}) as Promise<{
+      authState: BoatOAuthState;
+    }>,
+  cancelBoatOAuth: () =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/cancelOAuth", {}) as Promise<{
+      authState: BoatOAuthState;
+    }>,
+  saveBoatApiKey: (apiKey: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/saveApiKey", { apiKey }) as Promise<{
+      status: BoatCredentialStatus;
+    }>,
+  listBoatSandboxes: () =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/sandboxes", {}) as Promise<{
+      sandboxes: BoatSandboxSummary[];
+    }>,
+  createBoatSandbox: (params: { name?: string; type?: BoatSandboxSize; environment?: string; workingDir?: string }) =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/createSandbox", params) as Promise<{
+      sandbox: BoatSandboxSummary;
+    }>,
+  stopBoatSandbox: (sandboxId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/stopSandbox", { sandboxId }) as Promise<{
+      stopped: true;
+    }>,
+  resumeBoatSandbox: (sandboxId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/boat/resumeSandbox", { sandboxId }) as Promise<{
+      sandbox: BoatSandboxSummary;
     }>,
   sshStatus: () =>
     window.roderDesktop.request("desktop/cloud-machines/ssh/status", {}) as Promise<{
@@ -746,6 +786,10 @@ export const roderIpc = {
     window.roderDesktop.request("desktop/cloud-machines/remote/wake", { workspaceId }) as Promise<{
       status: RemoteRunnerStatusSnapshot;
     }>,
+  stopRemoteRunner: (workspaceId: string) =>
+    window.roderDesktop.request("desktop/cloud-machines/remote/stop", { workspaceId }) as Promise<{
+      status: RemoteRunnerStatusSnapshot;
+    }>,
   setupRemoteTailscaleTunnel: (workspaceId: string) =>
     window.roderDesktop.request("desktop/cloud-machines/remote/setupTailscale", { workspaceId }) as Promise<{
       status: RemoteRunnerStatusSnapshot;
@@ -754,7 +798,7 @@ export const roderIpc = {
     window.roderDesktop.request("desktop/cloud-machines/remote/previewPort", { workspaceId, port }) as Promise<{
       url: string;
       port: number;
-      transport?: "tailscale" | "ssh-forward" | "blaxel-preview";
+      transport?: "tailscale" | "ssh-forward" | "blaxel-preview" | "boat-host";
     }>,
   listProviders: () =>
     window.roderDesktop
@@ -780,6 +824,12 @@ export const roderIpc = {
     window.roderDesktop.agentBackendsConnect(backend, options) as Promise<AgentBackendsSnapshot>,
   logoutAgentBackend: (backend: ExternalAgentBackendId) =>
     window.roderDesktop.agentBackendsLogout(backend) as Promise<AgentBackendsSnapshot>,
+  backendSetupState: () => window.roderDesktop.agentBackendsSetupState() as Promise<BackendSetupState>,
+  startBackendSetup: (backend: ExternalAgentBackendId, options?: { forceInstall?: boolean }) =>
+    window.roderDesktop.agentBackendsStartSetup(backend, options) as Promise<BackendSetupState>,
+  submitBackendSetupCode: (code: string) =>
+    window.roderDesktop.agentBackendsSubmitSetupCode(code) as Promise<BackendSetupState>,
+  cancelBackendSetup: () => window.roderDesktop.agentBackendsCancelSetup() as Promise<BackendSetupState>,
   startTurn: (
     threadId: string,
     prompt: string,

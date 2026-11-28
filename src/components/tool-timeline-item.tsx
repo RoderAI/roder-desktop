@@ -24,7 +24,7 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
     return <RoutingDecisionToolItem message={message} onOpenChange={onOpenChange} open={open} title={title} />;
   }
 
-  if (isShellToolName(message.toolName) && (message.toolInput || message.toolOutput)) {
+  if ((isShellToolName(message.toolName) || Boolean(message.toolInput)) && (message.toolInput || message.toolOutput)) {
     return (
       <ToolShellItem message={message} onOpenChange={onOpenChange} open={open} status={status} summary={summary} />
     );
@@ -32,6 +32,19 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
 
   if (message.toolPreview) {
     return <ToolEditItem message={message} onOpenChange={onOpenChange} open={open} status={status} summary={summary} />;
+  }
+
+  if (message.toolOutput) {
+    return (
+      <ToolOutputItem
+        message={message}
+        onOpenChange={onOpenChange}
+        open={open}
+        status={status}
+        summary={summary}
+        title={title}
+      />
+    );
   }
 
   return (
@@ -44,6 +57,45 @@ export function ToolTimelineItem({ message, onOpenChange, open }: ToolTimelineIt
         </span>
       ) : null}
     </div>
+  );
+}
+
+function ToolOutputItem({
+  message,
+  onOpenChange,
+  open,
+  status,
+  summary,
+  title,
+}: ToolDisclosureControlProps & {
+  message: ConversationMessage;
+  status: "running" | "complete" | "failed";
+  summary: string;
+  title: string;
+}): React.JSX.Element {
+  const Title = status === "running" ? ShimmerText : "span";
+
+  return (
+    <Collapsible.Root className="group/output-tool text-base leading-5" onOpenChange={onOpenChange} open={open}>
+      <Collapsible.Trigger
+        className="flex min-h-6 w-full min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        type="button"
+      >
+        <ToolFailureDot failed={status === "failed"} />
+        <Title className={cn("min-w-0 truncate font-medium", toolTextClass())}>{title}</Title>
+        {summary && summary !== title ? (
+          <span className="min-w-0 truncate text-muted-foreground" title={summary}>
+            {summary}
+          </span>
+        ) : null}
+        <DisclosureChevron groupName="output-tool" />
+      </Collapsible.Trigger>
+      <Collapsible.Panel className="tool-disclosure-panel pl-5 text-base leading-5 text-muted-foreground">
+        <pre className="m-0 max-h-72 overflow-auto whitespace-pre-wrap break-words py-1 font-mono text-sm leading-5 text-muted-foreground">
+          {message.toolOutput}
+        </pre>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }
 

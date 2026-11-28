@@ -4,6 +4,10 @@ import type {
   BlaxelCliStatus,
   BlaxelSandboxSummary,
   BlaxelWorkspaceInfo,
+  BoatCredentialStatus,
+  BoatOAuthState,
+  BoatSandboxSize,
+  BoatSandboxSummary,
   CloudMachine,
   CloudMachineInput,
   CloudProviderCredentialStatus,
@@ -28,6 +32,9 @@ type CloudMachinesState = {
   blaxelWorkspaces: BlaxelWorkspaceInfo[];
   blaxelSandboxes: BlaxelSandboxSummary[];
   blaxelActiveWorkspace: string | null;
+  boatCredentials: BoatCredentialStatus | null;
+  boatAuthState: BoatOAuthState | null;
+  boatSandboxes: BoatSandboxSummary[];
   localTailscale: LocalTailscaleStatus | null;
   tailscaleCredentials: TailscaleCredentialStatus | null;
   localSsh: LocalSshEnvironment | null;
@@ -38,6 +45,20 @@ type CloudMachinesState = {
   busy: boolean;
   refresh: () => Promise<void>;
   refreshCredentials: () => Promise<void>;
+  refreshBoatStatus: () => Promise<void>;
+  applyBoatAuthState: (state: BoatOAuthState) => void;
+  startBoatOAuth: () => Promise<BoatOAuthState>;
+  cancelBoatOAuth: () => Promise<BoatOAuthState>;
+  saveBoatApiKey: (apiKey: string) => Promise<void>;
+  refreshBoatSandboxes: () => Promise<void>;
+  createBoatSandbox: (params: {
+    name?: string;
+    type?: BoatSandboxSize;
+    environment?: string;
+    workingDir?: string;
+  }) => Promise<BoatSandboxSummary>;
+  stopBoatSandbox: (sandboxId: string) => Promise<void>;
+  resumeBoatSandbox: (sandboxId: string) => Promise<BoatSandboxSummary>;
   refreshTailscale: () => Promise<void>;
   refreshSsh: () => Promise<void>;
   refreshBlaxelSandboxes: (workspace?: string) => Promise<void>;
@@ -77,6 +98,9 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
       blaxelWorkspaces: [],
       blaxelSandboxes: [],
       blaxelActiveWorkspace: null,
+      boatCredentials: null,
+      boatAuthState: null,
+      boatSandboxes: [],
       localTailscale: null,
       tailscaleCredentials: null,
       localSsh: null,
@@ -104,10 +128,13 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
           const creds = await roderIpc.cloudCredentialsStatus();
           if (!creds || !Array.isArray(creds.statuses)) return;
           const blaxelStatus = creds.statuses.find((entry) => entry.providerId === "blaxel");
+          const boatStatus = creds.boatCredentials ?? null;
           set({
             credentialStatuses: creds.statuses,
             blaxelCli: creds.blaxelCli ?? null,
             blaxelActiveWorkspace: blaxelStatus?.workspace ?? creds.blaxelCli?.workspace ?? null,
+            ...(creds.boatCredentials !== undefined ? { boatCredentials: creds.boatCredentials } : {}),
+            ...(creds.boatAuthState !== undefined ? { boatAuthState: creds.boatAuthState } : {}),
             ...(creds.localTailscale !== undefined ? { localTailscale: creds.localTailscale } : {}),
             ...(creds.tailscaleCredentials !== undefined ? { tailscaleCredentials: creds.tailscaleCredentials } : {}),
             ...(creds.localSsh !== undefined ? { localSsh: creds.localSsh } : {}),
@@ -117,8 +144,144 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
               .refreshBlaxelSandboxes(blaxelStatus.workspace ?? undefined)
               .catch(() => undefined);
           }
+          if (boatStatus?.configured) {
+            void get()
+              .refreshBoatSandboxes()
+              .catch(() => undefined);
+          }
         } catch {
           // Optional enhancement when mocked or before engine is ready.
+        }
+      },
+      refreshBoatStatus: async () => {
+        try {
+          const status = await roderIpc.boatStatus();
+          if (!status) return;
+          set({
+            boatCredentials: status.credentials ?? null,
+            boatAuthState: status.authState ?? null,
+          });
+          if (status.credentials?.configured) {
+            void get()
+              .refreshBoatSandboxes()
+              .catch(() => undefined);
+          }
+        } catch {
+          // Optional when mocked or before engine is ready.
+        }
+      },
+      applyBoatAuthState: (boatAuthState) => {
+        set({ boatAuthState });
+        if (boatAuthState.phase === "completed") {
+          void get()
+            .refreshCredentials()
+            .catch(() => undefined);
+        }
+      },
+      startBoatOAuth: async () => {
+        set({ error: "" });
+        try {
+          const { authState } = await roderIpc.startBoatOAuth();
+          set({ boatAuthState: authState });
+          return authState;
+        } catch (error) {
+          const message = cleanErrorMessage(error, "Could not start Boat sign-in.");
+          set({ error: message });
+          throw new Error(message);
+        }
+      },
+      cancelBoatOAuth: async () => {
+        try {
+          const { authState } = await roderIpc.cancelBoatOAuth();
+          set({ boatAuthState: authState });
+          return authState;
+        } catch (error) {
+          const message = cleanErrorMessage(error, "Could not cancel Boat sign-in.");
+          set({ error: message });
+          throw new Error(message);
+        }
+      },
+      saveBoatApiKey: async (apiKey) => {
+        set({ savingCredentials: true, error: "" });
+        try {
+          const result = await roderIpc.saveBoatApiKey(apiKey);
+          set({
+            savingCredentials: false,
+            boatCredentials: result.status,
+          });
+          await get().refreshCredentials();
+          await get().refreshBoatSandboxes();
+        } catch (error) {
+          set({
+            savingCredentials: false,
+            error: cleanErrorMessage(error, "Could not verify or save Boat API key."),
+          });
+          throw error;
+        }
+      },
+      refreshBoatSandboxes: async () => {
+        set({ loadingSandboxes: true });
+        try {
+          const result = await roderIpc.listBoatSandboxes();
+          set({
+            boatSandboxes: Array.isArray(result?.sandboxes) ? result.sandboxes : [],
+            loadingSandboxes: false,
+          });
+        } catch (error) {
+          set({
+            loadingSandboxes: false,
+            error: cleanErrorMessage(error, "Could not load Boat sandboxes."),
+          });
+        }
+      },
+      createBoatSandbox: async (params) => {
+        set({ loadingSandboxes: true, error: "" });
+        try {
+          const { sandbox } = await roderIpc.createBoatSandbox(params);
+          set((state) => ({
+            loadingSandboxes: false,
+            boatSandboxes: [sandbox, ...state.boatSandboxes.filter((entry) => entry.id !== sandbox.id)],
+          }));
+          return sandbox;
+        } catch (error) {
+          set({
+            loadingSandboxes: false,
+            error: cleanErrorMessage(error, "Could not create Boat sandbox."),
+          });
+          throw error;
+        }
+      },
+      stopBoatSandbox: async (sandboxId) => {
+        set({ error: "" });
+        try {
+          await roderIpc.stopBoatSandbox(sandboxId);
+          set((state) => ({
+            boatSandboxes: state.boatSandboxes.map((entry) =>
+              entry.id === sandboxId ? { ...entry, state: "stopped" } : entry,
+            ),
+          }));
+        } catch (error) {
+          set({
+            error: cleanErrorMessage(error, "Could not stop Boat sandbox."),
+          });
+          throw error;
+        }
+      },
+      resumeBoatSandbox: async (sandboxId) => {
+        set({ error: "" });
+        try {
+          const { sandbox } = await roderIpc.resumeBoatSandbox(sandboxId);
+          set((state) => ({
+            boatSandboxes: state.boatSandboxes.some((entry) => entry.id === sandbox.id)
+              ? state.boatSandboxes.map((entry) => (entry.id === sandbox.id ? sandbox : entry))
+              : [sandbox, ...state.boatSandboxes],
+          }));
+          return sandbox;
+        } catch (error) {
+          set({
+            error: cleanErrorMessage(error, "Could not resume Boat sandbox."),
+          });
+          throw error;
         }
       },
       refreshTailscale: async () => {
@@ -273,6 +436,22 @@ export const useCloudMachinesStore = create<CloudMachinesState>()(
           set((state) => ({
             savingCredentials: false,
             ...(providerId === "blaxel" ? { blaxelSandboxes: [], blaxelWorkspaces: [] } : {}),
+            ...(providerId === "boat"
+              ? {
+                  boatSandboxes: [],
+                  boatCredentials: {
+                    configured: false,
+                    mode: "none",
+                    source: "none",
+                    preview: null,
+                    userLogin: null,
+                    userDisplayName: null,
+                    userEmail: null,
+                    scope: null,
+                    expiresAt: null,
+                  },
+                }
+              : {}),
             ...(providerId === "tailscale"
               ? {
                   tailscaleCredentials: {

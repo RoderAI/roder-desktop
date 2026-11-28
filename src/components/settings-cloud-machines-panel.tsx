@@ -1,14 +1,19 @@
 import {
   CheckCircle2,
   Cloud,
+  ExternalLink,
   KeyRound,
+  LoaderCircle,
   Network,
   Pencil,
+  Play,
   PlugZap,
   Plus,
   RefreshCw,
   Server,
   ShieldCheck,
+  Ship,
+  Square,
   Terminal,
   Trash2,
   Unplug,
@@ -20,6 +25,8 @@ import {
   parseQuickSshInput,
   validateMachineConfig,
   WINDOWS_CLOUD_MACHINES_NOTICE,
+  type BoatSandboxSize,
+  type BoatSandboxSummary,
   type CloudMachineTestResult,
   type SshConfigHostEntry,
 } from "@/lib/cloud-machines";
@@ -39,6 +46,9 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const blaxelWorkspaces = useCloudMachinesStore((state) => state.blaxelWorkspaces) ?? [];
   const blaxelSandboxes = useCloudMachinesStore((state) => state.blaxelSandboxes) ?? [];
   const blaxelActiveWorkspace = useCloudMachinesStore((state) => state.blaxelActiveWorkspace) ?? null;
+  const boatCredentials = useCloudMachinesStore((state) => state.boatCredentials) ?? null;
+  const boatAuthState = useCloudMachinesStore((state) => state.boatAuthState) ?? null;
+  const boatSandboxes = useCloudMachinesStore((state) => state.boatSandboxes) ?? [];
   const localTailscale = useCloudMachinesStore((state) => state.localTailscale) ?? null;
   const tailscaleCredentials = useCloudMachinesStore((state) => state.tailscaleCredentials) ?? null;
   const localSsh = useCloudMachinesStore((state) => state.localSsh) ?? null;
@@ -47,6 +57,13 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const busy = useCloudMachinesStore((state) => state.busy);
   const error = useCloudMachinesStore((state) => state.error);
   const refresh = useCloudMachinesStore((state) => state.refresh);
+  const refreshBoatSandboxes = useCloudMachinesStore((state) => state.refreshBoatSandboxes);
+  const startBoatOAuth = useCloudMachinesStore((state) => state.startBoatOAuth);
+  const cancelBoatOAuth = useCloudMachinesStore((state) => state.cancelBoatOAuth);
+  const saveBoatApiKey = useCloudMachinesStore((state) => state.saveBoatApiKey);
+  const createBoatSandbox = useCloudMachinesStore((state) => state.createBoatSandbox);
+  const stopBoatSandbox = useCloudMachinesStore((state) => state.stopBoatSandbox);
+  const resumeBoatSandbox = useCloudMachinesStore((state) => state.resumeBoatSandbox);
   const refreshTailscale = useCloudMachinesStore((state) => state.refreshTailscale);
   const refreshSsh = useCloudMachinesStore((state) => state.refreshSsh);
   const refreshBlaxelSandboxes = useCloudMachinesStore((state) => state.refreshBlaxelSandboxes);
@@ -72,6 +89,18 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const [formError, setFormError] = useState("");
   const [formNotice, setFormNotice] = useState("");
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+
+  // Boat credentials & guided sandbox state
+  const [showBoatKeyForm, setShowBoatKeyForm] = useState(false);
+  const [boatApiKey, setBoatApiKey] = useState("");
+  const [boatFeedback, setBoatFeedback] = useState<{ kind: "info" | "error"; text: string } | null>(null);
+  const [boatMode, setBoatMode] = useState<"existing" | "create">("existing");
+  const [selectedBoatSandboxId, setSelectedBoatSandboxId] = useState("");
+  const [boatTailscaleEnabled, setBoatTailscaleEnabled] = useState(true);
+  const [newBoatSandboxName, setNewBoatSandboxName] = useState("");
+  const [newBoatSandboxSize, setNewBoatSandboxSize] = useState<BoatSandboxSize>("default");
+  const [newBoatSandboxEnvironment, setNewBoatSandboxEnvironment] = useState("");
+  const [boatSandboxActionId, setBoatSandboxActionId] = useState<string | null>(null);
 
   // Blaxel credentials form state
   const [showBlaxelKeyForm, setShowBlaxelKeyForm] = useState(false);
@@ -121,9 +150,18 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const [testResults, setTestResults] = useState<Record<string, CloudMachineTestResult>>({});
 
   const formId = useId();
+  const boatProviderAvailable = providers.some((provider) => provider.provider_id === "boat");
   const blaxelProviderAvailable = providers.some((provider) => provider.provider_id === "blaxel");
   const tailscaleProviderAvailable = providers.some((provider) => provider.provider_id === "tailscale");
   const sshProviderAvailable = providers.some((provider) => provider.provider_id === "ssh");
+  const boatCredential = credentialStatuses.find((entry) => entry.providerId === "boat") ?? null;
+  const boatConnected = Boolean(boatCredentials?.configured || boatCredential?.configured);
+  const boatAuthInProgress = boatAuthState?.phase === "awaiting-browser" || boatAuthState?.phase === "exchanging";
+  const boatAccountLabel = boatCredentials?.userLogin
+    ? boatCredentials.userLogin.includes("@")
+      ? boatCredentials.userLogin
+      : `@${boatCredentials.userLogin}`
+    : boatCredentials?.userDisplayName || boatCredentials?.userEmail || null;
   const blaxelCredential = credentialStatuses.find((entry) => entry.providerId === "blaxel") ?? null;
   const blaxelConnected = Boolean(blaxelCredential?.configured);
   const tailscaleConfigured = Boolean(tailscaleCredentials?.configured);
@@ -133,13 +171,19 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
   const onlineTailscalePeerCount = tailscalePeers.filter((peer) => peer.online).length;
   const defaultProvider =
     providers.find((provider) => provider.provider_id === providerId) ??
+    (boatProviderAvailable && boatConnected
+      ? providers.find((provider) => provider.provider_id === "boat")
+      : undefined) ??
     (blaxelProviderAvailable ? providers.find((provider) => provider.provider_id === "blaxel") : undefined) ??
+    (boatProviderAvailable ? providers.find((provider) => provider.provider_id === "boat") : undefined) ??
     providers.find((provider) => provider.provider_id !== "unix-local") ??
     providers[0];
   const selectedProvider = defaultProvider;
+  const isBoatSelected = selectedProvider?.provider_id === "boat";
   const isBlaxelSelected = selectedProvider?.provider_id === "blaxel";
   const isTailscaleSelected = selectedProvider?.provider_id === "tailscale";
   const isSshSelected = selectedProvider?.provider_id === "ssh";
+  const selectedBoatSandbox = boatSandboxes.find((entry) => entry.id === selectedBoatSandboxId) ?? null;
   const providerHelp = machineProviderHelp(selectedProvider?.provider_id ?? "");
   const selectedProviderCredential = selectedProvider
     ? (credentialStatuses.find((entry) => entry.providerId === selectedProvider.provider_id) ?? null)
@@ -160,6 +204,12 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     setWorkspace("");
     setReadRoots("");
     setConfigText("{}");
+    setBoatMode("existing");
+    setSelectedBoatSandboxId("");
+    setBoatTailscaleEnabled(true);
+    setNewBoatSandboxName("");
+    setNewBoatSandboxSize("default");
+    setNewBoatSandboxEnvironment("");
     setSelectedSandboxName("");
     setBlaxelTailscaleEnabled(true);
     setNewSandboxName("");
@@ -262,11 +312,33 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     setConfigText(JSON.stringify(config, null, 2));
   }
 
+  function syncBoatGuidedConfig(
+    sandboxId: string,
+    sandboxName: string,
+    nextWorkspace: string,
+    nextTailscale = boatTailscaleEnabled,
+  ): void {
+    const cleanId = sandboxId.trim();
+    const cleanName = sandboxName.trim();
+    const cleanWorkspace = nextWorkspace.trim() || "/home/user";
+    const config: Record<string, unknown> = {
+      ...(cleanId ? { sandbox_id: cleanId } : {}),
+      ...(cleanName ? { sandbox_name: cleanName } : {}),
+      working_dir: cleanWorkspace,
+      ...(tailscaleConfigured ? { tailscale_tunnel: nextTailscale } : {}),
+    };
+    setConfigText(JSON.stringify(config, null, 2));
+  }
+
   function applyProviderSelection(nextProviderId: string): void {
     setProviderId(nextProviderId);
     setFormError("");
     setFormNotice("");
-    if (nextProviderId === "blaxel") {
+    if (nextProviderId === "boat") {
+      const nextWorkspace = !workspace.trim() || workspace.trim() === "/workspace" ? "/home/user" : workspace.trim();
+      setWorkspace(nextWorkspace);
+      syncBoatGuidedConfig(selectedBoatSandboxId, selectedBoatSandbox?.name ?? "", nextWorkspace, boatTailscaleEnabled);
+    } else if (nextProviderId === "blaxel") {
       if (!workspace.trim()) setWorkspace("/workspace");
       setConfigText(
         JSON.stringify(
@@ -315,6 +387,101 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       config.workspace = effectiveBlaxelWorkspace;
     }
     setConfigText(JSON.stringify(config, null, 2));
+  }
+
+  async function handleStartBoatOAuth(): Promise<void> {
+    if (!startBoatOAuth) return;
+    setBoatFeedback(null);
+    try {
+      await startBoatOAuth();
+    } catch (cause) {
+      setBoatFeedback({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : "Could not start Boat sign-in.",
+      });
+    }
+  }
+
+  async function handleCancelBoatOAuth(): Promise<void> {
+    if (!cancelBoatOAuth) return;
+    setBoatFeedback(null);
+    try {
+      await cancelBoatOAuth();
+    } catch (cause) {
+      setBoatFeedback({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : "Could not cancel Boat sign-in.",
+      });
+    }
+  }
+
+  async function handleSaveBoatApiKey(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!saveBoatApiKey) return;
+    setBoatFeedback(null);
+    try {
+      await saveBoatApiKey(boatApiKey.trim());
+      setBoatApiKey("");
+      setShowBoatKeyForm(false);
+      setBoatFeedback({
+        kind: "info",
+        text: "Verified and saved encrypted Boat API key.",
+      });
+    } catch (cause) {
+      setBoatFeedback({
+        kind: "error",
+        text: cause instanceof Error ? cause.message : "Could not save Boat API key.",
+      });
+    }
+  }
+
+  async function handleCreateBoatSandbox(): Promise<BoatSandboxSummary | null> {
+    if (!createBoatSandbox) return null;
+    setCreatingSandbox(true);
+    setFormError("");
+    try {
+      const targetWorkspace = workspace.trim() || "/home/user";
+      const created = await createBoatSandbox({
+        name: newBoatSandboxName.trim() || undefined,
+        type: newBoatSandboxSize,
+        environment: newBoatSandboxEnvironment.trim() || undefined,
+        workingDir: targetWorkspace,
+      });
+      setSelectedBoatSandboxId(created.id);
+      setBoatMode("existing");
+      setNewBoatSandboxName("");
+      setNewBoatSandboxEnvironment("");
+      if (!name.trim()) setName(created.name || created.id);
+      if (!workspace.trim()) setWorkspace(targetWorkspace);
+      syncBoatGuidedConfig(created.id, created.name ?? "", targetWorkspace);
+      setFormNotice(`Boat sandbox "${created.name || created.id}" is ready.`);
+      return created;
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : "Could not create Boat sandbox.");
+      return null;
+    } finally {
+      setCreatingSandbox(false);
+    }
+  }
+
+  async function handleBoatSandboxLifecycle(sandboxId: string, action: "stop" | "resume"): Promise<void> {
+    setBoatSandboxActionId(sandboxId);
+    setFormError("");
+    try {
+      if (action === "stop") {
+        if (!stopBoatSandbox) return;
+        await stopBoatSandbox(sandboxId);
+        setFormNotice(`Stopped Boat sandbox "${sandboxId}".`);
+      } else {
+        if (!resumeBoatSandbox) return;
+        const resumed = await resumeBoatSandbox(sandboxId);
+        setFormNotice(`Resumed Boat sandbox "${resumed.name || resumed.id}".`);
+      }
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : `Could not ${action} Boat sandbox.`);
+    } finally {
+      setBoatSandboxActionId(null);
+    }
   }
 
   async function handleImportBlaxelCli(): Promise<void> {
@@ -521,7 +688,54 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     let resolvedName = name.trim();
     let config: Record<string, unknown>;
 
-    if (isBlaxelSelected) {
+    if (isBoatSelected) {
+      if (!resolvedWorkspace) resolvedWorkspace = "/home/user";
+      let sandboxId = selectedBoatSandboxId.trim();
+      let sandboxName = selectedBoatSandbox?.name?.trim() || "";
+      if (boatMode === "create") {
+        const created = await handleCreateBoatSandbox();
+        if (!created) return;
+        sandboxId = created.id;
+        sandboxName = created.name ?? "";
+        if (!resolvedName) resolvedName = sandboxName || sandboxId;
+      }
+      if (!sandboxId) {
+        try {
+          const parsed: unknown = JSON.parse(configText);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            const candidate = (parsed as Record<string, unknown>).sandbox_id;
+            if (typeof candidate === "string" && candidate.trim()) {
+              sandboxId = candidate.trim();
+            }
+          }
+        } catch {
+          // handled below
+        }
+      }
+      if (!sandboxId) {
+        setFormError("Choose an existing Boat sandbox, enter a Boat sandbox ID (bx_...), or create a new one.");
+        return;
+      }
+      if (!resolvedName) resolvedName = sandboxName || sandboxId;
+
+      try {
+        const parsed: unknown = configText.trim() ? JSON.parse(configText) : {};
+        const baseConfig =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+        config = validateMachineConfig({
+          ...baseConfig,
+          sandbox_id: sandboxId,
+          ...(sandboxName ? { sandbox_name: sandboxName } : {}),
+          working_dir: resolvedWorkspace,
+          ...(tailscaleConfigured ? { tailscale_tunnel: boatTailscaleEnabled } : {}),
+        });
+      } catch {
+        setFormError(
+          "Enter a valid JSON object without credentials. Sign in with Boat in Connections instead of placing tokens in config.",
+        );
+        return;
+      }
+    } else if (isBlaxelSelected) {
       if (!resolvedWorkspace) resolvedWorkspace = "/workspace";
       let sandboxName = selectedSandboxName.trim();
       if (blaxelMode === "create") {
@@ -692,7 +906,12 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       setWorkspace(machine.workspace);
       setReadRoots((machine.readRoots ?? []).join("\n"));
       setConfigText(JSON.stringify(machine.config, null, 2));
-      if (machine.providerId === "blaxel") {
+      if (machine.providerId === "boat") {
+        const sbxId = typeof machine.config.sandbox_id === "string" ? machine.config.sandbox_id : "";
+        setSelectedBoatSandboxId(sbxId);
+        setBoatTailscaleEnabled(machine.config.tailscale_tunnel !== false);
+        setBoatMode("existing");
+      } else if (machine.providerId === "blaxel") {
         const sbx = typeof machine.config.sandbox_name === "string" ? machine.config.sandbox_name : "";
         setSelectedSandboxName(sbx);
         setBlaxelTailscaleEnabled(machine.config.tailscale_tunnel !== false);
@@ -746,16 +965,18 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
     }
   }
 
-  const canSubmit = isBlaxelSelected
-    ? Boolean(
-        selectedProvider &&
-        (blaxelMode === "create" ? newSandboxName.trim() : selectedSandboxName.trim() || name.trim()),
-      )
-    : isSshSelected
-      ? Boolean(selectedProvider && sshHost.trim() && workspace.trim())
-      : isTailscaleSelected
-        ? Boolean(selectedProvider && (tailscalePeerHost.trim() || tailscalePeerIp.trim()) && workspace.trim())
-        : Boolean(name.trim() && workspace.trim() && selectedProvider);
+  const canSubmit = isBoatSelected
+    ? Boolean(selectedProvider && (boatMode === "create" ? boatConnected : selectedBoatSandboxId.trim()))
+    : isBlaxelSelected
+      ? Boolean(
+          selectedProvider &&
+          (blaxelMode === "create" ? newSandboxName.trim() : selectedSandboxName.trim() || name.trim()),
+        )
+      : isSshSelected
+        ? Boolean(selectedProvider && sshHost.trim() && workspace.trim())
+        : isTailscaleSelected
+          ? Boolean(selectedProvider && (tailscalePeerHost.trim() || tailscalePeerIp.trim()) && workspace.trim())
+          : Boolean(name.trim() && workspace.trim() && selectedProvider);
 
   return (
     <section className="rounded-xl bg-card shadow-sm ring-1 ring-border/70">
@@ -801,6 +1022,195 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
       {formNotice && (
         <div role="status" className="border-b border-border bg-muted/30 px-5 py-2.5 text-sm text-foreground">
           {formNotice}
+        </div>
+      )}
+
+      {cloudSupported && (boatProviderAvailable || boatConnected || boatAuthInProgress) && (
+        <div hidden={view !== "connections"} className="space-y-3 border-b border-border px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-medium">
+                <Ship className="size-4 text-muted-foreground" />
+                Boat
+              </h2>
+              <p className="mt-1 text-sm font-normal text-muted-foreground">
+                Sign in with Boat to create and manage isolated cloud sandboxes with native agent execution, files, git
+                review, SSH terminal, port hosting, and desktop streaming.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {boatConnected ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="size-3.5" />
+                    Connected{boatAccountLabel ? ` · ${boatAccountLabel}` : ""}
+                  </span>
+                  {boatCredentials?.mode !== "oauth" && typeof startBoatOAuth === "function" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={savingCredentials || boatAuthInProgress}
+                      onClick={() => void handleStartBoatOAuth()}
+                    >
+                      <Ship className="size-3.5" />
+                      Sign in with Boat
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={savingCredentials}
+                    onClick={() => setShowBoatKeyForm((open) => !open)}
+                  >
+                    {boatCredentials?.mode === "api-key" ? "Update key" : "Use API key"}
+                  </Button>
+                  {boatCredentials?.source !== "env" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={savingCredentials}
+                      onClick={() => void handleClearCredentials("boat")}
+                    >
+                      <Unplug className="size-3.5" />
+                      Sign out
+                    </Button>
+                  )}
+                </>
+              ) : boatAuthInProgress ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => void handleCancelBoatOAuth()}>
+                  Cancel sign-in
+                </Button>
+              ) : (
+                <>
+                  {typeof startBoatOAuth === "function" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={savingCredentials}
+                      onClick={() => void handleStartBoatOAuth()}
+                    >
+                      <Ship className="size-3.5" />
+                      Sign in with Boat
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={savingCredentials}
+                    onClick={() => setShowBoatKeyForm((open) => !open)}
+                  >
+                    <KeyRound className="size-3.5" />
+                    {showBoatKeyForm ? "Hide key form" : "Use API key"}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {boatAuthInProgress && boatAuthState && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/30 px-3.5 py-2.5 text-sm">
+              <div className="flex items-center gap-2 text-foreground">
+                <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                <span>{boatAuthState.message || "Waiting for Boat sign-in in your browser…"}</span>
+              </div>
+              {boatAuthState.authUrl && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void window.roderDesktop.openExternal(boatAuthState.authUrl!)}
+                >
+                  <ExternalLink className="size-3.5" />
+                  Open Boat sign-in
+                </Button>
+              )}
+            </div>
+          )}
+
+          {boatAuthState?.phase === "error" && boatAuthState.error && (
+            <p role="alert" className="text-sm font-normal text-destructive">
+              {boatAuthState.error}
+            </p>
+          )}
+
+          {boatConnected && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-normal text-muted-foreground">
+              <p>
+                Auth:{" "}
+                {boatCredentials?.mode === "oauth"
+                  ? "Sign in with Boat (OAuth · encrypted)"
+                  : boatCredentials?.source === "env"
+                    ? "BOAT_API_KEY environment"
+                    : "Saved Boat API key"}
+                {boatCredentials?.preview ? (
+                  <>
+                    {" · "}
+                    <span className="font-mono">{boatCredentials.preview}</span>
+                  </>
+                ) : null}
+                {boatSandboxes.length > 0
+                  ? ` · ${boatSandboxes.length} ${boatSandboxes.length === 1 ? "sandbox" : "sandboxes"} available`
+                  : ""}
+              </p>
+              {boatProviderAvailable && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    applyProviderSelection("boat");
+                    openMachineForm("name");
+                  }}
+                >
+                  <Plus className="size-3.5" />
+                  Add Boat sandbox
+                </Button>
+              )}
+            </div>
+          )}
+
+          {boatFeedback && (
+            <p
+              role={boatFeedback.kind === "error" ? "alert" : "status"}
+              className={cn(
+                "text-sm font-normal",
+                boatFeedback.kind === "error" ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {boatFeedback.text}
+            </p>
+          )}
+
+          {showBoatKeyForm && (
+            <form
+              onSubmit={(event) => void handleSaveBoatApiKey(event)}
+              className="grid gap-3 rounded-lg bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+            >
+              <label htmlFor={`${formId}-boat-key`} className="space-y-1 text-sm">
+                <span className="text-muted-foreground">Boat API key</span>
+                <input
+                  id={`${formId}-boat-key`}
+                  type="password"
+                  className={cn(fieldClass, "font-mono")}
+                  value={boatApiKey}
+                  onChange={(event) => setBoatApiKey(event.currentTarget.value)}
+                  placeholder="boat_..."
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              <div className="flex items-end">
+                <Button type="submit" size="sm" disabled={savingCredentials || !boatApiKey.trim()}>
+                  {savingCredentials ? "Verifying…" : "Connect"}
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 
@@ -1390,6 +1800,8 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                       <Network className="size-4 shrink-0 text-muted-foreground" />
                     ) : machine.providerId === "ssh" ? (
                       <Server className="size-4 shrink-0 text-muted-foreground" />
+                    ) : machine.providerId === "boat" ? (
+                      <Ship className="size-4 shrink-0 text-muted-foreground" />
                     ) : (
                       <Cloud className="size-4 shrink-0 text-muted-foreground" />
                     )}
@@ -1421,7 +1833,8 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1">
-                        {(machine.providerId === "blaxel" ||
+                        {(machine.providerId === "boat" ||
+                          machine.providerId === "blaxel" ||
                           machine.providerId === "tailscale" ||
                           machine.providerId === "ssh") &&
                           cloudSupported && (
@@ -1517,15 +1930,17 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
                 value={name}
                 onChange={(event) => setName(event.currentTarget.value)}
                 placeholder={
-                  isBlaxelSelected
-                    ? "roder-remote-dev"
-                    : isSshSelected
-                      ? "hetzner-prod"
-                      : isTailscaleSelected
-                        ? "devbox"
-                        : "Development sandbox"
+                  isBoatSelected
+                    ? "my-boat-dev"
+                    : isBlaxelSelected
+                      ? "roder-remote-dev"
+                      : isSshSelected
+                        ? "hetzner-prod"
+                        : isTailscaleSelected
+                          ? "devbox"
+                          : "Development sandbox"
                 }
-                required={!isBlaxelSelected && !isTailscaleSelected && !isSshSelected}
+                required={!isBoatSelected && !isBlaxelSelected && !isTailscaleSelected && !isSshSelected}
               />
             </label>
             <label htmlFor={`${formId}-provider`} className="space-y-1.5 text-base">
@@ -1545,7 +1960,222 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
             </label>
           </div>
 
-          {isBlaxelSelected ? (
+          {isBoatSelected ? (
+            <div className="space-y-3 rounded-xl bg-muted/30 p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex rounded-lg bg-background p-0.5 ring-1 ring-border/70">
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
+                      boatMode === "existing"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setBoatMode("existing")}
+                  >
+                    Existing sandbox
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
+                      boatMode === "create"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setBoatMode("create")}
+                  >
+                    Create new sandbox
+                  </button>
+                </div>
+                {boatConnected && typeof refreshBoatSandboxes === "function" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={loadingSandboxes}
+                    onClick={() => void refreshBoatSandboxes()}
+                  >
+                    <RefreshCw className={cn("size-3.5", loadingSandboxes && "animate-spin")} />
+                    {loadingSandboxes ? "Loading…" : "Reload sandboxes"}
+                  </Button>
+                )}
+              </div>
+
+              {!boatConnected && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-background px-3 py-2.5 ring-1 ring-border/70">
+                  <p className="text-sm font-normal text-muted-foreground">
+                    Sign in with Boat to browse and provision sandboxes directly.
+                  </p>
+                  {typeof startBoatOAuth === "function" && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={savingCredentials || boatAuthInProgress}
+                      onClick={() => {
+                        setView("connections");
+                        void handleStartBoatOAuth();
+                      }}
+                    >
+                      <Ship className="size-3.5" />
+                      {boatAuthInProgress ? "Signing in…" : "Sign in with Boat"}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {boatMode === "existing" ? (
+                <div className="space-y-2.5">
+                  {boatSandboxes.length > 0 ? (
+                    <div className="space-y-2">
+                      <label htmlFor={`${formId}-boat-sandbox-select`} className="block space-y-1.5 text-base">
+                        <span>Boat sandbox</span>
+                        <select
+                          id={`${formId}-boat-sandbox-select`}
+                          className={cn(fieldClass, "font-mono")}
+                          value={selectedBoatSandboxId}
+                          onChange={(event) => {
+                            const nextId = event.currentTarget.value;
+                            const picked = boatSandboxes.find((entry) => entry.id === nextId);
+                            setSelectedBoatSandboxId(nextId);
+                            if (!name.trim() && (picked?.name || nextId)) setName(picked?.name || nextId);
+                            const nextWorkspace = workspace.trim() || "/home/user";
+                            if (!workspace.trim()) setWorkspace(nextWorkspace);
+                            syncBoatGuidedConfig(nextId, picked?.name ?? "", nextWorkspace);
+                          }}
+                        >
+                          <option value="">Choose a Boat sandbox…</option>
+                          {boatSandboxes.map((sandbox) => (
+                            <option key={sandbox.id} value={sandbox.id}>
+                              {sandbox.name ? `${sandbox.name} (${sandbox.id})` : sandbox.id}
+                              {sandbox.state ? ` · ${sandbox.state.toLowerCase()}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {selectedBoatSandbox && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                          <span>
+                            State: <span className="font-mono text-foreground">{selectedBoatSandbox.state}</span>
+                            {selectedBoatSandbox.desktopAvailable ? " · Desktop available" : ""}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {selectedBoatSandbox.state.toLowerCase() === "stopped" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={boatSandboxActionId === selectedBoatSandbox.id}
+                                onClick={() => void handleBoatSandboxLifecycle(selectedBoatSandbox.id, "resume")}
+                              >
+                                <Play className="size-3.5" />
+                                {boatSandboxActionId === selectedBoatSandbox.id ? "Resuming…" : "Resume"}
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={boatSandboxActionId === selectedBoatSandbox.id}
+                                onClick={() => void handleBoatSandboxLifecycle(selectedBoatSandbox.id, "stop")}
+                              >
+                                <Square className="size-3.5" />
+                                {boatSandboxActionId === selectedBoatSandbox.id ? "Stopping…" : "Stop"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <label htmlFor={`${formId}-boat-sandbox-manual`} className="block space-y-1.5 text-base">
+                      <span>Boat sandbox ID</span>
+                      <input
+                        id={`${formId}-boat-sandbox-manual`}
+                        className={cn(fieldClass, "font-mono")}
+                        value={selectedBoatSandboxId}
+                        onChange={(event) => {
+                          const nextId = event.currentTarget.value;
+                          setSelectedBoatSandboxId(nextId);
+                          const nextWorkspace = workspace.trim() || "/home/user";
+                          syncBoatGuidedConfig(nextId, "", nextWorkspace);
+                        }}
+                        placeholder="bx_abc123def456"
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label htmlFor={`${formId}-new-boat-name`} className="space-y-1.5 text-base">
+                    <span>Sandbox name (optional)</span>
+                    <input
+                      id={`${formId}-new-boat-name`}
+                      className={cn(fieldClass, "font-mono")}
+                      value={newBoatSandboxName}
+                      onChange={(event) => {
+                        const next = event.currentTarget.value;
+                        setNewBoatSandboxName(next);
+                        if (!name.trim() || name === newBoatSandboxName) {
+                          setName(next);
+                        }
+                        if (!workspace.trim()) setWorkspace("/home/user");
+                      }}
+                      placeholder="roder-boat-dev"
+                    />
+                  </label>
+                  <label htmlFor={`${formId}-new-boat-size`} className="space-y-1.5 text-base">
+                    <span>Size</span>
+                    <select
+                      id={`${formId}-new-boat-size`}
+                      className={fieldClass}
+                      value={newBoatSandboxSize}
+                      onChange={(event) => setNewBoatSandboxSize(event.currentTarget.value as BoatSandboxSize)}
+                    >
+                      <option value="small">small</option>
+                      <option value="default">default (4 vCPU · 8 GB)</option>
+                      <option value="large">large</option>
+                      <option value="xlarge">xlarge</option>
+                    </select>
+                  </label>
+                  <label htmlFor={`${formId}-new-boat-env`} className="space-y-1.5 text-base">
+                    <span>Environment (optional)</span>
+                    <input
+                      id={`${formId}-new-boat-env`}
+                      className={cn(fieldClass, "font-mono")}
+                      value={newBoatSandboxEnvironment}
+                      onChange={(event) => setNewBoatSandboxEnvironment(event.currentTarget.value)}
+                      placeholder="base"
+                    />
+                  </label>
+                </div>
+              )}
+
+              {tailscaleConfigured && (
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={boatTailscaleEnabled}
+                    onChange={(event) => {
+                      const nextEnabled = event.currentTarget.checked;
+                      setBoatTailscaleEnabled(nextEnabled);
+                      if (selectedBoatSandboxId) {
+                        syncBoatGuidedConfig(
+                          selectedBoatSandboxId,
+                          selectedBoatSandbox?.name ?? "",
+                          workspace,
+                          nextEnabled,
+                        );
+                      }
+                    }}
+                    className="size-4 rounded border-input accent-primary"
+                  />
+                  <span>Inject ephemeral Tailscale WireGuard tunnel into this Boat sandbox</span>
+                </label>
+              )}
+            </div>
+          ) : isBlaxelSelected ? (
             <div className="space-y-3 rounded-xl bg-muted/30 p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex rounded-lg bg-background p-0.5 ring-1 ring-border/70">
@@ -2124,19 +2754,21 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
               onChange={(event) => {
                 const next = event.currentTarget.value;
                 setWorkspace(next);
-                if (isBlaxelSelected && selectedSandboxName) {
+                if (isBoatSelected && selectedBoatSandboxId) {
+                  syncBoatGuidedConfig(selectedBoatSandboxId, selectedBoatSandbox?.name ?? "", next);
+                } else if (isBlaxelSelected && selectedSandboxName) {
                   syncBlaxelGuidedConfig(selectedSandboxName, next);
                 }
               }}
-              placeholder={isBlaxelSelected ? "/workspace" : "/workspace/project"}
-              required={!isBlaxelSelected}
+              placeholder={isBoatSelected ? "/home/user" : isBlaxelSelected ? "/workspace" : "/workspace/project"}
+              required={!isBoatSelected && !isBlaxelSelected}
             />
             <span className="block text-sm text-muted-foreground">
               An existing directory on the remote machine, not a folder on this computer.
             </span>
           </label>
 
-          {isBlaxelSelected || isTailscaleSelected || isSshSelected ? (
+          {isBoatSelected || isBlaxelSelected || isTailscaleSelected || isSshSelected ? (
             <details className="rounded-lg border border-border p-3">
               <summary className="cursor-pointer text-base">Advanced provider configuration (JSON)</summary>
               <div className="mt-3 space-y-2">
@@ -2192,7 +2824,7 @@ export function SettingsCloudMachinesPanel(): React.JSX.Element {
             </label>
           </details>
           <Button type="submit" size="sm" disabled={!canSubmit || creatingSandbox}>
-            {blaxelMode === "create" && isBlaxelSelected ? (
+            {(boatMode === "create" && isBoatSelected) || (blaxelMode === "create" && isBlaxelSelected) ? (
               <>
                 <Plus className="size-3.5" />
                 {creatingSandbox ? "Provisioning sandbox…" : "Create sandbox & save machine"}

@@ -182,8 +182,9 @@ export function Composer({
   const activeBackend = useRoderStore((state) => state.activeBackend) ?? "roder";
   const selectedPolicyMode = persistentAgentThread ? "bypass" : requestedPolicyMode;
   const [prompt, setPrompt] = useState("");
-  // Guard only, never rendered: a ref avoids a synchronous setState inside the drain effect.
+  // Guard only, never rendered: refs avoid synchronous setState inside the drain effect.
   const drainingQueuedPromptIdRef = useRef<string | null>(null);
+  const steeringQueuedPromptIdRef = useRef<string | null>(null);
   const [blockedQueuedPromptId, setBlockedQueuedPromptId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [sketchOpen, setSketchOpen] = useState(false);
@@ -288,6 +289,7 @@ export function Composer({
       attachmentPreparation.pending > 0 ||
       preparingAttachments > 0 ||
       drainingQueuedPromptIdRef.current ||
+      steeringQueuedPromptIdRef.current ||
       queuedPrompts.length === 0
     ) {
       return;
@@ -335,13 +337,18 @@ export function Composer({
   }
 
   async function steerQueuedPrompt(item: QueuedPrompt): Promise<void> {
-    if (attachmentPreparation.pending > 0) return;
+    if (attachmentPreparation.pending > 0 || steeringQueuedPromptIdRef.current) return;
+    steeringQueuedPromptIdRef.current = item.id;
     try {
       await onSteer(item.prompt, item.attachments);
       setBlockedQueuedPromptId((blockedId) => (blockedId === item.id ? null : blockedId));
       onRemoveQueuedPrompt(activeQueueKey, item.id);
     } catch {
       // The store surfaces the error; retain the message when steering fails.
+    } finally {
+      if (steeringQueuedPromptIdRef.current === item.id) {
+        steeringQueuedPromptIdRef.current = null;
+      }
     }
   }
 

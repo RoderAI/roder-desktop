@@ -1,5 +1,5 @@
 import type { ConversationMessage } from "@/types/roder";
-import { canonicalToolName, usesSummaryAsToolTitle } from "@/lib/tool-display";
+import { canonicalToolName, isIdentifierToolName, usesSummaryAsToolTitle } from "@/lib/tool-display";
 
 export function groupStatus(messages: ConversationMessage[]): "running" | "complete" | "failed" {
   if (messages.some((message) => message.toolStatus === "failed" || message.status === "failed")) {
@@ -19,6 +19,9 @@ export function humanizeToolName(toolName: string | undefined): string {
   const canonicalName = canonicalToolName(toolName);
   if (!canonicalName) {
     return "tool";
+  }
+  if (!isIdentifierToolName(toolName)) {
+    return canonicalName.replace(/\s+/g, " ").trim();
   }
   return canonicalName.replace(/[_-]+/g, " ");
 }

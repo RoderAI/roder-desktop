@@ -20,6 +20,13 @@ import {
   type ThreadRunner,
 } from "../../src/lib/cloud-machines";
 import type { BlaxelClient } from "./blaxel-client";
+import {
+  boatSandboxIdFromConfig,
+  boatSandboxNameFromConfig,
+  isBoatSandboxReadyState,
+  parseBoatMachineConfig,
+  type BoatClient,
+} from "./boat-client";
 import type { BlaxelAuth, CloudCredentialsService, ResolvedTailscaleAuth } from "./credentials";
 import {
   RemoteRoderTunnelManager,
@@ -82,6 +89,7 @@ type CachedPathIndex = {
 
 export type RemoteWorkspaceServiceOptions = {
   blaxelClient: BlaxelClient;
+  boatClient?: BoatClient;
   credentialsService: CloudCredentialsService;
   machinesService: CloudMachinesService;
   readThreadRunner: (threadId: string) => Promise<ThreadRunner | null>;
@@ -156,6 +164,10 @@ export function remoteRunnerTargetLabel(runner: Pick<ThreadRunner, "providerId" 
       return label.trim().replace(/\.+$/u, "");
     }
   }
+  if (providerId === "boat") {
+    const label = boatSandboxNameFromConfig(runner.config) || boatSandboxIdFromConfig(runner.config);
+    if (label) return label;
+  }
   if (providerId === "blaxel") {
     const sandboxName = blaxelSandboxNameFromConfig(runner.config);
     if (sandboxName) return sandboxName;
@@ -185,6 +197,7 @@ export class RemoteWorkspaceService extends EventEmitter {
       options.tunnelManager ??
       new RemoteRoderTunnelManager({
         blaxelClient: options.blaxelClient,
+        boatClient: options.boatClient,
         sshClient: this.sshClient,
       });
     this.tunnelManager.on(
@@ -290,6 +303,42 @@ export class RemoteWorkspaceService extends EventEmitter {
               peer: parseTailscalePeerConfig(target.config),
               workingDir: target.workspace,
             });
+      const tunnel = await openTunnel();
+      const forwardedParams = rewriteParamsToRemote(params, tunnel);
+      try {
+        const result = await tunnel.connection.request(method, forwardedParams);
+        return rewriteResultToDesktop(method, result, {
+          desktopWorkspaceId,
+          desktopRootId: target.rootId,
+          desktopRootName: target.rootName,
+        });
+      } catch (error) {
+        if (!tunnel.connection.isOpen()) {
+          const reconnected = await openTunnel();
+          const retryResult = await reconnected.connection.request(method, rewriteParamsToRemote(params, reconnected));
+          return rewriteResultToDesktop(method, retryResult, {
+            desktopWorkspaceId,
+            desktopRootId: target.rootId,
+            desktopRootName: target.rootName,
+          });
+        }
+        throw error;
+      }
+    }
+
+    if (provider === "boat") {
+      const boatTarget = parseBoatMachineConfig(target.config);
+      const tsOption = await this.resolveSandboxTailscaleAuth(target.config);
+      const openTunnel = () =>
+        this.tunnelManager.ensureBoatTunnel({
+          desktopWorkspaceId,
+          desktopRootName: target.rootName,
+          sandboxId: boatTarget.sandboxId,
+          sandboxName: boatTarget.sandboxName || target.targetName || boatTarget.sandboxId,
+          workingDir: target.workspace,
+          tailscaleAuth: tsOption?.auth ?? null,
+          preferTailscale: tsOption?.preferTailscale ?? false,
+        });
       const tunnel = await openTunnel();
       const forwardedParams = rewriteParamsToRemote(params, tunnel);
       try {
@@ -681,6 +730,38 @@ export class RemoteWorkspaceService extends EventEmitter {
       return { status, entries: [...directories, ...files] };
     }
 
+    if (effectiveRunnerProviderId(target) === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      await boatClient.ensureRunning(boatTarget.sandboxId);
+      const entries = await boatClient.listDirectory(boatTarget.sandboxId, absDir);
+      const directories: WorkspaceFileEntry[] = entries
+        .filter((entry) => entry.isDir && entry.name && entry.name !== ".git")
+        .map((entry) => ({
+          rootId: target.rootId,
+          rootName: target.rootName,
+          path: relativeDir ? `${relativeDir}/${entry.name}` : entry.name,
+          name: entry.name,
+          kind: "directory" as const,
+          hasChildren: true,
+        }))
+        .toSorted((left, right) => left.name.localeCompare(right.name));
+      const files: WorkspaceFileEntry[] = entries
+        .filter((entry) => !entry.isDir && Boolean(entry.name))
+        .map((entry) => ({
+          rootId: target.rootId,
+          rootName: target.rootName,
+          path: relativeDir ? `${relativeDir}/${entry.name}` : entry.name,
+          name: entry.name,
+          kind: "file" as const,
+          hasChildren: false,
+          size: entry.size,
+          modifiedMs: entry.modifiedAt ? Date.parse(entry.modifiedAt) || null : null,
+        }))
+        .toSorted((left, right) => left.name.localeCompare(right.name));
+      return { status, entries: [...directories, ...files] };
+    }
+
     const endpoint = await this.resolveBlaxelEndpoint(target);
     const listing = await this.options.blaxelClient.readDirectory(endpoint.auth, endpoint.sandboxUrl, absDir);
 
@@ -749,6 +830,11 @@ export class RemoteWorkspaceService extends EventEmitter {
     let bytes: Buffer;
     if (this.isSshBacked(target)) {
       bytes = await this.sshClient.readFile(this.parseSshBackedTarget(target), absPath);
+    } else if (effectiveRunnerProviderId(target) === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      await boatClient.ensureRunning(boatTarget.sandboxId);
+      bytes = await boatClient.readFile(boatTarget.sandboxId, absPath);
     } else {
       const endpoint = await this.resolveBlaxelEndpoint(target);
       bytes = (await this.options.blaxelClient.readFile(endpoint.auth, endpoint.sandboxUrl, absPath)).bytes;
@@ -820,6 +906,15 @@ export class RemoteWorkspaceService extends EventEmitter {
       const peer = this.parseSshBackedTarget(target);
       const proc = await this.sshClient.execCommand(peer, `sh -c ${shellQuotePosix(script)}`, { timeoutMs: 20_000 });
       output = proc.stdout;
+    } else if (effectiveRunnerProviderId(target) === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      await boatClient.ensureRunning(boatTarget.sandboxId);
+      const proc = await boatClient.execCommand(boatTarget.sandboxId, {
+        command: `sh -c ${shellQuotePosix(script)}`,
+        timeoutSeconds: 20,
+      });
+      output = proc.stdout;
     } else {
       const endpoint = await this.resolveBlaxelEndpoint(target);
       const proc = await this.options.blaxelClient.runProcess(endpoint.auth, endpoint.sandboxUrl, {
@@ -877,6 +972,15 @@ export class RemoteWorkspaceService extends EventEmitter {
         `sh -c ${shellQuotePosix(`cd -- ${shellQuotePosix(target.workspace)} && ${command}`)}`,
         { timeoutMs: 20_000 },
       );
+      rawPatch = proc.stdout;
+    } else if (effectiveRunnerProviderId(target) === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      await boatClient.ensureRunning(boatTarget.sandboxId);
+      const proc = await boatClient.execCommand(boatTarget.sandboxId, {
+        command: `sh -c ${shellQuotePosix(`cd -- ${shellQuotePosix(target.workspace)} && ${command}`)}`,
+        timeoutSeconds: 20,
+      });
       rawPatch = proc.stdout;
     } else {
       const endpoint = await this.resolveBlaxelEndpoint(target);
@@ -942,6 +1046,32 @@ export class RemoteWorkspaceService extends EventEmitter {
         message: directoryExists
           ? `Connected to ${label} (${osLine}) over ${transportLabel} · ${input.workspace} ready${hasRoder ? " · remote-roder available" : " · SSH bridge ready"}${tsNote}.`
           : `Connected to ${label} (${osLine}) over ${transportLabel}, but ${input.workspace} does not exist yet${tsNote}.`,
+      };
+    }
+
+    if (effectiveProvider === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(input.config);
+      const sandbox = await boatClient.ensureRunning(boatTarget.sandboxId);
+      const probe = await boatClient.execCommand(sandbox.id, {
+        command: `sh -c ${shellQuotePosix(`if [ -d ${shellQuotePosix(input.workspace)} ]; then echo DIR:YES; else echo DIR:NO; fi`)}`,
+        timeoutSeconds: 20,
+      });
+      const directoryExists = probe.stdout.includes("DIR:YES");
+      const tsStatus = await this.options.credentialsService.getTailscaleStatus();
+      const tsNote =
+        tsStatus.configured && tsStatus.preferForSandboxes && input.config.tailscale_tunnel !== false
+          ? " · Tailscale tunnel ready"
+          : "";
+      const desktopNote = sandbox.desktopAvailable ? " · desktop stream available" : "";
+      return {
+        ok: true,
+        status: sandbox.state.toUpperCase(),
+        sandboxUrl: sandbox.url ?? undefined,
+        directoryExists,
+        message: directoryExists
+          ? `Connected to ${sandbox.name} (${sandbox.id}) on Boat · ${input.workspace} ready${desktopNote}${tsNote}.`
+          : `Connected to ${sandbox.name} (${sandbox.id}) on Boat, but ${input.workspace} does not exist yet${tsNote}.`,
       };
     }
 
@@ -1063,6 +1193,59 @@ export class RemoteWorkspaceService extends EventEmitter {
       }
     }
 
+    if (provider === "boat") {
+      try {
+        const boatClient = this.requireBoatClient();
+        const boatTarget = parseBoatMachineConfig(target.config);
+        const sandbox = await boatClient.getSandbox(boatTarget.sandboxId, { bypassCache: true });
+        const key = tunnelKey("boat", "", boatTarget.sandboxId, target.workspace);
+        const activeTunnel = this.tunnelManager.getActiveTunnel(key);
+        const unsupportedReason = this.tunnelManager.isUnsupported(key);
+        const tailscaleError = this.tunnelManager.getTailscaleError(key);
+        const tailscaleCreds = await this.options.credentialsService.getTailscaleStatus();
+        const tailscaleActive = activeTunnel?.transport === "tailscale";
+        const ready = isBoatSandboxReadyState(sandbox.state);
+        return {
+          workspaceId,
+          providerId: "boat",
+          targetName: sandbox.name || boatTarget.sandboxName || boatTarget.sandboxId,
+          workspace: target.workspace,
+          status: sandbox.state.toUpperCase(),
+          url: sandbox.url,
+          desktopUrl: sandbox.desktopAvailable ? sandbox.desktopUrl : null,
+          reachable: ready,
+          bridgeMode: activeTunnel
+            ? tailscaleActive
+              ? "tailscale-tunnel"
+              : "remote-roder-tunnel"
+            : unsupportedReason
+              ? "boat-api"
+              : "pending",
+          bridgeDetail: activeTunnel
+            ? tailscaleActive
+              ? `Tailscale WireGuard tunnel (${activeTunnel.tailscaleDnsName || activeTunnel.tailscaleIp || activeTunnel.remoteWorkspaceId})`
+              : `remote-roder over Boat WSS (${activeTunnel.remoteWorkspaceId})`
+            : (unsupportedReason ??
+              (ready ? "Tunnel connects automatically when workspace tools open" : `Sandbox is ${sandbox.state}`)),
+          tailscaleActive,
+          tailscaleIp: activeTunnel?.tailscaleIp ?? null,
+          tailscaleDnsName: activeTunnel?.tailscaleDnsName ?? null,
+          tailscaleConfigured: tailscaleCreds.configured,
+          tailscaleError,
+        };
+      } catch (error) {
+        return {
+          workspaceId,
+          providerId: "boat",
+          targetName: target.targetName,
+          workspace: target.workspace,
+          status: "UNAVAILABLE",
+          reachable: false,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
     if (provider !== "blaxel") {
       return {
         workspaceId,
@@ -1157,6 +1340,27 @@ export class RemoteWorkspaceService extends EventEmitter {
       return this.getStatus(workspaceId);
     }
 
+    if (provider === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      const sandbox = await boatClient.ensureRunning(boatTarget.sandboxId);
+      if (!this.options.disableTunnel) {
+        const tsOption = await this.resolveSandboxTailscaleAuth(target.config);
+        await this.tunnelManager
+          .ensureBoatTunnel({
+            desktopWorkspaceId: workspaceId,
+            desktopRootName: target.rootName,
+            sandboxId: sandbox.id,
+            sandboxName: sandbox.name || boatTarget.sandboxName || sandbox.id,
+            workingDir: target.workspace,
+            tailscaleAuth: tsOption?.auth ?? null,
+            preferTailscale: tsOption?.preferTailscale ?? false,
+          })
+          .catch(() => undefined);
+      }
+      return this.getStatus(workspaceId);
+    }
+
     const endpoint = await this.resolveBlaxelEndpoint(target);
     await this.options.blaxelClient.wakeSandbox(endpoint.auth, endpoint.sandboxUrl);
     if (!this.options.disableTunnel) {
@@ -1223,6 +1427,23 @@ export class RemoteWorkspaceService extends EventEmitter {
       return this.getStatus(workspaceId);
     }
 
+    if (provider === "boat") {
+      const boatTarget = parseBoatMachineConfig(target.config);
+      const key = tunnelKey("boat", "", boatTarget.sandboxId, target.workspace);
+      this.tunnelManager.closeTunnel(key);
+      await this.tunnelManager.ensureBoatTunnel({
+        desktopWorkspaceId: workspaceId,
+        desktopRootName: target.rootName,
+        sandboxId: boatTarget.sandboxId,
+        sandboxName: boatTarget.sandboxName || target.targetName || boatTarget.sandboxId,
+        workingDir: target.workspace,
+        tailscaleAuth,
+        preferTailscale: true,
+        requireTailscale: true,
+      });
+      return this.getStatus(workspaceId);
+    }
+
     const endpoint = await this.resolveBlaxelEndpoint(target);
     const key = tunnelKey("blaxel", endpoint.auth.workspace, endpoint.sandboxName, target.workspace);
     this.tunnelManager.closeTunnel(key);
@@ -1240,10 +1461,43 @@ export class RemoteWorkspaceService extends EventEmitter {
     return this.getStatus(workspaceId);
   }
 
+  async stopBoatSandbox(workspaceId: string): Promise<RemoteRunnerStatusSnapshot> {
+    const target = await this.resolveTarget(workspaceId);
+    if (effectiveRunnerProviderId(target) !== "boat") {
+      throw new Error("Stop is only available for Boat sandboxes here.");
+    }
+    const boatClient = this.requireBoatClient();
+    const boatTarget = parseBoatMachineConfig(target.config);
+    this.tunnelManager.closeTunnel(tunnelKey("boat", "", boatTarget.sandboxId, target.workspace));
+    await boatClient.stopSandbox(boatTarget.sandboxId);
+    return this.getStatus(workspaceId);
+  }
+
+  async resolveBoatSshConnectionTarget(target: ResolvedRemoteTarget): Promise<SshConnectionTarget> {
+    const boatClient = this.requireBoatClient();
+    const boatTarget = parseBoatMachineConfig(target.config);
+    await boatClient.ensureRunning(boatTarget.sandboxId);
+    const { privateKeyPath, publicKey } = await boatClient.ensureDesktopSshKeypair();
+    const { sshHost, sshPort, sshUser } = await boatClient.configureSshKey(boatTarget.sandboxId, publicKey);
+    return {
+      host: sshHost,
+      sshUser,
+      sshPort,
+      identityFile: privateKeyPath,
+    };
+  }
+
+  private requireBoatClient(): BoatClient {
+    if (!this.options.boatClient) {
+      throw new Error("Boat sandbox client is unavailable.");
+    }
+    return this.options.boatClient;
+  }
+
   async openPreviewPort(
     workspaceId: string,
     port: number,
-  ): Promise<{ url: string; port: number; transport?: "tailscale" | "ssh-forward" | "blaxel-preview" }> {
+  ): Promise<{ url: string; port: number; transport?: "tailscale" | "ssh-forward" | "blaxel-preview" | "boat-host" }> {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error("Port must be a number between 1 and 65535.");
     }
@@ -1263,6 +1517,18 @@ export class RemoteWorkspaceService extends EventEmitter {
       }
       const forward = await this.sshClient.openLocalForward(sshTarget, port);
       return { url: `http://127.0.0.1:${forward.localPort}`, port, transport: "ssh-forward" };
+    }
+    if (provider === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      const key = tunnelKey("boat", "", boatTarget.sandboxId, target.workspace);
+      const activeTunnel = this.tunnelManager.getActiveTunnel(key);
+      if (activeTunnel?.transport === "tailscale" && activeTunnel.tailscaleIp) {
+        return { url: `http://${activeTunnel.tailscaleIp}:${port}`, port, transport: "tailscale" };
+      }
+      await boatClient.ensureRunning(boatTarget.sandboxId);
+      const hosted = await boatClient.hostPort(boatTarget.sandboxId, port, { public: true, localhost: true });
+      return { url: hosted.url, port, transport: "boat-host" };
     }
     const endpoint = await this.resolveBlaxelEndpoint(target);
     const key = tunnelKey("blaxel", endpoint.auth.workspace, endpoint.sandboxName, target.workspace);
@@ -1291,6 +1557,15 @@ export class RemoteWorkspaceService extends EventEmitter {
     if (this.isSshBacked(target)) {
       const peer = this.parseSshBackedTarget(target);
       const proc = await this.sshClient.execCommand(peer, `sh -c ${shellQuotePosix(script)}`, { timeoutMs: 20_000 });
+      output = proc.stdout;
+    } else if (effectiveRunnerProviderId(target) === "boat") {
+      const boatClient = this.requireBoatClient();
+      const boatTarget = parseBoatMachineConfig(target.config);
+      await boatClient.ensureRunning(boatTarget.sandboxId);
+      const proc = await boatClient.execCommand(boatTarget.sandboxId, {
+        command: `sh -c ${shellQuotePosix(script)}`,
+        timeoutSeconds: 20,
+      });
       output = proc.stdout;
     } else {
       const endpoint = await this.resolveBlaxelEndpoint(target);

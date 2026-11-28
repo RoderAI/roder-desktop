@@ -1295,6 +1295,29 @@ export type AgentBackendsSnapshot = {
   backends: Record<AgentBackendId, AgentBackendStatus>;
 };
 
+export type BackendSetupPhase =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "extracting"
+  | "verifying"
+  | "awaiting-browser"
+  | "awaiting-code"
+  | "submitting-code"
+  | "connecting"
+  | "completed"
+  | "error";
+
+export type BackendSetupState = {
+  backend: ExternalAgentBackendId | null;
+  phase: BackendSetupPhase;
+  message: string;
+  authUrl?: string | null;
+  downloadBytes?: number;
+  downloadTotal?: number | null;
+  error?: string | null;
+};
+
 export type AntigravityStatus = {
   state: "connected" | "disconnected" | "missing-runtime" | "connecting" | "error";
   runtimeInstalled: boolean;
@@ -1347,7 +1370,6 @@ declare global {
         cwd?: string;
         remoteWorkspaceId?: string;
         forceRestart?: boolean;
-        antigravitySetupMode?: "login" | "install";
       }) => Promise<TerminalSnapshot>;
       terminalWrite: (data: string, id?: string) => Promise<void>;
       runMarkdownShellCommand: (command: MarkdownShellCommand) => Promise<MarkdownShellResult>;
@@ -1382,6 +1404,13 @@ declare global {
         options?: { forceRefresh?: boolean },
       ) => Promise<AgentBackendsSnapshot>;
       agentBackendsLogout: (backend: ExternalAgentBackendId) => Promise<AgentBackendsSnapshot>;
+      agentBackendsSetupState: () => Promise<BackendSetupState>;
+      agentBackendsStartSetup: (
+        backend: ExternalAgentBackendId,
+        options?: { forceInstall?: boolean },
+      ) => Promise<BackendSetupState>;
+      agentBackendsSubmitSetupCode: (code: string) => Promise<BackendSetupState>;
+      agentBackendsCancelSetup: () => Promise<BackendSetupState>;
       antigravityStatus: () => Promise<AntigravityStatus>;
       antigravityConnect: (options?: { forceRefresh?: boolean }) => Promise<AntigravityStatus>;
       antigravityLogout: () => Promise<AntigravityStatus>;
